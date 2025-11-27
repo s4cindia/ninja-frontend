@@ -1,0 +1,66 @@
+.app {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.app-header {
+  margin-bottom: 3rem;
+}
+
+.app-header h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+  margin-bottom: 1rem;
+}
+
+.app-header p {
+  font-size: 1.2em;
+  color: #888;
+}
+
+.app-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+}
+
+.card {
+  padding: 2rem;
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  max-width: 600px;
+}
+
+.card h2 {
+  margin-bottom: 1rem;
+  color: #646cff;
+}
+
+.card p {
+  margin-bottom: 0.5rem;
+}
+
+.card code {
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+@media (prefers-color-scheme: light) {
+  .card {
+    background-color: rgba(0, 0, 0, 0.02);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+  }
+
+  .app-header p {
+    color: #666;
+  }
+
+  .card code {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+}
