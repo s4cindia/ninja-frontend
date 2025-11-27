@@ -47,7 +47,7 @@ This is a React + Vite + TypeScript frontend web application for the Ninja Platf
 ```
 
 ### Key Configuration
-- **Vite Config:** Configured to bind to 0.0.0.0:5000 with HMR on port 443 for Replit proxy compatibility
+- **Vite Config:** Configured with `allowedHosts: true` to accept requests from Replit's proxy, bound to 0.0.0.0:5000 with HMR on port 443
 - **TypeScript:** Strict mode enabled with modern ES2020 target
 - **Port:** Frontend runs on port 5000 (required for Replit webview)
 
