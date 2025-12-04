@@ -88,3 +88,38 @@ The project is configured for static site deployment:
 - The Vite dev server must bind to 0.0.0.0 (not localhost) for Replit's proxy to work
 - Port 5000 is the only port automatically exposed for web previews in Replit
 - HMR (Hot Module Replacement) is configured to work through Replit's proxy on port 443
+
+## Critical Rules
+
+1. NEVER commit secrets to Git
+2. All components must be accessible (WCAG 2.1 AA)
+3. Use TypeScript strict mode
+4. No inline styles - use Tailwind classes
+5. Keep components small and focused
+6. NEVER use Replit Agent for features - use approved Sprint Prompts only
+
+## Accessibility Requirements
+
+- All interactive elements must be keyboard accessible
+- Include proper ARIA labels
+- Maintain color contrast ratios
+- Support screen readers
+
+## Recovery Commands
+
+If the Repl gets stuck:
+- Restart: `kill 1`
+- Clear cache: `rm -rf node_modules/.cache`
+- Reinstall: `rm -rf node_modules && npm install`
+
+## Development Workflow
+
+1. Use approved Sprint Prompts from docs/sprint-prompts/ (in ninja-backend repo)
+2. For debugging, use Claude Code (not Replit Agent)
+3. Create feature branches: `git checkout -b feat/NINJA-XXX-description`
+4. Commit with conventional prefixes: feat, fix, docs, chore, etc.
+
+## Related Documentation
+
+- [Main Documentation](https://github.com/s4cindia/ninja-backend/tree/main/docs)
+- [Backend Repository](https://github.com/s4cindia/ninja-backend)
