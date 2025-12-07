@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useRegister } from '@/hooks/useAuth';
+import { getErrorMessage } from '@/services/api';
+import { Button, Input, Alert } from '@/components/ui';
 
 export function Register() {
   const [formData, setFormData] = useState({
@@ -9,82 +12,89 @@ export function Register() {
     password: '',
     confirmPassword: '',
   });
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [validationError, setValidationError] = useState('');
+  const register = useRegister();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      setError('Registration API not yet connected');
-    }, 500);
+    setValidationError('');
+
+    if (formData.password !== formData.confirmPassword) {
+      setValidationError('Passwords do not match');
+      return;
+    }
+
+    register.mutate({
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      email: formData.email,
+      password: formData.password,
+    });
   };
+
+  const error = validationError || (register.isError ? getErrorMessage(register.error) : '');
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {error && (
+        <Alert variant="error">
+          {error}
+        </Alert>
+      )}
+
       <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">First Name</label>
-          <input
-            type="text"
-            value={formData.firstName}
-            onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Last Name</label>
-          <input
-            type="text"
-            value={formData.lastName}
-            onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-            required
-          />
-        </div>
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Email</label>
-        <input
-          type="email"
-          value={formData.email}
-          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+        <Input
+          label="First Name"
+          type="text"
+          value={formData.firstName}
+          onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
           required
+          autoComplete="given-name"
         />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Password</label>
-        <input
-          type="password"
-          value={formData.password}
-          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+        <Input
+          label="Last Name"
+          type="text"
+          value={formData.lastName}
+          onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
           required
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Confirm Password</label>
-        <input
-          type="password"
-          value={formData.confirmPassword}
-          onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-          required
+          autoComplete="family-name"
         />
       </div>
 
-      {error && <div className="text-red-600 text-sm">{error}</div>}
+      <Input
+        label="Email"
+        type="email"
+        value={formData.email}
+        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+        required
+        autoComplete="email"
+      />
 
-      <button
-        type="submit"
-        disabled={isLoading}
-        className="w-full bg-primary-600 text-white py-2 px-4 rounded-md hover:bg-primary-700 disabled:opacity-50"
+      <Input
+        label="Password"
+        type="password"
+        value={formData.password}
+        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+        required
+        autoComplete="new-password"
+      />
+
+      <Input
+        label="Confirm Password"
+        type="password"
+        value={formData.confirmPassword}
+        onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+        required
+        autoComplete="new-password"
+      />
+
+      <Button 
+        type="submit" 
+        className="w-full"
+        isLoading={register.isPending}
       >
-        {isLoading ? 'Creating account...' : 'Create Account'}
-      </button>
+        Create Account
+      </Button>
 
       <p className="text-center text-sm text-gray-600">
         Already have an account?{' '}
