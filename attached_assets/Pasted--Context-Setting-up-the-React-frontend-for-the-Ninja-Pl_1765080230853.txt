@@ -1,0 +1,306 @@
+## Context
+Setting up the React frontend for the Ninja Platform. This will be a modern React application with TypeScript, Vite, and a professional project structure.
+
+## Current State
+- Fresh Replit workspace for frontend
+- Backend API running at port 5000
+
+## Objective
+Create a React + Vite + TypeScript project with proper configuration and folder structure.
+
+## Technical Requirements
+
+**Update `package.json`:**
+```json
+{
+  "name": "ninja-frontend",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.0",
+    "@tanstack/react-query": "^5.8.0",
+    "axios": "^1.6.0",
+    "zustand": "^4.4.0",
+    "clsx": "^2.0.0",
+    "lucide-react": "^0.294.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "typescript": "^5.3.0",
+    "vite": "^5.0.0",
+    "tailwindcss": "^3.3.0",
+    "postcss": "^8.4.0",
+    "autoprefixer": "^10.4.0"
+  }
+}
+```
+
+**Create `vite.config.ts`:**
+```typescript
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+  server: {
+    port: 5173,
+    host: '0.0.0.0',
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+    },
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: true,
+  },
+});
+```
+
+**Create `tsconfig.json`:**
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src"],
+  "references": [{ "path": "./tsconfig.node.json" }]
+}
+```
+
+**Create `tsconfig.node.json`:**
+```json
+{
+  "compilerOptions": {
+    "composite": true,
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["vite.config.ts"]
+}
+```
+
+**Create project structure:**
+src/
+├── components/          # Reusable UI components
+│   ├── ui/             # Base UI components (Button, Input, etc.)
+│   └── layout/         # Layout components (Header, Sidebar, etc.)
+├── pages/              # Page components
+├── hooks/              # Custom React hooks
+├── services/           # API services
+├── stores/             # Zustand stores
+├── types/              # TypeScript types
+├── utils/              # Utility functions
+├── styles/             # Global styles
+├── App.tsx             # Main App component
+├── main.tsx            # Entry point
+└── vite-env.d.ts       # Vite types
+
+**Create `src/main.tsx`:**
+```typescript
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import './styles/index.css';
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+```
+
+**Create `src/App.tsx`:**
+```typescript
+import { BrowserRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: 1,
+    },
+  },
+});
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <div className="min-h-screen bg-gray-50">
+          <header className="bg-white shadow-sm border-b">
+            <div className="max-w-7xl mx-auto px-4 py-4">
+              <h1 className="text-xl font-semibold text-gray-900">
+                🥷 Ninja Platform
+              </h1>
+            </div>
+          </header>
+          <main className="max-w-7xl mx-auto px-4 py-8">
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-medium mb-4">Welcome to Ninja Platform</h2>
+              <p className="text-gray-600">
+                Accessibility validation and compliance checking for educational publishers.
+              </p>
+              <div className="mt-4 p-4 bg-green-50 rounded-md">
+                <p className="text-green-700">✅ Frontend is running successfully!</p>
+              </div>
+            </div>
+          </main>
+        </div>
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
+}
+
+export default App;
+```
+
+**Create `src/styles/index.css`:**
+```css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom base styles */
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+```
+
+**Create `tailwind.config.js`:**
+```javascript
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        primary: {
+          50: '#f0f9ff',
+          100: '#e0f2fe',
+          200: '#bae6fd',
+          300: '#7dd3fc',
+          400: '#38bdf8',
+          500: '#0ea5e9',
+          600: '#0284c7',
+          700: '#0369a1',
+          800: '#075985',
+          900: '#0c4a6e',
+        },
+      },
+    },
+  },
+  plugins: [],
+};
+```
+
+**Create `postcss.config.js`:**
+```javascript
+export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+};
+```
+
+**Create `index.html`:**
+```html
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/ninja.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ninja Platform - Accessibility Validation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+```
+
+**Create `src/vite-env.d.ts`:**
+```typescript
+/// <reference types="vite/client" />
+```
+
+**Create placeholder files for folders:**
+
+- `src/components/ui/.gitkeep`
+- `src/components/layout/.gitkeep`
+- `src/pages/.gitkeep`
+- `src/hooks/.gitkeep`
+- `src/services/.gitkeep`
+- `src/stores/.gitkeep`
+- `src/types/.gitkeep`
+- `src/utils/.gitkeep`
+
+## Tasks
+1. Update package.json with all dependencies
+2. Create vite.config.ts with path aliases and proxy
+3. Create tsconfig.json and tsconfig.node.json
+4. Create the folder structure under src/
+5. Create src/main.tsx entry point
+6. Create src/App.tsx with basic layout
+7. Create src/styles/index.css with Tailwind imports
+8. Create tailwind.config.js and postcss.config.js
+9. Create index.html
+10. Run npm install
+11. Start the dev server with npm run dev
+12. Verify the app loads in browser
+
+## Acceptance Criteria
+- [ ] React app starts without errors
+- [ ] Tailwind CSS is working (styles applied)
+- [ ] TypeScript compiles without errors
+- [ ] Path alias @/ works
+- [ ] Folder structure created
+- [ ] App displays welcome message
