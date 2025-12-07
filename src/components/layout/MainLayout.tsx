@@ -1,5 +1,6 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth.store';
+import { S4CarlisleLogo } from '@/components/ui/Logo';
 import { 
   Home, 
   FileText, 
@@ -33,17 +34,20 @@ export function MainLayout() {
             <span className="text-xl font-semibold text-gray-900">Ninja Platform</span>
           </Link>
           
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600">
-              {user?.firstName} {user?.lastName}
-            </span>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-1 text-gray-600 hover:text-gray-900 text-sm"
-            >
-              <LogOut className="w-4 h-4" />
-              Logout
-            </button>
+          <div className="flex items-center gap-6">
+            <S4CarlisleLogo size="sm" />
+            <div className="flex items-center gap-4 border-l pl-6">
+              <span className="text-sm text-gray-600">
+                {user?.firstName} {user?.lastName}
+              </span>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1 text-gray-600 hover:text-gray-900 text-sm"
+              >
+                <LogOut className="w-4 h-4" />
+                Logout
+              </button>
+            </div>
           </div>
         </div>
       </header>

@@ -1,0 +1,149 @@
+## Context
+We need to add the S4Carlisle Publishing Services logo to all pages in the application for branding consistency.
+
+## Objective
+Add the S4Carlisle logo to both the MainLayout (header) and AuthLayout (login/register pages).
+
+## Technical Requirements
+
+**1. First, create the logo as an SVG or download it:**
+
+Create `public/s4carlisle-logo.png` by downloading from the company website, or create a text-based logo component.
+
+**2. Create `src/components/ui/Logo.tsx`:**
+```typescript
+interface LogoProps {
+  size?: 'sm' | 'md' | 'lg';
+  showText?: boolean;
+  className?: string;
+}
+
+export function Logo({ size = 'md', showText = true, className = '' }: LogoProps) {
+  const sizes = {
+    sm: 'h-6',
+    md: 'h-8',
+    lg: 'h-12',
+  };
+
+  return (
+    <div className={`flex items-center gap-2 ${className}`}>
+      <img 
+        src="/s4carlisle-logo.png" 
+        alt="S4Carlisle Publishing Services" 
+        className={`${sizes[size]} w-auto object-contain`}
+      />
+      {showText && (
+        <div className="hidden sm:block">
+          <span className="text-sm text-gray-500">powered by</span>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+**3. Alternative: Create a text-based logo if image is not available:**
+```typescript
+interface LogoProps {
+  size?: 'sm' | 'md' | 'lg';
+  className?: string;
+}
+
+export function S4CarlisleLogo({ size = 'md', className = '' }: LogoProps) {
+  const sizes = {
+    sm: { text: 'text-sm', subtext: 'text-xs' },
+    md: { text: 'text-base', subtext: 'text-xs' },
+    lg: { text: 'text-xl', subtext: 'text-sm' },
+  };
+
+  return (
+    <div className={`flex flex-col leading-tight ${className}`}>
+      <span className={`font-semibold ${sizes[size].text}`}>
+        <span className="text-primary-600">S</span>
+        <span className="text-red-600">4</span>
+        <span className="text-primary-800">CARLISLE</span>
+      </span>
+      <span className={`text-gray-500 ${sizes[size].subtext}`}>
+        Publishing Services
+      </span>
+    </div>
+  );
+}
+```
+
+**4. Update `src/components/layout/MainLayout.tsx`:**
+
+Add the logo to the header, positioned on the right side or in the footer area of the sidebar:
+```typescript
+// Add import at top
+import { S4CarlisleLogo } from '@/components/ui/Logo';
+
+// In the header, update to include:
+<header className="bg-white shadow-sm border-b sticky top-0 z-50">
+  <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    <Link to="/dashboard" className="flex items-center gap-2">
+      <span className="text-2xl">🥷</span>
+      <span className="text-xl font-semibold text-gray-900">Ninja Platform</span>
+    </Link>
+    
+    <div className="flex items-center gap-6">
+      <S4CarlisleLogo size="sm" />
+      <div className="flex items-center gap-4 border-l pl-6">
+        <span className="text-sm text-gray-600">
+          {user?.firstName} {user?.lastName}
+        </span>
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-1 text-gray-600 hover:text-gray-900 text-sm"
+        >
+          <LogOut className="w-4 h-4" />
+          Logout
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+```
+
+**5. Update `src/components/layout/AuthLayout.tsx`:**
+
+Add the logo below the Ninja Platform branding:
+```typescript
+// Add import at top
+import { S4CarlisleLogo } from '@/components/ui/Logo';
+
+// Update the layout:
+export function AuthLayout() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8">
+        <div className="text-center mb-8">
+          <span className="text-4xl">🥷</span>
+          <h1 className="text-2xl font-bold text-gray-900 mt-2">Ninja Platform</h1>
+          <p className="text-gray-600 text-sm mt-1">
+            Accessibility Validation Platform
+          </p>
+          <div className="mt-4 pt-4 border-t flex justify-center">
+            <S4CarlisleLogo size="md" />
+          </div>
+        </div>
+        <Outlet />
+      </div>
+    </div>
+  );
+}
+```
+
+## Tasks
+1. Create src/components/ui/Logo.tsx with S4CarlisleLogo component
+2. Update MainLayout.tsx to show logo in header (right side)
+3. Update AuthLayout.tsx to show logo below the Ninja Platform title
+4. Ensure logo is appropriately sized on all screen sizes
+5. Verify logo appears on login, register, and all authenticated pages
+
+## Acceptance Criteria
+- [ ] S4Carlisle logo visible on login page
+- [ ] S4Carlisle logo visible on register page  
+- [ ] S4Carlisle logo visible in main app header
+- [ ] Logo is appropriately sized (not too large or small)
+- [ ] Logo styling matches the brand colors (blue "S", red "4", dark blue "CARLISLE")

@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router-dom';
+import { S4CarlisleLogo } from '@/components/ui/Logo';
 
 export function AuthLayout() {
   return (
@@ -10,6 +11,9 @@ export function AuthLayout() {
           <p className="text-gray-600 text-sm mt-1">
             Accessibility Validation Platform
           </p>
+          <div className="mt-4 pt-4 border-t flex justify-center">
+            <S4CarlisleLogo size="md" />
+          </div>
         </div>
         <Outlet />
       </div>
