@@ -1,0 +1,119 @@
+## Context
+We need to update the branding to use the actual S4Carlisle logo image and position it correctly.
+
+## Changes Required
+
+1. Remove the ninja emoji (🥷) from all pages
+2. Place the S4Carlisle logo on the TOP LEFT of all pages
+3. Use the uploaded logo image from public/s4carlisle-logo.png
+4. Keep "Ninja Platform" as text next to or below the logo
+
+## Technical Requirements
+
+**Update `src/components/ui/Logo.tsx`:**
+```typescript
+interface LogoProps {
+  size?: 'sm' | 'md' | 'lg';
+  showNinjaText?: boolean;
+  className?: string;
+}
+
+export function Logo({ size = 'md', showNinjaText = true, className = '' }: LogoProps) {
+  const sizes = {
+    sm: 'h-8',
+    md: 'h-10',
+    lg: 'h-14',
+  };
+
+  return (
+    <div className={`flex items-center gap-3 ${className}`}>
+      <img 
+        src="/s4carlisle-logo.png" 
+        alt="S4Carlisle Publishing Services" 
+        className={`${sizes[size]} w-auto object-contain`}
+      />
+      {showNinjaText && (
+        <div className="border-l pl-3">
+          <span className="font-semibold text-gray-900">Ninja Platform</span>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+**Update `src/components/layout/MainLayout.tsx`:**
+
+Replace the header section:
+```typescript
+<header className="bg-white shadow-sm border-b sticky top-0 z-50">
+  <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    {/* Logo on the LEFT */}
+    <Link to="/dashboard" className="flex items-center">
+      <Logo size="sm" showNinjaText={true} />
+    </Link>
+    
+    {/* User info on the RIGHT */}
+    <div className="flex items-center gap-4">
+      <span className="text-sm text-gray-600">
+        {user?.firstName} {user?.lastName}
+      </span>
+      <button
+        onClick={handleLogout}
+        className="flex items-center gap-1 text-gray-600 hover:text-gray-900 text-sm"
+      >
+        <LogOut className="w-4 h-4" />
+        Logout
+      </button>
+    </div>
+  </div>
+</header>
+```
+
+**Update `src/components/layout/AuthLayout.tsx`:**
+
+Replace the branding section (remove ninja emoji, put logo on top):
+```typescript
+import { Outlet } from 'react-router-dom';
+import { Logo } from '@/components/ui/Logo';
+
+export function AuthLayout() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8">
+        <div className="text-center mb-8">
+          {/* S4Carlisle Logo centered at top */}
+          <div className="flex justify-center mb-4">
+            <img 
+              src="/s4carlisle-logo.png" 
+              alt="S4Carlisle Publishing Services" 
+              className="h-12 w-auto object-contain"
+            />
+          </div>
+          
+          {/* Ninja Platform title */}
+          <h1 className="text-2xl font-bold text-gray-900 mt-4">Ninja Platform</h1>
+          <p className="text-gray-600 text-sm mt-1">
+            Accessibility Validation Platform
+          </p>
+        </div>
+        <Outlet />
+      </div>
+    </div>
+  );
+}
+```
+
+## Tasks
+1. Update Logo.tsx to use the image from /s4carlisle-logo.png
+2. Update MainLayout.tsx - put logo on top left, remove ninja emoji
+3. Update AuthLayout.tsx - put logo at top center, remove ninja emoji
+4. Remove any remaining ninja emoji references
+5. Verify logo displays correctly on all pages
+
+## Acceptance Criteria
+- [ ] No ninja emoji visible anywhere
+- [ ] S4Carlisle logo image visible on top LEFT of main app header
+- [ ] S4Carlisle logo image visible at TOP CENTER of login/register pages
+- [ ] "Ninja Platform" text appears as subtitle/secondary branding
+- [ ] Logo is appropriately sized and not distorted

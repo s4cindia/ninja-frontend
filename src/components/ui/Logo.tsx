@@ -1,25 +1,28 @@
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg';
+  showNinjaText?: boolean;
   className?: string;
 }
 
-export function S4CarlisleLogo({ size = 'md', className = '' }: LogoProps) {
+export function Logo({ size = 'md', showNinjaText = true, className = '' }: LogoProps) {
   const sizes = {
-    sm: { text: 'text-sm', subtext: 'text-xs' },
-    md: { text: 'text-base', subtext: 'text-xs' },
-    lg: { text: 'text-xl', subtext: 'text-sm' },
+    sm: 'h-8',
+    md: 'h-10',
+    lg: 'h-14',
   };
 
   return (
-    <div className={`flex flex-col leading-tight ${className}`}>
-      <span className={`font-semibold ${sizes[size].text}`}>
-        <span className="text-primary-600">S</span>
-        <span className="text-red-600">4</span>
-        <span className="text-primary-800">CARLISLE</span>
-      </span>
-      <span className={`text-gray-500 ${sizes[size].subtext}`}>
-        Publishing Services
-      </span>
+    <div className={`flex items-center gap-3 ${className}`}>
+      <img 
+        src="/s4carlisle-logo.avif" 
+        alt="S4Carlisle Publishing Services" 
+        className={`${sizes[size]} w-auto object-contain`}
+      />
+      {showNinjaText && (
+        <div className="border-l pl-3">
+          <span className="font-semibold text-gray-900">Ninja Platform</span>
+        </div>
+      )}
     </div>
   );
 }

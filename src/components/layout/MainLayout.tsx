@@ -1,6 +1,6 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth.store';
-import { S4CarlisleLogo } from '@/components/ui/Logo';
+import { Logo } from '@/components/ui/Logo';
 import { 
   Home, 
   FileText, 
@@ -29,25 +29,21 @@ export function MainLayout() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link to="/dashboard" className="flex items-center gap-2">
-            <span className="text-2xl">🥷</span>
-            <span className="text-xl font-semibold text-gray-900">Ninja Platform</span>
+          <Link to="/dashboard" className="flex items-center">
+            <Logo size="sm" showNinjaText={true} />
           </Link>
           
-          <div className="flex items-center gap-6">
-            <S4CarlisleLogo size="sm" />
-            <div className="flex items-center gap-4 border-l pl-6">
-              <span className="text-sm text-gray-600">
-                {user?.firstName} {user?.lastName}
-              </span>
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-1 text-gray-600 hover:text-gray-900 text-sm"
-              >
-                <LogOut className="w-4 h-4" />
-                Logout
-              </button>
-            </div>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-gray-600">
+              {user?.firstName} {user?.lastName}
+            </span>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1 text-gray-600 hover:text-gray-900 text-sm"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout
+            </button>
           </div>
         </div>
       </header>
