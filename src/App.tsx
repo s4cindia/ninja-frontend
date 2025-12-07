@@ -1,5 +1,15 @@
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MainLayout } from '@/components/layout/MainLayout';
+import { AuthLayout } from '@/components/layout/AuthLayout';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { Dashboard } from '@/pages/Dashboard';
+import { Login } from '@/pages/Login';
+import { Register } from '@/pages/Register';
+import { Products } from '@/pages/Products';
+import { Jobs } from '@/pages/Jobs';
+import { Files } from '@/pages/Files';
+import { NotFound } from '@/pages/NotFound';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -14,26 +24,28 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <div className="min-h-screen bg-gray-50">
-          <header className="bg-white shadow-sm border-b">
-            <div className="max-w-7xl mx-auto px-4 py-4">
-              <h1 className="text-xl font-semibold text-gray-900">
-                Ninja Platform
-              </h1>
-            </div>
-          </header>
-          <main className="max-w-7xl mx-auto px-4 py-8">
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-medium mb-4">Welcome to Ninja Platform</h2>
-              <p className="text-gray-600">
-                Accessibility validation and compliance checking for educational publishers.
-              </p>
-              <div className="mt-4 p-4 bg-green-50 rounded-md">
-                <p className="text-green-700">Frontend is running successfully!</p>
-              </div>
-            </div>
-          </main>
-        </div>
+        <Routes>
+          <Route element={<AuthLayout />}>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+          </Route>
+
+          <Route
+            element={
+              <ProtectedRoute>
+                <MainLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/products" element={<Products />} />
+            <Route path="/jobs" element={<Jobs />} />
+            <Route path="/files" element={<Files />} />
+          </Route>
+
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
       </BrowserRouter>
     </QueryClientProvider>
   );

@@ -1,0 +1,613 @@
+## Context
+Setting up React Router with a proper page structure for the Ninja Platform. We need authentication-aware routing with protected routes.
+
+## Current State
+- React app running with basic App.tsx
+- React Router DOM installed
+- Need proper routing structure
+
+## Objective
+Create a complete routing setup with pages, layouts, and route protection.
+
+## Technical Requirements
+
+**Create `src/types/auth.types.ts`:**
+```typescript
+export interface User {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: 'ADMIN' | 'USER' | 'VIEWER';
+  tenantId: string;
+  tenant?: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+}
+
+export interface AuthState {
+  user: User | null;
+  accessToken: string | null;
+  refreshToken: string | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+}
+
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+export interface RegisterData {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  tenantId: string;
+}
+```
+
+**Create `src/stores/auth.store.ts`:**
+```typescript
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import type { User, AuthState } from '@/types/auth.types';
+
+interface AuthStore extends AuthState {
+  setUser: (user: User | null) => void;
+  setTokens: (accessToken: string, refreshToken: string) => void;
+  logout: () => void;
+  setLoading: (isLoading: boolean) => void;
+}
+
+export const useAuthStore = create<AuthStore>()(
+  persist(
+    (set) => ({
+      user: null,
+      accessToken: null,
+      refreshToken: null,
+      isAuthenticated: false,
+      isLoading: true,
+
+      setUser: (user) =>
+        set({
+          user,
+          isAuthenticated: !!user,
+          isLoading: false,
+        }),
+
+      setTokens: (accessToken, refreshToken) =>
+        set({
+          accessToken,
+          refreshToken,
+          isAuthenticated: true,
+        }),
+
+      logout: () =>
+        set({
+          user: null,
+          accessToken: null,
+          refreshToken: null,
+          isAuthenticated: false,
+        }),
+
+      setLoading: (isLoading) => set({ isLoading }),
+    }),
+    {
+      name: 'ninja-auth',
+      partialize: (state) => ({
+        accessToken: state.accessToken,
+        refreshToken: state.refreshToken,
+      }),
+    }
+  )
+);
+```
+
+**Create `src/components/layout/MainLayout.tsx`:**
+```typescript
+import { Outlet, Link, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@/stores/auth.store';
+import { 
+  Home, 
+  FileText, 
+  CheckCircle, 
+  Settings, 
+  LogOut,
+  Upload,
+  BarChart3
+} from 'lucide-react';
+
+export function MainLayout() {
+  const { user, logout } = useAuthStore();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const navItems = [
+    { to: '/dashboard', icon: Home, label: 'Dashboard' },
+    { to: '/products', icon: FileText, label: 'Products' },
+    { to: '/jobs', icon: CheckCircle, label: 'Jobs' },
+    { to: '/files', icon: Upload, label: 'Files' },
+    { to: '/reports', icon: BarChart3, label: 'Reports' },
+  ];
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+          <Link to="/dashboard" className="flex items-center gap-2">
+            <span className="text-2xl">🥷</span>
+            <span className="text-xl font-semibold text-gray-900">Ninja Platform</span>
+          </Link>
+          
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-gray-600">
+              {user?.firstName} {user?.lastName}
+            </span>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1 text-gray-600 hover:text-gray-900 text-sm"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="flex">
+        {/* Sidebar */}
+        <aside className="w-64 bg-white border-r min-h-[calc(100vh-57px)] p-4">
+          <nav className="space-y-1">
+            {navItems.map((item) => (
+              <Link
+                key={item.to}
+                to={item.to}
+                className="flex items-center gap-3 px-3 py-2 text-gray-700 rounded-md hover:bg-gray-100 transition-colors"
+              >
+                <item.icon className="w-5 h-5" />
+                <span>{item.label}</span>
+              </Link>
+            ))}
+          </nav>
+          
+          <div className="mt-8 pt-8 border-t">
+            <Link
+              to="/settings"
+              className="flex items-center gap-3 px-3 py-2 text-gray-700 rounded-md hover:bg-gray-100 transition-colors"
+            >
+              <Settings className="w-5 h-5" />
+              <span>Settings</span>
+            </Link>
+          </div>
+        </aside>
+
+        {/* Main Content */}
+        <main className="flex-1 p-6">
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  );
+}
+```
+
+**Create `src/components/layout/AuthLayout.tsx`:**
+```typescript
+import { Outlet } from 'react-router-dom';
+
+export function AuthLayout() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8">
+        <div className="text-center mb-8">
+          <span className="text-4xl">🥷</span>
+          <h1 className="text-2xl font-bold text-gray-900 mt-2">Ninja Platform</h1>
+          <p className="text-gray-600 text-sm mt-1">
+            Accessibility Validation Platform
+          </p>
+        </div>
+        <Outlet />
+      </div>
+    </div>
+  );
+}
+```
+
+**Create `src/components/ProtectedRoute.tsx`:**
+```typescript
+import { Navigate, useLocation } from 'react-router-dom';
+import { useAuthStore } from '@/stores/auth.store';
+
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  requiredRoles?: string[];
+}
+
+export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps) {
+  const { isAuthenticated, isLoading, user } = useAuthStore();
+  const location = useLocation();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (requiredRoles && user && !requiredRoles.includes(user.role)) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  return <>{children}</>;
+}
+```
+
+**Create page components:**
+
+**`src/pages/Dashboard.tsx`:**
+```typescript
+export function Dashboard() {
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-gray-500 text-sm font-medium">Total Products</h3>
+          <p className="text-3xl font-bold text-gray-900 mt-2">0</p>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-gray-500 text-sm font-medium">Active Jobs</h3>
+          <p className="text-3xl font-bold text-gray-900 mt-2">0</p>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-gray-500 text-sm font-medium">Compliance Rate</h3>
+          <p className="text-3xl font-bold text-green-600 mt-2">--</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+**`src/pages/Login.tsx`:**
+```typescript
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@/stores/auth.store';
+
+export function Login() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+  const { setUser, setTokens } = useAuthStore();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+
+    // TODO: Implement actual login API call
+    // For now, simulate login
+    setTimeout(() => {
+      setIsLoading(false);
+      setError('Login API not yet connected');
+    }, 1000);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+          Email
+        </label>
+        <input
+          id="email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+          required
+        />
+      </div>
+      <div>
+        <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+          Password
+        </label>
+        <input
+          id="password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+          required
+        />
+      </div>
+      
+      {error && (
+        <div className="text-red-600 text-sm">{error}</div>
+      )}
+
+      <button
+        type="submit"
+        disabled={isLoading}
+        className="w-full bg-primary-600 text-white py-2 px-4 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {isLoading ? 'Signing in...' : 'Sign In'}
+      </button>
+
+      <p className="text-center text-sm text-gray-600">
+        Don't have an account?{' '}
+        <Link to="/register" className="text-primary-600 hover:text-primary-500">
+          Register
+        </Link>
+      </p>
+    </form>
+  );
+}
+```
+
+**`src/pages/Register.tsx`:**
+```typescript
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+
+export function Register() {
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+  });
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('Registration API not yet connected');
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700">First Name</label>
+          <input
+            type="text"
+            value={formData.firstName}
+            onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Last Name</label>
+          <input
+            type="text"
+            value={formData.lastName}
+            onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+            required
+          />
+        </div>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Email</label>
+        <input
+          type="email"
+          value={formData.email}
+          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+          required
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Password</label>
+        <input
+          type="password"
+          value={formData.password}
+          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+          required
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Confirm Password</label>
+        <input
+          type="password"
+          value={formData.confirmPassword}
+          onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+          required
+        />
+      </div>
+
+      {error && <div className="text-red-600 text-sm">{error}</div>}
+
+      <button
+        type="submit"
+        disabled={isLoading}
+        className="w-full bg-primary-600 text-white py-2 px-4 rounded-md hover:bg-primary-700 disabled:opacity-50"
+      >
+        {isLoading ? 'Creating account...' : 'Create Account'}
+      </button>
+
+      <p className="text-center text-sm text-gray-600">
+        Already have an account?{' '}
+        <Link to="/login" className="text-primary-600 hover:text-primary-500">
+          Sign In
+        </Link>
+      </p>
+    </form>
+  );
+}
+```
+
+**`src/pages/Products.tsx`:**
+```typescript
+export function Products() {
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Products</h1>
+        <button className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700">
+          Add Product
+        </button>
+      </div>
+      <div className="bg-white rounded-lg shadow p-6">
+        <p className="text-gray-500">No products yet. Upload your first PDF or EPUB to get started.</p>
+      </div>
+    </div>
+  );
+}
+```
+
+**`src/pages/Jobs.tsx`:**
+```typescript
+export function Jobs() {
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Jobs</h1>
+      <div className="bg-white rounded-lg shadow p-6">
+        <p className="text-gray-500">No validation jobs yet.</p>
+      </div>
+    </div>
+  );
+}
+```
+
+**`src/pages/Files.tsx`:**
+```typescript
+export function Files() {
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Files</h1>
+        <button className="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700">
+          Upload File
+        </button>
+      </div>
+      <div className="bg-white rounded-lg shadow p-6">
+        <p className="text-gray-500">No files uploaded yet.</p>
+      </div>
+    </div>
+  );
+}
+```
+
+**`src/pages/NotFound.tsx`:**
+```typescript
+import { Link } from 'react-router-dom';
+
+export function NotFound() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-center">
+        <h1 className="text-6xl font-bold text-gray-300">404</h1>
+        <p className="text-xl text-gray-600 mt-4">Page not found</p>
+        <Link
+          to="/dashboard"
+          className="mt-6 inline-block bg-primary-600 text-white px-6 py-2 rounded-md hover:bg-primary-700"
+        >
+          Go to Dashboard
+        </Link>
+      </div>
+    </div>
+  );
+}
+```
+
+**Update `src/App.tsx`:**
+```typescript
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MainLayout } from '@/components/layout/MainLayout';
+import { AuthLayout } from '@/components/layout/AuthLayout';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { Dashboard } from '@/pages/Dashboard';
+import { Login } from '@/pages/Login';
+import { Register } from '@/pages/Register';
+import { Products } from '@/pages/Products';
+import { Jobs } from '@/pages/Jobs';
+import { Files } from '@/pages/Files';
+import { NotFound } from '@/pages/NotFound';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      retry: 1,
+    },
+  },
+});
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <Routes>
+          {/* Auth routes */}
+          <Route element={<AuthLayout />}>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+          </Route>
+
+          {/* Protected routes */}
+          <Route
+            element={
+              <ProtectedRoute>
+                <MainLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/products" element={<Products />} />
+            <Route path="/jobs" element={<Jobs />} />
+            <Route path="/files" element={<Files />} />
+          </Route>
+
+          {/* Redirects and fallbacks */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
+}
+
+export default App;
+```
+
+## Tasks
+1. Create src/types/auth.types.ts
+2. Create src/stores/auth.store.ts with Zustand persist
+3. Create src/components/layout/MainLayout.tsx with sidebar
+4. Create src/components/layout/AuthLayout.tsx
+5. Create src/components/ProtectedRoute.tsx
+6. Create all page components in src/pages/
+7. Update src/App.tsx with complete routing
+8. Verify navigation works between pages
+9. Verify protected routes redirect to login
+
+## Acceptance Criteria
+- [ ] Login and Register pages render with AuthLayout
+- [ ] Dashboard, Products, Jobs, Files use MainLayout with sidebar
+- [ ] Unauthenticated users redirect to /login
+- [ ] Navigation between pages works
+- [ ] 404 page shows for unknown routes
+- [ ] Auth state persists in localStorage

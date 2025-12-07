@@ -6,12 +6,14 @@ This is a React + Vite + TypeScript frontend web application for the Ninja Platf
 **Current State:** Fully functional development environment with Vite dev server running on port 5000.
 
 ## Recent Changes (December 7, 2025)
-- Updated package.json with complete dependency set (react-router-dom, @tanstack/react-query, axios, zustand, clsx, lucide-react)
-- Configured Vite with path aliases (@/) and API proxy for backend integration
+- **Routing Setup:** Complete React Router configuration with protected routes
+- **Authentication:** Zustand auth store with localStorage persistence
+- **Layouts:** MainLayout (sidebar navigation) and AuthLayout (login/register)
+- **Pages:** Dashboard, Login, Register, Products, Jobs, Files, NotFound
+- **Route Protection:** ProtectedRoute component with role-based access control
+- Updated package.json with complete dependency set
+- Configured Vite with path aliases (@/) and API proxy
 - Set up Tailwind CSS with custom primary color palette
-- Created professional project structure with all required directories
-- Updated App.tsx with React Router and React Query providers
-- Added Inter font family via Google Fonts
 - TypeScript configured with path aliases
 
 ## Project Architecture
@@ -34,16 +36,28 @@ This is a React + Vite + TypeScript frontend web application for the Ninja Platf
 ├── public/           # Static assets
 ├── src/
 │   ├── components/   # React components
-│   │   ├── layout/   # Layout components (Header, Sidebar, etc.)
-│   │   └── ui/       # Base UI components (Button, Input, etc.)
+│   │   ├── layout/   # Layout components (MainLayout, AuthLayout)
+│   │   │   ├── MainLayout.tsx   # Sidebar navigation for authenticated users
+│   │   │   └── AuthLayout.tsx   # Centered card layout for login/register
+│   │   ├── ui/       # Base UI components (Button, Input, etc.)
+│   │   └── ProtectedRoute.tsx   # Route protection with role-based access
 │   ├── hooks/        # Custom React hooks
 │   ├── pages/        # Page components
+│   │   ├── Dashboard.tsx    # Main dashboard with stats
+│   │   ├── Login.tsx        # Login form
+│   │   ├── Register.tsx     # Registration form
+│   │   ├── Products.tsx     # Products management
+│   │   ├── Jobs.tsx         # Jobs list
+│   │   ├── Files.tsx        # File uploads
+│   │   └── NotFound.tsx     # 404 error page
 │   ├── services/     # API services and external integrations
 │   ├── stores/       # Zustand state stores
+│   │   └── auth.store.ts    # Authentication state with persist
 │   ├── styles/       # CSS and Tailwind styles
 │   ├── types/        # TypeScript type definitions
+│   │   └── auth.types.ts    # User, AuthState, LoginCredentials types
 │   ├── utils/        # Utility functions
-│   ├── App.tsx       # Main application component with providers
+│   ├── App.tsx       # Main application component with routing
 │   ├── main.tsx      # Application entry point
 │   └── vite-env.d.ts # Vite type definitions
 ├── index.html        # HTML entry point (Inter font)
@@ -53,6 +67,18 @@ This is a React + Vite + TypeScript frontend web application for the Ninja Platf
 ├── postcss.config.js  # PostCSS configuration
 └── package.json      # Dependencies and scripts
 ```
+
+### Routing Structure
+- `/login` - Login page (AuthLayout)
+- `/register` - Registration page (AuthLayout)
+- `/dashboard` - Dashboard with stats (Protected, MainLayout)
+- `/products` - Products management (Protected, MainLayout)
+- `/jobs` - Validation jobs list (Protected, MainLayout)
+- `/files` - File uploads (Protected, MainLayout)
+- `/` - Redirects to /dashboard
+- `*` - 404 Not Found page
+
+Protected routes redirect unauthenticated users to `/login`. The ProtectedRoute component also supports role-based access control.
 
 ### Key Configuration
 - **Vite Config:** Path alias `@/` points to `./src`, API proxy for `/api` routes, `allowedHosts: true` for Replit proxy
