@@ -6,11 +6,17 @@ This is a React + Vite + TypeScript frontend web application for the Ninja Platf
 **Current State:** Fully functional development environment with Vite dev server running on port 5000.
 
 ## Recent Changes (December 7, 2025)
+- **Data Fetching Layer:** Complete TanStack Query setup with Axios API client
+- **API Services:** Configured Axios with auth interceptors, token refresh handling
+- **Auth Service:** Login, register, logout, getCurrentUser, refreshToken methods
+- **Files Service:** CRUD operations for files with upload support
+- **Query Hooks:** useLogin, useRegister, useLogout, useCurrentUser, useFiles, useUploadFile, useDeleteFile
 - **Routing Setup:** Complete React Router configuration with protected routes
 - **Authentication:** Zustand auth store with localStorage persistence
 - **Layouts:** MainLayout (sidebar navigation) and AuthLayout (login/register)
 - **Pages:** Dashboard, Login, Register, Products, Jobs, Files, NotFound
 - **Route Protection:** ProtectedRoute component with role-based access control
+- **Branding:** S4Carlisle logo image integrated throughout the application
 - Updated package.json with complete dependency set
 - Configured Vite with path aliases (@/) and API proxy
 - Set up Tailwind CSS with custom primary color palette
@@ -42,6 +48,9 @@ This is a React + Vite + TypeScript frontend web application for the Ninja Platf
 │   │   ├── ui/       # Base UI components (Button, Input, etc.)
 │   │   └── ProtectedRoute.tsx   # Route protection with role-based access
 │   ├── hooks/        # Custom React hooks
+│   │   ├── useAuth.ts       # Auth mutations: useLogin, useRegister, useLogout, useCurrentUser
+│   │   ├── useFiles.ts      # File operations: useFiles, useUploadFile, useDeleteFile
+│   │   └── index.ts         # Re-exports all hooks
 │   ├── pages/        # Page components
 │   │   ├── Dashboard.tsx    # Main dashboard with stats
 │   │   ├── Login.tsx        # Login form
@@ -51,6 +60,9 @@ This is a React + Vite + TypeScript frontend web application for the Ninja Platf
 │   │   ├── Files.tsx        # File uploads
 │   │   └── NotFound.tsx     # 404 error page
 │   ├── services/     # API services and external integrations
+│   │   ├── api.ts           # Axios client with auth interceptors
+│   │   ├── auth.service.ts  # Auth API: login, register, logout, getCurrentUser
+│   │   └── files.service.ts # Files API: list, upload, delete, getStats
 │   ├── stores/       # Zustand state stores
 │   │   └── auth.store.ts    # Authentication state with persist
 │   ├── styles/       # CSS and Tailwind styles
