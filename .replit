@@ -34,6 +34,14 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
+localPort = 33205
+externalPort = 3002
+
+[[ports]]
+localPort = 41649
+externalPort = 3001
+
+[[ports]]
 localPort = 44621
 externalPort = 3000
 
@@ -41,3 +49,8 @@ externalPort = 3000
 deploymentTarget = "static"
 build = ["npm", "run", "build"]
 publicDir = "dist"
+
+[userenv]
+
+[userenv.shared]
+VITE_API_URL = "/api/v1"

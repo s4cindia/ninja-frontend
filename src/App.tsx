@@ -1,22 +1,81 @@
-import "./styles/App.css";
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MainLayout } from '@/components/layout/MainLayout';
+import { AuthLayout } from '@/components/layout/AuthLayout';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { Dashboard } from '@/pages/Dashboard';
+import { Login } from '@/pages/Login';
+import { Register } from '@/pages/Register';
+import { Products } from '@/pages/Products';
+import { Jobs } from '@/pages/Jobs';
+import { Files } from '@/pages/Files';
+import { NotFound } from '@/pages/NotFound';
+import { Unauthorized } from '@/pages/Unauthorized';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      retry: 1,
+    },
+  },
+});
+
+function SessionExpiryHandler() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      navigate('/login', { state: { message: 'Your session has expired. Please log in again.' } });
+    };
+
+    window.addEventListener('auth:session-expired', handleSessionExpired);
+    return () => window.removeEventListener('auth:session-expired', handleSessionExpired);
+  }, [navigate]);
+
+  return null;
+}
+
+function AppRoutes() {
+  return (
+    <>
+      <SessionExpiryHandler />
+      <Routes>
+        <Route element={<AuthLayout />}>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+        </Route>
+
+        <Route
+          element={
+            <ProtectedRoute>
+              <MainLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/products" element={<Products />} />
+          <Route path="/jobs" element={<Jobs />} />
+          <Route path="/files" element={<Files />} />
+        </Route>
+
+        <Route path="/unauthorized" element={<Unauthorized />} />
+
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
+  );
+}
 
 function App() {
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1>Ninja Platform</h1>
-        <p>Welcome to the Ninja Platform Web Application</p>
-      </header>
-      <main className="app-main">
-        <div className="card">
-          <h2>Getting Started</h2>
-          <p>This is a React + Vite + TypeScript application.</p>
-          <p>
-            Edit <code>src/App.tsx</code> to get started.
-          </p>
-        </div>
-      </main>
-    </div>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }
 
