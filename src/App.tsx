@@ -12,6 +12,7 @@ import { Jobs } from '@/pages/Jobs';
 import { Files } from '@/pages/Files';
 import { NotFound } from '@/pages/NotFound';
 import { Unauthorized } from '@/pages/Unauthorized';
+import { ValidationResults } from '@/pages/ValidationResults';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -58,6 +59,7 @@ function AppRoutes() {
           <Route path="/products" element={<Products />} />
           <Route path="/jobs" element={<Jobs />} />
           <Route path="/files" element={<Files />} />
+          <Route path="/validation/:fileId" element={<ValidationResults />} />
         </Route>
 
         <Route path="/unauthorized" element={<Unauthorized />} />
