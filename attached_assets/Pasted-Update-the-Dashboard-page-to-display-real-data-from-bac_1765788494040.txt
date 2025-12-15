@@ -1,0 +1,277 @@
+Update the Dashboard page to display real data from backend APIs instead of static placeholders.
+
+## Files to Create/Update
+
+### 1. Create `src/services/dashboard.service.ts`
+```tsx
+import api from './api';
+
+export interface DashboardStats {
+  totalFiles: number;
+  filesProcessed: number;
+  filesPending: number;
+  filesFailed: number;
+  averageComplianceScore: number;
+  recentActivity: ActivityItem[];
+}
+
+export interface ActivityItem {
+  id: string;
+  type: 'upload' | 'validation' | 'export';
+  fileName: string;
+  status: 'completed' | 'processing' | 'failed';
+  timestamp: string;
+  score?: number;
+}
+
+export const dashboardService = {
+  getStats: async (): Promise<DashboardStats> => {
+    // Aggregate from existing endpoints
+    const filesResponse = await api.get('/files');
+    const files = filesResponse.data.files || filesResponse.data || [];
+
+    const totalFiles = files.length;
+    const filesProcessed = files.filter((f: any) => f.status === 'completed' || f.status === 'processed').length;
+    const filesPending = files.filter((f: any) => f.status === 'pending' || f.status === 'processing').length;
+    const filesFailed = files.filter((f: any) => f.status === 'failed').length;
+
+    // Calculate average compliance score from completed files (placeholder logic)
+    const averageComplianceScore = filesProcessed > 0 ? 78 : 0;
+
+    // Build recent activity from files
+    const recentActivity: ActivityItem[] = files.slice(0, 5).map((f: any) => ({
+      id: f.id,
+      type: 'upload' as const,
+      fileName: f.name || f.filename,
+      status: f.status === 'completed' || f.status === 'processed' ? 'completed' : f.status === 'failed' ? 'failed' : 'processing',
+      timestamp: f.uploadedAt || f.createdAt || new Date().toISOString(),
+    }));
+
+    return {
+      totalFiles,
+      filesProcessed,
+      filesPending,
+      filesFailed,
+      averageComplianceScore,
+      recentActivity,
+    };
+  },
+};
+```
+
+### 2. Create `src/hooks/useDashboard.ts`
+```tsx
+import { useQuery } from '@tanstack/react-query';
+import { dashboardService } from '../services/dashboard.service';
+
+export function useDashboardStats() {
+  return useQuery({
+    queryKey: ['dashboard', 'stats'],
+    queryFn: dashboardService.getStats,
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+}
+```
+
+### 3. Update Dashboard Page (likely `src/pages/Dashboard.tsx` or similar)
+```tsx
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { 
+  FileText, Upload, CheckCircle, Clock, AlertCircle,
+  TrendingUp, ArrowRight, Loader2
+} from 'lucide-react';
+import { MainLayout } from '../components/layout/MainLayout';
+import { Button } from '../components/ui/Button';
+import { Alert } from '../components/ui/Alert';
+import { useDashboardStats } from '../hooks/useDashboard';
+
+function StatCard({ 
+  title, value, icon: Icon, color, href 
+}: { 
+  title: string; 
+  value: number; 
+  icon: React.ElementType; 
+  color: string;
+  href?: string;
+}) {
+  const content = (
+    <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-gray-500">{title}</p>
+          <p className="text-3xl font-bold text-gray-900 mt-1">{value}</p>
+        </div>
+        <div className={`p-3 rounded-full ${color}`}>
+          <Icon className="h-6 w-6 text-white" />
+        </div>
+      </div>
+    </div>
+  );
+
+  if (href) {
+    return <Link to={href}>{content}</Link>;
+  }
+  return content;
+}
+
+function ScoreRing({ score }: { score: number }) {
+  const circumference = 2 * Math.PI * 40;
+  const strokeDashoffset = circumference - (score / 100) * circumference;
+  const color = score >= 90 ? 'text-green-600' : score >= 70 ? 'text-yellow-600' : 'text-red-600';
+
+  return (
+    <div className="relative w-24 h-24">
+      <svg className="w-24 h-24 transform -rotate-90">
+        <circle cx="48" cy="48" r="40" fill="none" stroke="currentColor" strokeWidth="8" className="text-gray-200" />
+        <circle cx="48" cy="48" r="40" fill="none" stroke="currentColor" strokeWidth="8" strokeLinecap="round" className={color}
+          style={{ strokeDasharray: circumference, strokeDashoffset, transition: 'stroke-dashoffset 0.5s ease-in-out' }} />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className={`text-2xl font-bold ${color}`}>{Math.round(score)}</span>
+      </div>
+    </div>
+  );
+}
+
+function ActivityItem({ activity }: { activity: any }) {
+  const statusIcons = {
+    completed: <CheckCircle className="h-4 w-4 text-green-500" />,
+    processing: <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />,
+    failed: <AlertCircle className="h-4 w-4 text-red-500" />,
+  };
+
+  return (
+    <div className="flex items-center justify-between py-3">
+      <div className="flex items-center gap-3">
+        {statusIcons[activity.status as keyof typeof statusIcons]}
+        <div>
+          <p className="text-sm font-medium text-gray-900 truncate max-w-xs">{activity.fileName}</p>
+          <p className="text-xs text-gray-500">{new Date(activity.timestamp).toLocaleString()}</p>
+        </div>
+      </div>
+      {activity.score !== undefined && (
+        <span className="text-sm font-medium text-gray-700">{activity.score}%</span>
+      )}
+    </div>
+  );
+}
+
+export function Dashboard() {
+  const { data: stats, isLoading, error } = useDashboardStats();
+
+  return (
+    <MainLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+            <p className="mt-1 text-sm text-gray-500">Overview of your accessibility validation activity</p>
+          </div>
+          <Link to="/files">
+            <Button>
+              <Upload className="h-4 w-4 mr-2" />
+              Upload File
+            </Button>
+          </Link>
+        </div>
+
+        {error && (
+          <Alert variant="error">Failed to load dashboard data. Please refresh the page.</Alert>
+        )}
+
+        {isLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+          </div>
+        ) : stats && (
+          <>
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard title="Total Files" value={stats.totalFiles} icon={FileText} color="bg-blue-500" href="/files" />
+              <StatCard title="Processed" value={stats.filesProcessed} icon={CheckCircle} color="bg-green-500" />
+              <StatCard title="Pending" value={stats.filesPending} icon={Clock} color="bg-yellow-500" />
+              <StatCard title="Failed" value={stats.filesFailed} icon={AlertCircle} color="bg-red-500" />
+            </div>
+
+            {/* Compliance Score & Activity */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Average Compliance */}
+              <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <h3 className="text-sm font-medium text-gray-500 mb-4">Average Compliance Score</h3>
+                <div className="flex items-center gap-4">
+                  <ScoreRing score={stats.averageComplianceScore} />
+                  <div>
+                    <p className="text-sm text-gray-600">Across all processed files</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {stats.averageComplianceScore >= 90 ? 'Excellent' : stats.averageComplianceScore >= 70 ? 'Good' : 'Needs Improvement'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Activity */}
+              <div className="lg:col-span-2 bg-white rounded-lg border border-gray-200">
+                <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                  <h2 className="text-lg font-medium text-gray-900">Recent Activity</h2>
+                  <Link to="/files" className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1">
+                    View all <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+                <div className="px-6 divide-y divide-gray-100">
+                  {stats.recentActivity.length > 0 ? (
+                    stats.recentActivity.map((activity) => (
+                      <ActivityItem key={activity.id} activity={activity} />
+                    ))
+                  ) : (
+                    <div className="py-8 text-center text-sm text-gray-500">
+                      No recent activity. Upload a file to get started.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h2 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h2>
+              <div className="flex flex-wrap gap-3">
+                <Link to="/files">
+                  <Button variant="outline">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload Document
+                  </Button>
+                </Link>
+                <Link to="/files">
+                  <Button variant="outline">
+                    <FileText className="h-4 w-4 mr-2" />
+                    View All Files
+                  </Button>
+                </Link>
+                <Button variant="outline" disabled>
+                  <TrendingUp className="h-4 w-4 mr-2" />
+                  Generate Report
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </MainLayout>
+  );
+}
+
+export default Dashboard;
+```
+
+## Acceptance Criteria
+- [ ] Display total files, processed, pending, failed counts from real API data
+- [ ] Average compliance score with animated circular indicator
+- [ ] Recent activity list with status icons (completed/processing/failed)
+- [ ] Quick action buttons linking to relevant pages
+- [ ] Loading state with spinner
+- [ ] Error state with alert message
+- [ ] Auto-refresh every 30 seconds
+- [ ] Empty state for no activity
+- [ ] Clicking "Total Files" card navigates to Files page
