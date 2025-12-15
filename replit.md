@@ -5,7 +5,23 @@ This is a React + Vite + TypeScript frontend web application for the Ninja Platf
 
 **Current State:** Fully functional development environment with Vite dev server running on port 5000.
 
-## Recent Changes (December 7, 2025)
+## Recent Changes (December 15, 2025)
+- **Dashboard with Real Data:** Updated Dashboard page with backend API integration
+  - Stat cards for total files, processed, pending, failed with loading states
+  - Circular compliance score indicator with color-coded thresholds
+  - Recent activity feed with time formatting
+  - Auto-refresh every 30 seconds via React Query
+- **Compliance Pages:** Section 508 and FPC compliance mapping pages
+  - src/pages/compliance/Section508Page.tsx - Section 508 criteria mapping
+  - src/pages/compliance/FpcPage.tsx - Functional Performance Criteria validation
+  - ConformanceBadge component with status icons
+- **New Services & Hooks:**
+  - src/services/dashboard.service.ts - Dashboard stats and activity API
+  - src/services/compliance.service.ts - Section 508 and FPC APIs
+  - src/hooks/useDashboard.ts - Dashboard data hooks with auto-refresh
+  - src/hooks/useCompliance.ts - Compliance data hooks
+
+## Previous Changes (December 7, 2025)
 - **UI Component Library:** Complete reusable component library with Tailwind CSS
   - Button (variants: primary, secondary, outline, ghost, danger; sizes: sm, md, lg; loading state, icons)
   - Input (label, error, helperText, accessible with htmlFor)
