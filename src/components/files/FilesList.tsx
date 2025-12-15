@@ -14,10 +14,10 @@ interface FilesListProps {
 }
 
 const statusConfig: Record<FileStatus, { icon: React.ElementType; color: string; label: string }> = {
-  UPLOADED: { icon: Clock, color: 'text-yellow-500 bg-yellow-50', label: 'Pending' },
+  UPLOADED: { icon: Clock, color: 'text-yellow-500 bg-yellow-50', label: 'Uploaded' },
   PROCESSING: { icon: Loader2, color: 'text-blue-500 bg-blue-50', label: 'Processing' },
-  PROCESSED: { icon: CheckCircle, color: 'text-green-500 bg-green-50', label: 'Completed' },
-  ERROR: { icon: XCircle, color: 'text-red-500 bg-red-50', label: 'Failed' },
+  PROCESSED: { icon: CheckCircle, color: 'text-green-500 bg-green-50', label: 'Processed' },
+  ERROR: { icon: XCircle, color: 'text-red-500 bg-red-50', label: 'Error' },
 };
 
 function StatusBadge({ status }: { status: FileStatus }) {

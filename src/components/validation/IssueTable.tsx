@@ -208,7 +208,7 @@ function IssueRow({
                   {issue.wcagCriteria.map((criteria) => (
                     <a
                       key={criteria}
-                      href={`https://www.w3.org/WAI/WCAG21/Understanding/${criteria.toLowerCase().replace('.', '')}`}
+                      href={`https://www.w3.org/WAI/WCAG21/Understanding/${criteria.toLowerCase().replace(/\./g, '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700"

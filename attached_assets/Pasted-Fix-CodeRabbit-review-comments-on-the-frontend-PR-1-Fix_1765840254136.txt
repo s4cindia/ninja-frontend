@@ -1,0 +1,61 @@
+Fix CodeRabbit review comments on the frontend PR:
+
+### 1. Fix FileStatus type mismatch (Critical)
+
+In src/components/files/FilesList.tsx, update to match backend status values:
+
+// Change type
+export type FileStatus = 'UPLOADED' | 'PROCESSING' | 'PROCESSED' | 'ERROR';
+
+// Update statusConfig
+const statusConfig: Record<FileStatus, { icon: React.ElementType; color: string; label: string }> = {
+  UPLOADED: { icon: Clock, color: 'text-yellow-500 bg-yellow-50', label: 'Uploaded' },
+  PROCESSING: { icon: Loader2, color: 'text-blue-500 bg-blue-50', label: 'Processing' },
+  PROCESSED: { icon: CheckCircle, color: 'text-green-500 bg-green-50', label: 'Processed' },
+  ERROR: { icon: XCircle, color: 'text-red-500 bg-red-50', label: 'Error' },
+};
+
+// Update the view button condition (around line 138)
+{onView && file.status === 'PROCESSED' && (
+
+### 2. Fix WCAG URL slug generation (Major)
+
+In src/components/validation/IssueTable.tsx, fix the URL generation to remove ALL dots:
+
+// Change from:
+href={`https://www.w3.org/WAI/WCAG21/Understanding/${criteria.toLowerCase().replace('.', '')}`}
+
+// Change to (use global regex):
+href={`https://www.w3.org/WAI/WCAG21/Understanding/${criteria.toLowerCase().replace(/\./g, '')}`}
+
+### 3. Use shared cn utility (Major)
+
+In src/pages/ValidationResults.tsx:
+- Add import at top: import { cn } from '@/utils/cn';
+- Remove the local cn function (lines 62-64)
+
+### 4. Remove unused useDashboard hook (Minor)
+
+In src/hooks/useDashboard.ts, remove the unused useDashboard function if it exists and isn't used anywhere.
+
+### 5. Add missing useFpcDefinitions hook (Minor)
+
+In src/hooks/useCompliance.ts, add:
+
+export function useFpcDefinitions() {
+  return useQuery({
+    queryKey: ['fpcDefinitions'],
+    queryFn: () => complianceService.getFpcDefinitions(),
+  });
+}
+
+### 6. Update dashboardService status checks (Major)
+
+In src/services/dashboard.service.ts, update status checks to use uppercase:
+
+const filesProcessed = files.filter((f: any) => f.status === 'PROCESSED').length;
+const filesPending = files.filter((f: any) => f.status === 'UPLOADED' || f.status === 'PROCESSING').length;
+const filesFailed = files.filter((f: any) => f.status === 'ERROR').length;
+
+// And in recentActivity mapping:
+status: f.status === 'PROCESSED' ? 'completed' : f.status === 'ERROR' ? 'failed' : 'processing',

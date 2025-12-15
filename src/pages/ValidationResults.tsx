@@ -16,6 +16,7 @@ import { Alert } from '@/components/ui/Alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { IssueTable } from '@/components/validation/IssueTable';
 import { useValidation, useUpdateIssueStatus, useRetryValidation } from '@/hooks/useAccessibility';
+import { cn } from '@/utils/cn';
 import type { IssueSeverity, IssueStatus } from '@/services/accessibility.service';
 
 type FilterSeverity = IssueSeverity | 'all';
@@ -57,10 +58,6 @@ function SummaryCard({
       </div>
     </button>
   );
-}
-
-function cn(...classes: (string | boolean | undefined)[]) {
-  return classes.filter(Boolean).join(' ');
 }
 
 export function ValidationResults() {
