@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useRef, useMemo } from 'react';
 import { Upload, File, X, AlertCircle } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
@@ -22,10 +22,17 @@ export function FileUploadZone({
   const [isDragOver, setIsDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const validExtensions = useMemo(() => {
+    return accept
+      .split(',')
+      .map(ext => ext.trim().toLowerCase())
+      .filter(ext => ext.startsWith('.'));
+  }, [accept]);
 
   const validateFile = useCallback((file: File): string | null => {
     const extension = '.' + file.name.split('.').pop()?.toLowerCase();
-    const validExtensions = ['.pdf', '.epub', '.docx'];
     if (!validExtensions.includes(extension)) {
       return `Invalid file type. Accepted: ${validExtensions.join(', ')}`;
     }
@@ -36,7 +43,7 @@ export function FileUploadZone({
     }
 
     return null;
-  }, [maxSize]);
+  }, [maxSize, validExtensions]);
 
   const handleFile = useCallback((file: File) => {
     const validationError = validateFile(file);
@@ -85,6 +92,9 @@ export function FileUploadZone({
   const clearSelection = useCallback(() => {
     setSelectedFile(null);
     setError(null);
+    if (inputRef.current) {
+      inputRef.current.value = '';
+    }
   }, []);
 
   const formatFileSize = (bytes: number): string => {
@@ -92,6 +102,12 @@ export function FileUploadZone({
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
+
+  const displayAcceptedTypes = useMemo(() => {
+    return validExtensions
+      .map(ext => ext.replace('.', '').toUpperCase())
+      .join(', ');
+  }, [validExtensions]);
 
   return (
     <div className={cn('w-full', className)}>
@@ -108,6 +124,7 @@ export function FileUploadZone({
         )}
       >
         <input
+          ref={inputRef}
           type="file"
           accept={accept}
           onChange={handleInputChange}
@@ -151,7 +168,7 @@ export function FileUploadZone({
               or click to browse
             </p>
             <p className="mt-2 text-xs text-gray-400">
-              PDF, EPUB, DOCX up to {Math.round(maxSize / 1024 / 1024)}MB
+              {displayAcceptedTypes} up to {Math.round(maxSize / 1024 / 1024)}MB
             </p>
           </>
         )}
