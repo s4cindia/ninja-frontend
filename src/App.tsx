@@ -12,6 +12,9 @@ import { Jobs } from '@/pages/Jobs';
 import { Files } from '@/pages/Files';
 import { NotFound } from '@/pages/NotFound';
 import { Unauthorized } from '@/pages/Unauthorized';
+import { ValidationResults } from '@/pages/ValidationResults';
+import { Section508Page } from '@/pages/compliance/Section508Page';
+import { FpcPage } from '@/pages/compliance/FpcPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -58,6 +61,9 @@ function AppRoutes() {
           <Route path="/products" element={<Products />} />
           <Route path="/jobs" element={<Jobs />} />
           <Route path="/files" element={<Files />} />
+          <Route path="/validation/:fileId" element={<ValidationResults />} />
+          <Route path="/compliance/section508/:fileId" element={<Section508Page />} />
+          <Route path="/compliance/fpc/:fileId" element={<FpcPage />} />
         </Route>
 
         <Route path="/unauthorized" element={<Unauthorized />} />

@@ -34,15 +34,7 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 33205
-externalPort = 3002
-
-[[ports]]
-localPort = 41649
-externalPort = 3001
-
-[[ports]]
-localPort = 44621
+localPort = 5001
 externalPort = 3000
 
 [deployment]
@@ -53,4 +45,4 @@ publicDir = "dist"
 [userenv]
 
 [userenv.shared]
-VITE_API_URL = "/api/v1"
+VITE_API_URL = "https://c48ebf88-c2db-4675-9589-90ad84ac1e0a-00-2o7hlystdhu3f.pike.replit.dev/api/v1"
