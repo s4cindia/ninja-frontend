@@ -10,9 +10,25 @@ export const api = axios.create({
   },
 });
 
+function getAccessToken(): string | null {
+  const storeToken = useAuthStore.getState().accessToken;
+  if (storeToken) return storeToken;
+  
+  try {
+    const stored = localStorage.getItem('ninja-auth');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return parsed.state?.accessToken || null;
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return null;
+}
+
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const { accessToken } = useAuthStore.getState();
+    const accessToken = getAccessToken();
     
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
