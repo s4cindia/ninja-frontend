@@ -208,9 +208,11 @@ export function Dashboard() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <div className="flex gap-3">
-          <Button as={Link} to="/files" variant="primary" leftIcon={<Upload className="w-4 h-4" />}>
-            Upload File
-          </Button>
+          <Link to="/files">
+            <Button variant="primary" leftIcon={<Upload className="w-4 h-4" />}>
+              Upload File
+            </Button>
+          </Link>
         </div>
       </div>
 
