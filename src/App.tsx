@@ -15,6 +15,7 @@ import { Unauthorized } from '@/pages/Unauthorized';
 import { ValidationResults } from '@/pages/ValidationResults';
 import { Section508Page } from '@/pages/compliance/Section508Page';
 import { FpcPage } from '@/pages/compliance/FpcPage';
+import { TestEditionSelector } from '@/pages/test/TestEditionSelector';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -67,6 +68,8 @@ function AppRoutes() {
         </Route>
 
         <Route path="/unauthorized" element={<Unauthorized />} />
+
+        <Route path="/test/edition-selector" element={<TestEditionSelector />} />
 
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<NotFound />} />
