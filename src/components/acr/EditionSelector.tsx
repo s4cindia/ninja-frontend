@@ -46,7 +46,9 @@ export function EditionSelector({ selectedEdition, onSelect, disabled = false }:
     );
   }
 
-  if (!editions || editions.length === 0) {
+  const editionsList = Array.isArray(editions) ? editions : [];
+
+  if (editionsList.length === 0) {
     return (
       <div className="text-center py-12">
         <p className="text-gray-500">No editions available.</p>
@@ -57,7 +59,7 @@ export function EditionSelector({ selectedEdition, onSelect, disabled = false }:
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {editions.map((edition) => {
+        {editionsList.map((edition) => {
           const isSelected = selectedEdition?.code === edition.code;
           const isHovered = hoveredEdition === edition.code;
           const labels = EDITION_LABELS[edition.code as AcrEditionCode];
