@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Check, Info, Star } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
 import type { AcrEdition, AcrEditionCode } from '@/types/acr.types';
 import { useEditions } from '@/hooks/useAcr';
@@ -64,6 +63,8 @@ export function EditionSelector({ selectedEdition, onSelect, disabled = false }:
           const isHovered = hoveredEdition === edition.code;
           const labels = EDITION_LABELS[edition.code as AcrEditionCode];
           const tooltip = EDITION_TOOLTIPS[edition.code as AcrEditionCode];
+          const isRecommended = edition.isRecommended || edition.recommended;
+          const criteriaCount = edition.criteriaCount ?? (Array.isArray(edition.criteria) ? edition.criteria.length : 0);
 
           return (
             <div
@@ -85,15 +86,15 @@ export function EditionSelector({ selectedEdition, onSelect, disabled = false }:
                     ? 'border-primary-500 bg-primary-50 shadow-md'
                     : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm',
                   disabled && 'opacity-50 cursor-not-allowed',
-                  edition.isRecommended && !isSelected && 'border-primary-200 bg-primary-25'
+                  isRecommended && !isSelected && 'border-green-200 bg-green-50'
                 )}
               >
-                {edition.isRecommended && (
-                  <div className="absolute -top-2 left-1/2 -translate-x-1/2">
-                    <Badge variant="success" size="sm" className="flex items-center gap-1">
+                {isRecommended && (
+                  <div className="absolute -top-3 -right-2 z-10">
+                    <span className="inline-flex items-center gap-1 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-sm">
                       <Star className="h-3 w-3" />
                       Recommended
-                    </Badge>
+                    </span>
                   </div>
                 )}
 
@@ -122,7 +123,7 @@ export function EditionSelector({ selectedEdition, onSelect, disabled = false }:
 
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">
-                    {edition.criteriaCount} criteria
+                    {criteriaCount} criteria
                   </span>
                   <Info className="h-4 w-4 text-gray-400" />
                 </div>

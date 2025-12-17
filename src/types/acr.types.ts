@@ -5,8 +5,11 @@ export interface AcrEdition {
   code: AcrEditionCode;
   name: string;
   description: string;
-  criteriaCount: number;
-  isRecommended: boolean;
+  criteriaCount?: number;
+  criteria?: { length: number } | unknown[];
+  isRecommended?: boolean;
+  recommended?: boolean;
+  standards?: string[];
 }
 
 export interface EditionDetails extends AcrEdition {
