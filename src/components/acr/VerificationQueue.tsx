@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Filter, CheckSquare } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
@@ -19,7 +19,7 @@ interface VerificationQueueProps {
   onComplete: () => void;
 }
 
-const mockItems: VerificationItemType[] = [
+const MOCK_ITEMS: VerificationItemType[] = [
   {
     id: '1',
     criterionId: '1.1.1',
@@ -126,8 +126,8 @@ const SEVERITY_OPTIONS: { value: Severity; label: string }[] = [
 ];
 
 const CONFIDENCE_OPTIONS: { value: ConfidenceLevel; label: string }[] = [
-  { value: 'low', label: 'Low Confidence' },
-  { value: 'manual', label: 'Manual Required' },
+  { value: 'low', label: 'LOW' },
+  { value: 'manual', label: 'MANUAL_REQUIRED' },
 ];
 
 const STATUS_OPTIONS: { value: VerificationStatus; label: string }[] = [
@@ -139,7 +139,6 @@ const STATUS_OPTIONS: { value: VerificationStatus; label: string }[] = [
 const BULK_STATUSES: { value: VerificationStatus; label: string }[] = [
   { value: 'verified_pass', label: 'Verified Pass' },
   { value: 'verified_fail', label: 'Verified Fail' },
-  { value: 'verified_partial', label: 'Verified Partial' },
   { value: 'deferred', label: 'Deferred' },
 ];
 
@@ -160,20 +159,31 @@ export function VerificationQueue({ jobId, onComplete }: VerificationQueueProps)
   const [bulkStatus, setBulkStatus] = useState<VerificationStatus>('verified_pass');
   const [bulkMethod, setBulkMethod] = useState<VerificationMethod>('Manual Review');
   const [bulkNotes, setBulkNotes] = useState('');
-  const [localItems, setLocalItems] = useState<VerificationItemType[]>(mockItems);
+  const [localItems, setLocalItems] = useState<VerificationItemType[]>([]);
+  const [useMockData, setUseMockData] = useState(false);
 
-  const { data: apiData, isLoading: isApiLoading, error: apiError } = useVerificationQueue(jobId, filters);
+  const { data: apiData, isLoading, error } = useVerificationQueue(jobId, filters);
   const submitMutation = useSubmitVerification();
   const bulkMutation = useBulkVerification();
 
-  const items = apiData?.items ?? localItems;
-  const isLoading = isApiLoading && !apiError;
+  useEffect(() => {
+    if (error) {
+      setUseMockData(true);
+      setLocalItems(MOCK_ITEMS);
+    } else if (apiData?.items) {
+      setUseMockData(false);
+      setLocalItems(apiData.items);
+    }
+  }, [apiData, error]);
+
+  const items = useMockData ? localItems : (apiData?.items ?? []);
   const isSubmitting = submitMutation.isPending || bulkMutation.isPending;
 
-  const bulkRequiresNotes = bulkStatus === 'verified_fail' || bulkStatus === 'verified_partial';
+  const bulkRequiresNotes = bulkStatus === 'verified_fail';
   const canBulkSubmit = selectedItems.size > 0 && (!bulkRequiresNotes || bulkNotes.trim().length > 0);
 
   const filteredItems = useMemo(() => {
+    if (!useMockData) return items;
     return items.filter((item) => {
       if (filters.severity?.length && !filters.severity.includes(item.severity)) {
         return false;
@@ -181,17 +191,20 @@ export function VerificationQueue({ jobId, onComplete }: VerificationQueueProps)
       if (filters.confidenceLevel?.length && !filters.confidenceLevel.includes(item.confidenceLevel)) {
         return false;
       }
-      if (filters.status?.length && !filters.status.includes(item.status)) {
-        return false;
+      if (filters.status?.length) {
+        const normalizedStatus = item.status.startsWith('verified_') ? 'verified_pass' : item.status;
+        if (!filters.status.includes(normalizedStatus as VerificationStatus)) {
+          return false;
+        }
       }
       return true;
     });
-  }, [items, filters]);
+  }, [items, filters, useMockData]);
 
-  const verifiedCount = items.filter(i => 
+  const verifiedCount = apiData?.verifiedCount ?? items.filter(i => 
     i.status === 'verified_pass' || i.status === 'verified_fail' || i.status === 'verified_partial'
   ).length;
-  const totalCount = items.length;
+  const totalCount = apiData?.totalCount ?? items.length;
   const progressPercent = totalCount > 0 ? Math.round((verifiedCount / totalCount) * 100) : 0;
 
   const handleSelectItem = (id: string, selected: boolean) => {
@@ -220,9 +233,7 @@ export function VerificationQueue({ jobId, onComplete }: VerificationQueueProps)
     method: VerificationMethod, 
     notes: string
   ) => {
-    try {
-      await submitMutation.mutateAsync({ itemId, status, method, notes });
-    } catch {
+    if (useMockData) {
       setLocalItems(prev => prev.map(item => 
         item.id === itemId 
           ? { 
@@ -239,6 +250,8 @@ export function VerificationQueue({ jobId, onComplete }: VerificationQueueProps)
             } 
           : item
       ));
+    } else {
+      await submitMutation.mutateAsync({ itemId, status, method, notes });
     }
   };
 
@@ -246,14 +259,7 @@ export function VerificationQueue({ jobId, onComplete }: VerificationQueueProps)
     if (!canBulkSubmit) return;
     
     const itemIds = Array.from(selectedItems);
-    try {
-      await bulkMutation.mutateAsync({ 
-        itemIds, 
-        status: bulkStatus, 
-        method: bulkMethod, 
-        notes: bulkNotes 
-      });
-    } catch {
+    if (useMockData) {
       setLocalItems(prev => prev.map(item => 
         selectedItems.has(item.id)
           ? { 
@@ -270,6 +276,13 @@ export function VerificationQueue({ jobId, onComplete }: VerificationQueueProps)
             } 
           : item
       ));
+    } else {
+      await bulkMutation.mutateAsync({ 
+        itemIds, 
+        status: bulkStatus, 
+        method: bulkMethod, 
+        notes: bulkNotes 
+      });
     }
     setSelectedItems(new Set());
     setBulkNotes('');
@@ -288,7 +301,7 @@ export function VerificationQueue({ jobId, onComplete }: VerificationQueueProps)
     });
   };
 
-  if (isLoading) {
+  if (isLoading && !useMockData) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" />
@@ -309,7 +322,12 @@ export function VerificationQueue({ jobId, onComplete }: VerificationQueueProps)
             style={{ width: `${progressPercent}%` }}
           />
         </div>
-        <p className="text-xs text-gray-500 mt-2">Job ID: {jobId}</p>
+        <div className="flex items-center justify-between mt-2">
+          <p className="text-xs text-gray-500">Job ID: {jobId}</p>
+          {useMockData && (
+            <span className="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded">Demo Mode</span>
+          )}
+        </div>
       </div>
 
       <div className="bg-white rounded-lg border overflow-hidden">
@@ -446,7 +464,7 @@ export function VerificationQueue({ jobId, onComplete }: VerificationQueueProps)
               </div>
             </div>
             {bulkRequiresNotes && !bulkNotes.trim() && (
-              <p className="text-xs text-red-600 mt-2">Notes are required for Fail or Partial status</p>
+              <p className="text-xs text-red-600 mt-2">Notes are required for Fail status</p>
             )}
           </div>
         )}
