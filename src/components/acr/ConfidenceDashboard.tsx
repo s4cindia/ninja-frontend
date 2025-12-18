@@ -1,7 +1,14 @@
-import { AlertCircle, CheckCircle, AlertTriangle, HelpCircle } from 'lucide-react';
+import { useState } from 'react';
+import { AlertCircle, CheckCircle, AlertTriangle, HelpCircle, ChevronDown, Bot, User } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
+
+interface CriterionCheck {
+  id: string;
+  description: string;
+  passed: boolean;
+}
 
 interface CriterionConfidence {
   id: string;
@@ -12,6 +19,8 @@ interface CriterionConfidence {
   status: 'pass' | 'fail' | 'not_applicable' | 'not_tested';
   needsVerification: boolean;
   remarks?: string;
+  automatedChecks: CriterionCheck[];
+  manualChecks: string[];
 }
 
 interface ConfidenceDashboardProps {
@@ -20,14 +29,119 @@ interface ConfidenceDashboardProps {
 }
 
 const mockCriteria: CriterionConfidence[] = [
-  { id: '1', criterionId: '1.1.1', name: 'Non-text Content', level: 'A', confidenceScore: 95, status: 'pass', needsVerification: false },
-  { id: '2', criterionId: '1.2.1', name: 'Audio-only and Video-only', level: 'A', confidenceScore: 72, status: 'pass', needsVerification: true },
-  { id: '3', criterionId: '1.3.1', name: 'Info and Relationships', level: 'A', confidenceScore: 88, status: 'pass', needsVerification: false },
-  { id: '4', criterionId: '1.4.1', name: 'Use of Color', level: 'A', confidenceScore: 45, status: 'fail', needsVerification: true },
-  { id: '5', criterionId: '1.4.3', name: 'Contrast (Minimum)', level: 'AA', confidenceScore: 98, status: 'pass', needsVerification: false },
-  { id: '6', criterionId: '2.1.1', name: 'Keyboard', level: 'A', confidenceScore: 60, status: 'pass', needsVerification: true },
-  { id: '7', criterionId: '2.4.1', name: 'Bypass Blocks', level: 'A', confidenceScore: 0, status: 'not_applicable', needsVerification: false },
-  { id: '8', criterionId: '2.4.4', name: 'Link Purpose', level: 'A', confidenceScore: 82, status: 'pass', needsVerification: false },
+  { 
+    id: '1', 
+    criterionId: '1.1.1', 
+    name: 'Non-text Content', 
+    level: 'A', 
+    confidenceScore: 95, 
+    status: 'pass', 
+    needsVerification: false,
+    automatedChecks: [
+      { id: '1a', description: 'Alt text presence verified for all images', passed: true },
+      { id: '1b', description: 'Decorative images marked with empty alt', passed: true },
+      { id: '1c', description: 'Form inputs have accessible labels', passed: true },
+    ],
+    manualChecks: ['Verify alt text quality and accuracy', 'Check complex images have long descriptions']
+  },
+  { 
+    id: '2', 
+    criterionId: '1.2.1', 
+    name: 'Audio-only and Video-only', 
+    level: 'A', 
+    confidenceScore: 72, 
+    status: 'pass', 
+    needsVerification: true,
+    automatedChecks: [
+      { id: '2a', description: 'Media elements detected', passed: true },
+      { id: '2b', description: 'Transcript file references found', passed: false },
+    ],
+    manualChecks: ['Verify transcript accuracy', 'Test audio description availability', 'Confirm captions are synchronized']
+  },
+  { 
+    id: '3', 
+    criterionId: '1.3.1', 
+    name: 'Info and Relationships', 
+    level: 'A', 
+    confidenceScore: 88, 
+    status: 'pass', 
+    needsVerification: false,
+    automatedChecks: [
+      { id: '3a', description: 'Heading hierarchy validated', passed: true },
+      { id: '3b', description: 'Table headers properly marked', passed: true },
+      { id: '3c', description: 'Form labels associated correctly', passed: true },
+    ],
+    manualChecks: ['Review semantic markup accuracy']
+  },
+  { 
+    id: '4', 
+    criterionId: '1.4.1', 
+    name: 'Use of Color', 
+    level: 'A', 
+    confidenceScore: 45, 
+    status: 'fail', 
+    needsVerification: true,
+    automatedChecks: [
+      { id: '4a', description: 'Color-only indicators detected', passed: false },
+      { id: '4b', description: 'Link differentiation checked', passed: false },
+    ],
+    manualChecks: ['Verify information conveyed by color has text alternative', 'Check form error states use more than color']
+  },
+  { 
+    id: '5', 
+    criterionId: '1.4.3', 
+    name: 'Contrast (Minimum)', 
+    level: 'AA', 
+    confidenceScore: 98, 
+    status: 'pass', 
+    needsVerification: false,
+    automatedChecks: [
+      { id: '5a', description: 'Text contrast ratio >= 4.5:1 verified', passed: true },
+      { id: '5b', description: 'Large text contrast ratio >= 3:1 verified', passed: true },
+      { id: '5c', description: 'UI component contrast checked', passed: true },
+    ],
+    manualChecks: ['Verify contrast on images with text overlay']
+  },
+  { 
+    id: '6', 
+    criterionId: '2.1.1', 
+    name: 'Keyboard', 
+    level: 'A', 
+    confidenceScore: 60, 
+    status: 'pass', 
+    needsVerification: true,
+    automatedChecks: [
+      { id: '6a', description: 'Tab order follows logical sequence', passed: true },
+      { id: '6b', description: 'No keyboard traps detected', passed: true },
+      { id: '6c', description: 'Custom controls have keyboard handlers', passed: false },
+    ],
+    manualChecks: ['Test all interactive elements with keyboard only', 'Verify custom widgets are fully operable', 'Check modal dialogs trap focus correctly']
+  },
+  { 
+    id: '7', 
+    criterionId: '2.4.1', 
+    name: 'Bypass Blocks', 
+    level: 'A', 
+    confidenceScore: 0, 
+    status: 'not_applicable', 
+    needsVerification: false,
+    automatedChecks: [],
+    manualChecks: []
+  },
+  { 
+    id: '8', 
+    criterionId: '2.4.4', 
+    name: 'Link Purpose', 
+    level: 'A', 
+    confidenceScore: 82, 
+    status: 'pass', 
+    needsVerification: false,
+    automatedChecks: [
+      { id: '8a', description: 'Generic link text detected (e.g., "click here")', passed: true },
+      { id: '8b', description: 'Links have descriptive text or aria-label', passed: true },
+    ],
+    manualChecks: ['Verify link purpose is clear in context']
+  },
 ];
 
 function getConfidenceColor(score: number): string {
@@ -58,8 +172,21 @@ function getStatusIcon(status: CriterionConfidence['status']) {
 }
 
 export function ConfidenceDashboard({ jobId, onVerifyClick }: ConfidenceDashboardProps) {
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const isLoading = false;
   const criteria = mockCriteria;
+
+  const toggleRow = (id: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   const overallConfidence = criteria.length > 0
     ? Math.round(criteria.filter(c => c.status !== 'not_applicable').reduce((acc, c) => acc + c.confidenceScore, 0) / criteria.filter(c => c.status !== 'not_applicable').length)
@@ -131,63 +258,134 @@ export function ConfidenceDashboard({ jobId, onVerifyClick }: ConfidenceDashboar
           </div>
         </div>
         <div className="divide-y">
-          {criteria.map((criterion) => (
-            <div
-              key={criterion.id}
-              className={cn(
-                'px-4 py-3 flex items-center gap-4',
-                criterion.needsVerification && 'bg-orange-50'
-              )}
-            >
-              <div className="flex-shrink-0">
-                {getStatusIcon(criterion.status)}
-              </div>
+          {criteria.map((criterion) => {
+            const isExpanded = expandedRows.has(criterion.id);
+            const hasDetails = criterion.automatedChecks.length > 0 || criterion.manualChecks.length > 0;
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-900">{criterion.criterionId}</span>
-                  <span className="text-sm text-gray-600 truncate">{criterion.name}</span>
-                  <span className={cn(
-                    'text-xs px-1.5 py-0.5 rounded font-medium',
-                    criterion.level === 'A' && 'bg-blue-100 text-blue-700',
-                    criterion.level === 'AA' && 'bg-purple-100 text-purple-700',
-                    criterion.level === 'AAA' && 'bg-indigo-100 text-indigo-700'
-                  )}>
-                    {criterion.level}
-                  </span>
-                </div>
-                {criterion.remarks && (
-                  <p className="text-xs text-gray-500 mt-0.5 truncate">{criterion.remarks}</p>
-                )}
-              </div>
+            return (
+              <div key={criterion.id}>
+                <button
+                  type="button"
+                  onClick={() => hasDetails && toggleRow(criterion.id)}
+                  disabled={!hasDetails}
+                  className={cn(
+                    'w-full px-4 py-3 flex items-center gap-4 text-left transition-colors',
+                    criterion.needsVerification && 'bg-orange-50',
+                    hasDetails && 'hover:bg-gray-50 cursor-pointer',
+                    !hasDetails && 'cursor-default'
+                  )}
+                >
+                  <div className="flex-shrink-0">
+                    {getStatusIcon(criterion.status)}
+                  </div>
 
-              <div className="flex items-center gap-3 flex-shrink-0">
-                {criterion.status !== 'not_applicable' && (
-                  <div className="w-24">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 bg-gray-200 rounded-full h-2">
-                        <div
-                          className={cn('h-2 rounded-full', getConfidenceColor(criterion.confidenceScore))}
-                          style={{ width: `${criterion.confidenceScore}%` }}
-                        />
+                      <span className="font-medium text-gray-900">{criterion.criterionId}</span>
+                      <span className="text-sm text-gray-600 truncate">{criterion.name}</span>
+                      <span className={cn(
+                        'text-xs px-1.5 py-0.5 rounded font-medium',
+                        criterion.level === 'A' && 'bg-blue-100 text-blue-700',
+                        criterion.level === 'AA' && 'bg-purple-100 text-purple-700',
+                        criterion.level === 'AAA' && 'bg-indigo-100 text-indigo-700'
+                      )}>
+                        {criterion.level}
+                      </span>
+                    </div>
+                    {criterion.remarks && (
+                      <p className="text-xs text-gray-500 mt-0.5 truncate">{criterion.remarks}</p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    {criterion.status !== 'not_applicable' && (
+                      <div className="w-24">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 bg-gray-200 rounded-full h-2">
+                            <div
+                              className={cn('h-2 rounded-full', getConfidenceColor(criterion.confidenceScore))}
+                              style={{ width: `${criterion.confidenceScore}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-medium text-gray-600 w-8">{criterion.confidenceScore}%</span>
+                        </div>
                       </div>
-                      <span className="text-xs font-medium text-gray-600 w-8">{criterion.confidenceScore}%</span>
+                    )}
+
+                    {criterion.needsVerification && onVerifyClick && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onVerifyClick(criterion.criterionId);
+                        }}
+                      >
+                        Verify
+                      </Button>
+                    )}
+
+                    {hasDetails && (
+                      <ChevronDown 
+                        className={cn(
+                          'h-5 w-5 text-gray-400 transition-transform duration-200',
+                          isExpanded && 'rotate-180'
+                        )} 
+                      />
+                    )}
+                  </div>
+                </button>
+
+                {isExpanded && hasDetails && (
+                  <div className="px-4 py-4 bg-gray-50 border-t border-gray-100">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-9">
+                      {criterion.automatedChecks.length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <Bot className="h-4 w-4 text-blue-600" />
+                            <h4 className="text-sm font-medium text-gray-900">Automated Checks</h4>
+                          </div>
+                          <ul className="space-y-2">
+                            {criterion.automatedChecks.map((check) => (
+                              <li key={check.id} className="flex items-start gap-2 text-sm">
+                                {check.passed ? (
+                                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                                ) : (
+                                  <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+                                )}
+                                <span className={cn(
+                                  check.passed ? 'text-gray-600' : 'text-red-700'
+                                )}>
+                                  {check.description}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {criterion.manualChecks.length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <User className="h-4 w-4 text-orange-600" />
+                            <h4 className="text-sm font-medium text-gray-900">Manual Checks Needed</h4>
+                          </div>
+                          <ul className="space-y-2">
+                            {criterion.manualChecks.map((check, idx) => (
+                              <li key={idx} className="flex items-start gap-2 text-sm text-gray-600">
+                                <span className="h-4 w-4 flex items-center justify-center text-orange-500 mt-0.5 flex-shrink-0">•</span>
+                                {check}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
-
-                {criterion.needsVerification && onVerifyClick && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onVerifyClick(criterion.criterionId)}
-                  >
-                    Verify
-                  </Button>
-                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
