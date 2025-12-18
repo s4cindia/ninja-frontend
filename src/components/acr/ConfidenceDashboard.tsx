@@ -109,8 +109,26 @@ export function ConfidenceDashboard({ jobId, onVerifyClick }: ConfidenceDashboar
 
       <div className="bg-white rounded-lg border overflow-hidden">
         <div className="px-4 py-3 border-b bg-gray-50">
-          <h3 className="font-semibold text-gray-900">Criterion Confidence Scores</h3>
-          <p className="text-sm text-gray-500">Job ID: {jobId}</p>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h3 className="font-semibold text-gray-900">Criterion Confidence Scores</h3>
+              <p className="text-sm text-gray-500">Job ID: {jobId}</p>
+            </div>
+            <div className="flex items-center gap-4 text-xs text-gray-500">
+              <span className="flex items-center gap-1">
+                <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium">A</span>
+                Basic
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium">AA</span>
+                Standard
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded font-medium">AAA</span>
+                Enhanced
+              </span>
+            </div>
+          </div>
         </div>
         <div className="divide-y">
           {criteria.map((criterion) => (
