@@ -17,6 +17,8 @@ import { Section508Page } from '@/pages/compliance/Section508Page';
 import { FpcPage } from '@/pages/compliance/FpcPage';
 import { TestEditionSelector } from '@/pages/test/TestEditionSelector';
 import { TestConfidenceDashboard } from '@/pages/test/TestConfidenceDashboard';
+import { TestVerificationQueue } from '@/pages/test/TestVerificationQueue';
+import { VerificationQueuePage } from '@/pages/acr/VerificationQueuePage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -66,12 +68,14 @@ function AppRoutes() {
           <Route path="/validation/:fileId" element={<ValidationResults />} />
           <Route path="/compliance/section508/:fileId" element={<Section508Page />} />
           <Route path="/compliance/fpc/:fileId" element={<FpcPage />} />
+          <Route path="/acr/verification/:jobId" element={<VerificationQueuePage />} />
         </Route>
 
         <Route path="/unauthorized" element={<Unauthorized />} />
 
         <Route path="/test/edition-selector" element={<TestEditionSelector />} />
         <Route path="/test/confidence-dashboard" element={<TestConfidenceDashboard />} />
+        <Route path="/test/verification-queue" element={<TestVerificationQueue />} />
 
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<NotFound />} />
