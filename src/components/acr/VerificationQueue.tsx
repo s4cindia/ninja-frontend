@@ -159,20 +159,19 @@ export function VerificationQueue({ jobId, onComplete }: VerificationQueueProps)
   const [bulkStatus, setBulkStatus] = useState<VerificationStatus>('verified_pass');
   const [bulkMethod, setBulkMethod] = useState<VerificationMethod>('Manual Review');
   const [bulkNotes, setBulkNotes] = useState('');
-  const [localItems, setLocalItems] = useState<VerificationItemType[]>([]);
-  const [useMockData, setUseMockData] = useState(false);
+  const [localItems, setLocalItems] = useState<VerificationItemType[]>(MOCK_ITEMS);
+  const [useMockData, setUseMockData] = useState(true);
 
   const { data: apiData, isLoading, error } = useVerificationQueue(jobId, filters);
   const submitMutation = useSubmitVerification();
   const bulkMutation = useBulkVerification();
 
   useEffect(() => {
-    if (error) {
-      setUseMockData(true);
-      setLocalItems(MOCK_ITEMS);
-    } else if (apiData?.items) {
+    if (apiData?.items && apiData.items.length > 0) {
       setUseMockData(false);
       setLocalItems(apiData.items);
+    } else if (error || (apiData && apiData.items?.length === 0)) {
+      setUseMockData(true);
     }
   }, [apiData, error]);
 
