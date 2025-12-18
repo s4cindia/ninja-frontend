@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronDown, Clock, CheckCircle, XCircle, AlertTriangle, History } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
@@ -52,9 +52,24 @@ const VERIFICATION_STATUSES: { value: VerificationStatus; label: string }[] = [
 export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmitting }: VerificationItemProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [formStatus, setFormStatus] = useState<VerificationStatus>('verified_pass');
-  const [formMethod, setFormMethod] = useState<VerificationMethod>('Manual Review');
-  const [formNotes, setFormNotes] = useState('');
+  
+  const latestHistory = item.history.length > 0 ? item.history[item.history.length - 1] : null;
+  
+  const [formStatus, setFormStatus] = useState<VerificationStatus>(
+    latestHistory?.status ?? 'verified_pass'
+  );
+  const [formMethod, setFormMethod] = useState<VerificationMethod>(
+    latestHistory?.method ?? 'Manual Review'
+  );
+  const [formNotes, setFormNotes] = useState(latestHistory?.notes ?? '');
+
+  useEffect(() => {
+    if (latestHistory) {
+      setFormStatus(latestHistory.status);
+      setFormMethod(latestHistory.method);
+      setFormNotes(latestHistory.notes);
+    }
+  }, [latestHistory?.id]);
 
   const severityConfig = SEVERITY_CONFIG[item.severity];
   const statusConfig = STATUS_CONFIG[item.status];
@@ -66,7 +81,6 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
   const handleSubmit = () => {
     if (canSubmit) {
       onSubmit(item.id, formStatus, formMethod, formNotes);
-      setFormNotes('');
     }
   };
 
