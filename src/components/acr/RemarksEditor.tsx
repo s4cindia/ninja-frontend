@@ -14,6 +14,11 @@ interface RemarksEditorProps {
   disabled?: boolean;
 }
 
+const getMinLength = (level: ConformanceLevel): number => {
+  if (level === 'does_not_support') return 50;
+  return 20;
+};
+
 export function RemarksEditor({
   remarks,
   conformanceLevel,
@@ -32,6 +37,7 @@ export function RemarksEditor({
   }, [remarks, isEditing]);
   
   const validation = validateRemarks(isEditing ? editValue : remarks, conformanceLevel);
+  const minLength = getMinLength(conformanceLevel);
   
   const handleStartEdit = () => {
     setEditValue(remarks);
@@ -67,9 +73,9 @@ export function RemarksEditor({
           <div className="flex items-center justify-between">
             <span className={cn(
               'text-xs',
-              validation.characterCount < 20 ? 'text-red-500' : 'text-gray-500'
+              validation.characterCount < minLength ? 'text-red-500' : 'text-gray-500'
             )}>
-              {validation.characterCount} characters
+              {validation.characterCount} / {minLength} min characters
             </span>
             <div className="flex items-center gap-2">
               <Button
