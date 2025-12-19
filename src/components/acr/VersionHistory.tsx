@@ -1,15 +1,20 @@
-import { useState } from 'react';
-import { History, Clock, User, ChevronRight, RotateCcw, ArrowLeftRight, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { History, Clock, User, ChevronRight, RotateCcw, ArrowLeftRight, Loader2, CheckCircle } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { useMockVersionHistory, useMockVersionDetails } from '@/hooks/useAcrVersions';
+import { MOCK_VERSIONS, useMockVersionDetails } from '@/hooks/useAcrVersions';
 import type { VersionEntry, VersionChange } from '@/types/version.types';
 
 interface VersionHistoryProps {
   acrId: string;
   onRestore: (version: number) => void;
   onCompare?: (v1: number, v2: number) => void;
+}
+
+interface ToastState {
+  show: boolean;
+  message: string;
 }
 
 function formatDate(dateStr: string): string {
@@ -97,6 +102,7 @@ function VersionItem({
   isSelected,
   isCompareMode,
   isCompareSelected,
+  isCurrent,
   onClick,
   onCompareSelect,
 }: {
@@ -104,6 +110,7 @@ function VersionItem({
   isSelected: boolean;
   isCompareMode: boolean;
   isCompareSelected: boolean;
+  isCurrent: boolean;
   onClick: () => void;
   onCompareSelect: () => void;
 }) {
@@ -120,7 +127,7 @@ function VersionItem({
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-gray-900">Version {version.version}</span>
-            {version.version === 5 && (
+            {isCurrent && (
               <Badge variant="success" size="sm">Current</Badge>
             )}
             {isCompareSelected && (
@@ -161,9 +168,24 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
   const [isCompareMode, setIsCompareMode] = useState(false);
   const [compareVersions, setCompareVersions] = useState<number[]>([]);
+  const [versions, setVersions] = useState<VersionEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [toast, setToast] = useState<ToastState>({ show: false, message: '' });
 
-  const { versions, isLoading } = useMockVersionHistory(acrId);
   const { data: versionDetails, isLoading: isLoadingDetails } = useMockVersionDetails(acrId, selectedVersion);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setVersions([...MOCK_VERSIONS]);
+      setIsLoading(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [acrId]);
+
+  const showToast = (message: string) => {
+    setToast({ show: true, message });
+    setTimeout(() => setToast({ show: false, message: '' }), 3000);
+  };
 
   const handleVersionClick = (version: number) => {
     setSelectedVersion(selectedVersion === version ? null : version);
@@ -189,7 +211,19 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
   };
 
   const handleRestore = (version: number) => {
-    if (confirm(`Are you sure you want to restore to version ${version}? This will copy the content to a new draft.`)) {
+    if (confirm(`Restore to Version ${version}? This will create a new draft.`)) {
+      const maxVersion = Math.max(...versions.map(v => v.version));
+      const newVersion: VersionEntry = {
+        version: maxVersion + 1,
+        createdAt: new Date().toISOString(),
+        createdBy: 'Current User',
+        changeSummary: `Restored from Version ${version}`,
+        changeCount: 0,
+      };
+      
+      setVersions(prev => [newVersion, ...prev]);
+      setSelectedVersion(null);
+      showToast(`Restored to Version ${version}. New Version ${newVersion.version} created.`);
       onRestore(version);
     }
   };
@@ -202,8 +236,16 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
     );
   }
 
+  const currentVersion = versions.length > 0 ? versions[0].version : null;
+
   return (
     <div className="space-y-4">
+      {toast.show && (
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 bg-green-600 text-white px-4 py-3 rounded-lg shadow-lg animate-in slide-in-from-top-2">
+          <CheckCircle className="h-5 w-5" />
+          {toast.message}
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <History className="h-5 w-5 text-gray-600" />
@@ -255,6 +297,7 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
               isSelected={selectedVersion === version.version}
               isCompareMode={isCompareMode}
               isCompareSelected={compareVersions.includes(version.version)}
+              isCurrent={version.version === currentVersion}
               onClick={() => handleVersionClick(version.version)}
               onCompareSelect={() => handleCompareSelect(version.version)}
             />

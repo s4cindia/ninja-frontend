@@ -53,7 +53,7 @@ export function useCompareVersions(acrId: string, v1: number | null, v2: number 
   });
 }
 
-const MOCK_VERSIONS: VersionEntry[] = [
+export const MOCK_VERSIONS: VersionEntry[] = [
   {
     version: 5,
     createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
