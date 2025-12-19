@@ -279,7 +279,7 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
 
       {credibility && !credibility.isCredible && (
         <Alert variant="warning" title="Credibility Warning">
-          <p>{credibility.supportsPercentage}% of criteria are marked as "Supports". This high percentage may raise questions about the thoroughness of the evaluation.</p>
+          <p>{credibility.supportsPercentage ?? (criteria.length > 0 ? Math.round((criteria.filter(c => c.conformanceLevel === 'supports').length / criteria.length) * 100) : 0)}% of criteria are marked as "Supports". This high percentage may raise questions about the thoroughness of the evaluation.</p>
           {credibility.suspiciousCriteria?.length > 0 && (
             <p className="mt-1">Suspicious entries: {credibility.suspiciousCriteria.join(', ')}</p>
           )}
