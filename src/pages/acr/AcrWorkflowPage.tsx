@@ -357,7 +357,7 @@ export function AcrWorkflowPage() {
           </div>
         );
 
-      case 2:
+      case 2: {
         const MOCK_EXISTING_JOBS = [
           { id: 'job-001', name: 'Product Catalog EPUB', date: '2024-12-15', status: 'completed' },
           { id: 'job-002', name: 'User Manual PDF', date: '2024-12-14', status: 'completed' },
@@ -482,6 +482,7 @@ export function AcrWorkflowPage() {
             )}
           </div>
         );
+      }
 
       case 3:
         return (
