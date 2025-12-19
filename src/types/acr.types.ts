@@ -91,3 +91,24 @@ export interface UpdateCriterionRequest {
   remarks?: string;
   attribution?: AttributionTag;
 }
+
+export type ExportFormat = 'docx' | 'pdf' | 'html';
+
+export interface ExportOptions {
+  format: ExportFormat;
+  includeMethodology: boolean;
+  includeAttributionTags: boolean;
+  includeLegalDisclaimer: boolean;
+  branding?: {
+    companyName?: string;
+    primaryColor?: string;
+    footerText?: string;
+  };
+}
+
+export interface ExportResult {
+  downloadUrl: string;
+  filename: string;
+  format: ExportFormat;
+  generatedAt: string;
+}
