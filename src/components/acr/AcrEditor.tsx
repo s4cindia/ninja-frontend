@@ -126,9 +126,31 @@ const MOCK_FINALIZATION: FinalizationStatus = {
   missingRemarksCount: 1,
 };
 
+const STORAGE_KEY = 'acr-editor-demo-data';
+
+function loadFromStorage(): AcrDocument | null {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return null;
+}
+
+function saveToStorage(doc: AcrDocument): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(doc));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
   const [generatingId, setGeneratingId] = useState<string | null>(null);
-  const [localDocument, setLocalDocument] = useState<AcrDocument>(MOCK_DOCUMENT);
+  const [localDocument, setLocalDocument] = useState<AcrDocument>(() => loadFromStorage() ?? MOCK_DOCUMENT);
   const [localCredibility, setLocalCredibility] = useState<CredibilityValidation>(MOCK_CREDIBILITY);
   const [localFinalization, setLocalFinalization] = useState<FinalizationStatus>(MOCK_FINALIZATION);
   
@@ -191,6 +213,12 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
         pendingCount: 0,
         missingRemarksCount,
       });
+    }
+  }, [localDocument, useMockData]);
+
+  useEffect(() => {
+    if (useMockData) {
+      saveToStorage(localDocument);
     }
   }, [localDocument, useMockData]);
 
