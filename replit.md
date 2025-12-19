@@ -6,6 +6,11 @@ This is a React + Vite + TypeScript frontend web application for the Ninja Platf
 **Current State:** Fully functional development environment with Vite dev server running on port 5000.
 
 ## Recent Changes (December 19, 2025)
+- **ACR Editor Bug Fix:** Fixed "Mark as Final" button staying disabled after editing criteria
+  - Suspicious criteria flag (`isSuspicious`) now cleared when user updates conformance or remarks
+  - Human-verified edits automatically remove the suspicious status
+  - Blockers list properly updates after user reviews flagged items
+
 - **ACR Workflow Page Bug Fix #4:** Fixed verification status persistence
   - Verification changes now persist when navigating between workflow steps
   - Added `verifications` to workflow state (stored in localStorage)

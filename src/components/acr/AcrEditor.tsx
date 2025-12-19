@@ -227,7 +227,7 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
       setLocalDocument(prev => ({
         ...prev,
         criteria: prev.criteria.map(c =>
-          c.id === criterionId ? { ...c, conformanceLevel: level, attribution: 'HUMAN-VERIFIED' as const } : c
+          c.id === criterionId ? { ...c, conformanceLevel: level, attribution: 'HUMAN-VERIFIED' as const, isSuspicious: false } : c
         ),
       }));
     } else {
@@ -243,7 +243,7 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
       setLocalDocument(prev => ({
         ...prev,
         criteria: prev.criteria.map(c =>
-          c.id === criterionId ? { ...c, remarks, attribution: 'HUMAN-VERIFIED' as const } : c
+          c.id === criterionId ? { ...c, remarks, attribution: 'HUMAN-VERIFIED' as const, isSuspicious: false } : c
         ),
       }));
     } else {
