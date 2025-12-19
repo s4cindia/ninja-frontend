@@ -210,7 +210,7 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
   const items = useMockData ? localItems : (apiData?.items ?? []);
   const isSubmitting = submitMutation.isPending || bulkMutation.isPending;
 
-  const bulkRequiresNotes = bulkStatus === 'verified_fail';
+  const bulkRequiresNotes = bulkStatus === 'verified_fail' || bulkStatus === 'verified_partial';
   const canBulkSubmit = selectedItems.size > 0 && (!bulkRequiresNotes || bulkNotes.trim().length > 0);
 
   const filteredItems = useMemo(() => {
