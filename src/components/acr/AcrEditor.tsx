@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, FileCheck } from 'lucide-react';
+import { CheckCircle, FileCheck } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
@@ -150,7 +150,6 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
     if (useMockData) {
       const supportsCount = localDocument.criteria.filter(c => c.conformanceLevel === 'supports').length;
       const supportsPercentage = Math.round((supportsCount / localDocument.criteria.length) * 100);
-      const missingRemarks = localDocument.criteria.filter(c => !c.remarks.trim()).length;
       const suspiciousCount = localDocument.criteria.filter(c => c.isSuspicious).length;
       
       setLocalCredibility({
@@ -161,14 +160,42 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
       });
       
       const blockers: string[] = [];
-      if (missingRemarks > 0) blockers.push(`${missingRemarks} criteria missing remarks`);
-      if (suspiciousCount > 0) blockers.push(`${suspiciousCount} suspicious entries require review`);
+      
+      const emptyRemarks = localDocument.criteria.filter(c => !c.remarks.trim());
+      if (emptyRemarks.length > 0) {
+        blockers.push(`${emptyRemarks.length} criteria with empty remarks: ${emptyRemarks.map(c => c.criterionId).join(', ')}`);
+      }
+      
+      const shortRemarks = localDocument.criteria.filter(c => c.remarks.trim().length > 0 && c.remarks.trim().length < 20);
+      if (shortRemarks.length > 0) {
+        blockers.push(`${shortRemarks.length} criteria with remarks < 20 characters: ${shortRemarks.map(c => c.criterionId).join(', ')}`);
+      }
+      
+      const dnsWithoutDetail = localDocument.criteria.filter(c => 
+        c.conformanceLevel === 'does_not_support' && c.remarks.trim().length < 50
+      );
+      if (dnsWithoutDetail.length > 0) {
+        blockers.push(`${dnsWithoutDetail.length} "Does Not Support" items need detailed explanation (50+ chars): ${dnsWithoutDetail.map(c => c.criterionId).join(', ')}`);
+      }
+      
+      const partialWithoutKeywords = localDocument.criteria.filter(c => {
+        if (c.conformanceLevel !== 'partially_supports') return false;
+        const lower = c.remarks.toLowerCase();
+        return !lower.includes('except') && !lower.includes('partial') && !lower.includes('some') && !lower.includes('most');
+      });
+      if (partialWithoutKeywords.length > 0) {
+        blockers.push(`${partialWithoutKeywords.length} "Partially Supports" items missing context keywords: ${partialWithoutKeywords.map(c => c.criterionId).join(', ')}`);
+      }
+      
+      if (suspiciousCount > 0) {
+        blockers.push(`${suspiciousCount} suspicious entries require review`);
+      }
       
       setLocalFinalization({
         canFinalize: blockers.length === 0,
         blockers,
         pendingCount: 0,
-        missingRemarksCount: missingRemarks,
+        missingRemarksCount: emptyRemarks.length,
       });
     }
   }, [localDocument, useMockData]);
@@ -324,36 +351,39 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
 
       <div className="bg-white rounded-lg border p-4">
         <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-              <FileCheck className="h-5 w-5" />
-              Finalization Status
-            </h3>
-            {finalization?.canFinalize ? (
-              <div className="flex items-center gap-1 text-green-600 text-sm mt-1">
-                <CheckCircle className="h-4 w-4" />
-                Ready to finalize
-              </div>
-            ) : (
-              <div className="mt-2 space-y-1">
-                {blockers.map((blocker, idx) => (
-                  <div key={idx} className="flex items-center gap-1 text-red-600 text-sm">
-                    <XCircle className="h-4 w-4 flex-shrink-0" />
-                    {blocker}
-                  </div>
-                ))}
-              </div>
-            )}
+          <div className="flex items-center gap-2">
+            <FileCheck className="h-5 w-5" />
+            <span className="font-semibold text-gray-900">Finalization Status</span>
           </div>
           
           <Button
             onClick={handleFinalize}
-            disabled={!finalization?.canFinalize || document?.status === 'final' || finalizeMutation.isPending}
+            disabled={blockers.length > 0 || document?.status === 'final' || finalizeMutation.isPending}
             isLoading={finalizeMutation.isPending}
           >
             Mark as Final
           </Button>
         </div>
+        
+        {blockers.length > 0 && (
+          <div className="mt-4">
+            <p className="text-sm text-red-600 font-medium mb-2">
+              Cannot finalize - {blockers.length} issue(s) to resolve:
+            </p>
+            <ul className="text-sm text-red-600 list-disc list-inside space-y-1">
+              {blockers.map((blocker, idx) => (
+                <li key={idx}>{blocker}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        
+        {blockers.length === 0 && (
+          <p className="text-sm text-green-600 mt-2 flex items-center gap-1">
+            <CheckCircle className="h-4 w-4" />
+            All requirements met - ready to finalize
+          </p>
+        )}
       </div>
     </div>
   );
