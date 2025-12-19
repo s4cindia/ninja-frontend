@@ -150,7 +150,6 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
     if (useMockData) {
       const supportsCount = localDocument.criteria.filter(c => c.conformanceLevel === 'supports').length;
       const supportsPercentage = Math.round((supportsCount / localDocument.criteria.length) * 100);
-      const suspiciousCount = localDocument.criteria.filter(c => c.isSuspicious).length;
       
       setLocalCredibility({
         isCredible: supportsPercentage <= 95,
@@ -161,41 +160,36 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
       
       const blockers: string[] = [];
       
-      const emptyRemarks = localDocument.criteria.filter(c => !c.remarks.trim());
-      if (emptyRemarks.length > 0) {
-        blockers.push(`${emptyRemarks.length} criteria with empty remarks: ${emptyRemarks.map(c => c.criterionId).join(', ')}`);
-      }
-      
-      const shortRemarks = localDocument.criteria.filter(c => c.remarks.trim().length > 0 && c.remarks.trim().length < 20);
-      if (shortRemarks.length > 0) {
-        blockers.push(`${shortRemarks.length} criteria with remarks < 20 characters: ${shortRemarks.map(c => c.criterionId).join(', ')}`);
-      }
-      
-      const dnsWithoutDetail = localDocument.criteria.filter(c => 
-        c.conformanceLevel === 'does_not_support' && c.remarks.trim().length < 50
-      );
-      if (dnsWithoutDetail.length > 0) {
-        blockers.push(`${dnsWithoutDetail.length} "Does Not Support" items need detailed explanation (50+ chars): ${dnsWithoutDetail.map(c => c.criterionId).join(', ')}`);
-      }
-      
-      const partialWithoutKeywords = localDocument.criteria.filter(c => {
-        if (c.conformanceLevel !== 'partially_supports') return false;
-        const lower = c.remarks.toLowerCase();
-        return !lower.includes('except') && !lower.includes('partial') && !lower.includes('some') && !lower.includes('most');
+      localDocument.criteria.forEach(c => {
+        if (!c.remarks.trim()) {
+          blockers.push(`${c.criterionId} ${c.criterionName} - remarks required`);
+        } else if (c.remarks.trim().length < 20) {
+          blockers.push(`${c.criterionId} ${c.criterionName} - remarks too short (min 20 characters)`);
+        }
+        
+        if (c.conformanceLevel === 'does_not_support' && c.remarks.trim().length < 50) {
+          blockers.push(`${c.criterionId} ${c.criterionName} - "Does Not Support" requires detailed explanation (50+ characters)`);
+        }
+        
+        if (c.conformanceLevel === 'partially_supports') {
+          const lower = c.remarks.toLowerCase();
+          if (!lower.includes('except') && !lower.includes('partial') && !lower.includes('some') && !lower.includes('most')) {
+            blockers.push(`${c.criterionId} ${c.criterionName} - "Partially Supports" missing context keywords`);
+          }
+        }
+        
+        if (c.isSuspicious) {
+          blockers.push(`${c.criterionId} ${c.criterionName} - flagged as suspicious, requires review`);
+        }
       });
-      if (partialWithoutKeywords.length > 0) {
-        blockers.push(`${partialWithoutKeywords.length} "Partially Supports" items missing context keywords: ${partialWithoutKeywords.map(c => c.criterionId).join(', ')}`);
-      }
       
-      if (suspiciousCount > 0) {
-        blockers.push(`${suspiciousCount} suspicious entries require review`);
-      }
+      const missingRemarksCount = localDocument.criteria.filter(c => !c.remarks.trim()).length;
       
       setLocalFinalization({
         canFinalize: blockers.length === 0,
         blockers,
         pendingCount: 0,
-        missingRemarksCount: emptyRemarks.length,
+        missingRemarksCount,
       });
     }
   }, [localDocument, useMockData]);
