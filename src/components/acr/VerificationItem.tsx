@@ -52,6 +52,7 @@ const VERIFICATION_STATUSES: { value: VerificationStatus; label: string }[] = [
 export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmitting }: VerificationItemProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
   
   const latestHistory = item.history.length > 0 ? item.history[item.history.length - 1] : null;
   const historyLength = item.history.length;
@@ -70,6 +71,9 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
       setFormStatus(latest.status);
       setFormMethod(latest.method);
       setFormNotes(latest.notes);
+      setSubmitSuccess(true);
+      const timer = setTimeout(() => setSubmitSuccess(false), 2000);
+      return () => clearTimeout(timer);
     }
   }, [historyLength, item.history]);
 
@@ -238,7 +242,13 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
               />
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex items-center justify-end gap-3">
+              {submitSuccess && (
+                <span className="text-sm text-green-600 flex items-center gap-1">
+                  <CheckCircle className="h-4 w-4" />
+                  Saved!
+                </span>
+              )}
               <Button
                 onClick={handleSubmit}
                 disabled={!canSubmit || isSubmitting}
