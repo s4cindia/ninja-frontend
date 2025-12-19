@@ -189,10 +189,11 @@ export function useMockVersionDetails(_acrId: string, version: number | null) {
     }
     setIsLoading(true);
     const timer = setTimeout(() => {
-      setData(MOCK_VERSION_DETAILS[version] || {
-        ...MOCK_VERSIONS.find(v => v.version === version)!,
+      const existingVersion = MOCK_VERSIONS.find(v => v.version === version);
+      setData(MOCK_VERSION_DETAILS[version] || (existingVersion ? {
+        ...existingVersion,
         changes: [],
-      });
+      } : null));
       setIsLoading(false);
     }, 300);
     return () => clearTimeout(timer);
