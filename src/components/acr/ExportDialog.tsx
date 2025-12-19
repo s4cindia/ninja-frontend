@@ -54,7 +54,7 @@ export function ExportDialog({ acrId, isOpen, onClose }: ExportDialogProps) {
     if (!isOpen) {
       reset();
     }
-  }, [isOpen]);
+  }, [isOpen, reset]);
 
   if (!isOpen) return null;
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import type { ExportOptions, ExportResult, ExportFormat } from '@/types/acr.types';
@@ -25,11 +25,11 @@ export function useExportAcr() {
     return mutation.mutateAsync({ acrId, options });
   };
 
-  const reset = () => {
+  const reset = useCallback(() => {
     setDownloadUrl(null);
     setFilename(null);
     mutation.reset();
-  };
+  }, [mutation]);
 
   return {
     exportAcr: doExport,
@@ -73,11 +73,11 @@ export function useMockExport() {
     return result;
   };
 
-  const reset = () => {
+  const reset = useCallback(() => {
     setDownloadUrl(null);
     setFilename(null);
     setIsExporting(false);
-  };
+  }, []);
 
   return {
     exportAcr,
