@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CheckCircle, XCircle, FileCheck } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
@@ -144,6 +144,33 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
   const finalization = apiFinalization ?? localFinalization;
   const useMockData = !apiDocument && !!docError;
 
+  useEffect(() => {
+    if (useMockData) {
+      const supportsCount = localDocument.criteria.filter(c => c.conformanceLevel === 'supports').length;
+      const supportsPercentage = Math.round((supportsCount / localDocument.criteria.length) * 100);
+      const missingRemarks = localDocument.criteria.filter(c => !c.remarks.trim()).length;
+      const suspiciousCount = localDocument.criteria.filter(c => c.isSuspicious).length;
+      
+      setLocalCredibility({
+        isCredible: supportsPercentage <= 95,
+        supportsPercentage,
+        warnings: supportsPercentage > 95 ? ['High percentage of "Supports" determinations may need review'] : [],
+        suspiciousCriteria: localDocument.criteria.filter(c => c.isSuspicious).map(c => c.criterionId),
+      });
+      
+      const blockers: string[] = [];
+      if (missingRemarks > 0) blockers.push(`${missingRemarks} criteria missing remarks`);
+      if (suspiciousCount > 0) blockers.push(`${suspiciousCount} suspicious entries require review`);
+      
+      setLocalFinalization({
+        canFinalize: blockers.length === 0,
+        blockers,
+        pendingCount: 0,
+        missingRemarksCount: missingRemarks,
+      });
+    }
+  }, [localDocument, useMockData]);
+
   const handleUpdateConformance = (criterionId: string, level: ConformanceLevel) => {
     if (useMockData) {
       setLocalDocument(prev => ({
@@ -152,7 +179,6 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
           c.id === criterionId ? { ...c, conformanceLevel: level, attribution: 'HUMAN-VERIFIED' as const } : c
         ),
       }));
-      updateCredibilityAndFinalization();
     } else {
       updateMutation.mutate({
         criterionId,
@@ -169,7 +195,6 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
           c.id === criterionId ? { ...c, remarks, attribution: 'HUMAN-VERIFIED' as const } : c
         ),
       }));
-      updateCredibilityAndFinalization();
     } else {
       updateMutation.mutate({
         criterionId,
@@ -190,7 +215,6 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
           c.id === criterion.id ? { ...c, remarks: generatedRemarks, attribution: 'AI-SUGGESTED' as const } : c
         ),
       }));
-      updateCredibilityAndFinalization();
     } else {
       try {
         const result = await generateMutation.mutateAsync({
@@ -207,31 +231,6 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
     }
     
     setGeneratingId(null);
-  };
-
-  const updateCredibilityAndFinalization = () => {
-    const supportsCount = localDocument.criteria.filter(c => c.conformanceLevel === 'supports').length;
-    const supportsPercentage = Math.round((supportsCount / localDocument.criteria.length) * 100);
-    const missingRemarks = localDocument.criteria.filter(c => !c.remarks.trim()).length;
-    const suspiciousCount = localDocument.criteria.filter(c => c.isSuspicious).length;
-    
-    setLocalCredibility({
-      isCredible: supportsPercentage <= 95,
-      supportsPercentage,
-      warnings: supportsPercentage > 95 ? ['High percentage of "Supports" determinations may need review'] : [],
-      suspiciousCriteria: localDocument.criteria.filter(c => c.isSuspicious).map(c => c.criterionId),
-    });
-    
-    const blockers: string[] = [];
-    if (missingRemarks > 0) blockers.push(`${missingRemarks} criteria missing remarks`);
-    if (suspiciousCount > 0) blockers.push(`${suspiciousCount} suspicious entries require review`);
-    
-    setLocalFinalization({
-      canFinalize: blockers.length === 0,
-      blockers,
-      pendingCount: 0,
-      missingRemarksCount: missingRemarks,
-    });
   };
 
   const handleFinalize = async () => {
