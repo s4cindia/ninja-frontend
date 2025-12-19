@@ -12,7 +12,8 @@ import {
   Download,
   Loader2,
   X,
-  File
+  File,
+  RotateCcw
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
@@ -211,6 +212,20 @@ export function AcrWorkflowPage() {
 
   const handleRestore = (version: number) => {
     console.log('Restoring to version:', version);
+  };
+
+  const handleResetWorkflow = () => {
+    localStorage.removeItem(`${STORAGE_KEY}-${state.jobId || 'new'}`);
+    setState({
+      currentStep: 1,
+      selectedEdition: null,
+      documentSource: null,
+      uploadedFile: null,
+      jobId: null,
+      acrId: null,
+      verificationComplete: false,
+      isFinalized: false,
+    });
   };
 
   const handleSelectDocumentSource = (source: DocumentSource) => {
@@ -642,9 +657,19 @@ export function AcrWorkflowPage() {
       <div className="mb-8">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold text-gray-900">ACR Generation Workflow</h1>
-          <Badge variant="info">
-            Step {state.currentStep} of {WORKFLOW_STEPS.length}
-          </Badge>
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleResetWorkflow}
+            >
+              <RotateCcw className="h-4 w-4 mr-1" />
+              Start New
+            </Button>
+            <Badge variant="info">
+              Step {state.currentStep} of {WORKFLOW_STEPS.length}
+            </Badge>
+          </div>
         </div>
         <p className="text-gray-600">
           Complete each step to generate your Accessibility Conformance Report.

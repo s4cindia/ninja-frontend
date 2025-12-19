@@ -6,6 +6,12 @@ This is a React + Vite + TypeScript frontend web application for the Ninja Platf
 **Current State:** Fully functional development environment with Vite dev server running on port 5000.
 
 ## Recent Changes (December 19, 2025)
+- **ACR Workflow Page Bug Fix #3:** Fixed Step 2 initial selection regression
+  - Added "Start New" button to workflow header for resetting workflow state
+  - Clears cached localStorage state so users can restart from Step 1
+  - Two-option selection (Upload vs Existing Job) properly displays when documentSource is null
+  - Fixed by adding handleResetWorkflow function that clears localStorage and resets all state
+
 - **ACR Workflow Page Bug Fix #2:** Fixed Step 5 navigation issue
   - "Mark as Final" now correctly advances to Step 6 (Export) instead of redirecting to Dashboard
   - Fixed by updating isFinalized and currentStep atomically in single state update
