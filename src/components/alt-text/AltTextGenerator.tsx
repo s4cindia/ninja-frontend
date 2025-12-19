@@ -54,6 +54,7 @@ export const AltTextGenerator: React.FC<AltTextGeneratorProps> = ({
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(imageUrl || null);
   const [useContext, setUseContext] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
   
   const { isGenerating, result, error, generate, generateContextual, generateFromFile, reset } = useAltTextGeneration();
   const { imageType, classify } = useImageClassification();
@@ -67,13 +68,36 @@ export const AltTextGenerator: React.FC<AltTextGeneratorProps> = ({
     }
   }, [reset]);
 
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) {
-      setUploadedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
-      reset();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      if (file.type.startsWith('image/')) {
+        setUploadedFile(file);
+        setPreviewUrl(URL.createObjectURL(file));
+        reset();
+      }
     }
   }, [reset]);
 
@@ -119,12 +143,15 @@ export const AltTextGenerator: React.FC<AltTextGeneratorProps> = ({
       {showUpload && !imageUrl && (
         <div
           className={cn(
-            'border-2 border-dashed rounded-lg p-6 text-center transition-colors',
+            'border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer',
             'hover:border-primary-400 hover:bg-primary-50',
+            isDragging && 'border-primary-500 bg-primary-100',
             previewUrl && 'border-primary-300 bg-primary-50'
           )}
           onDrop={handleDrop}
-          onDragOver={(e) => e.preventDefault()}
+          onDragOver={handleDragOver}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
         >
           {previewUrl ? (
             <div className="space-y-3">
