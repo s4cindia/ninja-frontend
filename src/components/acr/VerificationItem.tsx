@@ -54,6 +54,7 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
   const [showHistory, setShowHistory] = useState(false);
   
   const latestHistory = item.history.length > 0 ? item.history[item.history.length - 1] : null;
+  const historyLength = item.history.length;
   
   const [formStatus, setFormStatus] = useState<VerificationStatus>(
     latestHistory?.status ?? 'verified_pass'
@@ -64,12 +65,13 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
   const [formNotes, setFormNotes] = useState(latestHistory?.notes ?? '');
 
   useEffect(() => {
-    if (latestHistory) {
-      setFormStatus(latestHistory.status);
-      setFormMethod(latestHistory.method);
-      setFormNotes(latestHistory.notes);
+    const latest = item.history.length > 0 ? item.history[item.history.length - 1] : null;
+    if (latest) {
+      setFormStatus(latest.status);
+      setFormMethod(latest.method);
+      setFormNotes(latest.notes);
     }
-  }, [latestHistory?.id]);
+  }, [historyLength, item.history]);
 
   const severityConfig = SEVERITY_CONFIG[item.severity];
   const statusConfig = STATUS_CONFIG[item.status];
