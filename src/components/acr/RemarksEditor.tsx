@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sparkles, Edit2, Check, X, AlertTriangle } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
@@ -24,6 +24,12 @@ export function RemarksEditor({
 }: RemarksEditorProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(remarks);
+  
+  useEffect(() => {
+    if (!isEditing) {
+      setEditValue(remarks);
+    }
+  }, [remarks, isEditing]);
   
   const validation = validateRemarks(isEditing ? editValue : remarks, conformanceLevel);
   
