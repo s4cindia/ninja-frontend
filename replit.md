@@ -5,7 +5,19 @@ This is a React + Vite + TypeScript frontend web application for the Ninja Platf
 
 **Current State:** Fully functional development environment with Vite dev server running on port 5000.
 
-## Recent Changes (December 15, 2025)
+## Recent Changes (December 19, 2025)
+- **ACR Workflow Page Bug Fix:** Fixed Step 2 document upload selection
+  - Separated handlers for "Upload New Document" vs "Select Existing Job"
+  - Added `documentSource` state to track selection type ('upload' | 'existing')
+  - Added `uploadedFile` state for tracking uploaded file metadata
+  - Created proper file upload UI with drag-drop support and file browser
+  - Created existing job selection UI with list of completed jobs
+  - Added back button to return to source selection
+  - File selection shows file name and size with clear button
+  - Job selection highlights selected job with checkmark
+  - State properly persisted in localStorage
+
+## Changes (December 15, 2025)
 - **Dashboard with Real Data:** Updated Dashboard page with backend API integration
   - Stat cards for total files, processed, pending, failed with loading states
   - Circular compliance score indicator with color-coded thresholds

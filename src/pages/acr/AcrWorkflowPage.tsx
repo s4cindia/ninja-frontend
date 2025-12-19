@@ -10,7 +10,9 @@ import {
   UserCheck,
   Edit3,
   Download,
-  Loader2
+  Loader2,
+  X,
+  File
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
@@ -40,9 +42,19 @@ const WORKFLOW_STEPS: WorkflowStep[] = [
   { id: 6, name: 'Export', description: 'Download ACR', icon: Download },
 ];
 
+type DocumentSource = 'upload' | 'existing' | null;
+
+interface UploadedFile {
+  name: string;
+  size: number;
+  type: string;
+}
+
 interface WorkflowState {
   currentStep: number;
   selectedEdition: AcrEdition | null;
+  documentSource: DocumentSource;
+  uploadedFile: UploadedFile | null;
   jobId: string | null;
   acrId: string | null;
   verificationComplete: boolean;
@@ -63,6 +75,8 @@ function loadWorkflowState(jobId?: string): WorkflowState {
   return {
     currentStep: 1,
     selectedEdition: null,
+    documentSource: null,
+    uploadedFile: null,
     jobId: jobId || null,
     acrId: jobId ? `acr-${jobId}` : null,
     verificationComplete: false,
@@ -187,13 +201,6 @@ export function AcrWorkflowPage() {
     updateState({ selectedEdition: edition });
   };
 
-  const handleJobSelect = (jobId: string) => {
-    updateState({ 
-      jobId, 
-      acrId: `acr-${jobId}`,
-    });
-  };
-
   const handleVerificationComplete = () => {
     updateState({ verificationComplete: true });
   };
@@ -205,6 +212,75 @@ export function AcrWorkflowPage() {
 
   const handleRestore = (version: number) => {
     console.log('Restoring to version:', version);
+  };
+
+  const handleSelectDocumentSource = (source: DocumentSource) => {
+    updateState({ 
+      documentSource: source,
+      uploadedFile: null,
+      jobId: null,
+      acrId: null,
+    });
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const uploadedFile: UploadedFile = {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+      };
+      const newJobId = `upload-${Date.now()}`;
+      updateState({ 
+        uploadedFile,
+        jobId: newJobId,
+        acrId: `acr-${newJobId}`,
+      });
+    }
+  };
+
+  const handleFileDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const file = event.dataTransfer.files?.[0];
+    if (file) {
+      const uploadedFile: UploadedFile = {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+      };
+      const newJobId = `upload-${Date.now()}`;
+      updateState({ 
+        uploadedFile,
+        jobId: newJobId,
+        acrId: `acr-${newJobId}`,
+      });
+    }
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+  };
+
+  const handleClearFile = () => {
+    updateState({ 
+      uploadedFile: null,
+      jobId: null,
+      acrId: null,
+    });
+  };
+
+  const handleSelectExistingJob = (jobId: string) => {
+    updateState({ 
+      jobId, 
+      acrId: `acr-${jobId}`,
+    });
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   const canProceed = (): boolean => {
@@ -250,6 +326,12 @@ export function AcrWorkflowPage() {
         );
 
       case 2:
+        const MOCK_EXISTING_JOBS = [
+          { id: 'job-001', name: 'Product Catalog EPUB', date: '2024-12-15', status: 'completed' },
+          { id: 'job-002', name: 'User Manual PDF', date: '2024-12-14', status: 'completed' },
+          { id: 'job-003', name: 'Training Materials HTML', date: '2024-12-12', status: 'completed' },
+        ];
+
         return (
           <div className="space-y-6">
             <div>
@@ -259,38 +341,148 @@ export function AcrWorkflowPage() {
               </p>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div 
-                className={cn(
-                  'border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors',
-                  'hover:border-primary-400 hover:bg-primary-50'
-                )}
-                onClick={() => handleJobSelect(`job-${Date.now()}`)}
-              >
-                <Upload className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                <h3 className="font-medium text-gray-900 mb-1">Upload New Document</h3>
-                <p className="text-sm text-gray-500">Upload EPUB, PDF, or HTML files</p>
-              </div>
+            {!state.documentSource && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div 
+                  className={cn(
+                    'border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors',
+                    'hover:border-primary-400 hover:bg-primary-50'
+                  )}
+                  onClick={() => handleSelectDocumentSource('upload')}
+                >
+                  <Upload className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <h3 className="font-medium text-gray-900 mb-1">Upload New Document</h3>
+                  <p className="text-sm text-gray-500">Upload EPUB, PDF, or HTML files</p>
+                </div>
 
-              <div 
-                className={cn(
-                  'border-2 rounded-lg p-8 text-center cursor-pointer transition-colors',
-                  'hover:border-primary-400 hover:bg-primary-50',
-                  state.jobId && 'border-primary-500 bg-primary-50'
-                )}
-                onClick={() => handleJobSelect('demo-job-123')}
-              >
-                <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                <h3 className="font-medium text-gray-900 mb-1">Select Existing Job</h3>
-                <p className="text-sm text-gray-500">Use a completed validation job</p>
+                <div 
+                  className={cn(
+                    'border-2 rounded-lg p-8 text-center cursor-pointer transition-colors',
+                    'hover:border-primary-400 hover:bg-primary-50'
+                  )}
+                  onClick={() => handleSelectDocumentSource('existing')}
+                >
+                  <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <h3 className="font-medium text-gray-900 mb-1">Select Existing Job</h3>
+                  <p className="text-sm text-gray-500">Use a completed validation job</p>
+                </div>
               </div>
-            </div>
+            )}
+
+            {state.documentSource === 'upload' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium text-gray-900">Upload Document</h3>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handleSelectDocumentSource(null)}
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Back
+                  </Button>
+                </div>
+
+                {!state.uploadedFile ? (
+                  <div
+                    className={cn(
+                      'border-2 border-dashed rounded-lg p-12 text-center transition-colors',
+                      'hover:border-primary-400 hover:bg-primary-50'
+                    )}
+                    onDrop={handleFileDrop}
+                    onDragOver={handleDragOver}
+                  >
+                    <Upload className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+                    <h3 className="font-medium text-gray-900 mb-2">
+                      Drag and drop your file here
+                    </h3>
+                    <p className="text-sm text-gray-500 mb-4">
+                      Supports EPUB, PDF, and HTML files
+                    </p>
+                    <label className="cursor-pointer inline-block">
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".epub,.pdf,.html,.htm"
+                        onChange={handleFileUpload}
+                      />
+                      <span className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors">
+                        Browse Files
+                      </span>
+                    </label>
+                  </div>
+                ) : (
+                  <div className="border rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+                          <File className="h-5 w-5 text-primary-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">{state.uploadedFile.name}</p>
+                          <p className="text-sm text-gray-500">{formatFileSize(state.uploadedFile.size)}</p>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={handleClearFile}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {state.documentSource === 'existing' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-medium text-gray-900">Select Existing Job</h3>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => handleSelectDocumentSource(null)}
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Back
+                  </Button>
+                </div>
+
+                <div className="border rounded-lg divide-y">
+                  {MOCK_EXISTING_JOBS.map((job) => (
+                    <div
+                      key={job.id}
+                      className={cn(
+                        'p-4 cursor-pointer transition-colors',
+                        'hover:bg-gray-50',
+                        state.jobId === job.id && 'bg-primary-50 border-l-4 border-l-primary-500'
+                      )}
+                      onClick={() => handleSelectExistingJob(job.id)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-5 w-5 text-gray-400" />
+                          <div>
+                            <p className="font-medium text-gray-900">{job.name}</p>
+                            <p className="text-sm text-gray-500">Completed on {job.date}</p>
+                          </div>
+                        </div>
+                        {state.jobId === job.id && (
+                          <CheckCircle className="h-5 w-5 text-primary-600" />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {state.jobId && (
               <Alert variant="success">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4" />
-                  Job Selected: <Badge variant="info">{state.jobId}</Badge>
+                  {state.documentSource === 'upload' ? 'Document uploaded' : 'Job selected'}: 
+                  <Badge variant="info">
+                    {state.uploadedFile?.name || state.jobId}
+                  </Badge>
                 </div>
               </Alert>
             )}
