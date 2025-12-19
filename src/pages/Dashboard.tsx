@@ -1,5 +1,5 @@
 import { FileText, Clock, CheckCircle, XCircle, Activity, Upload, Search } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useDashboardStats, useRecentActivity } from '@/hooks/useDashboard';
 import { Spinner } from '@/components/ui/Spinner';
 import { Alert } from '@/components/ui/Alert';
@@ -190,6 +190,7 @@ function RecentActivityList() {
 }
 
 export function Dashboard() {
+  const navigate = useNavigate();
   const { data: stats, isLoading: statsLoading, error: statsError } = useDashboardStats();
 
   if (statsError) {
@@ -208,11 +209,13 @@ export function Dashboard() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <div className="flex gap-3">
-          <Link to="/files">
-            <Button variant="primary" leftIcon={<Upload className="w-4 h-4" />}>
-              Upload File
-            </Button>
-          </Link>
+          <Button 
+            variant="primary" 
+            leftIcon={<Upload className="w-4 h-4" />}
+            onClick={() => navigate('/files')}
+          >
+            Upload File
+          </Button>
         </div>
       </div>
 
