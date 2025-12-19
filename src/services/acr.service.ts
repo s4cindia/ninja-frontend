@@ -22,8 +22,8 @@ export const acrService = {
   },
 
   async getDocument(jobId: string): Promise<AcrDocument> {
-    const response = await api.get<AcrDocument>(`/acr/${jobId}`);
-    return response.data;
+    const response = await api.get<ApiResponse<AcrDocument>>(`/acr/${jobId}`);
+    return response.data.data;
   },
 
   async updateCriterion(
@@ -31,25 +31,25 @@ export const acrService = {
     criterionId: string,
     data: UpdateCriterionRequest
   ): Promise<void> {
-    await api.patch(`/acr/${jobId}/criteria/${criterionId}`, data);
+    await api.patch<ApiResponse<void>>(`/acr/${jobId}/criteria/${criterionId}`, data);
   },
 
   async generateRemarks(data: GenerateRemarksRequest): Promise<GenerateRemarksResponse> {
-    const response = await api.post<GenerateRemarksResponse>('/acr/generate-remarks', data);
-    return response.data;
+    const response = await api.post<ApiResponse<GenerateRemarksResponse>>('/acr/generate-remarks', data);
+    return response.data.data;
   },
 
   async validateCredibility(jobId: string): Promise<CredibilityValidation> {
-    const response = await api.post<CredibilityValidation>(`/acr/${jobId}/validate-credibility`);
-    return response.data;
+    const response = await api.post<ApiResponse<CredibilityValidation>>(`/acr/${jobId}/validate-credibility`);
+    return response.data.data;
   },
 
   async getFinalizationStatus(jobId: string): Promise<FinalizationStatus> {
-    const response = await api.get<FinalizationStatus>(`/acr/${jobId}/can-finalize`);
-    return response.data;
+    const response = await api.get<ApiResponse<FinalizationStatus>>(`/acr/${jobId}/can-finalize`);
+    return response.data.data;
   },
 
   async finalizeDocument(jobId: string): Promise<void> {
-    await api.post(`/acr/${jobId}/finalize`);
+    await api.post<ApiResponse<void>>(`/acr/${jobId}/finalize`);
   },
 };
