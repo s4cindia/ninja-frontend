@@ -5,7 +5,57 @@ This is a React + Vite + TypeScript frontend web application for the Ninja Platf
 
 **Current State:** Fully functional development environment with Vite dev server running on port 5000.
 
-## Recent Changes (December 15, 2025)
+## Recent Changes (December 19, 2025)
+- **ACR Editor Error Handling:** Added proper error handling for remark generation
+  - Empty catch block replaced with proper error logging and user feedback
+  - Inline error alert displays when AI remark generation fails
+  - Error auto-dismisses after 5 seconds or can be manually closed
+
+- **Step 2 Document Upload Redesign:** Both options now show side-by-side
+  - Upload interface and job selection displayed in two-column layout
+  - Selected option highlighted with blue border ring
+  - Improved UX without back-and-forth navigation
+
+- **Dashboard Mock Data:** Added fallback data when backend API unavailable
+  - Stats and activity now load with demo data when API calls fail
+  - No more network error messages in demo mode
+
+- **ACR Editor Bug Fix:** Fixed "Mark as Final" button staying disabled after editing criteria
+  - Suspicious criteria flag (`isSuspicious`) now cleared when user updates conformance or remarks
+  - Human-verified edits automatically remove the suspicious status
+  - Blockers list properly updates after user reviews flagged items
+
+- **ACR Workflow Page Bug Fix #4:** Fixed verification status persistence
+  - Verification changes now persist when navigating between workflow steps
+  - Added `verifications` to workflow state (stored in localStorage)
+  - VerificationQueue accepts `savedVerifications` prop to restore state on mount
+  - VerificationQueue calls `onVerificationUpdate` when changes are made
+  - Parent workflow state and localStorage updated atomically on each verification
+  - Supports both individual and bulk verification persistence
+
+- **ACR Workflow Page Bug Fix #3:** Fixed Step 2 initial selection regression
+  - Added "Start New" button to workflow header for resetting workflow state
+  - Clears cached localStorage state so users can restart from Step 1
+  - Two-option selection (Upload vs Existing Job) properly displays when documentSource is null
+  - Fixed by adding handleResetWorkflow function that clears localStorage and resets all state
+
+- **ACR Workflow Page Bug Fix #2:** Fixed Step 5 navigation issue
+  - "Mark as Final" now correctly advances to Step 6 (Export) instead of redirecting to Dashboard
+  - Fixed by updating isFinalized and currentStep atomically in single state update
+  - Removed reliance on handleNext() closure which could cause timing issues
+
+- **ACR Workflow Page Bug Fix #1:** Fixed Step 2 document upload selection
+  - Separated handlers for "Upload New Document" vs "Select Existing Job"
+  - Added `documentSource` state to track selection type ('upload' | 'existing')
+  - Added `uploadedFile` state for tracking uploaded file metadata
+  - Created proper file upload UI with drag-drop support and file browser
+  - Created existing job selection UI with list of completed jobs
+  - Added back button to return to source selection
+  - File selection shows file name and size with clear button
+  - Job selection highlights selected job with checkmark
+  - State properly persisted in localStorage
+
+## Changes (December 15, 2025)
 - **Dashboard with Real Data:** Updated Dashboard page with backend API integration
   - Stat cards for total files, processed, pending, failed with loading states
   - Circular compliance score indicator with color-coded thresholds
