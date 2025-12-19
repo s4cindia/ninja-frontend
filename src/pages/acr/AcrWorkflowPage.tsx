@@ -254,14 +254,6 @@ export function AcrWorkflowPage() {
     });
   };
 
-  const handleSelectDocumentSource = (source: DocumentSource) => {
-    updateState({ 
-      documentSource: source,
-      uploadedFile: null,
-      jobId: null,
-      acrId: null,
-    });
-  };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -381,62 +373,30 @@ export function AcrWorkflowPage() {
               </p>
             </div>
             
-            {!state.documentSource && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div 
-                  className={cn(
-                    'border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors',
-                    'hover:border-primary-400 hover:bg-primary-50'
-                  )}
-                  onClick={() => handleSelectDocumentSource('upload')}
-                >
-                  <Upload className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <h3 className="font-medium text-gray-900 mb-1">Upload New Document</h3>
-                  <p className="text-sm text-gray-500">Upload EPUB, PDF, or HTML files</p>
-                </div>
-
-                <div 
-                  className={cn(
-                    'border-2 rounded-lg p-8 text-center cursor-pointer transition-colors',
-                    'hover:border-primary-400 hover:bg-primary-50'
-                  )}
-                  onClick={() => handleSelectDocumentSource('existing')}
-                >
-                  <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <h3 className="font-medium text-gray-900 mb-1">Select Existing Job</h3>
-                  <p className="text-sm text-gray-500">Use a completed validation job</p>
-                </div>
-              </div>
-            )}
-
-            {state.documentSource === 'upload' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-medium text-gray-900">Upload Document</h3>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => handleSelectDocumentSource(null)}
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Back
-                  </Button>
-                </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className={cn(
+                'border rounded-lg p-6 transition-all',
+                state.documentSource === 'upload' && 'ring-2 ring-primary-500 border-primary-500'
+              )}>
+                <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
+                  <Upload className="h-5 w-5 text-gray-500" />
+                  Upload New Document
+                </h3>
 
                 {!state.uploadedFile ? (
                   <div
                     className={cn(
-                      'border-2 border-dashed rounded-lg p-12 text-center transition-colors',
+                      'border-2 border-dashed rounded-lg p-8 text-center transition-colors',
                       'hover:border-primary-400 hover:bg-primary-50'
                     )}
                     onDrop={handleFileDrop}
                     onDragOver={handleDragOver}
                   >
-                    <Upload className="h-16 w-16 mx-auto text-gray-400 mb-4" />
-                    <h3 className="font-medium text-gray-900 mb-2">
+                    <Upload className="h-12 w-12 mx-auto text-gray-400 mb-3" />
+                    <p className="text-sm text-gray-600 mb-3">
                       Drag and drop your file here
-                    </h3>
-                    <p className="text-sm text-gray-500 mb-4">
+                    </p>
+                    <p className="text-xs text-gray-400 mb-4">
                       Supports EPUB, PDF, and HTML files
                     </p>
                     <label className="cursor-pointer inline-block">
@@ -452,7 +412,7 @@ export function AcrWorkflowPage() {
                     </label>
                   </div>
                 ) : (
-                  <div className="border rounded-lg p-4">
+                  <div className="border rounded-lg p-4 bg-primary-50">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
@@ -470,42 +430,36 @@ export function AcrWorkflowPage() {
                   </div>
                 )}
               </div>
-            )}
 
-            {state.documentSource === 'existing' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-medium text-gray-900">Select Existing Job</h3>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => handleSelectDocumentSource(null)}
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Back
-                  </Button>
-                </div>
+              <div className={cn(
+                'border rounded-lg p-6 transition-all',
+                state.documentSource === 'existing' && 'ring-2 ring-primary-500 border-primary-500'
+              )}>
+                <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-gray-500" />
+                  Select Existing Job
+                </h3>
 
-                <div className="border rounded-lg divide-y">
+                <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
                   {MOCK_EXISTING_JOBS.map((job) => (
                     <div
                       key={job.id}
                       className={cn(
-                        'p-4 cursor-pointer transition-colors',
+                        'p-3 cursor-pointer transition-colors',
                         'hover:bg-gray-50',
-                        state.jobId === job.id && 'bg-primary-50 border-l-4 border-l-primary-500'
+                        state.jobId === job.id && state.documentSource === 'existing' && 'bg-primary-50'
                       )}
                       onClick={() => handleSelectExistingJob(job.id)}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <FileText className="h-5 w-5 text-gray-400" />
+                          <FileText className="h-4 w-4 text-gray-400" />
                           <div>
-                            <p className="font-medium text-gray-900">{job.name}</p>
-                            <p className="text-sm text-gray-500">Completed on {job.date}</p>
+                            <p className="font-medium text-gray-900 text-sm">{job.name}</p>
+                            <p className="text-xs text-gray-500">Completed on {job.date}</p>
                           </div>
                         </div>
-                        {state.jobId === job.id && (
+                        {state.jobId === job.id && state.documentSource === 'existing' && (
                           <CheckCircle className="h-5 w-5 text-primary-600" />
                         )}
                       </div>
@@ -513,7 +467,7 @@ export function AcrWorkflowPage() {
                   ))}
                 </div>
               </div>
-            )}
+            </div>
 
             {state.jobId && (
               <Alert variant="success">
@@ -521,7 +475,7 @@ export function AcrWorkflowPage() {
                   <CheckCircle className="h-4 w-4" />
                   {state.documentSource === 'upload' ? 'Document uploaded' : 'Job selected'}: 
                   <Badge variant="info">
-                    {state.uploadedFile?.name || state.jobId}
+                    {state.uploadedFile?.name || MOCK_EXISTING_JOBS.find(j => j.id === state.jobId)?.name || state.jobId}
                   </Badge>
                 </div>
               </Alert>
