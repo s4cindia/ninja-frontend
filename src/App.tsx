@@ -22,6 +22,7 @@ import { TestAcrEditor } from '@/pages/test/TestAcrEditor';
 import TestExportDialog from '@/pages/test/TestExportDialog';
 import TestVersionHistory from '@/pages/test/TestVersionHistory';
 import TestAcrWorkflow from '@/pages/test/TestAcrWorkflow';
+import { TestAltTextGenerator } from '@/pages/test/TestAltTextGenerator';
 import { VerificationQueuePage } from '@/pages/acr/VerificationQueuePage';
 import { AcrEditorPage } from '@/pages/acr/AcrEditorPage';
 import { AcrWorkflowPage } from '@/pages/acr/AcrWorkflowPage';
@@ -89,6 +90,7 @@ function AppRoutes() {
         <Route path="/test/export-dialog" element={<TestExportDialog />} />
         <Route path="/test/version-history" element={<TestVersionHistory />} />
         <Route path="/test/acr-workflow" element={<TestAcrWorkflow />} />
+        <Route path="/test/alt-text-generator" element={<TestAltTextGenerator />} />
 
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<NotFound />} />
