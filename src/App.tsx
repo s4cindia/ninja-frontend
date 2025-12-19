@@ -18,7 +18,9 @@ import { FpcPage } from '@/pages/compliance/FpcPage';
 import { TestEditionSelector } from '@/pages/test/TestEditionSelector';
 import { TestConfidenceDashboard } from '@/pages/test/TestConfidenceDashboard';
 import { TestVerificationQueue } from '@/pages/test/TestVerificationQueue';
+import { TestAcrEditor } from '@/pages/test/TestAcrEditor';
 import { VerificationQueuePage } from '@/pages/acr/VerificationQueuePage';
+import { AcrEditorPage } from '@/pages/acr/AcrEditorPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -69,6 +71,7 @@ function AppRoutes() {
           <Route path="/compliance/section508/:fileId" element={<Section508Page />} />
           <Route path="/compliance/fpc/:fileId" element={<FpcPage />} />
           <Route path="/acr/verification/:jobId" element={<VerificationQueuePage />} />
+          <Route path="/acr/editor/:jobId" element={<AcrEditorPage />} />
         </Route>
 
         <Route path="/unauthorized" element={<Unauthorized />} />
@@ -76,6 +79,7 @@ function AppRoutes() {
         <Route path="/test/edition-selector" element={<TestEditionSelector />} />
         <Route path="/test/confidence-dashboard" element={<TestConfidenceDashboard />} />
         <Route path="/test/verification-queue" element={<TestVerificationQueue />} />
+        <Route path="/test/acr-editor" element={<TestAcrEditor />} />
 
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<NotFound />} />

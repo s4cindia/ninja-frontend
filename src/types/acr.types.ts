@@ -22,3 +22,72 @@ export interface EditionSection {
   name: string;
   criteriaCount: number;
 }
+
+export type ConformanceLevel = 'supports' | 'partially_supports' | 'does_not_support' | 'not_applicable';
+
+export type AttributionTag = 'AUTOMATED' | 'AI-SUGGESTED' | 'HUMAN-VERIFIED';
+
+export interface AcrCriterion {
+  id: string;
+  criterionId: string;
+  criterionName: string;
+  wcagLevel: 'A' | 'AA' | 'AAA';
+  conformanceLevel: ConformanceLevel;
+  remarks: string;
+  attribution: AttributionTag;
+  isSuspicious: boolean;
+  lastModifiedBy?: string;
+  lastModifiedAt?: string;
+}
+
+export interface AcrDocument {
+  id: string;
+  jobId: string;
+  productName: string;
+  editionId: string;
+  editionName: string;
+  criteria: AcrCriterion[];
+  createdAt: string;
+  updatedAt: string;
+  status: 'draft' | 'review' | 'final';
+}
+
+export interface CredibilityValidation {
+  isCredible: boolean;
+  supportsPercentage: number;
+  warnings: string[];
+  suspiciousCriteria: string[];
+}
+
+export interface FinalizationStatus {
+  canFinalize: boolean;
+  blockers: string[];
+  pendingCount: number;
+  missingRemarksCount: number;
+}
+
+export interface RemarksValidation {
+  isValid: boolean;
+  warnings: string[];
+  characterCount: number;
+  minLength: number;
+  requiredKeywords: string[];
+  missingKeywords: string[];
+}
+
+export interface GenerateRemarksRequest {
+  criterionId: string;
+  conformanceLevel: ConformanceLevel;
+  context?: string;
+}
+
+export interface GenerateRemarksResponse {
+  remarks: string;
+  confidence: number;
+}
+
+export interface UpdateCriterionRequest {
+  conformanceLevel?: ConformanceLevel;
+  remarks?: string;
+  attribution?: AttributionTag;
+}
