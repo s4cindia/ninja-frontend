@@ -20,6 +20,7 @@ import { TestConfidenceDashboard } from '@/pages/test/TestConfidenceDashboard';
 import { TestVerificationQueue } from '@/pages/test/TestVerificationQueue';
 import { TestAcrEditor } from '@/pages/test/TestAcrEditor';
 import TestExportDialog from '@/pages/test/TestExportDialog';
+import TestVersionHistory from '@/pages/test/TestVersionHistory';
 import { VerificationQueuePage } from '@/pages/acr/VerificationQueuePage';
 import { AcrEditorPage } from '@/pages/acr/AcrEditorPage';
 
@@ -82,6 +83,7 @@ function AppRoutes() {
         <Route path="/test/verification-queue" element={<TestVerificationQueue />} />
         <Route path="/test/acr-editor" element={<TestAcrEditor />} />
         <Route path="/test/export-dialog" element={<TestExportDialog />} />
+        <Route path="/test/version-history" element={<TestVersionHistory />} />
 
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<NotFound />} />
