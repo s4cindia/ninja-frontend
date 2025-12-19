@@ -6,6 +6,20 @@ This is a React + Vite + TypeScript frontend web application for the Ninja Platf
 **Current State:** Fully functional development environment with Vite dev server running on port 5000.
 
 ## Recent Changes (December 19, 2025)
+- **ACR Editor Error Handling:** Added proper error handling for remark generation
+  - Empty catch block replaced with proper error logging and user feedback
+  - Inline error alert displays when AI remark generation fails
+  - Error auto-dismisses after 5 seconds or can be manually closed
+
+- **Step 2 Document Upload Redesign:** Both options now show side-by-side
+  - Upload interface and job selection displayed in two-column layout
+  - Selected option highlighted with blue border ring
+  - Improved UX without back-and-forth navigation
+
+- **Dashboard Mock Data:** Added fallback data when backend API unavailable
+  - Stats and activity now load with demo data when API calls fail
+  - No more network error messages in demo mode
+
 - **ACR Editor Bug Fix:** Fixed "Mark as Final" button staying disabled after editing criteria
   - Suspicious criteria flag (`isSuspicious`) now cleared when user updates conformance or remarks
   - Human-verified edits automatically remove the suspicious status

@@ -150,6 +150,7 @@ function saveToStorage(doc: AcrDocument): void {
 
 export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
   const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [generateError, setGenerateError] = useState<string | null>(null);
   const [localDocument, setLocalDocument] = useState<AcrDocument>(() => loadFromStorage() ?? MOCK_DOCUMENT);
   const [localCredibility, setLocalCredibility] = useState<CredibilityValidation>(MOCK_CREDIBILITY);
   const [localFinalization, setLocalFinalization] = useState<FinalizationStatus>(MOCK_FINALIZATION);
@@ -276,8 +277,10 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
           criterionId: criterion.id,
           data: { remarks: result.remarks, attribution: 'AI-SUGGESTED' },
         });
-      } catch {
-        // Handle error
+      } catch (error) {
+        console.error('Failed to generate remarks:', error);
+        setGenerateError('Failed to generate remarks. Please try again.');
+        setTimeout(() => setGenerateError(null), 5000);
       }
     }
     
@@ -337,6 +340,12 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
           </Alert>
         ) : null;
       })()}
+
+      {generateError && (
+        <Alert variant="error" title="Error" onClose={() => setGenerateError(null)}>
+          {generateError}
+        </Alert>
+      )}
 
       <div className="bg-white rounded-lg border overflow-hidden">
         <div className="px-4 py-3 border-b bg-gray-50">
