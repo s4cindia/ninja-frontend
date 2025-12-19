@@ -6,9 +6,8 @@ export interface AcrEdition {
   name: string;
   description: string;
   criteriaCount?: number;
-  criteria?: { length: number } | unknown[];
+  criteria?: AcrCriterion[];
   isRecommended?: boolean;
-  recommended?: boolean;
   standards?: string[];
 }
 

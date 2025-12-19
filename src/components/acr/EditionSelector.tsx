@@ -63,7 +63,7 @@ export function EditionSelector({ selectedEdition, onSelect, disabled = false }:
           const isHovered = hoveredEdition === edition.code;
           const labels = EDITION_LABELS[edition.code as AcrEditionCode];
           const tooltip = EDITION_TOOLTIPS[edition.code as AcrEditionCode];
-          const isRecommended = edition.isRecommended || edition.recommended;
+          const isRecommended = edition.isRecommended;
           const criteriaCount = edition.criteriaCount ?? (Array.isArray(edition.criteria) ? edition.criteria.length : 0);
 
           return (
