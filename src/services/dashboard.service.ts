@@ -73,7 +73,8 @@ export const dashboardService = {
     try {
       const response = await api.get<ApiResponse<DashboardStats>>('/dashboard/stats');
       return response.data.data;
-    } catch {
+    } catch (error) {
+      console.error('Failed to fetch dashboard stats:', error);
       return MOCK_STATS;
     }
   },
@@ -84,7 +85,8 @@ export const dashboardService = {
         params: { limit },
       });
       return response.data.data;
-    } catch {
+    } catch (error) {
+      console.error('Failed to fetch recent activity:', error);
       return MOCK_ACTIVITY.slice(0, limit);
     }
   },
@@ -93,7 +95,8 @@ export const dashboardService = {
     try {
       const response = await api.get<ApiResponse<DashboardData>>('/dashboard');
       return response.data.data;
-    } catch {
+    } catch (error) {
+      console.error('Failed to fetch dashboard:', error);
       return {
         stats: MOCK_STATS,
         recentActivity: MOCK_ACTIVITY,
