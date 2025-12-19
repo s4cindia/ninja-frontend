@@ -139,10 +139,12 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
   const generateMutation = useGenerateRemarks();
   const finalizeMutation = useFinalizeDocument(jobId);
 
+  const useMockData = !apiDocument && (!!docError || !isLoadingDoc);
   const document = apiDocument ?? localDocument;
   const credibility = apiCredibility ?? localCredibility;
   const finalization = apiFinalization ?? localFinalization;
-  const useMockData = !apiDocument && !!docError;
+  const criteria = document?.criteria ?? [];
+  const blockers = finalization?.blockers ?? [];
 
   useEffect(() => {
     if (useMockData) {
@@ -256,8 +258,8 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
       <div className="bg-white rounded-lg border p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">{document.productName}</h2>
-            <p className="text-sm text-gray-500">{document.editionName} - {document.criteria.length} criteria</p>
+            <h2 className="text-lg font-semibold text-gray-900">{document?.productName ?? 'Loading...'}</h2>
+            <p className="text-sm text-gray-500">{document?.editionName ?? ''} - {criteria.length} criteria</p>
           </div>
           <div className="flex items-center gap-2">
             {useMockData && (
@@ -265,20 +267,20 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
             )}
             <span className={cn(
               'px-2 py-1 rounded text-xs font-medium',
-              document.status === 'draft' && 'bg-gray-100 text-gray-600',
-              document.status === 'review' && 'bg-yellow-100 text-yellow-700',
-              document.status === 'final' && 'bg-green-100 text-green-700'
+              document?.status === 'draft' && 'bg-gray-100 text-gray-600',
+              document?.status === 'review' && 'bg-yellow-100 text-yellow-700',
+              document?.status === 'final' && 'bg-green-100 text-green-700'
             )}>
-              {document.status.charAt(0).toUpperCase() + document.status.slice(1)}
+              {document?.status ? document.status.charAt(0).toUpperCase() + document.status.slice(1) : 'Unknown'}
             </span>
           </div>
         </div>
       </div>
 
-      {!credibility.isCredible && (
+      {credibility && !credibility.isCredible && (
         <Alert variant="warning" title="Credibility Warning">
           <p>{credibility.supportsPercentage}% of criteria are marked as "Supports". This high percentage may raise questions about the thoroughness of the evaluation.</p>
-          {credibility.suspiciousCriteria.length > 0 && (
+          {credibility.suspiciousCriteria?.length > 0 && (
             <p className="mt-1">Suspicious entries: {credibility.suspiciousCriteria.join(', ')}</p>
           )}
         </Alert>
@@ -301,7 +303,7 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
               </tr>
             </thead>
             <tbody>
-              {document.criteria.map((criterion) => (
+              {criteria.map((criterion) => (
                 <CriterionRow
                   key={criterion.id}
                   criterion={criterion}
@@ -309,7 +311,7 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
                   onUpdateRemarks={(remarks) => handleUpdateRemarks(criterion.id, remarks)}
                   onGenerateRemarks={() => handleGenerateRemarks(criterion)}
                   isGeneratingRemarks={generatingId === criterion.id}
-                  disabled={document.status === 'final'}
+                  disabled={document?.status === 'final'}
                 />
               ))}
             </tbody>
@@ -324,14 +326,14 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
               <FileCheck className="h-5 w-5" />
               Finalization Status
             </h3>
-            {finalization.canFinalize ? (
+            {finalization?.canFinalize ? (
               <div className="flex items-center gap-1 text-green-600 text-sm mt-1">
                 <CheckCircle className="h-4 w-4" />
                 Ready to finalize
               </div>
             ) : (
               <div className="mt-2 space-y-1">
-                {finalization.blockers.map((blocker, idx) => (
+                {blockers.map((blocker, idx) => (
                   <div key={idx} className="flex items-center gap-1 text-red-600 text-sm">
                     <XCircle className="h-4 w-4 flex-shrink-0" />
                     {blocker}
@@ -343,7 +345,7 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
           
           <Button
             onClick={handleFinalize}
-            disabled={!finalization.canFinalize || document.status === 'final' || finalizeMutation.isPending}
+            disabled={!finalization?.canFinalize || document?.status === 'final' || finalizeMutation.isPending}
             isLoading={finalizeMutation.isPending}
           >
             Mark as Final
