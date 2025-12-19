@@ -223,8 +223,13 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
         return false;
       }
       if (filters.status?.length) {
-        const normalizedStatus = item.status.startsWith('verified_') ? 'verified_pass' : item.status;
-        if (!filters.status.includes(normalizedStatus as VerificationStatus)) {
+        const statusMatches = filters.status.some(filterStatus => {
+          if ((filterStatus as string) === 'verified') {
+            return item.status.startsWith('verified_');
+          }
+          return item.status === filterStatus;
+        });
+        if (!statusMatches) {
           return false;
         }
       }
