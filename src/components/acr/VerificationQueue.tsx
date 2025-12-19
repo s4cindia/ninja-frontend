@@ -14,9 +14,18 @@ import type {
   VerificationFilters 
 } from '@/types/verification.types';
 
+interface SavedVerification {
+  status: string;
+  method: string;
+  notes: string;
+  verifiedAt: string;
+}
+
 interface VerificationQueueProps {
   jobId: string;
   onComplete: () => void;
+  savedVerifications?: { [itemId: string]: SavedVerification };
+  onVerificationUpdate?: (itemId: string, status: string, method: string, notes: string) => void;
 }
 
 const MOCK_ITEMS: VerificationItemType[] = [
@@ -152,14 +161,36 @@ const VERIFICATION_METHODS: VerificationMethod[] = [
   'WAVE',
 ];
 
-export function VerificationQueue({ jobId, onComplete }: VerificationQueueProps) {
+export function VerificationQueue({ jobId, onComplete, savedVerifications, onVerificationUpdate }: VerificationQueueProps) {
   const [filters, setFilters] = useState<VerificationFilters>({});
   const [showFilters, setShowFilters] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState<VerificationStatus>('verified_pass');
   const [bulkMethod, setBulkMethod] = useState<VerificationMethod>('Manual Review');
   const [bulkNotes, setBulkNotes] = useState('');
-  const [localItems, setLocalItems] = useState<VerificationItemType[]>(MOCK_ITEMS);
+  const [localItems, setLocalItems] = useState<VerificationItemType[]>(() => {
+    if (savedVerifications && Object.keys(savedVerifications).length > 0) {
+      return MOCK_ITEMS.map(item => {
+        const saved = savedVerifications[item.id];
+        if (saved) {
+          return {
+            ...item,
+            status: saved.status as VerificationStatus,
+            history: [...item.history, {
+              id: `h-saved-${item.id}`,
+              status: saved.status as VerificationStatus,
+              method: saved.method as VerificationMethod,
+              notes: saved.notes,
+              verifiedBy: 'Current User',
+              verifiedAt: saved.verifiedAt,
+            }],
+          };
+        }
+        return item;
+      });
+    }
+    return MOCK_ITEMS;
+  });
   const [useMockData, setUseMockData] = useState(true);
 
   const { data: apiData, isLoading, error } = useVerificationQueue(jobId, filters);
@@ -249,6 +280,7 @@ export function VerificationQueue({ jobId, onComplete }: VerificationQueueProps)
             } 
           : item
       ));
+      onVerificationUpdate?.(itemId, status, method, notes);
     } else {
       await submitMutation.mutateAsync({ itemId, status, method, notes });
     }
@@ -275,6 +307,9 @@ export function VerificationQueue({ jobId, onComplete }: VerificationQueueProps)
             } 
           : item
       ));
+      itemIds.forEach(itemId => {
+        onVerificationUpdate?.(itemId, bulkStatus, bulkMethod, bulkNotes);
+      });
     } else {
       await bulkMutation.mutateAsync({ 
         itemIds, 

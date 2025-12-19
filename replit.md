@@ -6,6 +6,14 @@ This is a React + Vite + TypeScript frontend web application for the Ninja Platf
 **Current State:** Fully functional development environment with Vite dev server running on port 5000.
 
 ## Recent Changes (December 19, 2025)
+- **ACR Workflow Page Bug Fix #4:** Fixed verification status persistence
+  - Verification changes now persist when navigating between workflow steps
+  - Added `verifications` to workflow state (stored in localStorage)
+  - VerificationQueue accepts `savedVerifications` prop to restore state on mount
+  - VerificationQueue calls `onVerificationUpdate` when changes are made
+  - Parent workflow state and localStorage updated atomically on each verification
+  - Supports both individual and bulk verification persistence
+
 - **ACR Workflow Page Bug Fix #3:** Fixed Step 2 initial selection regression
   - Added "Start New" button to workflow header for resetting workflow state
   - Clears cached localStorage state so users can restart from Step 1

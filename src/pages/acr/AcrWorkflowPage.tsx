@@ -51,6 +51,15 @@ interface UploadedFile {
   type: string;
 }
 
+interface VerificationData {
+  [itemId: string]: {
+    status: string;
+    method: string;
+    notes: string;
+    verifiedAt: string;
+  };
+}
+
 interface WorkflowState {
   currentStep: number;
   selectedEdition: AcrEdition | null;
@@ -60,6 +69,7 @@ interface WorkflowState {
   acrId: string | null;
   verificationComplete: boolean;
   isFinalized: boolean;
+  verifications: VerificationData;
 }
 
 const STORAGE_KEY = 'acr-workflow-state';
@@ -82,6 +92,7 @@ function loadWorkflowState(jobId?: string): WorkflowState {
     acrId: jobId ? `acr-${jobId}` : null,
     verificationComplete: false,
     isFinalized: false,
+    verifications: {},
   };
 }
 
@@ -225,6 +236,21 @@ export function AcrWorkflowPage() {
       acrId: null,
       verificationComplete: false,
       isFinalized: false,
+      verifications: {},
+    });
+  };
+
+  const handleVerificationUpdate = (itemId: string, status: string, method: string, notes: string) => {
+    updateState({
+      verifications: {
+        ...state.verifications,
+        [itemId]: {
+          status,
+          method,
+          notes,
+          verifiedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+        },
+      },
     });
   };
 
@@ -528,6 +554,8 @@ export function AcrWorkflowPage() {
             <VerificationQueue 
               jobId={state.jobId || 'demo'} 
               onComplete={handleVerificationComplete}
+              savedVerifications={state.verifications}
+              onVerificationUpdate={handleVerificationUpdate}
             />
             {state.verificationComplete && (
               <Alert variant="success">
