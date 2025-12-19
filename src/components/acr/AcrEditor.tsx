@@ -110,10 +110,10 @@ const MOCK_DOCUMENT: AcrDocument = {
 };
 
 const MOCK_CREDIBILITY: CredibilityValidation = {
-  isCredible: false,
+  isCredible: true,
   supportsPercentage: 71,
-  warnings: ['High percentage of "Supports" determinations may need review'],
-  suspiciousCriteria: ['1.4.3'],
+  warnings: [],
+  suspiciousCriteria: [],
 };
 
 const MOCK_FINALIZATION: FinalizationStatus = {
@@ -277,14 +277,17 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
         </div>
       </div>
 
-      {credibility && !credibility.isCredible && (
-        <Alert variant="warning" title="Credibility Warning">
-          <p>{credibility.supportsPercentage ?? (criteria.length > 0 ? Math.round((criteria.filter(c => c.conformanceLevel === 'supports').length / criteria.length) * 100) : 0)}% of criteria are marked as "Supports". This high percentage may raise questions about the thoroughness of the evaluation.</p>
-          {credibility.suspiciousCriteria?.length > 0 && (
-            <p className="mt-1">Suspicious entries: {credibility.suspiciousCriteria.join(', ')}</p>
-          )}
-        </Alert>
-      )}
+      {(() => {
+        const supportsPercentage = credibility?.supportsPercentage ?? (criteria.length > 0 ? Math.round((criteria.filter(c => c.conformanceLevel === 'supports').length / criteria.length) * 100) : 0);
+        return supportsPercentage > 95 ? (
+          <Alert variant="warning" title="Credibility Warning">
+            <p>{supportsPercentage}% of criteria are marked as "Supports". This high percentage may raise questions about the thoroughness of the evaluation.</p>
+            {credibility?.suspiciousCriteria?.length > 0 && (
+              <p className="mt-1">Suspicious entries: {credibility.suspiciousCriteria.join(', ')}</p>
+            )}
+          </Alert>
+        ) : null;
+      })()}
 
       <div className="bg-white rounded-lg border overflow-hidden">
         <div className="px-4 py-3 border-b bg-gray-50">
