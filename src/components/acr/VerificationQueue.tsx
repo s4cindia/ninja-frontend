@@ -198,11 +198,12 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
   const bulkMutation = useBulkVerification();
 
   useEffect(() => {
-    if (apiData?.items && apiData.items.length > 0) {
+    if (error) {
+      console.warn('Verification API unavailable, using mock data');
+      setUseMockData(true);
+    } else if (apiData?.items !== undefined) {
       setUseMockData(false);
       setLocalItems(apiData.items);
-    } else if (error || (apiData && apiData.items?.length === 0)) {
-      setUseMockData(true);
     }
   }, [apiData, error]);
 
