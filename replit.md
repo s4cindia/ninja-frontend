@@ -6,7 +6,12 @@ This is a React + Vite + TypeScript frontend web application for the Ninja Platf
 **Current State:** Fully functional development environment with Vite dev server running on port 5000.
 
 ## Recent Changes (December 19, 2025)
-- **ACR Workflow Page Bug Fix:** Fixed Step 2 document upload selection
+- **ACR Workflow Page Bug Fix #2:** Fixed Step 5 navigation issue
+  - "Mark as Final" now correctly advances to Step 6 (Export) instead of redirecting to Dashboard
+  - Fixed by updating isFinalized and currentStep atomically in single state update
+  - Removed reliance on handleNext() closure which could cause timing issues
+
+- **ACR Workflow Page Bug Fix #1:** Fixed Step 2 document upload selection
   - Separated handlers for "Upload New Document" vs "Select Existing Job"
   - Added `documentSource` state to track selection type ('upload' | 'existing')
   - Added `uploadedFile` state for tracking uploaded file metadata

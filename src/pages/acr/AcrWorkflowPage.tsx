@@ -206,8 +206,7 @@ export function AcrWorkflowPage() {
   };
 
   const handleFinalize = () => {
-    updateState({ isFinalized: true });
-    handleNext();
+    updateState({ isFinalized: true, currentStep: 6 });
   };
 
   const handleRestore = (version: number) => {
