@@ -7,3 +7,5 @@ export * from './Spinner';
 export * from './EmptyState';
 export * from './Table';
 export * from './Logo';
+export * from './Progress';
+export * from './Tabs';
