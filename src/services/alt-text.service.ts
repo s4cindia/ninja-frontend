@@ -6,40 +6,41 @@ import type {
   AltTextFlag 
 } from '@/types/alt-text.types';
 
-function generateMockResult(imageId: string): AltTextGenerationResult {
-  const mockDescriptions = [
-    {
-      shortAlt: 'A scenic mountain landscape with snow-capped peaks under a blue sky',
-      extendedAlt: 'A panoramic view of a mountain range featuring snow-capped peaks rising against a clear blue sky. The foreground shows alpine meadows with scattered wildflowers, while evergreen forests line the lower slopes. Wispy clouds drift across the peaks, creating a serene atmosphere.',
-      confidence: 87,
-      flags: [] as AltTextFlag[],
-    },
-    {
-      shortAlt: 'Bar chart showing quarterly sales data from Q1 to Q4',
-      extendedAlt: 'A vertical bar chart displaying sales performance across four quarters. Q1 shows 12 units, Q2 peaks at 19 units, Q3 dips to 8 units, and Q4 recovers to 15 units. The chart uses blue bars on a white background with labeled axes.',
-      confidence: 92,
-      flags: ['DATA_VISUALIZATION', 'DATA_EXTRACTED'] as AltTextFlag[],
-    },
-    {
-      shortAlt: 'Professional headshot of a person smiling at camera',
-      extendedAlt: 'A professional portrait photograph showing an individual from the shoulders up. The subject is positioned slightly off-center with natural lighting highlighting their features. The background is softly blurred to keep focus on the subject.',
-      confidence: 68,
-      flags: ['FACE_DETECTED', 'LOW_CONFIDENCE'] as AltTextFlag[],
-    },
-  ];
+function generateMockResult(imageId: string, fileName?: string): AltTextGenerationResult {
+  const baseMock = {
+    shortAlt: '[Demo Mode] Image requires backend AI service for accurate description',
+    extendedAlt: 'This is a placeholder description. Connect the backend alt-text API endpoints to enable real AI-powered image analysis using Google Gemini or similar vision models. The actual service will analyze image content, detect objects, text, faces, and generate context-aware descriptions.',
+    confidence: 50,
+    flags: ['NEEDS_MANUAL_REVIEW'] as AltTextFlag[],
+  };
   
-  const index = Math.abs(imageId.charCodeAt(imageId.length - 1) % mockDescriptions.length);
-  const mock = mockDescriptions[index];
+  if (fileName) {
+    const lowerName = fileName.toLowerCase();
+    if (lowerName.includes('chart') || lowerName.includes('graph') || lowerName.includes('data')) {
+      baseMock.shortAlt = `[Demo] Chart/graph image: ${fileName}`;
+      baseMock.flags = ['DATA_VISUALIZATION', 'NEEDS_MANUAL_REVIEW'];
+      baseMock.confidence = 60;
+    } else if (lowerName.includes('photo') || lowerName.includes('img') || lowerName.includes('pic')) {
+      baseMock.shortAlt = `[Demo] Photo image: ${fileName}`;
+      baseMock.confidence = 55;
+    } else if (lowerName.includes('diagram') || lowerName.includes('flow')) {
+      baseMock.shortAlt = `[Demo] Diagram image: ${fileName}`;
+      baseMock.flags = ['COMPLEX_IMAGE', 'NEEDS_MANUAL_REVIEW'];
+      baseMock.confidence = 55;
+    } else {
+      baseMock.shortAlt = `[Demo] Uploaded image: ${fileName}`;
+    }
+  }
   
   return {
     imageId,
-    shortAlt: mock.shortAlt,
-    extendedAlt: mock.extendedAlt,
-    confidence: mock.confidence,
-    flags: mock.flags,
-    aiModel: 'demo-model-v1',
+    shortAlt: baseMock.shortAlt,
+    extendedAlt: baseMock.extendedAlt,
+    confidence: baseMock.confidence,
+    flags: baseMock.flags,
+    aiModel: 'demo-mode (backend unavailable)',
     generatedAt: new Date().toISOString(),
-    needsReview: mock.confidence < 70,
+    needsReview: true,
   };
 }
 
@@ -123,20 +124,7 @@ export const altTextService = {
       await new Promise(resolve => setTimeout(resolve, 1500));
       
       const generatedId = imageId || `uploaded-${Date.now()}`;
-      const result = generateMockResult(generatedId);
-      
-      if (file.name.toLowerCase().includes('chart') || file.name.toLowerCase().includes('graph')) {
-        result.shortAlt = `Chart visualization from ${file.name}`;
-        result.flags = ['DATA_VISUALIZATION'];
-        result.confidence = 85;
-      } else if (file.name.toLowerCase().includes('photo') || file.name.toLowerCase().includes('image')) {
-        result.shortAlt = `Photograph from ${file.name}`;
-        result.confidence = 78;
-      } else {
-        result.shortAlt = `Image content from uploaded file: ${file.name}`;
-      }
-      
-      return result;
+      return generateMockResult(generatedId, file.name);
     }
   },
 
