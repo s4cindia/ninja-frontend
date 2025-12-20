@@ -36,6 +36,19 @@ const FLAG_COLORS: Record<string, string> = {
   COMPLEX_IMAGE: 'yellow',
 };
 
+const mapColorToVariant = (color: string): 'default' | 'success' | 'warning' | 'error' | 'info' => {
+  const colorMap: Record<string, 'default' | 'success' | 'warning' | 'error' | 'info'> = {
+    gray: 'default',
+    green: 'success',
+    yellow: 'warning',
+    orange: 'warning',
+    red: 'error',
+    blue: 'info',
+    purple: 'info',
+  };
+  return colorMap[color] || 'default';
+};
+
 const getConfidenceColor = (confidence: number) => {
   if (confidence >= 85) return 'text-green-600 bg-green-100';
   if (confidence >= 70) return 'text-yellow-600 bg-yellow-100';
@@ -326,7 +339,7 @@ const ReviewItem: React.FC<ReviewItemProps> = ({
         <div className="flex-1 min-w-0">
           <p className="text-sm text-gray-900 truncate">{item.shortAlt}</p>
           <div className="flex items-center gap-2 mt-1">
-            <Badge variant={statusConfig.color as 'default' | 'success' | 'warning' | 'error' | 'info'}>
+            <Badge variant={mapColorToVariant(statusConfig.color)}>
               {statusConfig.icon}
               <span className="ml-1">{statusConfig.label}</span>
             </Badge>
@@ -387,7 +400,7 @@ const ReviewItem: React.FC<ReviewItemProps> = ({
           {item.flags.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {item.flags.map((flag) => (
-                <Badge key={flag} variant={FLAG_COLORS[flag] as 'default' | 'success' | 'warning' | 'error' | 'info' || 'default'} className="text-xs">
+                <Badge key={flag} variant={mapColorToVariant(FLAG_COLORS[flag] || 'gray')} className="text-xs">
                   {flag.replace(/_/g, ' ')}
                 </Badge>
               ))}

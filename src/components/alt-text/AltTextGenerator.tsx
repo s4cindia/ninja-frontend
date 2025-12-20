@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Upload, Sparkles, RefreshCw, Check, AlertTriangle, Info } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -58,11 +58,17 @@ export const AltTextGenerator: React.FC<AltTextGeneratorProps> = ({
   
   const { isGenerating, result, error, generate, generateContextual, generateFromFile, reset } = useAltTextGeneration();
   const { imageType, classify } = useImageClassification();
+  
+  const previewUrlRef = useRef<string | null>(null);
+  
+  useEffect(() => {
+    previewUrlRef.current = previewUrl;
+  }, [previewUrl]);
 
   useEffect(() => {
     return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
       }
     };
   }, []);
@@ -129,7 +135,11 @@ export const AltTextGenerator: React.FC<AltTextGeneratorProps> = ({
       if (data) {
         onGenerated?.(data);
         if (imageId) {
-          await classify(imageId, jobId);
+          try {
+            await classify(imageId, jobId);
+          } catch (classifyErr) {
+            console.warn('Classification failed:', classifyErr);
+          }
         }
       }
     } catch (err) {
