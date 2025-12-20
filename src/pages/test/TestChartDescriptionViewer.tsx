@@ -1,6 +1,6 @@
 import React from 'react';
 import { ChartDescriptionViewer, ChartDescriptionBadge } from '@/components/alt-text/ChartDescriptionViewer';
-import { ChartDescription } from '@/types/alt-text.types';
+import { ChartDescription, AltTextFlag } from '@/types/alt-text.types';
 
 const sampleDescriptions: ChartDescription[] = [
   {
@@ -9,7 +9,7 @@ const sampleDescriptions: ChartDescription[] = [
     shortAlt: 'Bar chart showing quarterly sales performance across four regions',
     longDescription: 'A vertical bar chart comparing sales performance across North, South, East, and West regions for Q1-Q4 2024. The chart uses color-coded bars with North in blue, South in green, East in orange, and West in purple. The y-axis shows revenue in millions of dollars, ranging from 0 to 25M. The x-axis shows the four quarters. Notable observations include the North region consistently outperforming others, with Q4 showing the highest overall sales across all regions.',
     confidence: 92,
-    flags: ['DATA_VISUALIZATION', 'DATA_EXTRACTED'],
+    flags: ['DATA_VISUALIZATION', 'DATA_EXTRACTED'] as AltTextFlag[],
     aiModel: 'gemini-1.5-pro',
     generatedAt: new Date().toISOString(),
     dataTable: [
@@ -35,7 +35,7 @@ const sampleDescriptions: ChartDescription[] = [
     shortAlt: 'Pie chart showing market share distribution among top 5 competitors',
     longDescription: 'A pie chart displaying market share percentages for the top 5 companies in the industry. Company A holds the largest share at 35% (blue), followed by Company B at 25% (green), Company C at 20% (orange), Company D at 12% (purple), and Others at 8% (gray).',
     confidence: 88,
-    flags: ['DATA_VISUALIZATION', 'DATA_EXTRACTED'],
+    flags: ['DATA_VISUALIZATION', 'DATA_EXTRACTED'] as AltTextFlag[],
     aiModel: 'gemini-1.5-pro',
     generatedAt: new Date().toISOString(),
     dataTable: [
@@ -56,7 +56,7 @@ const sampleDescriptions: ChartDescription[] = [
     shortAlt: 'Flowchart showing the document approval workflow with decision points',
     longDescription: 'A process flowchart illustrating the document approval workflow. The process begins with "Submit Document", flows to "Initial Review" performed by the team lead. A decision diamond asks "Meets Standards?" - if No, the flow goes to "Request Revisions" which loops back to the submitter. If Yes, it proceeds to "Manager Approval", another decision point for "Approved?" - if No, returns to revisions, if Yes, continues to "Final Processing" and ends at "Document Published".',
     confidence: 85,
-    flags: ['DATA_VISUALIZATION', 'COMPLEX_IMAGE'],
+    flags: ['DATA_VISUALIZATION', 'COMPLEX_IMAGE'] as AltTextFlag[],
     aiModel: 'gemini-1.5-pro',
     generatedAt: new Date().toISOString(),
     keyFindings: [
@@ -71,7 +71,7 @@ const sampleDescriptions: ChartDescription[] = [
     shortAlt: 'Line chart showing website traffic trends over 12 months',
     longDescription: 'A line chart tracking monthly website visitors from January to December 2024. The chart shows three lines: total visitors (blue), unique visitors (green), and returning visitors (orange). All metrics show an upward trend with a notable spike in November due to a marketing campaign.',
     confidence: 78,
-    flags: ['DATA_VISUALIZATION', 'DATA_EXTRACTED'],
+    flags: ['DATA_VISUALIZATION', 'DATA_EXTRACTED'] as AltTextFlag[],
     aiModel: 'gemini-1.5-pro',
     generatedAt: new Date().toISOString(),
     dataTable: [
@@ -92,7 +92,7 @@ const sampleDescriptions: ChartDescription[] = [
     shortAlt: 'Team members collaborating in a modern office meeting room',
     longDescription: 'A photograph showing five team members gathered around a conference table in a bright, modern office space. Natural light streams through large windows. Participants have laptops and notebooks, engaged in what appears to be a brainstorming session.',
     confidence: 72,
-    flags: ['FACE_DETECTED'],
+    flags: ['FACE_DETECTED'] as AltTextFlag[],
     aiModel: 'gemini-1.5-pro',
     generatedAt: new Date().toISOString(),
   },

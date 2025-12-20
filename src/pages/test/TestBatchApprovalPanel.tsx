@@ -130,7 +130,7 @@ export const TestBatchApprovalPanel: React.FC = () => {
 
   const handleInlineApprove = async () => {
     const eligible = items.filter(
-      i => i.status === 'pending' && i.confidence >= inlineConfidence
+      i => ['pending', 'needs_review'].includes(i.status) && i.confidence >= inlineConfidence
     );
     await handleBatchApprove(eligible.map(i => i.id));
   };

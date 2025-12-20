@@ -81,7 +81,7 @@ export interface ChartDescription {
   trends?: string[];
   keyFindings?: string[];
   confidence: number;
-  flags: string[];
+  flags: AltTextFlag[];
   aiModel: string;
   generatedAt: string;
   needsLongDescription?: boolean;

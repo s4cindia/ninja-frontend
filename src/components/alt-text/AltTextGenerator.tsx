@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Upload, Sparkles, RefreshCw, Check, AlertTriangle, Info } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -15,18 +15,18 @@ interface AltTextGeneratorProps {
   showUpload?: boolean;
 }
 
-const FLAG_LABELS: Record<AltTextFlag, { label: string; color: string }> = {
-  FACE_DETECTED: { label: 'Face Detected', color: 'yellow' },
-  TEXT_IN_IMAGE: { label: 'Contains Text', color: 'blue' },
-  LOW_CONFIDENCE: { label: 'Low Confidence', color: 'red' },
-  SENSITIVE_CONTENT: { label: 'Sensitive', color: 'red' },
-  COMPLEX_SCENE: { label: 'Complex Scene', color: 'yellow' },
-  NEEDS_MANUAL_REVIEW: { label: 'Needs Review', color: 'orange' },
-  REGENERATED: { label: 'Regenerated', color: 'gray' },
-  PARSE_ERROR: { label: 'Parse Error', color: 'red' },
-  DATA_VISUALIZATION: { label: 'Data Viz', color: 'purple' },
-  DATA_EXTRACTED: { label: 'Data Extracted', color: 'green' },
-  COMPLEX_IMAGE: { label: 'Complex', color: 'yellow' },
+const FLAG_LABELS: Record<AltTextFlag, { label: string; color: 'default' | 'success' | 'warning' | 'error' | 'info' }> = {
+  FACE_DETECTED: { label: 'Face Detected', color: 'warning' },
+  TEXT_IN_IMAGE: { label: 'Contains Text', color: 'info' },
+  LOW_CONFIDENCE: { label: 'Low Confidence', color: 'error' },
+  SENSITIVE_CONTENT: { label: 'Sensitive', color: 'error' },
+  COMPLEX_SCENE: { label: 'Complex Scene', color: 'warning' },
+  NEEDS_MANUAL_REVIEW: { label: 'Needs Review', color: 'warning' },
+  REGENERATED: { label: 'Regenerated', color: 'default' },
+  PARSE_ERROR: { label: 'Parse Error', color: 'error' },
+  DATA_VISUALIZATION: { label: 'Data Viz', color: 'info' },
+  DATA_EXTRACTED: { label: 'Data Extracted', color: 'success' },
+  COMPLEX_IMAGE: { label: 'Complex', color: 'warning' },
 };
 
 const IMAGE_TYPE_LABELS: Record<ImageType, string> = {
@@ -59,14 +59,25 @@ export const AltTextGenerator: React.FC<AltTextGeneratorProps> = ({
   const { isGenerating, result, error, generate, generateContextual, generateFromFile, reset } = useAltTextGeneration();
   const { imageType, classify } = useImageClassification();
 
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, []);
+
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
       setUploadedFile(file);
       setPreviewUrl(URL.createObjectURL(file));
       reset();
     }
-  }, [reset]);
+  }, [reset, previewUrl]);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -85,21 +96,21 @@ export const AltTextGenerator: React.FC<AltTextGeneratorProps> = ({
     e.stopPropagation();
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
     
-    const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-      const file = files[0];
-      if (file.type.startsWith('image/')) {
-        setUploadedFile(file);
-        setPreviewUrl(URL.createObjectURL(file));
-        reset();
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
       }
+      setUploadedFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+      reset();
     }
-  }, [reset]);
+  }, [reset, previewUrl]);
 
   const handleGenerate = async () => {
     try {
@@ -127,6 +138,9 @@ export const AltTextGenerator: React.FC<AltTextGeneratorProps> = ({
   };
 
   const handleRemoveFile = () => {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
     setUploadedFile(null);
     setPreviewUrl(null);
     reset();
@@ -282,7 +296,7 @@ export const AltTextGenerator: React.FC<AltTextGeneratorProps> = ({
               {result.flags.map((flag) => {
                 const config = FLAG_LABELS[flag];
                 return (
-                  <Badge key={flag} variant={config?.color as 'default' | 'success' | 'warning' | 'error' | 'info' || 'default'}>
+                  <Badge key={flag} variant={config?.color || 'default'}>
                     {config?.label || flag}
                   </Badge>
                 );
@@ -298,7 +312,11 @@ export const AltTextGenerator: React.FC<AltTextGeneratorProps> = ({
           )}
 
           <div className="flex gap-2 pt-2 border-t">
-            <Button variant="primary" size="sm">
+            <Button 
+              variant="primary" 
+              size="sm"
+              onClick={() => onGenerated?.(result)}
+            >
               <Check className="h-4 w-4 mr-1" />
               Approve
             </Button>

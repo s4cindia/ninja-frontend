@@ -18,7 +18,7 @@ export default defineConfig({
     },
     proxy: {
       '/api/v1': {
-        target: 'https://c48ebf88-c2db-4675-9589-90ad84ac1e0a-00-2o7hlystdhu3f.pike.replit.dev',
+        target: process.env.VITE_API_URL || 'https://c48ebf88-c2db-4675-9589-90ad84ac1e0a-00-2o7hlystdhu3f.pike.replit.dev',
         changeOrigin: true,
         secure: true,
       },

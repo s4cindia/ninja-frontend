@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import DOMPurify from 'dompurify';
 import { 
   FileText, Code, Eye, Edit2, Check, X, Copy, 
   Sparkles, RefreshCw, ChevronDown,
@@ -209,7 +210,9 @@ export const LongDescriptionEditor: React.FC<LongDescriptionEditorProps> = ({
         {viewMode === 'preview' ? (
           <div 
             className="prose prose-sm max-w-none"
-            dangerouslySetInnerHTML={{ __html: editContent.html || editContent.plainText }}
+            dangerouslySetInnerHTML={{ 
+              __html: DOMPurify.sanitize(editContent.html || editContent.plainText) 
+            }}
           />
         ) : isEditing ? (
           <textarea

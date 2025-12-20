@@ -68,9 +68,13 @@ export const AltTextReviewQueue: React.FC<AltTextReviewQueueProps> = ({
   const [batchConfidence, setBatchConfidence] = useState(85);
 
   const handleApprove = async (item: GeneratedAltText, customText?: string) => {
-    await approve(item.id, customText);
-    setEditingId(null);
-    setEditText('');
+    try {
+      await approve(item.id, customText);
+      setEditingId(null);
+      setEditText('');
+    } catch (error) {
+      console.error('Failed to approve:', error);
+    }
   };
 
   const handleStartEdit = (item: GeneratedAltText) => {
@@ -79,8 +83,13 @@ export const AltTextReviewQueue: React.FC<AltTextReviewQueueProps> = ({
   };
 
   const handleBatchApprove = async () => {
-    const result = await batchApprove(batchConfidence);
-    alert(`Approved ${result?.approved || 0} items`);
+    try {
+      const result = await batchApprove(batchConfidence);
+      alert(`Approved ${result?.approved || 0} items`);
+    } catch (error) {
+      console.error('Batch approve failed:', error);
+      alert('Failed to batch approve items');
+    }
   };
 
   return (
