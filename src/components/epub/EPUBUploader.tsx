@@ -4,6 +4,7 @@ import { Button } from '../ui/Button';
 import { Progress } from '../ui/Progress';
 import { Alert } from '../ui/Alert';
 import { cn } from '@/utils/cn';
+import { api } from '@/services/api';
 
 type UploadState = 'idle' | 'uploading' | 'auditing' | 'complete' | 'error';
 
@@ -112,9 +113,10 @@ export const EPUBUploader: React.FC<EPUBUploaderProps> = ({
         setProgress(prev => Math.min(prev + 10, 90));
       }, 200);
 
-      const response = await fetch('/api/v1/epub/audit-upload', {
-        method: 'POST',
-        body: formData,
+      const response = await api.post('/epub/audit-upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       });
 
       if (progressInterval) {
@@ -124,12 +126,7 @@ export const EPUBUploader: React.FC<EPUBUploaderProps> = ({
       setProgress(95);
       setState('auditing');
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Upload failed: ${response.statusText}`);
-      }
-
-      const result: AuditSummary = await response.json();
+      const result: AuditSummary = response.data.data || response.data;
       setProgress(100);
       setState('complete');
       onUploadComplete?.(result);

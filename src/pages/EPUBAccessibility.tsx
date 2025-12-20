@@ -6,6 +6,7 @@ import { EPUBAuditResults, AuditResult, AuditIssue } from '@/components/epub/EPU
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
+import { api } from '@/services/api';
 
 interface UploadSummary {
   jobId: string;
@@ -87,20 +88,10 @@ export const EPUBAccessibility: React.FC = () => {
 
   const handleUploadComplete = async (summary: UploadSummary) => {
     try {
-      const response = await fetch(`/api/v1/epub/job/${summary.jobId}/audit/result`);
-      
-      if (response.ok) {
-        const fullResult: AuditResult = await response.json();
-        setAuditResult(fullResult);
-        setIsDemo(false);
-      } else {
-        const demoResult: AuditResult = {
-          ...summary,
-          issues: generateDemoIssues(summary.issuesSummary),
-        };
-        setAuditResult(demoResult);
-        setIsDemo(true);
-      }
+      const response = await api.get(`/epub/job/${summary.jobId}/audit/result`);
+      const fullResult: AuditResult = response.data.data || response.data;
+      setAuditResult(fullResult);
+      setIsDemo(false);
     } catch {
       const demoResult: AuditResult = {
         ...summary,
@@ -141,16 +132,8 @@ export const EPUBAccessibility: React.FC = () => {
     setIsCreatingPlan(true);
     
     try {
-      const response = await fetch(`/api/v1/epub/job/${auditResult.jobId}/remediation`, {
-        method: 'POST',
-      });
-      
-      if (response.ok) {
-        navigate(`/epub/remediate/${auditResult.jobId}`);
-      } else {
-        console.warn('Failed to create remediation plan, navigating anyway');
-        navigate(`/epub/remediate/${auditResult.jobId}`);
-      }
+      await api.post(`/epub/job/${auditResult.jobId}/remediation`);
+      navigate(`/epub/remediate/${auditResult.jobId}`);
     } catch {
       console.warn('API unavailable, navigating to remediation page');
       navigate(`/epub/remediate/${auditResult.jobId}`);
@@ -165,16 +148,10 @@ export const EPUBAccessibility: React.FC = () => {
     setIsDownloading(true);
     
     try {
-      const response = await fetch(
-        `/api/v1/epub/job/${auditResult.jobId}/report?format=json`
-      );
-      
-      let data;
-      if (response.ok) {
-        data = await response.json();
-      } else {
-        data = auditResult;
-      }
+      const response = await api.get(`/epub/job/${auditResult.jobId}/report`, {
+        params: { format: 'json' },
+      });
+      const data = response.data.data || response.data;
       
       const blob = new Blob([JSON.stringify(data, null, 2)], { 
         type: 'application/json' 
