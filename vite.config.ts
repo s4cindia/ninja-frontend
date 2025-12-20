@@ -17,9 +17,10 @@ export default defineConfig({
       clientPort: 443,
     },
     proxy: {
-      '/api': {
-        target: 'http://localhost:5000',
+      '/api/v1': {
+        target: process.env.VITE_API_URL || 'http://localhost:3001',
         changeOrigin: true,
+        secure: false,
       },
     },
   },
