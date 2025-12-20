@@ -17,9 +17,10 @@ export default defineConfig({
       clientPort: 443,
     },
     proxy: {
-      '/api': {
-        target: 'http://localhost:5000',
+      '/api/v1': {
+        target: 'https://c48ebf88-c2db-4675-9589-90ad84ac1e0a-00-2o7hlystdhu3f.pike.replit.dev',
         changeOrigin: true,
+        secure: true,
       },
     },
   },
