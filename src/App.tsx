@@ -24,6 +24,7 @@ import TestVersionHistory from '@/pages/test/TestVersionHistory';
 import TestAcrWorkflow from '@/pages/test/TestAcrWorkflow';
 import { TestAltTextGenerator } from '@/pages/test/TestAltTextGenerator';
 import { TestAltTextReviewQueue } from '@/pages/test/TestAltTextReviewQueue';
+import { TestImagePreviewCard } from '@/pages/test/TestImagePreviewCard';
 import { VerificationQueuePage } from '@/pages/acr/VerificationQueuePage';
 import { AcrEditorPage } from '@/pages/acr/AcrEditorPage';
 import { AcrWorkflowPage } from '@/pages/acr/AcrWorkflowPage';
@@ -93,6 +94,7 @@ function AppRoutes() {
         <Route path="/test/acr-workflow" element={<TestAcrWorkflow />} />
         <Route path="/test/alt-text-generator" element={<TestAltTextGenerator />} />
         <Route path="/test/alt-text-review" element={<TestAltTextReviewQueue />} />
+        <Route path="/test/image-preview" element={<TestImagePreviewCard />} />
 
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<NotFound />} />
