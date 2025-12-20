@@ -3,7 +3,8 @@ import type {
   AltTextGenerationResult, 
   ImageType, 
   DocumentContext,
-  AltTextFlag 
+  AltTextFlag,
+  GeneratedAltText
 } from '@/types/alt-text.types';
 
 function generateMockResult(imageId: string, fileName?: string): AltTextGenerationResult {
@@ -192,5 +193,79 @@ export const altTextService = {
         ],
       };
     }
+  },
+
+  async getReviewQueue(jobId: string, filters?: {
+    status?: string;
+    minConfidence?: number;
+    maxConfidence?: number;
+    flags?: string[];
+  }): Promise<{
+    items: GeneratedAltText[];
+    stats: {
+      total: number;
+      pending: number;
+      needsReview: number;
+      approved: number;
+      edited: number;
+      rejected: number;
+    };
+    pendingReview: number;
+  }> {
+    const params = new URLSearchParams();
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.minConfidence) params.append('minConfidence', String(filters.minConfidence));
+    if (filters?.maxConfidence) params.append('maxConfidence', String(filters.maxConfidence));
+    if (filters?.flags?.length) params.append('flags', filters.flags.join(','));
+    
+    const response = await api.get<ApiResponse<{
+      items: GeneratedAltText[];
+      stats: {
+        total: number;
+        pending: number;
+        needsReview: number;
+        approved: number;
+        edited: number;
+        rejected: number;
+      };
+      pendingReview: number;
+    }>>(`/alt-text/job/${jobId}/review-queue?${params}`);
+    return response.data.data;
+  },
+
+  async getById(id: string): Promise<GeneratedAltText> {
+    const response = await api.get<ApiResponse<GeneratedAltText>>(`/alt-text/${id}`);
+    return response.data.data;
+  },
+
+  async approve(id: string, approvedAlt?: string, notes?: string): Promise<GeneratedAltText> {
+    const response = await api.post<ApiResponse<GeneratedAltText>>(`/alt-text/${id}/approve`, {
+      approvedAlt,
+      notes,
+    });
+    return response.data.data;
+  },
+
+  async reject(id: string, reason?: string): Promise<GeneratedAltText> {
+    const response = await api.post<ApiResponse<GeneratedAltText>>(`/alt-text/${id}/reject`, {
+      reason,
+    });
+    return response.data.data;
+  },
+
+  async regenerate(id: string, options?: {
+    additionalContext?: string;
+    useContextAware?: boolean;
+  }): Promise<GeneratedAltText> {
+    const response = await api.post<ApiResponse<GeneratedAltText>>(`/alt-text/${id}/regenerate`, options);
+    return response.data.data;
+  },
+
+  async batchApprove(jobId: string, options?: {
+    minConfidence?: number;
+    ids?: string[];
+  }): Promise<{ approved: number; message: string }> {
+    const response = await api.post<ApiResponse<{ approved: number; message: string }>>(`/alt-text/job/${jobId}/batch-approve`, options);
+    return response.data.data;
   },
 };
