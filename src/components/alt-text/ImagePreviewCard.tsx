@@ -184,7 +184,19 @@ export const ImagePreviewCard: React.FC<ImagePreviewCardProps> = ({
 
         {showAltOverlay && showAlt && (
           <div className="absolute inset-0 bg-black/80 p-3 overflow-y-auto">
-            <p className="text-white text-sm">{alt}</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute top-1 right-1 text-white hover:bg-white/20 p-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowAlt(false);
+              }}
+              title="Hide alt text"
+            >
+              <EyeOff className="h-4 w-4" />
+            </Button>
+            <p className="text-white text-sm pr-8">{alt}</p>
             {extendedAlt && (
               <p className="text-gray-300 text-xs mt-2">{extendedAlt}</p>
             )}
