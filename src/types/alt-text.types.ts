@@ -66,3 +66,23 @@ export interface DocumentContext {
   chapterTitle?: string;
   pageNumber?: number;
 }
+
+export interface DataTableRow {
+  label: string;
+  values: (string | number)[];
+}
+
+export interface ChartDescription {
+  imageId: string;
+  imageType: ImageType;
+  shortAlt: string;
+  longDescription: string;
+  dataTable?: DataTableRow[];
+  trends?: string[];
+  keyFindings?: string[];
+  confidence: number;
+  flags: string[];
+  aiModel: string;
+  generatedAt: string;
+  needsLongDescription?: boolean;
+}
