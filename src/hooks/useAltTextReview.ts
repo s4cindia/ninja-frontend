@@ -151,6 +151,19 @@ export function useAltTextReview(jobId: string) {
     loadQueue();
   }, [loadQueue]);
 
+  useEffect(() => {
+    if (isDemo) {
+      setStats({
+        total: items.length,
+        pending: items.filter(i => i.status === 'pending').length,
+        needsReview: items.filter(i => i.status === 'needs_review').length,
+        approved: items.filter(i => i.status === 'approved').length,
+        edited: items.filter(i => i.status === 'edited').length,
+        rejected: items.filter(i => i.status === 'rejected').length,
+      });
+    }
+  }, [items, isDemo]);
+
   const approve = async (id: string, approvedAlt?: string) => {
     try {
       if (isDemo) {
