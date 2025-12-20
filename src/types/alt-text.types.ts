@@ -86,3 +86,42 @@ export interface ChartDescription {
   generatedAt: string;
   needsLongDescription?: boolean;
 }
+
+export interface LongDescription {
+  id: string;
+  imageId: string;
+  jobId: string;
+  altTextId?: string;
+  trigger: string;
+  content: {
+    html: string;
+    plainText: string;
+    markdown: string;
+  };
+  wordCount: number;
+  sections?: DescriptionSection[];
+  status: 'pending' | 'approved' | 'edited';
+  approvedBy?: string;
+  approvedAt?: string;
+  aiModel: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DescriptionSection {
+  heading: string;
+  content: string;
+}
+
+export interface AriaMarkup {
+  imgTag: string;
+  descriptionDiv: string;
+}
+
+export type LongDescriptionTrigger = 
+  | 'COMPLEX_CHART'
+  | 'MANY_COMPONENTS'
+  | 'DENSE_INFORMATION'
+  | 'DATA_TABLE'
+  | 'FLOWCHART'
+  | 'MANUAL_REQUEST';
