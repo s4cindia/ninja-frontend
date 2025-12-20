@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  CheckCircle2, AlertTriangle, Filter, Zap, 
+  CheckCircle2, Filter, Zap, 
   ChevronDown, ChevronUp, Info, XCircle
 } from 'lucide-react';
 import { Button } from '../ui/Button';
@@ -260,14 +260,12 @@ export const BatchApprovalPanel: React.FC<BatchApprovalPanelProps> = ({
 
       {lastResult && (
         <Alert variant="success">
-          <CheckCircle2 className="h-4 w-4" />
           {lastResult.message}
         </Alert>
       )}
 
       {criteria.minConfidence < 70 && (
         <Alert variant="warning">
-          <AlertTriangle className="h-4 w-4" />
           Low confidence threshold may approve inaccurate alt text. Consider manual review.
         </Alert>
       )}
