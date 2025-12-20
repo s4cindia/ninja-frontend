@@ -41,4 +41,4 @@ externalPort = 3000
 [userenv]
 
 [userenv.development]
-VITE_API_URL = "https://c48ebf88-c2db-4675-9589-90ad84ac1e0a-00-2o7hlystdhu3f.pike.replit.dev"
+VITE_API_URL = "https://c48ebf88-c2db-4675-9589-90ad84ac1e0a-00-2o7hlystdhu3f.pike.replit.dev/api/v1"
