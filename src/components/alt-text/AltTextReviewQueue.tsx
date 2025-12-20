@@ -171,7 +171,10 @@ export const AltTextReviewQueue: React.FC<AltTextReviewQueueProps> = ({
               <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
               <select
                 value={filters.status || ''}
-                onChange={(e) => setFilters({ ...filters, status: e.target.value as AltTextStatus || undefined })}
+                onChange={(e) => setFilters({ 
+                  ...filters, 
+                  status: e.target.value ? (e.target.value as AltTextStatus) : undefined 
+                })}
                 className="w-full px-3 py-2 border rounded-lg text-sm"
               >
                 <option value="">All Statuses</option>
