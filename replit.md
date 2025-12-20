@@ -5,7 +5,26 @@ This is a React + Vite + TypeScript frontend web application for the Ninja Platf
 
 **Current State:** Fully functional development environment with Vite dev server running on port 5000.
 
-## Recent Changes (December 19, 2025)
+## Recent Changes (December 20, 2025)
+- **EPUB Upload & Audit UI (FE-3.22):** Complete EPUB accessibility audit workflow
+  - EPUBUploader: Drag-drop file upload, .epub validation, 100MB limit, upload states
+  - EPUBAuditResults: Accessibility score (0-100) with color coding (≥85 green, ≥70 yellow, <70 red)
+  - Issues list with severity icons, auto-fixable vs manual badges, WCAG criteria
+  - Tabs to filter: All, Critical, Serious, Auto-fixable
+  - "Create Remediation Plan" and "Download Report" actions
+  - Demo mode fallback when backend unavailable
+  - Routes: /epub and /epub/remediate/:jobId
+  - New UI components: Progress bar, Tabs
+
+- **CodeRabbit PR Fixes:** Multiple security and code quality improvements
+  - XSS vulnerability fixed with DOMPurify sanitization
+  - Memory leak fixes with URL.revokeObjectURL cleanup
+  - Stale closure fix in cleanup effects using refs
+  - Badge variant type safety improvements
+  - Error handling in review queue operations
+  - Environment variable for proxy URL in vite.config.ts
+
+## Changes (December 19, 2025)
 - **ACR Editor Error Handling:** Added proper error handling for remark generation
   - Empty catch block replaced with proper error logging and user feedback
   - Inline error alert displays when AI remark generation fails
