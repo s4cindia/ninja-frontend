@@ -103,26 +103,51 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState('all');
 
+  // Defensive data access with fallbacks
+  const issues = result?.issues ?? [];
+  const accessibilityScore = result?.accessibilityScore ?? 0;
+  const isValid = result?.isValid ?? false;
+  const epubVersion = result?.epubVersion ?? 'Unknown';
+  
+  // Build issuesSummary with fallbacks - compute from issues if not provided
+  const issuesSummary = useMemo(() => {
+    if (result?.issuesSummary?.total !== undefined) {
+      return result.issuesSummary;
+    }
+    // Compute from issues array if issuesSummary is missing
+    const critical = issues.filter(i => i.severity === 'critical').length;
+    const serious = issues.filter(i => i.severity === 'serious').length;
+    const moderate = issues.filter(i => i.severity === 'moderate').length;
+    const minor = issues.filter(i => i.severity === 'minor').length;
+    return {
+      total: issues.length,
+      critical,
+      serious,
+      moderate,
+      minor,
+    };
+  }, [result?.issuesSummary, issues]);
+
   const autoFixableCount = useMemo(() => 
-    result.issues.filter(isAutoFixable).length, 
-    [result.issues]
+    issues.filter(isAutoFixable).length, 
+    [issues]
   );
 
   const filteredIssues = useMemo(() => {
     switch (activeTab) {
       case 'critical':
-        return result.issues.filter(i => i.severity === 'critical');
+        return issues.filter(i => i.severity === 'critical');
       case 'serious':
-        return result.issues.filter(i => i.severity === 'serious');
+        return issues.filter(i => i.severity === 'serious');
       case 'autofixable':
-        return result.issues.filter(isAutoFixable);
+        return issues.filter(isAutoFixable);
       default:
-        return result.issues;
+        return issues;
     }
-  }, [result.issues, activeTab]);
+  }, [issues, activeTab]);
 
   const circumference = 2 * Math.PI * 45;
-  const scoreOffset = circumference - (result.accessibilityScore / 100) * circumference;
+  const scoreOffset = circumference - (accessibilityScore / 100) * circumference;
 
   return (
     <div className="space-y-6">
@@ -149,23 +174,23 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
                   strokeLinecap="round"
                   strokeDasharray={circumference}
                   strokeDashoffset={scoreOffset}
-                  className={cn('transition-all duration-1000', getScoreRingColor(result.accessibilityScore))}
+                  className={cn('transition-all duration-1000', getScoreRingColor(accessibilityScore))}
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className={cn('text-3xl font-bold', getScoreColor(result.accessibilityScore))}>
-                  {result.accessibilityScore}
+                <span className={cn('text-3xl font-bold', getScoreColor(accessibilityScore))}>
+                  {accessibilityScore}
                 </span>
                 <span className="text-xs text-gray-500">/ 100</span>
               </div>
             </div>
             <p className="mt-3 font-medium text-gray-900">Accessibility Score</p>
             <div className="flex items-center gap-2 mt-2">
-              <Badge variant={result.isValid ? 'success' : 'error'} size="sm">
-                {result.isValid ? 'Valid EPUB' : 'Invalid EPUB'}
+              <Badge variant={isValid ? 'success' : 'error'} size="sm">
+                {isValid ? 'Valid EPUB' : 'Invalid EPUB'}
               </Badge>
               <Badge variant="info" size="sm">
-                {result.epubVersion}
+                {epubVersion}
               </Badge>
             </div>
           </CardContent>
@@ -179,31 +204,31 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               <SummaryCard 
                 label="Total" 
-                value={result.issuesSummary.total} 
+                value={issuesSummary.total} 
                 bgColor="bg-gray-100" 
                 textColor="text-gray-700"
               />
               <SummaryCard 
                 label="Critical" 
-                value={result.issuesSummary.critical} 
+                value={issuesSummary.critical} 
                 bgColor="bg-red-100" 
                 textColor="text-red-700"
               />
               <SummaryCard 
                 label="Serious" 
-                value={result.issuesSummary.serious} 
+                value={issuesSummary.serious} 
                 bgColor="bg-orange-100" 
                 textColor="text-orange-700"
               />
               <SummaryCard 
                 label="Moderate" 
-                value={result.issuesSummary.moderate} 
+                value={issuesSummary.moderate} 
                 bgColor="bg-yellow-100" 
                 textColor="text-yellow-700"
               />
               <SummaryCard 
                 label="Minor" 
-                value={result.issuesSummary.minor} 
+                value={issuesSummary.minor} 
                 bgColor="bg-blue-100" 
                 textColor="text-blue-700"
               />
@@ -256,13 +281,13 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
           <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="mb-4">
               <TabsTrigger value="all">
-                All ({result.issues.length})
+                All ({issues.length})
               </TabsTrigger>
               <TabsTrigger value="critical">
-                Critical ({result.issuesSummary.critical})
+                Critical ({issuesSummary.critical})
               </TabsTrigger>
               <TabsTrigger value="serious">
-                Serious ({result.issuesSummary.serious})
+                Serious ({issuesSummary.serious})
               </TabsTrigger>
               <TabsTrigger value="autofixable">
                 Auto-fixable ({autoFixableCount})
