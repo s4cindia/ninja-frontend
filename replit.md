@@ -1,289 +1,68 @@
 # Ninja Platform Web Application
 
 ## Overview
-This is a React + Vite + TypeScript frontend web application for the Ninja Platform. The project provides accessibility validation and compliance checking for educational publishers.
+This project is a React + Vite + TypeScript frontend web application for the Ninja Platform. Its primary purpose is to provide accessibility validation and compliance checking for educational publishers. The application offers a comprehensive workflow for EPUB accessibility auditing and remediation, aiming to streamline the process of creating compliant educational content. It features EPUB upload, detailed audit reports, and a guided remediation plan with both automated and manual task management. The platform seeks to enhance the accessibility of digital publications, ensuring adherence to standards like WCAG, Section 508, and FPC.
 
-**Current State:** Fully functional development environment with Vite dev server running on port 5000.
+## User Preferences
+- **Communication style**: I prefer simple language.
+- **Coding style**: I like functional programming.
+- **Workflow preferences**: I want iterative development.
+- **Interaction preferences**: Ask before making major changes.
+- **General working preferences**: I prefer detailed explanations.
+- **Do not make changes to the folder `node_modules`**.
+- **Do not make changes to the file `package-lock.json`**.
+- **NEVER commit secrets to Git**.
+- **All components must be accessible (WCAG 2.1 AA)**.
+- **Use TypeScript strict mode**.
+- **No inline styles - use Tailwind classes**.
+- **Keep components small and focused**.
+- **NEVER use Replit Agent for features - use approved Sprint Prompts only**.
+- **For debugging, use Claude Code (not Replit Agent)**.
+- **Create feature branches**: `git checkout -b feat/NINJA-XXX-description`.
+- **Commit with conventional prefixes**: feat, fix, docs, chore, etc.
 
-## Recent Changes (December 20, 2025)
-- **EPUB Upload & Audit UI (FE-3.22):** Complete EPUB accessibility audit workflow
-  - EPUBUploader: Drag-drop file upload, .epub validation, 100MB limit, upload states
-  - EPUBAuditResults: Accessibility score (0-100) with color coding (≥85 green, ≥70 yellow, <70 red)
-  - Issues list with severity icons, auto-fixable vs manual badges, WCAG criteria
-  - Tabs to filter: All, Critical, Serious, Auto-fixable
-  - "Create Remediation Plan" and "Download Report" actions
-  - Demo mode fallback when backend unavailable
-  - Routes: /epub and /epub/remediate/:jobId
-  - New UI components: Progress bar, Tabs
+## System Architecture
 
-- **CodeRabbit PR Fixes:** Multiple security and code quality improvements
-  - XSS vulnerability fixed with DOMPurify sanitization
-  - Memory leak fixes with URL.revokeObjectURL cleanup
-  - Stale closure fix in cleanup effects using refs
-  - Badge variant type safety improvements
-  - Error handling in review queue operations
-  - Environment variable for proxy URL in vite.config.ts
+### UI/UX Decisions
+The application features a clean, responsive design built with Tailwind CSS. It uses a consistent component library for elements like buttons, inputs, cards, badges, and alerts to ensure a unified user experience. Key UI patterns include:
+- **Dashboard**: Provides an overview of stats, compliance scores, and recent activity.
+- **EPUB Workflow**: Guided multi-step process for uploading, auditing, and remediating EPUB files, featuring drag-and-drop upload, progress indicators, and detailed issue lists.
+- **Accessibility Features**: Focus on WCAG 2.1 AA compliance, including keyboard accessibility, ARIA labels, color contrast, and screen reader support.
+- **Branding**: Integrates S4Carlisle branding elements.
 
-## Changes (December 19, 2025)
-- **ACR Editor Error Handling:** Added proper error handling for remark generation
-  - Empty catch block replaced with proper error logging and user feedback
-  - Inline error alert displays when AI remark generation fails
-  - Error auto-dismisses after 5 seconds or can be manually closed
+### Technical Implementations
+- **Frontend Framework**: React 18.2 with Vite 5.0 for fast development and build times.
+- **Language**: TypeScript 5.3 for type safety and improved developer experience.
+- **Styling**: Tailwind CSS 3.3 for utility-first styling and easy customization.
+- **Routing**: React Router DOM 6.20 for declarative navigation and protected routes with role-based access control.
+- **State Management**: Zustand 4.4 for global state, with persistence for authentication.
+- **Data Fetching**: TanStack Query 5.8 for efficient data fetching, caching, and synchronization, integrated with Axios.
+- **Authentication**: JWT-based authentication with Axios interceptors for token refresh.
+- **EPUB Processing**: Client-side logic for managing EPUB upload, displaying audit results, and orchestrating the remediation plan, including handling task statuses (pending, in_progress, completed, failed, skipped) and types (auto, manual).
+- **Error Handling**: Robust error handling across the application, including user-friendly alerts and fallback mechanisms for API failures (e.g., demo mode with mock data).
+- **Security**: XSS protection using DOMPurify, memory leak prevention, and proper cleanup of resources.
 
-- **Step 2 Document Upload Redesign:** Both options now show side-by-side
-  - Upload interface and job selection displayed in two-column layout
-  - Selected option highlighted with blue border ring
-  - Improved UX without back-and-forth navigation
+### Feature Specifications
+- **EPUB Accessibility Audit**: Upload EPUB files, receive an accessibility score, and view a detailed list of issues categorized by severity and WCAG criteria.
+- **EPUB Remediation Plan**: Generate a step-by-step remediation plan with auto-fixable and manual tasks. Track progress, cancel ongoing remediation, and view a comparison summary of the fixed EPUB.
+- **ACR Editor**: Functionality for editing and verifying accessibility conformance remarks, with error handling and persistence of verification status.
+- **Dashboard**: Displays key metrics (total files, processed, pending, failed), compliance scores, and recent activity, with real-time updates.
+- **Compliance Pages**: Dedicated pages for Section 508 and Functional Performance Criteria (FPC) mapping.
+- **User Authentication**: Secure login, registration, and user management with protected routes.
+- **File Management**: Upload, list, and delete files.
 
-- **Dashboard Mock Data:** Added fallback data when backend API unavailable
-  - Stats and activity now load with demo data when API calls fail
-  - No more network error messages in demo mode
+### System Design Choices
+- **Modular Architecture**: Organized directory structure (`components`, `hooks`, `pages`, `services`, `stores`, `utils`) promoting reusability and maintainability.
+- **API Client**: Centralized Axios client with authentication interceptors and error handling.
+- **Custom Hooks**: Encapsulate data fetching and business logic for cleaner components.
+- **Vite Configuration**: Path aliases (`@/`) for simplified imports, API proxy for backend integration, and specific configurations for Replit hosting (port 5000, 0.0.0.0 binding).
 
-- **ACR Editor Bug Fix:** Fixed "Mark as Final" button staying disabled after editing criteria
-  - Suspicious criteria flag (`isSuspicious`) now cleared when user updates conformance or remarks
-  - Human-verified edits automatically remove the suspicious status
-  - Blockers list properly updates after user reviews flagged items
+## External Dependencies
 
-- **ACR Workflow Page Bug Fix #4:** Fixed verification status persistence
-  - Verification changes now persist when navigating between workflow steps
-  - Added `verifications` to workflow state (stored in localStorage)
-  - VerificationQueue accepts `savedVerifications` prop to restore state on mount
-  - VerificationQueue calls `onVerificationUpdate` when changes are made
-  - Parent workflow state and localStorage updated atomically on each verification
-  - Supports both individual and bulk verification persistence
-
-- **ACR Workflow Page Bug Fix #3:** Fixed Step 2 initial selection regression
-  - Added "Start New" button to workflow header for resetting workflow state
-  - Clears cached localStorage state so users can restart from Step 1
-  - Two-option selection (Upload vs Existing Job) properly displays when documentSource is null
-  - Fixed by adding handleResetWorkflow function that clears localStorage and resets all state
-
-- **ACR Workflow Page Bug Fix #2:** Fixed Step 5 navigation issue
-  - "Mark as Final" now correctly advances to Step 6 (Export) instead of redirecting to Dashboard
-  - Fixed by updating isFinalized and currentStep atomically in single state update
-  - Removed reliance on handleNext() closure which could cause timing issues
-
-- **ACR Workflow Page Bug Fix #1:** Fixed Step 2 document upload selection
-  - Separated handlers for "Upload New Document" vs "Select Existing Job"
-  - Added `documentSource` state to track selection type ('upload' | 'existing')
-  - Added `uploadedFile` state for tracking uploaded file metadata
-  - Created proper file upload UI with drag-drop support and file browser
-  - Created existing job selection UI with list of completed jobs
-  - Added back button to return to source selection
-  - File selection shows file name and size with clear button
-  - Job selection highlights selected job with checkmark
-  - State properly persisted in localStorage
-
-## Changes (December 15, 2025)
-- **Dashboard with Real Data:** Updated Dashboard page with backend API integration
-  - Stat cards for total files, processed, pending, failed with loading states
-  - Circular compliance score indicator with color-coded thresholds
-  - Recent activity feed with time formatting
-  - Auto-refresh every 30 seconds via React Query
-- **Compliance Pages:** Section 508 and FPC compliance mapping pages
-  - src/pages/compliance/Section508Page.tsx - Section 508 criteria mapping
-  - src/pages/compliance/FpcPage.tsx - Functional Performance Criteria validation
-  - ConformanceBadge component with status icons
-- **New Services & Hooks:**
-  - src/services/dashboard.service.ts - Dashboard stats and activity API
-  - src/services/compliance.service.ts - Section 508 and FPC APIs
-  - src/hooks/useDashboard.ts - Dashboard data hooks with auto-refresh
-  - src/hooks/useCompliance.ts - Compliance data hooks
-
-## Previous Changes (December 7, 2025)
-- **UI Component Library:** Complete reusable component library with Tailwind CSS
-  - Button (variants: primary, secondary, outline, ghost, danger; sizes: sm, md, lg; loading state, icons)
-  - Input (label, error, helperText, accessible with htmlFor)
-  - Card (Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter)
-  - Badge (variants: default, success, warning, error, info; sizes: sm, md)
-  - Alert (variants: info, success, warning, error; title, closable with aria-label)
-  - Spinner (sizes: sm, md, lg; accessible with role="status")
-  - EmptyState (icon, title, description, action props)
-  - Table (Table, TableHeader, TableBody, TableRow, TableHead, TableCell)
-  - Logo (S4Carlisle branding component)
-- **Updated Pages:** Login and Register pages now use the new UI components
-- **Data Fetching Layer:** Complete TanStack Query setup with Axios API client
-- **API Services:** Configured Axios with auth interceptors, token refresh handling
-- **Auth Service:** Login, register, logout, getCurrentUser, refreshToken methods
-- **Files Service:** CRUD operations for files with upload support
-- **Query Hooks:** useLogin, useRegister, useLogout, useCurrentUser, useFiles, useUploadFile, useDeleteFile
-- **Routing Setup:** Complete React Router configuration with protected routes
-- **Authentication:** Zustand auth store with localStorage persistence
-- **Layouts:** MainLayout (sidebar navigation) and AuthLayout (login/register)
-- **Pages:** Dashboard, Login, Register, Products, Jobs, Files, NotFound
-- **Route Protection:** ProtectedRoute component with role-based access control
-- **Branding:** S4Carlisle logo image integrated throughout the application
-- Updated package.json with complete dependency set
-- Configured Vite with path aliases (@/) and API proxy
-- Set up Tailwind CSS with custom primary color palette
-- TypeScript configured with path aliases
-
-## Project Architecture
-
-### Technology Stack
-- **Frontend Framework:** React 18.2
-- **Build Tool:** Vite 5.0
-- **Language:** TypeScript 5.3
-- **Styling:** Tailwind CSS 3.3
-- **Routing:** React Router DOM 6.20
-- **Data Fetching:** React Query (@tanstack/react-query) 5.8
-- **State Management:** Zustand 4.4
-- **HTTP Client:** Axios 1.6
-- **Icons:** Lucide React 0.294
-- **Dev Server:** Vite dev server on port 5000
-
-### Directory Structure
-```
-/
-├── public/           # Static assets
-├── src/
-│   ├── components/   # React components
-│   │   ├── layout/   # Layout components (MainLayout, AuthLayout)
-│   │   │   ├── MainLayout.tsx   # Sidebar navigation for authenticated users
-│   │   │   └── AuthLayout.tsx   # Centered card layout for login/register
-│   │   ├── ui/       # Base UI components (Button, Input, etc.)
-│   │   └── ProtectedRoute.tsx   # Route protection with role-based access
-│   ├── hooks/        # Custom React hooks
-│   │   ├── useAuth.ts       # Auth mutations: useLogin, useRegister, useLogout, useCurrentUser
-│   │   ├── useFiles.ts      # File operations: useFiles, useUploadFile, useDeleteFile
-│   │   └── index.ts         # Re-exports all hooks
-│   ├── pages/        # Page components
-│   │   ├── Dashboard.tsx    # Main dashboard with stats
-│   │   ├── Login.tsx        # Login form
-│   │   ├── Register.tsx     # Registration form
-│   │   ├── Products.tsx     # Products management
-│   │   ├── Jobs.tsx         # Jobs list
-│   │   ├── Files.tsx        # File uploads
-│   │   └── NotFound.tsx     # 404 error page
-│   ├── services/     # API services and external integrations
-│   │   ├── api.ts           # Axios client with auth interceptors
-│   │   ├── auth.service.ts  # Auth API: login, register, logout, getCurrentUser
-│   │   └── files.service.ts # Files API: list, upload, delete, getStats
-│   ├── stores/       # Zustand state stores
-│   │   └── auth.store.ts    # Authentication state with persist
-│   ├── styles/       # CSS and Tailwind styles
-│   ├── types/        # TypeScript type definitions
-│   │   └── auth.types.ts    # User, AuthState, LoginCredentials types
-│   ├── utils/        # Utility functions
-│   ├── App.tsx       # Main application component with routing
-│   ├── main.tsx      # Application entry point
-│   └── vite-env.d.ts # Vite type definitions
-├── index.html        # HTML entry point (Inter font)
-├── vite.config.ts    # Vite configuration with aliases and proxy
-├── tsconfig.json     # TypeScript configuration with path aliases
-├── tailwind.config.js # Tailwind CSS configuration
-├── postcss.config.js  # PostCSS configuration
-└── package.json      # Dependencies and scripts
-```
-
-### Routing Structure
-- `/login` - Login page (AuthLayout)
-- `/register` - Registration page (AuthLayout)
-- `/dashboard` - Dashboard with stats (Protected, MainLayout)
-- `/products` - Products management (Protected, MainLayout)
-- `/jobs` - Validation jobs list (Protected, MainLayout)
-- `/files` - File uploads (Protected, MainLayout)
-- `/` - Redirects to /dashboard
-- `*` - 404 Not Found page
-
-Protected routes redirect unauthenticated users to `/login`. The ProtectedRoute component also supports role-based access control.
-
-### Key Configuration
-- **Vite Config:** Path alias `@/` points to `./src`, API proxy for `/api` routes, `allowedHosts: true` for Replit proxy
-- **TypeScript:** Strict mode with path aliases (`@/*` maps to `./src/*`)
-- **Tailwind:** Custom primary color palette, content scans ./src and index.html
-- **Port:** Frontend runs on port 5000 (required for Replit webview)
-
-## Development
-
-### Running the Application
-The application starts automatically via the "Start application" workflow. To manually start:
-```bash
-npm run dev
-```
-
-### Available Scripts
-- `npm run dev` - Start development server on port 5000
-- `npm run build` - TypeScript compile and Vite build for production
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint
-- `npm run type-check` - Run TypeScript type checking
-
-### Path Aliases
-Use `@/` to import from the src directory:
-```typescript
-import { Button } from '@/components/ui/Button';
-import { useAuth } from '@/hooks/useAuth';
-import { api } from '@/services/api';
-```
-
-### Deployment
-The project is configured for static site deployment:
-- Build command: `npm run build`
-- Output directory: `dist/`
-- Deployment type: Static
-
-## Dependencies
-
-### Production Dependencies
-- react: ^18.2.0
-- react-dom: ^18.2.0
-- react-router-dom: ^6.20.0
-- @tanstack/react-query: ^5.8.0
-- axios: ^1.6.0
-- zustand: ^4.4.0
-- clsx: ^2.0.0
-- lucide-react: ^0.294.0
-
-### Development Dependencies
-- @vitejs/plugin-react: ^4.2.0
-- typescript: ^5.3.0
-- vite: ^5.0.0
-- tailwindcss: ^3.3.0
-- postcss: ^8.4.0
-- autoprefixer: ^10.4.0
-- @types/node: ^20.10.0
-- @types/react: ^18.2.0
-- @types/react-dom: ^18.2.0
-- eslint and related plugins
-
-## Notes
-- The Vite dev server must bind to 0.0.0.0 (not localhost) for Replit's proxy to work
-- Port 5000 is the only port automatically exposed for web previews in Replit
-- HMR (Hot Module Replacement) is configured to work through Replit's proxy on port 443
-- API requests to `/api/*` are proxied to http://localhost:5000
-
-## Critical Rules
-
-1. NEVER commit secrets to Git
-2. All components must be accessible (WCAG 2.1 AA)
-3. Use TypeScript strict mode
-4. No inline styles - use Tailwind classes
-5. Keep components small and focused
-6. NEVER use Replit Agent for features - use approved Sprint Prompts only
-
-## Accessibility Requirements
-
-- All interactive elements must be keyboard accessible
-- Include proper ARIA labels
-- Maintain color contrast ratios
-- Support screen readers
-
-## Recovery Commands
-
-If the Repl gets stuck:
-- Restart: `kill 1`
-- Clear cache: `rm -rf node_modules/.cache`
-- Reinstall: `rm -rf node_modules && npm install`
-
-## Development Workflow
-
-1. Use approved Sprint Prompts from docs/sprint-prompts/ (in ninja-backend repo)
-2. For debugging, use Claude Code (not Replit Agent)
-3. Create feature branches: `git checkout -b feat/NINJA-XXX-description`
-4. Commit with conventional prefixes: feat, fix, docs, chore, etc.
-
-## Related Documentation
-
-- [Main Documentation](https://github.com/s4cindia/ninja-backend/tree/main/docs)
-- [Backend Repository](https://github.com/s4cindia/ninja-backend)
+- **API Backend**: Custom backend API for user authentication, file operations, dashboard statistics, compliance data, and EPUB audit/remediation services. (Proxied via `/api` in Vite config).
+- **Axios**: HTTP client for making API requests.
+- **@tanstack/react-query**: For server state management and data synchronization.
+- **Zustand**: For client-side state management, particularly authentication.
+- **React Router DOM**: For client-side routing.
+- **Lucide React**: Icon library for UI elements.
+- **DOMPurify**: Used for sanitizing HTML content to prevent XSS vulnerabilities.
