@@ -265,14 +265,25 @@ export const EPUBRemediation: React.FC = () => {
   };
 
   const handleDownloadRemediated = async () => {
-    if (!jobId) return;
+    if (!jobId) {
+      setError('No job ID available');
+      setTimeout(() => setError(null), 3000);
+      return;
+    }
+
+    if (jobId.startsWith('demo-') || isDemo) {
+      setError('Download not available in demo mode');
+      setTimeout(() => setError(null), 3000);
+      return;
+    }
 
     try {
-      const response = await api.get(`/epub/job/${jobId}/download`, {
+      const response = await api.get(`/epub/job/${jobId}/download-remediated`, {
         responseType: 'blob',
       });
       
-      const url = URL.createObjectURL(response.data);
+      const blob = new Blob([response.data], { type: 'application/epub+zip' });
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = plan?.epubFileName?.replace('.epub', '-remediated.epub') || 'remediated.epub';
@@ -280,8 +291,9 @@ export const EPUBRemediation: React.FC = () => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch {
-      setError('Download not available in demo mode');
+    } catch (err) {
+      console.error('Download failed:', err);
+      setError('Failed to download remediated EPUB. Please try again.');
       setTimeout(() => setError(null), 3000);
     }
   };
