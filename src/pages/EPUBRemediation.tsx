@@ -81,7 +81,7 @@ export const EPUBRemediation: React.FC = () => {
     setPageState('fixing');
     setFixProgress(0);
 
-    const autoFixableIssues = plan.issues.filter(i => i.isAutoFixable);
+    const autoFixableIssues = (plan?.issues ?? []).filter(i => i.isAutoFixable);
     const totalToFix = autoFixableIssues.length;
 
     for (let i = 0; i < totalToFix; i++) {
@@ -181,8 +181,9 @@ export const EPUBRemediation: React.FC = () => {
     );
   }
 
-  const fixedCount = plan.issues.filter(i => i.status === 'fixed').length;
-  const pendingCount = plan.issues.filter(i => i.status === 'pending' && i.isAutoFixable).length;
+  const issues = plan?.issues ?? [];
+  const fixedCount = issues.filter(i => i.status === 'fixed').length;
+  const pendingCount = issues.filter(i => i.status === 'pending' && i.isAutoFixable).length;
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -237,7 +238,7 @@ export const EPUBRemediation: React.FC = () => {
             {pageState === 'ready' && (
               <Button onClick={handleApplyAutoFixes}>
                 <Wrench className="h-4 w-4 mr-2" />
-                Apply Auto-Fixes ({plan.autoFixableCount})
+                Apply Auto-Fixes ({plan?.autoFixableCount ?? issues.filter(i => i.isAutoFixable).length})
               </Button>
             )}
             {pageState === 'fixing' && (
@@ -262,11 +263,11 @@ export const EPUBRemediation: React.FC = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Issues ({plan.issues.length})</CardTitle>
+          <CardTitle>Issues ({issues.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {plan.issues.map((issue) => (
+            {issues.map((issue) => (
               <div 
                 key={issue.id}
                 className={`flex items-start gap-3 p-3 rounded-lg border ${
