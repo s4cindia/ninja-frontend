@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { BookOpen, ArrowLeft, Wrench, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -28,9 +28,34 @@ interface RemediationPlan {
 
 type PageState = 'loading' | 'ready' | 'fixing' | 'complete' | 'error';
 
+interface LocationState {
+  auditResult?: {
+    jobId: string;
+    issues: Array<{
+      id: string;
+      code: string;
+      severity: 'critical' | 'serious' | 'moderate' | 'minor';
+      message: string;
+      location?: string;
+    }>;
+  };
+  autoFixableIssues?: Array<{
+    id: string;
+    code: string;
+    severity: 'critical' | 'serious' | 'moderate' | 'minor';
+    message: string;
+    location?: string;
+    isAutoFixable: boolean;
+    status: 'pending';
+  }>;
+  isDemo?: boolean;
+}
+
 export const EPUBRemediation: React.FC = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const locationState = location.state as LocationState | null;
   
   const [pageState, setPageState] = useState<PageState>('loading');
   const [plan, setPlan] = useState<RemediationPlan | null>(null);
@@ -46,34 +71,61 @@ export const EPUBRemediation: React.FC = () => {
         return;
       }
 
+      if (locationState?.autoFixableIssues && locationState.autoFixableIssues.length > 0) {
+        const planFromState: RemediationPlan = {
+          jobId,
+          epubFileName: 'uploaded-file.epub',
+          totalIssues: locationState.autoFixableIssues.length,
+          autoFixableCount: locationState.autoFixableIssues.length,
+          issues: locationState.autoFixableIssues.map(issue => ({
+            id: issue.id,
+            code: issue.code,
+            severity: issue.severity,
+            message: issue.message,
+            location: issue.location,
+            isAutoFixable: true,
+            status: 'pending' as const,
+          })),
+        };
+        setPlan(planFromState);
+        setPageState('ready');
+        setIsDemo(locationState.isDemo ?? false);
+        return;
+      }
+
       try {
         const response = await api.get(`/epub/job/${jobId}/remediation`);
         const data = response.data.data || response.data;
-        setPlan(data);
-        setPageState('ready');
-        setIsDemo(false);
+        if (data.issues && data.issues.length > 0) {
+          setPlan(data);
+          setPageState('ready');
+          setIsDemo(false);
+          return;
+        }
       } catch {
-        const demoPlan: RemediationPlan = {
-          jobId: jobId,
-          epubFileName: 'sample-book.epub',
-          totalIssues: 5,
-          autoFixableCount: 5,
-          issues: [
-            { id: '1', code: 'EPUB-META-002', severity: 'moderate', message: '[Demo] Missing accessibility features metadata', isAutoFixable: true, status: 'pending' },
-            { id: '2', code: 'EPUB-META-003', severity: 'minor', message: '[Demo] Missing accessMode metadata', isAutoFixable: true, status: 'pending' },
-            { id: '3', code: 'EPUB-META-004', severity: 'minor', message: '[Demo] Missing accessibilityHazard metadata', isAutoFixable: true, status: 'pending' },
-            { id: '4', code: 'EPUB-META-005', severity: 'minor', message: '[Demo] Missing accessibilitySummary metadata', isAutoFixable: true, status: 'pending' },
-            { id: '5', code: 'EPUB-NAV-001', severity: 'moderate', message: '[Demo] Navigation document missing landmarks', isAutoFixable: true, status: 'pending' },
-          ],
-        };
-        setPlan(demoPlan);
-        setPageState('ready');
-        setIsDemo(true);
+        // Fall through to demo plan
       }
+
+      const demoPlan: RemediationPlan = {
+        jobId: jobId,
+        epubFileName: 'sample-book.epub',
+        totalIssues: 5,
+        autoFixableCount: 5,
+        issues: [
+          { id: '1', code: 'EPUB-META-002', severity: 'moderate', message: '[Demo] Missing accessibility features metadata', isAutoFixable: true, status: 'pending' },
+          { id: '2', code: 'EPUB-META-003', severity: 'minor', message: '[Demo] Missing accessMode metadata', isAutoFixable: true, status: 'pending' },
+          { id: '3', code: 'EPUB-META-004', severity: 'minor', message: '[Demo] Missing accessibilityHazard metadata', isAutoFixable: true, status: 'pending' },
+          { id: '4', code: 'EPUB-META-005', severity: 'minor', message: '[Demo] Missing accessibilitySummary metadata', isAutoFixable: true, status: 'pending' },
+          { id: '5', code: 'EPUB-NAV-001', severity: 'moderate', message: '[Demo] Navigation document missing landmarks', isAutoFixable: true, status: 'pending' },
+        ],
+      };
+      setPlan(demoPlan);
+      setPageState('ready');
+      setIsDemo(true);
     };
 
     loadRemediationPlan();
-  }, [jobId]);
+  }, [jobId, locationState]);
 
   const handleApplyAutoFixes = async () => {
     if (!plan) return;

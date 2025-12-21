@@ -131,12 +131,26 @@ export const EPUBAccessibility: React.FC = () => {
     
     setIsCreatingPlan(true);
     
+    const autoFixableIssues = auditResult.issues.filter(i => 
+      i.severity === 'moderate' || i.severity === 'minor'
+    ).map(issue => ({
+      ...issue,
+      isAutoFixable: true,
+      status: 'pending' as const,
+    }));
+    
+    const remediationState = {
+      auditResult,
+      autoFixableIssues,
+      isDemo,
+    };
+    
     try {
       await api.post(`/epub/job/${auditResult.jobId}/remediation`);
-      navigate(`/epub/remediate/${auditResult.jobId}`);
+      navigate(`/epub/remediate/${auditResult.jobId}`, { state: remediationState });
     } catch {
       console.warn('API unavailable, navigating to remediation page');
-      navigate(`/epub/remediate/${auditResult.jobId}`);
+      navigate(`/epub/remediate/${auditResult.jobId}`, { state: remediationState });
     } finally {
       setIsCreatingPlan(false);
     }
