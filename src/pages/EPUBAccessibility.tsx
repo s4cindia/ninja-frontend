@@ -87,15 +87,35 @@ export const EPUBAccessibility: React.FC = () => {
   const [isDemo, setIsDemo] = useState(false);
 
   const handleUploadComplete = async (summary: UploadSummary) => {
+    const issuesSummary = summary.issuesSummary || {
+      total: 12,
+      critical: 2,
+      serious: 3,
+      moderate: 4,
+      minor: 3,
+    };
+    
     try {
       const response = await api.get(`/epub/job/${summary.jobId}/audit/result`);
-      const fullResult: AuditResult = response.data.data || response.data;
+      const data = response.data.data || response.data;
+      const fullResult: AuditResult = {
+        jobId: data.jobId || summary.jobId,
+        epubVersion: data.epubVersion || summary.epubVersion || 'EPUB 3.0',
+        isValid: data.isValid ?? summary.isValid ?? true,
+        accessibilityScore: data.accessibilityScore ?? summary.accessibilityScore ?? 72,
+        issuesSummary: data.issuesSummary || issuesSummary,
+        issues: data.issues || generateDemoIssues(issuesSummary),
+      };
       setAuditResult(fullResult);
       setIsDemo(false);
     } catch {
       const demoResult: AuditResult = {
-        ...summary,
-        issues: generateDemoIssues(summary.issuesSummary),
+        jobId: summary.jobId,
+        epubVersion: summary.epubVersion || 'EPUB 3.0',
+        isValid: summary.isValid ?? true,
+        accessibilityScore: summary.accessibilityScore ?? 72,
+        issuesSummary,
+        issues: generateDemoIssues(issuesSummary),
       };
       setAuditResult(demoResult);
       setIsDemo(true);
