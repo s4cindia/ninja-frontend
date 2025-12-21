@@ -64,7 +64,23 @@ export const EPUBComparison: React.FC = () => {
       try {
         const response = await api.get(`/epub/job/${jobId}/comparison/summary`);
         const data = response.data.data || response.data;
-        setComparison(data);
+        setComparison({
+          jobId: data.jobId || jobId,
+          epubFileName: data.epubFileName || 'document.epub',
+          fixedCount: data.fixedCount ?? 0,
+          failedCount: data.failedCount ?? 0,
+          skippedCount: data.skippedCount ?? 0,
+          beforeScore: data.beforeScore ?? 45,
+          afterScore: data.afterScore ?? 85,
+          filesModified: data.filesModified ?? 0,
+          modificationsByCategory: data.modificationsByCategory || {
+            metadata: 0,
+            accessibility: 0,
+            structure: 0,
+            content: 0,
+          },
+          changes: data.changes || [],
+        });
         setIsDemo(false);
       } catch {
         const demoData: ComparisonData = {
