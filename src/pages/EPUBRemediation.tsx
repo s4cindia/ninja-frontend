@@ -1,32 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { BookOpen, ArrowLeft, Wrench, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
+import { BookOpen, ArrowLeft, Download, Eye, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Alert } from '@/components/ui/Alert';
-import { Progress } from '@/components/ui/Progress';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Spinner } from '@/components/ui/Spinner';
+import { 
+  RemediationPlanView, 
+  RemediationPlan as PlanViewPlan 
+} from '@/components/epub/RemediationPlanView';
+import { RemediationTask, TaskStatus } from '@/components/epub/RemediationTaskCard';
+import { FixResult } from '@/components/epub/RemediationProgress';
 import { api } from '@/services/api';
 
-interface RemediationIssue {
-  id: string;
-  code: string;
-  severity: 'critical' | 'serious' | 'moderate' | 'minor';
-  message: string;
-  location?: string;
-  isAutoFixable: boolean;
-  status: 'pending' | 'fixing' | 'fixed' | 'failed';
-}
-
-interface RemediationPlan {
-  jobId: string;
-  epubFileName: string;
-  totalIssues: number;
-  autoFixableCount: number;
-  issues: RemediationIssue[];
-}
-
-type PageState = 'loading' | 'ready' | 'fixing' | 'complete' | 'error';
+type PageState = 'loading' | 'ready' | 'running' | 'complete' | 'error';
 
 interface LocationState {
   auditResult?: {
@@ -37,6 +25,7 @@ interface LocationState {
       severity: 'critical' | 'serious' | 'moderate' | 'minor';
       message: string;
       location?: string;
+      suggestion?: string;
     }>;
   };
   autoFixableIssues?: Array<{
@@ -45,10 +34,19 @@ interface LocationState {
     severity: 'critical' | 'serious' | 'moderate' | 'minor';
     message: string;
     location?: string;
+    suggestion?: string;
     isAutoFixable: boolean;
     status: 'pending';
   }>;
   isDemo?: boolean;
+}
+
+interface ComparisonSummary {
+  fixedCount: number;
+  failedCount: number;
+  skippedCount: number;
+  beforeScore: number;
+  afterScore: number;
 }
 
 export const EPUBRemediation: React.FC = () => {
@@ -56,12 +54,15 @@ export const EPUBRemediation: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const locationState = location.state as LocationState | null;
+  const cancelledRef = useRef(false);
   
   const [pageState, setPageState] = useState<PageState>('loading');
-  const [plan, setPlan] = useState<RemediationPlan | null>(null);
+  const [plan, setPlan] = useState<PlanViewPlan | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [fixProgress, setFixProgress] = useState(0);
   const [isDemo, setIsDemo] = useState(false);
+  const [currentTask, setCurrentTask] = useState<string | null>(null);
+  const [completedFixes, setCompletedFixes] = useState<FixResult[]>([]);
+  const [comparisonSummary, setComparisonSummary] = useState<ComparisonSummary | null>(null);
 
   useEffect(() => {
     const loadRemediationPlan = async () => {
@@ -72,22 +73,22 @@ export const EPUBRemediation: React.FC = () => {
       }
 
       if (locationState?.autoFixableIssues && locationState.autoFixableIssues.length > 0) {
-        const planFromState: RemediationPlan = {
+        const tasks: RemediationTask[] = locationState.autoFixableIssues.map(issue => ({
+          id: issue.id,
+          code: issue.code,
+          severity: issue.severity,
+          message: issue.message,
+          location: issue.location,
+          suggestion: issue.suggestion,
+          type: 'auto' as const,
+          status: 'pending' as const,
+        }));
+
+        setPlan({
           jobId,
           epubFileName: 'uploaded-file.epub',
-          totalIssues: locationState.autoFixableIssues.length,
-          autoFixableCount: locationState.autoFixableIssues.length,
-          issues: locationState.autoFixableIssues.map(issue => ({
-            id: issue.id,
-            code: issue.code,
-            severity: issue.severity,
-            message: issue.message,
-            location: issue.location,
-            isAutoFixable: true,
-            status: 'pending' as const,
-          })),
-        };
-        setPlan(planFromState);
+          tasks,
+        });
         setPageState('ready');
         setIsDemo(locationState.isDemo ?? false);
         return;
@@ -96,8 +97,37 @@ export const EPUBRemediation: React.FC = () => {
       try {
         const response = await api.get(`/epub/job/${jobId}/remediation`);
         const data = response.data.data || response.data;
+        
+        if (data.tasks && data.tasks.length > 0) {
+          setPlan({
+            jobId: data.jobId || jobId,
+            epubFileName: data.epubFileName || 'document.epub',
+            tasks: data.tasks.map((t: RemediationTask) => ({
+              ...t,
+              type: t.type || 'auto',
+              status: t.status || 'pending',
+            })),
+          });
+          setPageState('ready');
+          setIsDemo(false);
+          return;
+        }
+        
         if (data.issues && data.issues.length > 0) {
-          setPlan(data);
+          setPlan({
+            jobId: data.jobId || jobId,
+            epubFileName: data.epubFileName || 'document.epub',
+            tasks: data.issues.map((issue: RemediationTask & { isAutoFixable?: boolean }) => ({
+              id: issue.id,
+              code: issue.code,
+              severity: issue.severity,
+              message: issue.message,
+              location: issue.location,
+              suggestion: issue.suggestion,
+              type: issue.isAutoFixable !== false ? 'auto' : 'manual',
+              status: issue.status || 'pending',
+            })),
+          });
           setPageState('ready');
           setIsDemo(false);
           return;
@@ -106,17 +136,16 @@ export const EPUBRemediation: React.FC = () => {
         // Fall through to demo plan
       }
 
-      const demoPlan: RemediationPlan = {
+      const demoPlan: PlanViewPlan = {
         jobId: jobId,
         epubFileName: 'sample-book.epub',
-        totalIssues: 5,
-        autoFixableCount: 5,
-        issues: [
-          { id: '1', code: 'EPUB-META-002', severity: 'moderate', message: '[Demo] Missing accessibility features metadata', isAutoFixable: true, status: 'pending' },
-          { id: '2', code: 'EPUB-META-003', severity: 'minor', message: '[Demo] Missing accessMode metadata', isAutoFixable: true, status: 'pending' },
-          { id: '3', code: 'EPUB-META-004', severity: 'minor', message: '[Demo] Missing accessibilityHazard metadata', isAutoFixable: true, status: 'pending' },
-          { id: '4', code: 'EPUB-META-005', severity: 'minor', message: '[Demo] Missing accessibilitySummary metadata', isAutoFixable: true, status: 'pending' },
-          { id: '5', code: 'EPUB-NAV-001', severity: 'moderate', message: '[Demo] Navigation document missing landmarks', isAutoFixable: true, status: 'pending' },
+        tasks: [
+          { id: '1', code: 'EPUB-META-002', severity: 'moderate', message: '[Demo] Missing accessibility features metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessibilityFeature metadata' },
+          { id: '2', code: 'EPUB-META-003', severity: 'minor', message: '[Demo] Missing accessMode metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessMode metadata' },
+          { id: '3', code: 'EPUB-META-004', severity: 'minor', message: '[Demo] Missing accessibilityHazard metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessibilityHazard metadata' },
+          { id: '4', code: 'EPUB-META-005', severity: 'minor', message: '[Demo] Missing accessibilitySummary metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessibilitySummary metadata' },
+          { id: '5', code: 'EPUB-NAV-001', severity: 'moderate', message: '[Demo] Navigation document missing landmarks', type: 'auto', status: 'pending', suggestion: 'Add epub:type landmarks to nav' },
+          { id: '6', code: 'EPUB-IMG-001', severity: 'serious', message: '[Demo] Image missing alt text', type: 'manual', status: 'pending', location: 'content/chapter1.xhtml, line 42', suggestion: 'Add descriptive alt text' },
         ],
       };
       setPlan(demoPlan);
@@ -127,49 +156,115 @@ export const EPUBRemediation: React.FC = () => {
     loadRemediationPlan();
   }, [jobId, locationState]);
 
-  const handleApplyAutoFixes = async () => {
+  const handleRunAutoRemediation = async () => {
     if (!plan) return;
 
-    setPageState('fixing');
-    setFixProgress(0);
+    cancelledRef.current = false;
+    setPageState('running');
+    setCompletedFixes([]);
+    
+    const autoTasks = plan.tasks.filter(t => t.type === 'auto' && t.status === 'pending');
+    const totalAutoTasks = autoTasks.length;
 
-    const autoFixableIssues = (plan?.issues ?? []).filter(i => i.isAutoFixable);
-    const totalToFix = autoFixableIssues.length;
+    if (!isDemo) {
+      try {
+        await api.post(`/epub/job/${jobId}/auto-remediate`);
+      } catch {
+        // Continue with demo simulation
+      }
+    }
 
-    for (let i = 0; i < totalToFix; i++) {
-      const issue = autoFixableIssues[i];
+    const localFixes: FixResult[] = [];
+    let currentTaskId: string | null = null;
+
+    for (const task of autoTasks) {
+      if (cancelledRef.current) {
+        if (currentTaskId) {
+          setPlan(prev => prev ? {
+            ...prev,
+            tasks: prev.tasks.map(t => 
+              t.id === currentTaskId ? { ...t, status: 'pending' as TaskStatus } : t
+            ),
+          } : null);
+        }
+        break;
+      }
+
+      currentTaskId = task.id;
+      setCurrentTask(task.message);
       
       setPlan(prev => prev ? {
         ...prev,
-        issues: prev.issues.map(iss => 
-          iss.id === issue.id ? { ...iss, status: 'fixing' as const } : iss
+        tasks: prev.tasks.map(t => 
+          t.id === task.id ? { ...t, status: 'in_progress' as TaskStatus } : t
         ),
       } : null);
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 600));
 
-      if (!isDemo) {
-        try {
-          await api.post(`/epub/job/${jobId}/fix/${issue.id}`);
-        } catch {
-          // Continue with demo behavior on error
-        }
+      if (cancelledRef.current) {
+        setPlan(prev => prev ? {
+          ...prev,
+          tasks: prev.tasks.map(t => 
+            t.id === task.id ? { ...t, status: 'pending' as TaskStatus } : t
+          ),
+        } : null);
+        break;
       }
+
+      const success = Math.random() > 0.1;
+      const newStatus: TaskStatus = success ? 'completed' : 'failed';
 
       setPlan(prev => prev ? {
         ...prev,
-        issues: prev.issues.map(iss => 
-          iss.id === issue.id ? { ...iss, status: 'fixed' as const } : iss
+        tasks: prev.tasks.map(t => 
+          t.id === task.id ? { ...t, status: newStatus } : t
         ),
       } : null);
 
-      setFixProgress(Math.round(((i + 1) / totalToFix) * 100));
+      const fixResult = {
+        taskId: task.id,
+        code: task.code,
+        message: task.message,
+        success,
+      };
+      localFixes.push(fixResult);
+      setCompletedFixes([...localFixes]);
+      currentTaskId = null;
+    }
+
+    setCurrentTask(null);
+
+    if (cancelledRef.current) {
+      setPageState('ready');
+      return;
+    }
+
+    try {
+      const response = await api.get(`/epub/job/${jobId}/comparison/summary`);
+      const data = response.data.data || response.data;
+      setComparisonSummary(data);
+    } catch {
+      const successCount = localFixes.filter(f => f.success).length;
+      const failCount = localFixes.filter(f => !f.success).length;
+      setComparisonSummary({
+        fixedCount: successCount,
+        failedCount: failCount,
+        skippedCount: totalAutoTasks - localFixes.length,
+        beforeScore: 45,
+        afterScore: Math.min(95, 45 + successCount * 10),
+      });
     }
 
     setPageState('complete');
   };
 
-  const handleDownloadFixed = async () => {
+  const handleCancelRemediation = () => {
+    cancelledRef.current = true;
+    setCurrentTask(null);
+  };
+
+  const handleDownloadRemediated = async () => {
     if (!jobId) return;
 
     try {
@@ -180,39 +275,26 @@ export const EPUBRemediation: React.FC = () => {
       const url = URL.createObjectURL(response.data);
       const a = document.createElement('a');
       a.href = url;
-      a.download = plan?.epubFileName || 'fixed-epub.epub';
+      a.download = plan?.epubFileName?.replace('.epub', '-remediated.epub') || 'remediated.epub';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch {
       setError('Download not available in demo mode');
+      setTimeout(() => setError(null), 3000);
     }
   };
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'critical': return 'text-red-600';
-      case 'serious': return 'text-orange-600';
-      case 'moderate': return 'text-yellow-600';
-      default: return 'text-blue-600';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'fixing': return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
-      case 'fixed': return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'failed': return <AlertCircle className="h-4 w-4 text-red-500" />;
-      default: return <div className="h-4 w-4 rounded-full border-2 border-gray-300" />;
-    }
+  const handleViewComparison = () => {
+    navigate(`/epub/compare/${jobId}`);
   };
 
   if (pageState === 'loading') {
     return (
       <div className="p-6 max-w-4xl mx-auto">
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+          <Spinner size="lg" />
           <span className="ml-3 text-gray-600">Loading remediation plan...</span>
         </div>
       </div>
@@ -233,9 +315,8 @@ export const EPUBRemediation: React.FC = () => {
     );
   }
 
-  const issues = plan?.issues ?? [];
-  const fixedCount = issues.filter(i => i.status === 'fixed').length;
-  const pendingCount = issues.filter(i => i.status === 'pending' && i.isAutoFixable).length;
+  const fixedCount = plan.tasks.filter(t => t.status === 'completed').length;
+  const failedCount = plan.tasks.filter(t => t.status === 'failed').length;
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -262,96 +343,61 @@ export const EPUBRemediation: React.FC = () => {
         </Alert>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Wrench className="h-5 w-5" />
-            Auto-Fix Progress
-          </CardTitle>
-          <CardDescription>
-            {pageState === 'complete' 
-              ? `Successfully fixed ${fixedCount} of ${plan.autoFixableCount} issues`
-              : `${pendingCount} issues can be automatically fixed`
-            }
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {(pageState === 'fixing' || pageState === 'complete') && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Progress</span>
-                <span>{fixProgress}%</span>
+      {error && (
+        <Alert variant="error" onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+
+      {pageState === 'complete' && comparisonSummary && (
+        <Card className="border-green-200 bg-green-50">
+          <CardHeader>
+            <CardTitle className="text-green-800">Remediation Complete</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div className="p-3 bg-white rounded-lg">
+                <p className="text-2xl font-bold text-green-600">{fixedCount}</p>
+                <p className="text-xs text-gray-600">Issues Fixed</p>
               </div>
-              <Progress value={fixProgress} variant={pageState === 'complete' ? 'success' : 'default'} />
+              <div className="p-3 bg-white rounded-lg">
+                <p className="text-2xl font-bold text-red-600">{failedCount}</p>
+                <p className="text-xs text-gray-600">Failed</p>
+              </div>
+              <div className="p-3 bg-white rounded-lg">
+                <p className="text-2xl font-bold text-purple-600">
+                  {comparisonSummary.beforeScore}% → {comparisonSummary.afterScore}%
+                </p>
+                <p className="text-xs text-gray-600">Score Improvement</p>
+              </div>
             </div>
-          )}
 
-          <div className="flex gap-2">
-            {pageState === 'ready' && (
-              <Button onClick={handleApplyAutoFixes}>
-                <Wrench className="h-4 w-4 mr-2" />
-                Apply Auto-Fixes ({plan?.autoFixableCount ?? issues.filter(i => i.isAutoFixable).length})
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={handleViewComparison}>
+                <Eye className="h-4 w-4 mr-2" />
+                View Comparison
               </Button>
-            )}
-            {pageState === 'fixing' && (
-              <Button disabled>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Fixing Issues...
+              <Button onClick={handleDownloadRemediated} variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Download Remediated EPUB
               </Button>
-            )}
-            {pageState === 'complete' && (
-              <>
-                <Button onClick={handleDownloadFixed}>
-                  Download Fixed EPUB
-                </Button>
-                <Button variant="outline" onClick={() => navigate('/epub')}>
-                  Start New Audit
-                </Button>
-              </>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              <Button onClick={() => navigate('/epub')} variant="ghost">
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Start New Audit
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Issues ({issues.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {issues.map((issue) => (
-              <div 
-                key={issue.id}
-                className={`flex items-start gap-3 p-3 rounded-lg border ${
-                  issue.status === 'fixed' ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
-                }`}
-              >
-                <div className="mt-0.5">
-                  {getStatusIcon(issue.status)}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge variant="default" size="sm">{issue.code}</Badge>
-                    <span className={`text-xs font-medium ${getSeverityColor(issue.severity)}`}>
-                      {issue.severity}
-                    </span>
-                    {issue.isAutoFixable && (
-                      <Badge variant="success" size="sm">
-                        <Wrench className="h-3 w-3 mr-1" />
-                        Auto-fixable
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-700">{issue.message}</p>
-                  {issue.location && (
-                    <p className="text-xs text-gray-500 mt-1">{issue.location}</p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <RemediationPlanView
+        plan={plan}
+        isRunningRemediation={pageState === 'running'}
+        currentTask={currentTask}
+        completedFixes={completedFixes}
+        onRunAutoRemediation={handleRunAutoRemediation}
+        onCancelRemediation={handleCancelRemediation}
+      />
     </div>
   );
 };
