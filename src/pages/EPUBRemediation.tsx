@@ -72,6 +72,8 @@ export const EPUBRemediation: React.FC = () => {
         return;
       }
 
+      const isDemoJob = jobId.startsWith('demo-');
+
       if (locationState?.autoFixableIssues && locationState.autoFixableIssues.length > 0) {
         const tasks: RemediationTask[] = locationState.autoFixableIssues.map(issue => ({
           id: issue.id,
@@ -90,7 +92,7 @@ export const EPUBRemediation: React.FC = () => {
           tasks,
         });
         setPageState('ready');
-        setIsDemo(locationState.isDemo ?? false);
+        setIsDemo(isDemoJob);
         return;
       }
 
