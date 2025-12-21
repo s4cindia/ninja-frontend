@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { BookOpen, ArrowLeft, Download, Eye, RotateCcw } from 'lucide-react';
+import { BookOpen, ArrowLeft, Eye, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Alert } from '@/components/ui/Alert';
@@ -12,6 +12,7 @@ import {
 } from '@/components/epub/RemediationPlanView';
 import { RemediationTask, TaskStatus } from '@/components/epub/RemediationTaskCard';
 import { FixResult } from '@/components/epub/RemediationProgress';
+import { EPUBExportOptions } from '@/components/epub/EPUBExportOptions';
 import { api } from '@/services/api';
 
 type PageState = 'loading' | 'ready' | 'running' | 'complete' | 'error';
@@ -279,40 +280,6 @@ export const EPUBRemediation: React.FC = () => {
     setCurrentTask(null);
   };
 
-  const handleDownloadRemediated = async () => {
-    if (!jobId) {
-      setError('No job ID available');
-      setTimeout(() => setError(null), 3000);
-      return;
-    }
-
-    if (jobId.startsWith('demo-')) {
-      setError('Download not available in demo mode');
-      setTimeout(() => setError(null), 3000);
-      return;
-    }
-
-    try {
-      const response = await api.get(`/epub/job/${jobId}/download-remediated`, {
-        responseType: 'blob',
-      });
-      
-      const blob = new Blob([response.data], { type: 'application/epub+zip' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = plan?.epubFileName?.replace('.epub', '-remediated.epub') || 'remediated.epub';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Download failed:', err);
-      setError('Failed to download remediated EPUB. Please try again.');
-      setTimeout(() => setError(null), 3000);
-    }
-  };
-
   const handleViewComparison = () => {
     const comparisonData = {
       epubFileName: plan?.epubFileName || 'uploaded-file.epub',
@@ -385,44 +352,51 @@ export const EPUBRemediation: React.FC = () => {
       )}
 
       {pageState === 'complete' && comparisonSummary && (
-        <Card className="border-green-200 bg-green-50">
-          <CardHeader>
-            <CardTitle className="text-green-800">Remediation Complete</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div className="p-3 bg-white rounded-lg">
-                <p className="text-2xl font-bold text-green-600">{fixedCount}</p>
-                <p className="text-xs text-gray-600">Issues Fixed</p>
+        <>
+          <Card className="border-green-200 bg-green-50">
+            <CardHeader>
+              <CardTitle className="text-green-800">Remediation Complete</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="p-3 bg-white rounded-lg">
+                  <p className="text-2xl font-bold text-green-600">{fixedCount}</p>
+                  <p className="text-xs text-gray-600">Issues Fixed</p>
+                </div>
+                <div className="p-3 bg-white rounded-lg">
+                  <p className="text-2xl font-bold text-red-600">{failedCount}</p>
+                  <p className="text-xs text-gray-600">Failed</p>
+                </div>
+                <div className="p-3 bg-white rounded-lg">
+                  <p className="text-2xl font-bold text-purple-600">
+                    {comparisonSummary.beforeScore}% → {comparisonSummary.afterScore}%
+                  </p>
+                  <p className="text-xs text-gray-600">Score Improvement</p>
+                </div>
               </div>
-              <div className="p-3 bg-white rounded-lg">
-                <p className="text-2xl font-bold text-red-600">{failedCount}</p>
-                <p className="text-xs text-gray-600">Failed</p>
-              </div>
-              <div className="p-3 bg-white rounded-lg">
-                <p className="text-2xl font-bold text-purple-600">
-                  {comparisonSummary.beforeScore}% → {comparisonSummary.afterScore}%
-                </p>
-                <p className="text-xs text-gray-600">Score Improvement</p>
-              </div>
-            </div>
 
-            <div className="flex flex-wrap gap-3">
-              <Button onClick={handleViewComparison}>
-                <Eye className="h-4 w-4 mr-2" />
-                View Comparison
-              </Button>
-              <Button onClick={handleDownloadRemediated} variant="outline">
-                <Download className="h-4 w-4 mr-2" />
-                Download Remediated EPUB
-              </Button>
-              <Button onClick={() => navigate('/epub')} variant="ghost">
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Start New Audit
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+              <div className="flex flex-wrap gap-3">
+                <Button onClick={handleViewComparison}>
+                  <Eye className="h-4 w-4 mr-2" />
+                  View Comparison
+                </Button>
+                <Button onClick={() => navigate('/epub')} variant="ghost">
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Start New Audit
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <EPUBExportOptions
+            jobId={jobId || ''}
+            epubFileName={plan?.epubFileName || 'remediated.epub'}
+            isDemo={isDemo}
+            fixedCount={fixedCount}
+            beforeScore={comparisonSummary.beforeScore}
+            afterScore={comparisonSummary.afterScore}
+          />
+        </>
       )}
 
       <RemediationPlanView

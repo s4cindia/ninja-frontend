@@ -7,3 +7,4 @@ export { RemediationProgress } from './RemediationProgress';
 export type { FixResult } from './RemediationProgress';
 export { RemediationPlanView } from './RemediationPlanView';
 export type { RemediationPlan } from './RemediationPlanView';
+export { EPUBExportOptions } from './EPUBExportOptions';
