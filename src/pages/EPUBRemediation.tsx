@@ -135,24 +135,30 @@ export const EPUBRemediation: React.FC = () => {
           return;
         }
       } catch {
-        // Fall through to demo plan
+        if (!isDemoJob) {
+          setError('Unable to load remediation plan. The backend service is temporarily unavailable.');
+          setPageState('error');
+          return;
+        }
       }
 
-      const demoPlan: PlanViewPlan = {
-        jobId: jobId,
-        epubFileName: 'sample-book.epub',
-        tasks: [
-          { id: '1', code: 'EPUB-META-002', severity: 'moderate', message: '[Demo] Missing accessibility features metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessibilityFeature metadata' },
-          { id: '2', code: 'EPUB-META-003', severity: 'minor', message: '[Demo] Missing accessMode metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessMode metadata' },
-          { id: '3', code: 'EPUB-META-004', severity: 'minor', message: '[Demo] Missing accessibilityHazard metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessibilityHazard metadata' },
-          { id: '4', code: 'EPUB-META-005', severity: 'minor', message: '[Demo] Missing accessibilitySummary metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessibilitySummary metadata' },
-          { id: '5', code: 'EPUB-NAV-001', severity: 'moderate', message: '[Demo] Navigation document missing landmarks', type: 'auto', status: 'pending', suggestion: 'Add epub:type landmarks to nav' },
-          { id: '6', code: 'EPUB-IMG-001', severity: 'serious', message: '[Demo] Image missing alt text', type: 'manual', status: 'pending', location: 'content/chapter1.xhtml, line 42', suggestion: 'Add descriptive alt text' },
-        ],
-      };
-      setPlan(demoPlan);
-      setPageState('ready');
-      setIsDemo(true);
+      if (isDemoJob) {
+        const demoPlan: PlanViewPlan = {
+          jobId: jobId,
+          epubFileName: 'sample-book.epub',
+          tasks: [
+            { id: '1', code: 'EPUB-META-002', severity: 'moderate', message: '[Demo] Missing accessibility features metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessibilityFeature metadata' },
+            { id: '2', code: 'EPUB-META-003', severity: 'minor', message: '[Demo] Missing accessMode metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessMode metadata' },
+            { id: '3', code: 'EPUB-META-004', severity: 'minor', message: '[Demo] Missing accessibilityHazard metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessibilityHazard metadata' },
+            { id: '4', code: 'EPUB-META-005', severity: 'minor', message: '[Demo] Missing accessibilitySummary metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessibilitySummary metadata' },
+            { id: '5', code: 'EPUB-NAV-001', severity: 'moderate', message: '[Demo] Navigation document missing landmarks', type: 'auto', status: 'pending', suggestion: 'Add epub:type landmarks to nav' },
+            { id: '6', code: 'EPUB-IMG-001', severity: 'serious', message: '[Demo] Image missing alt text', type: 'manual', status: 'pending', location: 'content/chapter1.xhtml, line 42', suggestion: 'Add descriptive alt text' },
+          ],
+        };
+        setPlan(demoPlan);
+        setPageState('ready');
+        setIsDemo(true);
+      }
     };
 
     loadRemediationPlan();
@@ -273,7 +279,7 @@ export const EPUBRemediation: React.FC = () => {
       return;
     }
 
-    if (jobId.startsWith('demo-') || isDemo) {
+    if (jobId.startsWith('demo-')) {
       setError('Download not available in demo mode');
       setTimeout(() => setError(null), 3000);
       return;
