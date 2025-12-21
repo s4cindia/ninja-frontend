@@ -314,7 +314,15 @@ export const EPUBRemediation: React.FC = () => {
   };
 
   const handleViewComparison = () => {
-    navigate(`/epub/compare/${jobId}`);
+    const comparisonData = {
+      epubFileName: plan?.epubFileName || 'uploaded-file.epub',
+      fixedCount: plan?.tasks.filter(t => t.status === 'completed').length || 0,
+      failedCount: plan?.tasks.filter(t => t.status === 'failed').length || 0,
+      skippedCount: plan?.tasks.filter(t => t.status === 'skipped').length || 0,
+      beforeScore: comparisonSummary?.beforeScore || 45,
+      afterScore: comparisonSummary?.afterScore || 85,
+    };
+    navigate(`/epub/compare/${jobId}`, { state: comparisonData });
   };
 
   if (pageState === 'loading') {

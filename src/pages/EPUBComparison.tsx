@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, BookOpen, CheckCircle, FileText, Code, Tag, Layout, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -43,9 +43,20 @@ const categoryConfig = {
   content: { icon: FileText, color: 'text-orange-600', bg: 'bg-orange-50', label: 'Content' },
 };
 
+interface LocationState {
+  epubFileName?: string;
+  fixedCount?: number;
+  failedCount?: number;
+  skippedCount?: number;
+  beforeScore?: number;
+  afterScore?: number;
+}
+
 export const EPUBComparison: React.FC = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const locationState = location.state as LocationState | null;
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,20 +72,27 @@ export const EPUBComparison: React.FC = () => {
         return;
       }
 
+      const stateFileName = locationState?.epubFileName || 'uploaded-file.epub';
+      const stateFixedCount = locationState?.fixedCount ?? 0;
+      const stateFailedCount = locationState?.failedCount ?? 0;
+      const stateSkippedCount = locationState?.skippedCount ?? 0;
+      const stateBeforeScore = locationState?.beforeScore ?? 45;
+      const stateAfterScore = locationState?.afterScore ?? 85;
+
       try {
         const response = await api.get(`/epub/job/${jobId}/comparison/summary`);
         const data = response.data.data || response.data;
         setComparison({
           jobId: data.jobId || jobId,
-          epubFileName: data.epubFileName || 'document.epub',
-          fixedCount: data.fixedCount ?? 0,
-          failedCount: data.failedCount ?? 0,
-          skippedCount: data.skippedCount ?? 0,
-          beforeScore: data.beforeScore ?? 45,
-          afterScore: data.afterScore ?? 85,
-          filesModified: data.filesModified ?? 0,
+          epubFileName: data.epubFileName || stateFileName,
+          fixedCount: data.fixedCount ?? stateFixedCount,
+          failedCount: data.failedCount ?? stateFailedCount,
+          skippedCount: data.skippedCount ?? stateSkippedCount,
+          beforeScore: data.beforeScore ?? stateBeforeScore,
+          afterScore: data.afterScore ?? stateAfterScore,
+          filesModified: data.filesModified ?? stateFixedCount,
           modificationsByCategory: data.modificationsByCategory || {
-            metadata: 0,
+            metadata: stateFixedCount,
             accessibility: 0,
             structure: 0,
             content: 0,
@@ -83,71 +101,24 @@ export const EPUBComparison: React.FC = () => {
         });
         setIsDemo(false);
       } catch {
-        const demoData: ComparisonData = {
+        setComparison({
           jobId,
-          epubFileName: 'sample-book.epub',
-          fixedCount: 5,
-          failedCount: 0,
-          skippedCount: 1,
-          beforeScore: 45,
-          afterScore: 92,
-          filesModified: 3,
+          epubFileName: stateFileName,
+          fixedCount: stateFixedCount,
+          failedCount: stateFailedCount,
+          skippedCount: stateSkippedCount,
+          beforeScore: stateBeforeScore,
+          afterScore: stateAfterScore,
+          filesModified: stateFixedCount,
           modificationsByCategory: {
-            metadata: 4,
-            accessibility: 1,
+            metadata: stateFixedCount,
+            accessibility: 0,
             structure: 0,
             content: 0,
           },
-          changes: [
-            {
-              id: '1',
-              category: 'metadata',
-              type: 'Added',
-              description: 'Added schema:accessibilityFeature metadata',
-              location: 'content.opf',
-              before: '<metadata>...</metadata>',
-              after: '<metadata>\n  <meta property="schema:accessibilityFeature">tableOfContents</meta>\n  ...</metadata>',
-            },
-            {
-              id: '2',
-              category: 'metadata',
-              type: 'Added',
-              description: 'Added schema:accessMode metadata',
-              location: 'content.opf',
-              before: '',
-              after: '<meta property="schema:accessMode">textual</meta>',
-            },
-            {
-              id: '3',
-              category: 'metadata',
-              type: 'Added',
-              description: 'Added schema:accessibilityHazard metadata',
-              location: 'content.opf',
-              before: '',
-              after: '<meta property="schema:accessibilityHazard">none</meta>',
-            },
-            {
-              id: '4',
-              category: 'metadata',
-              type: 'Added',
-              description: 'Added schema:accessibilitySummary metadata',
-              location: 'content.opf',
-              before: '',
-              after: '<meta property="schema:accessibilitySummary">This publication conforms to WCAG 2.0 Level AA.</meta>',
-            },
-            {
-              id: '5',
-              category: 'accessibility',
-              type: 'Added',
-              description: 'Added epub:type landmarks to navigation',
-              location: 'nav.xhtml',
-              before: '<nav>...</nav>',
-              after: '<nav epub:type="toc" role="doc-toc">...</nav>',
-            },
-          ],
-        };
-        setComparison(demoData);
-        setIsDemo(true);
+          changes: [],
+        });
+        setIsDemo(false);
       } finally {
         setLoading(false);
       }
