@@ -10,6 +10,7 @@ import { api } from '@/services/api';
 
 interface UploadSummary {
   jobId: string;
+  fileName?: string;
   epubVersion: string;
   isValid: boolean;
   accessibilityScore: number;
@@ -114,8 +115,12 @@ export const EPUBAccessibility: React.FC = () => {
         minor: apiIssues.filter((i: AuditIssue) => i.severity === 'minor').length,
       } : issuesSummary;
       
+      const fileName = data.fileName || summary.fileName || 'document.epub';
+      console.log('[EPUBAccessibility] fileName from API:', fileName);
+      
       const fullResult: AuditResult = {
         jobId: data.jobId || summary.jobId,
+        fileName,
         epubVersion: data.epubVersion || summary.epubVersion || 'EPUB 3.0',
         isValid: data.isValid ?? summary.isValid ?? true,
         accessibilityScore: data.accessibilityScore ?? summary.accessibilityScore ?? 72,
@@ -128,6 +133,7 @@ export const EPUBAccessibility: React.FC = () => {
       console.warn('[EPUBAccessibility] Failed to fetch audit result, using summary data. isDemoJob:', isDemoJob);
       const fallbackResult: AuditResult = {
         jobId: summary.jobId,
+        fileName: summary.fileName || 'document.epub',
         epubVersion: summary.epubVersion || 'EPUB 3.0',
         isValid: summary.isValid ?? true,
         accessibilityScore: summary.accessibilityScore ?? 72,
@@ -180,6 +186,7 @@ export const EPUBAccessibility: React.FC = () => {
       auditResult,
       autoFixableIssues,
       isDemo,
+      fileName: auditResult.fileName,
     };
 
     console.log('[EPUBAccessibility] Creating remediation plan');

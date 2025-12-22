@@ -10,6 +10,7 @@ type UploadState = 'idle' | 'uploading' | 'auditing' | 'complete' | 'error';
 
 interface AuditSummary {
   jobId: string;
+  fileName?: string;
   epubVersion: string;
   isValid: boolean;
   accessibilityScore: number;
@@ -127,6 +128,7 @@ export const EPUBUploader: React.FC<EPUBUploaderProps> = ({
       setState('auditing');
 
       const result: AuditSummary = response.data.data || response.data;
+      result.fileName = result.fileName || selectedFile.name;
       setProgress(100);
       setState('complete');
       onUploadComplete?.(result);

@@ -21,6 +21,7 @@ type PageState = 'loading' | 'ready' | 'running' | 'complete' | 'error';
 interface LocationState {
   auditResult?: {
     jobId: string;
+    fileName?: string;
     issues: Array<{
       id: string;
       code: string;
@@ -41,6 +42,7 @@ interface LocationState {
     status: 'pending';
   }>;
   isDemo?: boolean;
+  fileName?: string;
 }
 
 interface ComparisonSummary {
@@ -67,6 +69,17 @@ export const EPUBRemediation: React.FC = () => {
   console.log('[EPUBRemediation] urlStatus:', urlStatus);
   console.log('[EPUBRemediation] locationState:', locationState);
   
+  // Get initial filename from multiple sources
+  const getInitialFileName = (): string => {
+    if (locationState?.fileName) return locationState.fileName;
+    if (locationState?.auditResult?.fileName) return locationState.auditResult.fileName;
+    if (jobId) {
+      const cached = localStorage.getItem(`ninja-job-${jobId}-filename`);
+      if (cached) return cached;
+    }
+    return 'Loading...';
+  };
+
   const [pageState, setPageState] = useState<PageState>(initialPageState);
   const [plan, setPlan] = useState<PlanViewPlan | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +87,45 @@ export const EPUBRemediation: React.FC = () => {
   const [currentTask, setCurrentTask] = useState<string | null>(null);
   const [completedFixes, setCompletedFixes] = useState<FixResult[]>([]);
   const [comparisonSummary, setComparisonSummary] = useState<ComparisonSummary | null>(null);
+  const [fileName, setFileName] = useState<string>(getInitialFileName());
+
+  // Persist filename to localStorage when it changes
+  useEffect(() => {
+    if (fileName && fileName !== 'Loading...' && jobId) {
+      localStorage.setItem(`ninja-job-${jobId}-filename`, fileName);
+    }
+  }, [fileName, jobId]);
+
+  // Fetch filename from API if not available
+  useEffect(() => {
+    const fetchFileName = async () => {
+      if (fileName === 'Loading...' && jobId) {
+        try {
+          const auditResponse = await api.get(`/epub/job/${jobId}/audit/result`);
+          const auditData = auditResponse.data?.data || auditResponse.data;
+          if (auditData?.fileName) {
+            setFileName(auditData.fileName);
+            return;
+          }
+        } catch {
+          // Try job endpoint
+        }
+        try {
+          const jobResponse = await api.get(`/jobs/${jobId}`);
+          const jobData = jobResponse.data?.data || jobResponse.data;
+          const fetchedName = jobData?.input?.fileName || jobData?.fileName;
+          if (fetchedName) {
+            setFileName(fetchedName);
+            return;
+          }
+        } catch {
+          // Use fallback
+        }
+        setFileName('document.epub');
+      }
+    };
+    fetchFileName();
+  }, [jobId, fileName]);
 
   // Load comparison summary when returning with status=completed
   useEffect(() => {
@@ -132,7 +184,7 @@ export const EPUBRemediation: React.FC = () => {
 
         setPlan({
           jobId,
-          epubFileName: 'uploaded-file.epub',
+          epubFileName: fileName !== 'Loading...' ? fileName : 'document.epub',
           tasks,
         });
         setPageState('ready');
@@ -145,9 +197,11 @@ export const EPUBRemediation: React.FC = () => {
         const data = response.data.data || response.data;
         
         if (data.tasks && data.tasks.length > 0) {
+          const apiFileName = data.epubFileName || data.fileName;
+          if (apiFileName && fileName === 'Loading...') setFileName(apiFileName);
           setPlan({
             jobId: data.jobId || jobId,
-            epubFileName: data.epubFileName || 'document.epub',
+            epubFileName: apiFileName || (fileName !== 'Loading...' ? fileName : 'document.epub'),
             tasks: data.tasks.map((t: RemediationTask) => ({
               ...t,
               type: t.type || 'auto',
@@ -160,9 +214,11 @@ export const EPUBRemediation: React.FC = () => {
         }
         
         if (data.issues && data.issues.length > 0) {
+          const apiFileName = data.epubFileName || data.fileName;
+          if (apiFileName && fileName === 'Loading...') setFileName(apiFileName);
           setPlan({
             jobId: data.jobId || jobId,
-            epubFileName: data.epubFileName || 'document.epub',
+            epubFileName: apiFileName || (fileName !== 'Loading...' ? fileName : 'document.epub'),
             tasks: data.issues.map((issue: RemediationTask & { isAutoFixable?: boolean }) => ({
               id: issue.id,
               code: issue.code,
@@ -188,9 +244,10 @@ export const EPUBRemediation: React.FC = () => {
 
       if (isDemoJob || isReturningCompleted) {
         const taskStatus = isReturningCompleted ? 'completed' : 'pending';
+        const demoFileName = fileName !== 'Loading...' ? fileName : 'sample-book.epub';
         const demoPlan: PlanViewPlan = {
           jobId: jobId,
-          epubFileName: 'sample-book.epub',
+          epubFileName: demoFileName,
           tasks: [
             { id: '1', code: 'EPUB-META-002', severity: 'moderate', message: 'Missing accessibility features metadata', type: 'auto', status: taskStatus as TaskStatus, suggestion: 'Add schema:accessibilityFeature metadata' },
             { id: '2', code: 'EPUB-META-003', severity: 'minor', message: 'Missing accessMode metadata', type: 'auto', status: taskStatus as TaskStatus, suggestion: 'Add schema:accessMode metadata' },
@@ -207,7 +264,7 @@ export const EPUBRemediation: React.FC = () => {
     };
 
     loadRemediationPlan();
-  }, [jobId, locationState, urlStatus]);
+  }, [jobId, locationState, urlStatus, fileName]);
 
   const handleRunAutoRemediation = async () => {
     if (!plan) return;
@@ -328,7 +385,8 @@ export const EPUBRemediation: React.FC = () => {
 
   const handleViewComparison = () => {
     const comparisonData = {
-      epubFileName: plan?.epubFileName || 'uploaded-file.epub',
+      epubFileName: plan?.epubFileName || fileName || 'document.epub',
+      fileName: fileName !== 'Loading...' ? fileName : (plan?.epubFileName || 'document.epub'),
       fixedCount: plan?.tasks.filter(t => t.status === 'completed').length || 0,
       failedCount: plan?.tasks.filter(t => t.status === 'failed').length || 0,
       skippedCount: plan?.tasks.filter(t => t.status === 'skipped').length || 0,

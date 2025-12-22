@@ -26,6 +26,7 @@ interface AuditIssue {
 
 interface AuditResult {
   jobId: string;
+  fileName?: string;
   epubVersion: string;
   isValid: boolean;
   accessibilityScore: number;
