@@ -239,10 +239,13 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
           {item.context && Object.keys(item.context).length > 0 && (
             <div>
               <p className="text-sm font-medium text-gray-700 mb-2">Context</p>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <pre className="text-xs text-gray-600 overflow-x-auto">
-                  {JSON.stringify(item.context, null, 2)}
-                </pre>
+              <div className="p-3 bg-gray-50 rounded-lg space-y-1">
+                {Object.entries(item.context).map(([key, value]) => (
+                  <div key={key} className="flex gap-2 text-sm">
+                    <span className="font-medium text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                    <span className="text-gray-700">{String(value)}</span>
+                  </div>
+                ))}
               </div>
             </div>
           )}
