@@ -158,7 +158,7 @@ export const EPUBComparison: React.FC = () => {
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <Button variant="ghost" size="sm" onClick={() => navigate(`/epub/remediate/${jobId}`)} className="mb-2">
+          <Button variant="ghost" size="sm" onClick={() => navigate(`/epub/remediate/${jobId}?status=completed`)} className="mb-2">
             <ArrowLeft className="h-4 w-4 mr-1" />
             Back to Remediation
           </Button>
@@ -318,7 +318,7 @@ export const EPUBComparison: React.FC = () => {
       </Card>
 
       <div className="flex justify-center gap-4">
-        <Button onClick={() => navigate(`/epub/remediate/${jobId}`)}>
+        <Button onClick={() => navigate(`/epub/remediate/${jobId}?status=completed`)}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Remediation
         </Button>
