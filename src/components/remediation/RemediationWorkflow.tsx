@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, ArrowRight, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, AlertCircle, CheckCircle, Download } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -8,6 +8,17 @@ import { Alert } from '@/components/ui/Alert';
 import { RemediationStepper, RemediationStep } from './RemediationStepper';
 import { RemediationSummary } from './RemediationSummary';
 import { api } from '@/services/api';
+
+const downloadBlob = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
 
 interface RemediationWorkflowProps {
   contentType: 'pdf' | 'epub';
@@ -86,8 +97,29 @@ export const RemediationWorkflow: React.FC<RemediationWorkflowProps> = ({
   const [remediationResult, setRemediationResult] = useState<RemediationResult | null>(null);
   const [comparisonData, setComparisonData] = useState<ComparisonData | null>(null);
   const [isRemediating, setIsRemediating] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const apiPrefix = contentType === 'epub' ? '/epub' : '/pdf';
+
+  const handleDownload = useCallback(async () => {
+    setIsDownloading(true);
+    const mimeType = contentType === 'pdf' ? 'application/pdf' : 'application/epub+zip';
+    const extension = contentType === 'pdf' ? 'pdf' : 'epub';
+    
+    try {
+      const response = await api.get(`${apiPrefix}/job/${jobId}/download-remediated`, {
+        responseType: 'blob',
+      });
+      
+      const blob = new Blob([response.data], { type: mimeType });
+      downloadBlob(blob, `remediated-file.${extension}`);
+    } catch (err) {
+      console.error('[RemediationWorkflow] Download failed:', err);
+      setError('Failed to download file. Please try again.');
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [apiPrefix, contentType, jobId]);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -352,8 +384,18 @@ export const RemediationWorkflow: React.FC<RemediationWorkflowProps> = ({
               You can now download the fixed file.
             </p>
             <div className="flex justify-center gap-3 mt-6">
-              <Button variant="primary" onClick={() => window.open(`/api/v1${apiPrefix}/job/${jobId}/download-remediated`, '_blank')}>
-                Download Fixed File
+              <Button variant="primary" onClick={handleDownload} disabled={isDownloading}>
+                {isDownloading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Downloading...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Fixed File
+                  </>
+                )}
               </Button>
               <Button variant="outline" onClick={onComplete}>
                 Done

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Wrench, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -7,6 +7,17 @@ import { RemediationHistory, RemediationWorkflow } from '@/components/remediatio
 import { api } from '@/services/api';
 
 type ContentType = 'pdf' | 'epub';
+
+const downloadBlob = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
 
 export const RemediationPage: React.FC = () => {
   const { jobId } = useParams<{ jobId?: string }>();
@@ -47,10 +58,22 @@ export const RemediationPage: React.FC = () => {
     navigate(`/remediation/${id}${typeParam}`);
   };
 
-  const handleDownload = (id: string, type?: ContentType) => {
+  const handleDownload = useCallback(async (id: string, type?: ContentType) => {
     const apiPrefix = type === 'pdf' ? 'pdf' : 'epub';
-    window.open(`/api/v1/${apiPrefix}/job/${id}/download-remediated`, '_blank');
-  };
+    const mimeType = type === 'pdf' ? 'application/pdf' : 'application/epub+zip';
+    const extension = type === 'pdf' ? 'pdf' : 'epub';
+    
+    try {
+      const response = await api.get(`/${apiPrefix}/job/${id}/download-remediated`, {
+        responseType: 'blob',
+      });
+      
+      const blob = new Blob([response.data], { type: mimeType });
+      downloadBlob(blob, `remediated-file.${extension}`);
+    } catch (error) {
+      console.error('[Download] Failed:', error);
+    }
+  }, []);
 
   const handleStartNew = () => {
     navigate('/epub');
