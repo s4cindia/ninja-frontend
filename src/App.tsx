@@ -34,6 +34,7 @@ import { AcrWorkflowPage } from '@/pages/acr/AcrWorkflowPage';
 import { EPUBAccessibility } from '@/pages/EPUBAccessibility';
 import { EPUBRemediation } from '@/pages/EPUBRemediation';
 import { EPUBComparison } from '@/pages/EPUBComparison';
+import { FeedbackDashboard } from '@/pages/FeedbackDashboard';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -90,6 +91,7 @@ function AppRoutes() {
           <Route path="/epub" element={<EPUBAccessibility />} />
           <Route path="/epub/remediate/:jobId" element={<EPUBRemediation />} />
           <Route path="/epub/compare/:jobId" element={<EPUBComparison />} />
+          <Route path="/feedback" element={<FeedbackDashboard />} />
         </Route>
 
         <Route path="/unauthorized" element={<Unauthorized />} />
