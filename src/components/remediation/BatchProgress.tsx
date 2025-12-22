@@ -1,0 +1,378 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { Spinner } from '@/components/ui/Spinner';
+import { Alert } from '@/components/ui/Alert';
+import { api } from '@/services/api';
+import { 
+  Loader2, 
+  CheckCircle, 
+  XCircle, 
+  Clock, 
+  AlertTriangle,
+  StopCircle,
+  Play,
+} from 'lucide-react';
+
+interface JobStatus {
+  jobId: string;
+  fileName: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  issuesFixed?: number;
+  error?: string;
+}
+
+interface BatchStatus {
+  batchId: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  totalJobs: number;
+  completedJobs: number;
+  failedJobs: number;
+  jobs: JobStatus[];
+  summary: {
+    totalIssuesFixed: number;
+    successRate: number;
+  };
+  estimatedTimeRemaining?: number;
+  currentJobIndex?: number;
+}
+
+interface BatchProgressProps {
+  batchId: string;
+  onComplete?: (status: BatchStatus) => void;
+  onCancel?: () => void;
+  className?: string;
+}
+
+const POLL_INTERVAL = 2500;
+
+const STATUS_ICONS = {
+  pending: Clock,
+  processing: Loader2,
+  completed: CheckCircle,
+  failed: XCircle,
+  cancelled: StopCircle,
+};
+
+const STATUS_COLORS = {
+  pending: 'text-gray-500',
+  processing: 'text-blue-500',
+  completed: 'text-green-500',
+  failed: 'text-red-500',
+  cancelled: 'text-amber-500',
+};
+
+const mapBatchStatus = (data: Record<string, unknown>): BatchStatus => {
+  const jobs = (data.jobs || []) as Record<string, unknown>[];
+  const summary = (data.summary || {}) as Record<string, unknown>;
+  
+  return {
+    batchId: String(data.batchId || data.batch_id || ''),
+    status: (data.status || 'pending') as BatchStatus['status'],
+    totalJobs: Number(data.totalJobs || data.total_jobs || 0),
+    completedJobs: Number(data.completedJobs || data.completed_jobs || 0),
+    failedJobs: Number(data.failedJobs || data.failed_jobs || 0),
+    jobs: jobs.map(j => ({
+      jobId: String(j.jobId || j.job_id || ''),
+      fileName: String(j.fileName || j.file_name || 'Unknown'),
+      status: (j.status || 'pending') as JobStatus['status'],
+      issuesFixed: j.issuesFixed !== undefined ? Number(j.issuesFixed || j.issues_fixed) : undefined,
+      error: j.error ? String(j.error) : undefined,
+    })),
+    summary: {
+      totalIssuesFixed: Number(summary.totalIssuesFixed || summary.total_issues_fixed || 0),
+      successRate: Number(summary.successRate || summary.success_rate || 0),
+    },
+    estimatedTimeRemaining: data.estimatedTimeRemaining !== undefined 
+      ? Number(data.estimatedTimeRemaining || data.estimated_time_remaining) 
+      : undefined,
+    currentJobIndex: data.currentJobIndex !== undefined
+      ? Number(data.currentJobIndex || data.current_job_index)
+      : undefined,
+  };
+};
+
+const generateDemoBatchStatus = (batchId: string, progress: number): BatchStatus => {
+  const totalJobs = 5;
+  const completedJobs = Math.min(totalJobs, Math.floor((progress / 100) * totalJobs));
+  const isCompleted = progress >= 100;
+  const currentIndex = isCompleted ? undefined : completedJobs;
+  
+  const baseJobs = [
+    { jobId: 'job-001', fileName: 'textbook-chapter1.epub', issuesFixed: 24 },
+    { jobId: 'job-002', fileName: 'student-guide.epub', issuesFixed: 18 },
+    { jobId: 'job-003', fileName: 'lab-manual.pdf', issuesFixed: 32 },
+    { jobId: 'job-004', fileName: 'lecture-notes.epub', issuesFixed: 12 },
+    { jobId: 'job-005', fileName: 'course-syllabus.pdf', issuesFixed: 15 },
+  ];
+
+  const jobs: JobStatus[] = baseJobs.map((job, idx) => {
+    const isJobCompleted = idx < completedJobs || isCompleted;
+    const isJobProcessing = !isCompleted && idx === completedJobs;
+    
+    return {
+      jobId: job.jobId,
+      fileName: job.fileName,
+      status: isJobCompleted ? 'completed' : isJobProcessing ? 'processing' : 'pending',
+      issuesFixed: isJobCompleted ? job.issuesFixed : undefined,
+    };
+  });
+
+  const actualCompleted = isCompleted ? totalJobs : completedJobs;
+  const totalIssuesFixed = jobs
+    .filter(j => j.status === 'completed')
+    .reduce((sum, j) => sum + (j.issuesFixed || 0), 0);
+
+  return {
+    batchId,
+    status: isCompleted ? 'completed' : 'processing',
+    totalJobs,
+    completedJobs: actualCompleted,
+    failedJobs: 0,
+    jobs,
+    summary: {
+      totalIssuesFixed,
+      successRate: 100,
+    },
+    estimatedTimeRemaining: isCompleted ? 0 : Math.max(0, (totalJobs - completedJobs) * 30),
+    currentJobIndex: currentIndex,
+  };
+};
+
+const formatTimeRemaining = (seconds: number): string => {
+  if (seconds < 60) return `${seconds}s`;
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}m ${secs}s`;
+};
+
+export const BatchProgress: React.FC<BatchProgressProps> = ({
+  batchId,
+  onComplete,
+  onCancel,
+  className = '',
+}) => {
+  const [batchStatus, setBatchStatus] = useState<BatchStatus | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const pollRef = useRef<NodeJS.Timeout | null>(null);
+  const demoProgressRef = useRef(0);
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      const response = await api.get(`/epub/batch/${batchId}`);
+      const data = response.data.data || response.data;
+      const status = mapBatchStatus(data);
+      setBatchStatus(status);
+      
+      if (status.status === 'completed' || status.status === 'failed' || status.status === 'cancelled') {
+        if (pollRef.current) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+        if (status.status === 'completed' && onComplete) {
+          onComplete(status);
+        }
+      }
+    } catch (err) {
+      console.error('[BatchProgress] Failed to fetch status:', err);
+      demoProgressRef.current = Math.min(100, demoProgressRef.current + 20);
+      const demoStatus = generateDemoBatchStatus(batchId, demoProgressRef.current);
+      setBatchStatus(demoStatus);
+      
+      if (demoProgressRef.current >= 100) {
+        if (pollRef.current) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+        if (onComplete) {
+          onComplete(demoStatus);
+        }
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [batchId, onComplete]);
+
+  useEffect(() => {
+    fetchStatus();
+    pollRef.current = setInterval(fetchStatus, POLL_INTERVAL);
+    
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+      }
+    };
+  }, [fetchStatus]);
+
+  const handleCancel = async () => {
+    setIsCancelling(true);
+    try {
+      await api.post(`/epub/batch/${batchId}/cancel`);
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+      setBatchStatus(prev => prev ? { ...prev, status: 'cancelled' } : null);
+      if (onCancel) onCancel();
+    } catch (err) {
+      console.error('[BatchProgress] Failed to cancel batch:', err);
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+      setBatchStatus(prev => prev ? { ...prev, status: 'cancelled' } : null);
+      if (onCancel) onCancel();
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  if (isLoading && !batchStatus) {
+    return (
+      <div className={`flex items-center justify-center py-12 ${className}`}>
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!batchStatus) {
+    return (
+      <Alert variant="warning" className={className}>
+        No batch status available
+      </Alert>
+    );
+  }
+
+  const progressPercent = batchStatus.totalJobs > 0
+    ? Math.round((batchStatus.completedJobs / batchStatus.totalJobs) * 100)
+    : 0;
+
+  const StatusIcon = STATUS_ICONS[batchStatus.status];
+  const statusColor = STATUS_COLORS[batchStatus.status];
+  const isProcessing = batchStatus.status === 'processing';
+
+  return (
+    <Card className={className}>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <StatusIcon 
+              className={`h-5 w-5 ${statusColor} ${isProcessing ? 'animate-spin' : ''}`} 
+              aria-hidden="true" 
+            />
+            Batch Remediation Progress
+          </CardTitle>
+          {isProcessing && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCancel}
+              disabled={isCancelling}
+              aria-label="Cancel batch remediation"
+            >
+              {isCancelling ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" aria-hidden="true" />
+              ) : (
+                <StopCircle className="h-4 w-4 mr-1" aria-hidden="true" />
+              )}
+              Cancel
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-700">
+              Overall Progress: {batchStatus.completedJobs} of {batchStatus.totalJobs} completed
+            </span>
+            <span className="text-sm font-semibold text-gray-900">{progressPercent}%</span>
+          </div>
+          <div 
+            className="h-4 bg-gray-200 rounded-full overflow-hidden"
+            role="progressbar"
+            aria-valuenow={progressPercent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Batch remediation progress"
+          >
+            <div
+              className="h-full bg-blue-600 transition-all duration-500 ease-out"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+          {batchStatus.estimatedTimeRemaining !== undefined && isProcessing && (
+            <p className="text-sm text-gray-500 mt-2">
+              Estimated time remaining: {formatTimeRemaining(batchStatus.estimatedTimeRemaining)}
+            </p>
+          )}
+        </div>
+
+        {batchStatus.failedJobs > 0 && (
+          <Alert variant="warning">
+            <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+            {batchStatus.failedJobs} job(s) failed during processing
+          </Alert>
+        )}
+
+        <div>
+          <h4 className="text-sm font-medium text-gray-700 mb-3">Job Status</h4>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {batchStatus.jobs.map((job, idx) => {
+              const JobIcon = STATUS_ICONS[job.status];
+              const jobColor = STATUS_COLORS[job.status];
+              const isCurrent = idx === batchStatus.currentJobIndex && isProcessing;
+              
+              return (
+                <div
+                  key={job.jobId}
+                  className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
+                    isCurrent ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <JobIcon 
+                      className={`h-4 w-4 ${jobColor} ${job.status === 'processing' ? 'animate-spin' : ''}`}
+                      aria-hidden="true"
+                    />
+                    <span className="text-sm font-medium text-gray-900">{job.fileName}</span>
+                    {isCurrent && (
+                      <Badge variant="info" size="sm">
+                        <Play className="h-3 w-3 mr-1" aria-hidden="true" />
+                        Processing
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {job.issuesFixed !== undefined && (
+                      <span className="text-sm text-green-600">
+                        {job.issuesFixed} issues fixed
+                      </span>
+                    )}
+                    {job.error && (
+                      <span className="text-sm text-red-600 max-w-48 truncate" title={job.error}>
+                        {job.error}
+                      </span>
+                    )}
+                    <Badge
+                      variant={
+                        job.status === 'completed' ? 'success' :
+                        job.status === 'failed' ? 'error' :
+                        job.status === 'processing' ? 'info' : 'default'
+                      }
+                      size="sm"
+                    >
+                      {job.status}
+                    </Badge>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};

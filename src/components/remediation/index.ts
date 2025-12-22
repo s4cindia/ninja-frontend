@@ -8,3 +8,6 @@ export type { Modification } from './ComparisonDiff';
 export { ComparisonSummaryCard } from './ComparisonSummaryCard';
 export { ModificationList } from './ModificationList';
 export { ComparisonView } from './ComparisonView';
+export { BatchJobSelector } from './BatchJobSelector';
+export { BatchProgress } from './BatchProgress';
+export { BatchResultsSummary } from './BatchResultsSummary';

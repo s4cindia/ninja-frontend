@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Wrench, Plus } from 'lucide-react';
+import { Wrench, Plus, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { RemediationHistory, RemediationWorkflow } from '@/components/remediation';
@@ -122,10 +122,16 @@ export const RemediationPage: React.FC = () => {
             View past remediation jobs and start new ones
           </p>
         </div>
-        <Button variant="primary" onClick={handleStartNew}>
-          <Plus className="h-4 w-4 mr-2" />
-          Start New Remediation
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" onClick={() => navigate('/remediation/batch')}>
+            <Layers className="h-4 w-4 mr-2" aria-hidden="true" />
+            Batch Remediation
+          </Button>
+          <Button variant="primary" onClick={handleStartNew}>
+            <Plus className="h-4 w-4 mr-2" aria-hidden="true" />
+            Start New Remediation
+          </Button>
+        </div>
       </div>
 
       <RemediationHistory
