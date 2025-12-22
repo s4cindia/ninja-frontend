@@ -71,19 +71,19 @@ export const BatchJobSelector: React.FC<BatchJobSelectorProps> = ({
       try {
         console.log('[BatchJobSelector] Fetching jobs...');
         const response = await api.get('/jobs');
-        console.log('[BatchJobSelector] Response:', response.data);
+        console.log('[BatchJobSelector] Full response:', response.data);
         
         const data = response.data.data || response.data;
         const jobList = Array.isArray(data) ? data : data.jobs || [];
         
-        // Filter for EPUB validation jobs that have output (completed audits)
-        const availableJobs = jobList
-          .filter((job: Record<string, unknown>) => 
-            job.output && (job.type === 'EPUB_VALIDATION' || job.type === 'epub')
-          )
-          .map(mapJobData);
+        console.log('[BatchJobSelector] Job list:', jobList);
+        console.log('[BatchJobSelector] First job sample:', jobList[0]);
         
-        setJobs(availableJobs);
+        // Map all jobs - filter can be adjusted once we know the data structure
+        const mappedJobs = jobList.map(mapJobData);
+        console.log('[BatchJobSelector] Mapped jobs:', mappedJobs);
+        
+        setJobs(mappedJobs);
       } catch (err) {
         console.error('[BatchJobSelector] Failed to fetch jobs:', err);
         setError('Failed to load jobs. Please check your connection and try again.');
