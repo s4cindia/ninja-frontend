@@ -174,7 +174,7 @@ export const EPUBComparison: React.FC = () => {
       </div>
 
       {isDemo && (
-        <Alert variant="info" onClose={() => {}}>
+        <Alert variant="info">
           Backend unavailable - showing demo comparison data
         </Alert>
       )}

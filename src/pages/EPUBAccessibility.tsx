@@ -184,40 +184,34 @@ export const EPUBAccessibility: React.FC = () => {
     }
   };
 
+  const downloadJsonBlob = (data: object, filename: string) => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { 
+      type: 'application/json' 
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const handleDownloadReport = async () => {
     if (!auditResult) return;
     
     setIsDownloading(true);
+    const filename = `epub-audit-report-${auditResult.jobId}.json`;
     
     try {
       const response = await api.get(`/epub/job/${auditResult.jobId}/report`, {
         params: { format: 'json' },
       });
       const data = response.data.data || response.data;
-      
-      const blob = new Blob([JSON.stringify(data, null, 2)], { 
-        type: 'application/json' 
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `epub-audit-report-${auditResult.jobId}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      downloadJsonBlob(data, filename);
     } catch {
-      const blob = new Blob([JSON.stringify(auditResult, null, 2)], { 
-        type: 'application/json' 
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `epub-audit-report-${auditResult.jobId}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      downloadJsonBlob(auditResult, filename);
     } finally {
       setIsDownloading(false);
     }

@@ -345,7 +345,7 @@ export const EPUBRemediation: React.FC = () => {
       </div>
 
       {isDemo && (
-        <Alert variant="info" onClose={() => {}}>
+        <Alert variant="info">
           Backend unavailable - showing demo remediation workflow
         </Alert>
       )}
