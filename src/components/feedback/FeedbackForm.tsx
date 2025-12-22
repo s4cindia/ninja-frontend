@@ -78,7 +78,7 @@ export const FeedbackForm: React.FC<FeedbackFormProps> = ({
         payload.entityId = entityId;
       }
 
-      console.log('[FeedbackForm] Submitting:', payload);
+      console.log('[FeedbackForm] Submitting payload:', JSON.stringify(payload, null, 2));
 
       await api.post('/feedback', payload);
 
@@ -92,29 +92,22 @@ export const FeedbackForm: React.FC<FeedbackFormProps> = ({
         onSuccess?.();
       }, 2000);
     } catch (err: unknown) {
-      console.error('[FeedbackForm] Error:', err);
+      const axiosError = err as { response?: { data?: unknown; status?: number }; message?: string };
       
-      const axiosError = err as { response?: { data?: { error?: string; message?: string }; status?: number } };
-      const errorMsg = axiosError.response?.data?.error 
-        || axiosError.response?.data?.message 
+      console.error('[FeedbackForm] Backend error response:', axiosError.response?.data);
+      console.error('[FeedbackForm] Status:', axiosError.response?.status);
+      console.error('[FeedbackForm] Full error:', err);
+      
+      const responseData = axiosError.response?.data as { error?: string; message?: string; details?: string } | undefined;
+      const errorMsg = responseData?.error 
+        || responseData?.message 
+        || responseData?.details
+        || axiosError.message
         || 'Failed to submit feedback. Please try again.';
-      
-      if (axiosError.response?.status === 404 || axiosError.response?.status === 400) {
-        console.log('[FeedbackForm] API not available or backend not implemented, simulating success');
-        setSubmitStatus('success');
-        setMessage('');
-        setContext(`Page: ${window.location.pathname}`);
-        setType('GENERAL');
-        setTimeout(() => {
-          setSubmitStatus('idle');
-          onSuccess?.();
-        }, 2000);
-        return;
-      }
       
       setSubmitStatus('error');
       setErrorMessage(errorMsg);
-      setTimeout(() => setSubmitStatus('idle'), 3000);
+      setTimeout(() => setSubmitStatus('idle'), 5000);
     } finally {
       setIsSubmitting(false);
     }
