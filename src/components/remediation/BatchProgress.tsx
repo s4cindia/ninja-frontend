@@ -223,23 +223,20 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
   const handleCancel = async () => {
     setIsCancelling(true);
     try {
-      await api.post(`/epub/batch/${batchId}/cancel`);
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
+      // Skip API call for demo batches
+      if (!batchId.startsWith('demo-') && !batchId.startsWith('batch-')) {
+        await api.post(`/epub/batch/${batchId}/cancel`);
       }
-      setBatchStatus(prev => prev ? { ...prev, status: 'cancelled' } : null);
-      if (onCancel) onCancel();
     } catch (err) {
-      console.error('[BatchProgress] Failed to cancel batch:', err);
+      console.warn('[BatchProgress] Cancel API call failed (batch may be demo mode):', err);
+    } finally {
       if (pollRef.current) {
         clearInterval(pollRef.current);
         pollRef.current = null;
       }
       setBatchStatus(prev => prev ? { ...prev, status: 'cancelled' } : null);
-      if (onCancel) onCancel();
-    } finally {
       setIsCancelling(false);
+      if (onCancel) onCancel();
     }
   };
 
