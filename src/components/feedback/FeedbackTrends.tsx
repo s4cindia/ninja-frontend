@@ -54,7 +54,8 @@ export const FeedbackTrends: React.FC<FeedbackTrendsProps> = ({ className }) => 
         const response = await api.get(`/feedback/dashboard/trends?days=${days}`);
         const trendData = response.data.data || response.data;
         setData(Array.isArray(trendData) ? trendData : []);
-      } catch {
+      } catch (error) {
+        console.error('[FeedbackTrends] Failed to fetch trends:', error);
         setData(generateDemoData(days));
       } finally {
         setIsLoading(false);

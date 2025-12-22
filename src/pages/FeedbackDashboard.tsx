@@ -98,7 +98,8 @@ export const FeedbackDashboard: React.FC = () => {
         const response = await api.get('/feedback/dashboard/stats');
         const data = response.data.data || response.data;
         setStats(data);
-      } catch {
+      } catch (error) {
+        console.error('[FeedbackDashboard] Failed to fetch stats:', error);
         setStats(generateDemoStats());
       } finally {
         setIsLoadingStats(false);
@@ -126,7 +127,8 @@ export const FeedbackDashboard: React.FC = () => {
         const data = response.data.data || response.data;
         setFeedbackItems(Array.isArray(data.items) ? data.items : Array.isArray(data) ? data : []);
         setTotalPages(data.totalPages || 5);
-      } catch {
+      } catch (error) {
+        console.error('[FeedbackDashboard] Failed to fetch feedback:', error);
         setFeedbackItems(generateDemoFeedback(page));
       } finally {
         setIsLoadingFeedback(false);

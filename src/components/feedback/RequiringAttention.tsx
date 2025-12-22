@@ -85,7 +85,8 @@ export const RequiringAttention: React.FC<RequiringAttentionProps> = ({
         const response = await api.get('/feedback/dashboard/requiring-attention');
         const data = response.data.data || response.data;
         setItems(Array.isArray(data) ? data : []);
-      } catch {
+      } catch (error) {
+        console.error('[RequiringAttention] Failed to fetch items:', error);
         setItems(generateDemoItems());
       } finally {
         setIsLoading(false);
@@ -100,8 +101,8 @@ export const RequiringAttention: React.FC<RequiringAttentionProps> = ({
     try {
       await api.patch(`/feedback/${id}`, { status: newStatus });
       setItems(prev => prev.filter(item => item.id !== id));
-    } catch {
-      setItems(prev => prev.filter(item => item.id !== id));
+    } catch (error) {
+      console.error('[RequiringAttention] Failed to update status:', error);
     } finally {
       setUpdatingId(null);
     }

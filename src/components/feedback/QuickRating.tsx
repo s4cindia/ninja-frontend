@@ -35,9 +35,11 @@ export const QuickRating: React.FC<QuickRatingProps> = ({
 
     const newRating: RatingValue = isPositive ? 'positive' : 'negative';
     const ratingToSubmit = rating === newRating ? null : newRating;
+    const previousRating = rating;
     
     setIsSubmitting(true);
     setError(null);
+    setRating(ratingToSubmit);
 
     try {
       const payload = {
@@ -45,18 +47,16 @@ export const QuickRating: React.FC<QuickRatingProps> = ({
         entityId,
         isPositive: ratingToSubmit === null ? null : ratingToSubmit === 'positive',
       };
-      console.log('[QuickRating] Submitting:', payload);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[QuickRating] Submitting:', payload);
+      }
       
       await api.post('/feedback/quick-rating', payload);
-      
-      setRating(ratingToSubmit);
       onRated?.(ratingToSubmit);
     } catch (err: unknown) {
-      const axiosError = err as { response?: { status?: number; data?: unknown } };
-      console.error('[QuickRating] Error:', axiosError.response?.status, axiosError.response?.data);
-      
-      setRating(ratingToSubmit);
-      onRated?.(ratingToSubmit);
+      console.error('[QuickRating] Error:', err);
+      setRating(previousRating);
+      setError('Failed to save rating');
     } finally {
       setIsSubmitting(false);
     }

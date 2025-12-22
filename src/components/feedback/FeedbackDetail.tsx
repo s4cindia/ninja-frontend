@@ -102,16 +102,9 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
       onStatusUpdate?.(item.id, newStatus);
       setTimeout(() => setSuccess(false), 2000);
     } catch (err: unknown) {
-      const axiosError = err as { response?: { status?: number } };
-      if (axiosError.response?.status === 400 || axiosError.response?.status === 404) {
-        setStatus(newStatus);
-        setSuccess(true);
-        onStatusUpdate?.(item.id, newStatus);
-        setTimeout(() => setSuccess(false), 2000);
-      } else {
-        setError('Failed to update status');
-        setTimeout(() => setError(null), 3000);
-      }
+      console.error('[FeedbackDetail] Failed to update status:', err);
+      setError('Failed to update status');
+      setTimeout(() => setError(null), 3000);
     } finally {
       setIsUpdating(false);
     }

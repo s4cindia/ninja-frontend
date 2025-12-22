@@ -78,7 +78,9 @@ export const FeedbackForm: React.FC<FeedbackFormProps> = ({
         payload.entityId = entityId;
       }
 
-      console.log('[FeedbackForm] Submitting payload:', JSON.stringify(payload, null, 2));
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[FeedbackForm] Submitting payload:', JSON.stringify(payload, null, 2));
+      }
 
       await api.post('/feedback', payload);
 

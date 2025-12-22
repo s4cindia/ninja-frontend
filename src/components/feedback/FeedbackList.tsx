@@ -222,7 +222,16 @@ export const FeedbackList: React.FC<FeedbackListProps> = ({
                     <tr
                       key={item.id}
                       onClick={() => onItemClick(item)}
-                      className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onItemClick(item);
+                        }
+                      }}
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`View feedback: ${item.type.replace(/_/g, ' ')}`}
+                      className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-inset"
                     >
                       <td className="py-3 px-2 text-sm text-gray-600">
                         {formatDate(item.createdAt)}
