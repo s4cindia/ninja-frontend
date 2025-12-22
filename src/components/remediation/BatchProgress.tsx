@@ -38,8 +38,14 @@ interface BatchStatus {
   currentJobIndex?: number;
 }
 
+interface SelectedJob {
+  jobId: string;
+  fileName: string;
+}
+
 interface BatchProgressProps {
   batchId: string;
+  selectedJobs?: SelectedJob[];
   onComplete?: (status: BatchStatus) => void;
   onCancel?: () => void;
   className?: string;
@@ -93,19 +99,26 @@ const mapBatchStatus = (data: Record<string, unknown>): BatchStatus => {
   };
 };
 
-const generateDemoBatchStatus = (batchId: string, progress: number): BatchStatus => {
-  const totalJobs = 5;
+const generateDemoBatchStatus = (
+  batchId: string, 
+  progress: number, 
+  selectedJobs?: SelectedJob[]
+): BatchStatus => {
+  const baseJobs = selectedJobs && selectedJobs.length > 0
+    ? selectedJobs.map((job) => ({
+        jobId: job.jobId,
+        fileName: job.fileName,
+        issuesFixed: 15 + Math.floor(Math.random() * 20),
+      }))
+    : [
+        { jobId: 'job-001', fileName: 'textbook-chapter1.epub', issuesFixed: 24 },
+        { jobId: 'job-002', fileName: 'student-guide.epub', issuesFixed: 18 },
+      ];
+
+  const totalJobs = baseJobs.length;
   const completedJobs = Math.min(totalJobs, Math.floor((progress / 100) * totalJobs));
   const isCompleted = progress >= 100;
   const currentIndex = isCompleted ? undefined : completedJobs;
-  
-  const baseJobs = [
-    { jobId: 'job-001', fileName: 'textbook-chapter1.epub', issuesFixed: 24 },
-    { jobId: 'job-002', fileName: 'student-guide.epub', issuesFixed: 18 },
-    { jobId: 'job-003', fileName: 'lab-manual.pdf', issuesFixed: 32 },
-    { jobId: 'job-004', fileName: 'lecture-notes.epub', issuesFixed: 12 },
-    { jobId: 'job-005', fileName: 'course-syllabus.pdf', issuesFixed: 15 },
-  ];
 
   const jobs: JobStatus[] = baseJobs.map((job, idx) => {
     const isJobCompleted = idx < completedJobs || isCompleted;
@@ -149,6 +162,7 @@ const formatTimeRemaining = (seconds: number): string => {
 
 export const BatchProgress: React.FC<BatchProgressProps> = ({
   batchId,
+  selectedJobs,
   onComplete,
   onCancel,
   className = '',
@@ -178,7 +192,7 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
     } catch (err) {
       console.error('[BatchProgress] Failed to fetch status:', err);
       demoProgressRef.current = Math.min(100, demoProgressRef.current + 20);
-      const demoStatus = generateDemoBatchStatus(batchId, demoProgressRef.current);
+      const demoStatus = generateDemoBatchStatus(batchId, demoProgressRef.current, selectedJobs);
       setBatchStatus(demoStatus);
       
       if (demoProgressRef.current >= 100) {
@@ -193,7 +207,7 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [batchId, onComplete]);
+  }, [batchId, selectedJobs, onComplete]);
 
   useEffect(() => {
     fetchStatus();

@@ -11,6 +11,11 @@ import { ArrowLeft, Play, Layers } from 'lucide-react';
 
 type BatchState = 'selection' | 'processing' | 'completed';
 
+interface SelectedJobInfo {
+  jobId: string;
+  fileName: string;
+}
+
 interface BatchSummary {
   batchId: string;
   totalJobs: number;
@@ -31,6 +36,7 @@ const BatchRemediationPage: React.FC = () => {
   const navigate = useNavigate();
   const [state, setState] = useState<BatchState>('selection');
   const [selectedJobs, setSelectedJobs] = useState<string[]>([]);
+  const [selectedJobsInfo, setSelectedJobsInfo] = useState<SelectedJobInfo[]>([]);
   const [batchId, setBatchId] = useState<string | null>(null);
   const [batchSummary, setBatchSummary] = useState<BatchSummary | null>(null);
   const [isStarting, setIsStarting] = useState(false);
@@ -188,13 +194,17 @@ const BatchRemediationPage: React.FC = () => {
       {state === 'selection' && (
         <BatchJobSelector
           selectedJobs={selectedJobs}
-          onSelectionChange={setSelectedJobs}
+          onSelectionChange={(ids, details) => {
+            setSelectedJobs(ids);
+            if (details) setSelectedJobsInfo(details);
+          }}
         />
       )}
 
       {state === 'processing' && batchId && (
         <BatchProgress
           batchId={batchId}
+          selectedJobs={selectedJobsInfo}
           onComplete={handleBatchComplete}
           onCancel={handleBatchCancel}
         />

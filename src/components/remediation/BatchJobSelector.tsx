@@ -17,9 +17,14 @@ interface Job {
   status: string;
 }
 
+interface SelectedJobInfo {
+  jobId: string;
+  fileName: string;
+}
+
 interface BatchJobSelectorProps {
   selectedJobs: string[];
-  onSelectionChange: (jobIds: string[]) => void;
+  onSelectionChange: (jobIds: string[], jobDetails?: SelectedJobInfo[]) => void;
   maxJobs?: number;
   className?: string;
 }
@@ -96,20 +101,29 @@ export const BatchJobSelector: React.FC<BatchJobSelectorProps> = ({
     return jobs.length > 0 && jobs.every(job => selectedJobs.includes(job.id));
   }, [jobs, selectedJobs]);
 
+  const getJobDetails = (jobIds: string[]): SelectedJobInfo[] => {
+    return jobIds.map(id => {
+      const job = jobs.find(j => j.id === id);
+      return { jobId: id, fileName: job?.fileName || 'Unknown' };
+    });
+  };
+
   const toggleJob = (jobId: string) => {
     if (selectedJobs.includes(jobId)) {
-      onSelectionChange(selectedJobs.filter(id => id !== jobId));
+      const newSelection = selectedJobs.filter(id => id !== jobId);
+      onSelectionChange(newSelection, getJobDetails(newSelection));
     } else if (selectedJobs.length < maxJobs) {
-      onSelectionChange([...selectedJobs, jobId]);
+      const newSelection = [...selectedJobs, jobId];
+      onSelectionChange(newSelection, getJobDetails(newSelection));
     }
   };
 
   const toggleAll = () => {
     if (isAllSelected) {
-      onSelectionChange([]);
+      onSelectionChange([], []);
     } else {
       const allIds = jobs.slice(0, maxJobs).map(job => job.id);
-      onSelectionChange(allIds);
+      onSelectionChange(allIds, getJobDetails(allIds));
     }
   };
 
