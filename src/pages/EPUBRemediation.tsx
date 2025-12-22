@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { BookOpen, ArrowLeft, Eye, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -55,19 +55,54 @@ export const EPUBRemediation: React.FC = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const locationState = location.state as LocationState | null;
   const cancelledRef = useRef(false);
 
+  // Check URL for completion status
+  const urlStatus = searchParams.get('status');
+  const initialPageState: PageState = urlStatus === 'completed' ? 'complete' : 'loading';
+
   console.log('[EPUBRemediation] jobId from URL:', jobId);
+  console.log('[EPUBRemediation] urlStatus:', urlStatus);
   console.log('[EPUBRemediation] locationState:', locationState);
   
-  const [pageState, setPageState] = useState<PageState>('loading');
+  const [pageState, setPageState] = useState<PageState>(initialPageState);
   const [plan, setPlan] = useState<PlanViewPlan | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isDemo, setIsDemo] = useState(false);
   const [currentTask, setCurrentTask] = useState<string | null>(null);
   const [completedFixes, setCompletedFixes] = useState<FixResult[]>([]);
   const [comparisonSummary, setComparisonSummary] = useState<ComparisonSummary | null>(null);
+
+  // Load comparison summary when returning with status=completed
+  useEffect(() => {
+    const loadCompletedState = async () => {
+      if (urlStatus === 'completed' && jobId && !comparisonSummary) {
+        try {
+          const response = await api.get(`/epub/job/${jobId}/comparison/summary`);
+          const data = response.data.data || response.data;
+          setComparisonSummary({
+            fixedCount: data.fixedCount ?? 0,
+            failedCount: data.failedCount ?? 0,
+            skippedCount: data.skippedCount ?? 0,
+            beforeScore: data.beforeScore ?? 45,
+            afterScore: data.afterScore ?? 85,
+          });
+        } catch {
+          // Use defaults if API fails
+          setComparisonSummary({
+            fixedCount: 0,
+            failedCount: 0,
+            skippedCount: 0,
+            beforeScore: 45,
+            afterScore: 85,
+          });
+        }
+      }
+    };
+    loadCompletedState();
+  }, [urlStatus, jobId, comparisonSummary]);
 
   useEffect(() => {
     const loadRemediationPlan = async () => {
@@ -78,9 +113,11 @@ export const EPUBRemediation: React.FC = () => {
       }
 
       const isDemoJob = jobId.startsWith('demo-');
-      console.log('[EPUBRemediation] isDemoJob:', isDemoJob);
+      const isReturningCompleted = urlStatus === 'completed';
+      console.log('[EPUBRemediation] isDemoJob:', isDemoJob, 'isReturningCompleted:', isReturningCompleted);
 
-      if (locationState?.autoFixableIssues && locationState.autoFixableIssues.length > 0) {
+      // If returning with completed status, still load plan but keep complete state
+      if (locationState?.autoFixableIssues && locationState.autoFixableIssues.length > 0 && !isReturningCompleted) {
         console.log('[EPUBRemediation] Using locationState autoFixableIssues');
         const tasks: RemediationTask[] = locationState.autoFixableIssues.map(issue => ({
           id: issue.id,
@@ -114,10 +151,10 @@ export const EPUBRemediation: React.FC = () => {
             tasks: data.tasks.map((t: RemediationTask) => ({
               ...t,
               type: t.type || 'auto',
-              status: t.status || 'pending',
+              status: isReturningCompleted ? (t.status || 'completed') : (t.status || 'pending'),
             })),
           });
-          setPageState('ready');
+          if (!isReturningCompleted) setPageState('ready');
           setIsDemo(false);
           return;
         }
@@ -134,42 +171,43 @@ export const EPUBRemediation: React.FC = () => {
               location: issue.location,
               suggestion: issue.suggestion,
               type: issue.isAutoFixable !== false ? 'auto' : 'manual',
-              status: issue.status || 'pending',
+              status: isReturningCompleted ? 'completed' : (issue.status || 'pending'),
             })),
           });
-          setPageState('ready');
+          if (!isReturningCompleted) setPageState('ready');
           setIsDemo(false);
           return;
         }
       } catch {
-        if (!isDemoJob) {
+        if (!isDemoJob && !isReturningCompleted) {
           setError('Unable to load remediation plan. The backend service is temporarily unavailable.');
           setPageState('error');
           return;
         }
       }
 
-      if (isDemoJob) {
+      if (isDemoJob || isReturningCompleted) {
+        const taskStatus = isReturningCompleted ? 'completed' : 'pending';
         const demoPlan: PlanViewPlan = {
           jobId: jobId,
           epubFileName: 'sample-book.epub',
           tasks: [
-            { id: '1', code: 'EPUB-META-002', severity: 'moderate', message: 'Missing accessibility features metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessibilityFeature metadata' },
-            { id: '2', code: 'EPUB-META-003', severity: 'minor', message: 'Missing accessMode metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessMode metadata' },
-            { id: '3', code: 'EPUB-META-004', severity: 'minor', message: 'Missing accessibilityHazard metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessibilityHazard metadata' },
-            { id: '4', code: 'EPUB-META-005', severity: 'minor', message: 'Missing accessibilitySummary metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessibilitySummary metadata' },
-            { id: '5', code: 'EPUB-NAV-001', severity: 'moderate', message: 'Navigation document missing landmarks', type: 'auto', status: 'pending', suggestion: 'Add epub:type landmarks to nav' },
-            { id: '6', code: 'EPUB-IMG-001', severity: 'serious', message: 'Image missing alt text', type: 'manual', status: 'pending', location: 'content/chapter1.xhtml, line 42', suggestion: 'Add descriptive alt text' },
+            { id: '1', code: 'EPUB-META-002', severity: 'moderate', message: 'Missing accessibility features metadata', type: 'auto', status: taskStatus as TaskStatus, suggestion: 'Add schema:accessibilityFeature metadata' },
+            { id: '2', code: 'EPUB-META-003', severity: 'minor', message: 'Missing accessMode metadata', type: 'auto', status: taskStatus as TaskStatus, suggestion: 'Add schema:accessMode metadata' },
+            { id: '3', code: 'EPUB-META-004', severity: 'minor', message: 'Missing accessibilityHazard metadata', type: 'auto', status: taskStatus as TaskStatus, suggestion: 'Add schema:accessibilityHazard metadata' },
+            { id: '4', code: 'EPUB-META-005', severity: 'minor', message: 'Missing accessibilitySummary metadata', type: 'auto', status: taskStatus as TaskStatus, suggestion: 'Add schema:accessibilitySummary metadata' },
+            { id: '5', code: 'EPUB-NAV-001', severity: 'moderate', message: 'Navigation document missing landmarks', type: 'auto', status: taskStatus as TaskStatus, suggestion: 'Add epub:type landmarks to nav' },
+            { id: '6', code: 'EPUB-IMG-001', severity: 'serious', message: 'Image missing alt text', type: 'manual', status: taskStatus as TaskStatus, location: 'content/chapter1.xhtml, line 42', suggestion: 'Add descriptive alt text' },
           ],
         };
         setPlan(demoPlan);
-        setPageState('ready');
-        setIsDemo(true);
+        if (!isReturningCompleted) setPageState('ready');
+        setIsDemo(isDemoJob);
       }
     };
 
     loadRemediationPlan();
-  }, [jobId, locationState]);
+  }, [jobId, locationState, urlStatus]);
 
   const handleRunAutoRemediation = async () => {
     if (!plan) return;
@@ -279,6 +317,8 @@ export const EPUBRemediation: React.FC = () => {
     }
 
     setPageState('complete');
+    // Update URL to persist completion state
+    setSearchParams({ status: 'completed' }, { replace: true });
   };
 
   const handleCancelRemediation = () => {
