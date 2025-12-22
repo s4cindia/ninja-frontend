@@ -121,6 +121,28 @@ export const RemediationWorkflow: React.FC<RemediationWorkflowProps> = ({
     fetchInitialData();
   }, [jobId, apiPrefix]);
 
+  // Auto-fetch comparison data when entering review step
+  useEffect(() => {
+    if (currentStep === 'review' && !comparisonData && !isLoading) {
+      const fetchComparison = async () => {
+        setIsLoading(true);
+        try {
+          const response = await api.get(`${apiPrefix}/job/${jobId}/comparison/summary`);
+          const comparison = response.data.data || response.data;
+          setComparisonData(comparison || generateDemoComparison());
+          addCompletedStep('review');
+        } catch (err) {
+          console.error('[RemediationWorkflow] Failed to fetch comparison:', err);
+          setComparisonData(generateDemoComparison());
+          addCompletedStep('review');
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchComparison();
+    }
+  }, [currentStep, comparisonData, isLoading, apiPrefix, jobId]);
+
   const handleCreatePlan = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -159,22 +181,6 @@ export const RemediationWorkflow: React.FC<RemediationWorkflowProps> = ({
     }
   }, [apiPrefix, jobId]);
 
-  const handleFetchComparison = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const response = await api.get(`${apiPrefix}/job/${jobId}/comparison/summary`);
-      const comparison = response.data.data || response.data;
-      setComparisonData(comparison || generateDemoComparison());
-      addCompletedStep('review');
-    } catch (err) {
-      console.error('[RemediationWorkflow] Failed to fetch comparison:', err);
-      setComparisonData(generateDemoComparison());
-      addCompletedStep('review');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [apiPrefix, jobId]);
-
   const handleExport = useCallback(() => {
     addCompletedStep('export');
     setCurrentStep('export');
@@ -196,14 +202,13 @@ export const RemediationWorkflow: React.FC<RemediationWorkflowProps> = ({
     } else if (currentStep === 'plan') {
       handleStartRemediation();
     } else if (currentStep === 'remediate') {
-      handleFetchComparison();
       setCurrentStep('review');
     } else if (currentStep === 'review') {
       handleExport();
     } else if (currentIndex < steps.length - 1) {
       setCurrentStep(steps[currentIndex + 1]);
     }
-  }, [currentStep, completedSteps, handleCreatePlan, handleStartRemediation, handleFetchComparison, handleExport]);
+  }, [currentStep, completedSteps, handleCreatePlan, handleStartRemediation, handleExport]);
 
   const handleBack = useCallback(() => {
     const steps: RemediationStep[] = ['audit', 'plan', 'remediate', 'review', 'export'];
