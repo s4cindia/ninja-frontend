@@ -141,8 +141,24 @@ const mapComparisonResponse = (data: Record<string, unknown>, jobId: string): Co
         accessibility: Number(changesByType.accessibility || 0),
       },
     },
-    files: Array.isArray(data.files) ? data.files : [],
-    modifications: Array.isArray(data.modifications) ? data.modifications : [],
+    files: Array.isArray(data.files) 
+      ? data.files.map((f: Record<string, unknown>) => ({
+          filePath: String(f.filePath || f.file_path || ''),
+          changeCount: Number(f.changeCount || f.change_count || 0),
+          categories: Array.isArray(f.categories) ? f.categories : [],
+        }))
+      : [],
+    modifications: Array.isArray(data.modifications) 
+      ? data.modifications.map((m: Record<string, unknown>) => ({
+          type: String(m.type || 'modify'),
+          category: String(m.category || 'content') as Modification['category'],
+          description: String(m.description || ''),
+          filePath: String(m.filePath || m.file_path || ''),
+          before: m.before ? String(m.before) : undefined,
+          after: m.after ? String(m.after) : undefined,
+          wcagCriteria: m.wcagCriteria || m.wcag_criteria ? String(m.wcagCriteria || m.wcag_criteria) : undefined,
+        }))
+      : [],
   };
 };
 
@@ -275,7 +291,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
                     <span className="text-sm font-mono text-gray-900">{file.filePath}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    {file.categories.map(cat => (
+                    {(file.categories || []).map(cat => (
                       <Badge key={cat} size="sm" variant="default">
                         {cat}
                       </Badge>
