@@ -93,13 +93,13 @@ export const RemediationWorkflow: React.FC<RemediationWorkflowProps> = ({
     const fetchInitialData = async () => {
       setIsLoading(true);
       try {
-        const auditResponse = await api.get(`${apiPrefix}/job/${jobId}/audit`);
+        const auditResponse = await api.get(`${apiPrefix}/job/${jobId}/audit/result`);
         const audit = auditResponse.data.data || auditResponse.data;
         setAuditData(audit);
         setCompletedSteps(['audit']);
 
         try {
-          const planResponse = await api.get(`${apiPrefix}/job/${jobId}/remediation`);
+          const planResponse = await api.get(`${apiPrefix}/job/${jobId}/remediation/plan`);
           const plan = planResponse.data.data || planResponse.data;
           if (plan) {
             setPlanData(plan);
