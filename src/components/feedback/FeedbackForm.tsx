@@ -60,13 +60,23 @@ export const FeedbackForm: React.FC<FeedbackFormProps> = ({
     setErrorMessage(null);
 
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         type,
         message: message.trim(),
-        context: context.trim() ? { page: window.location.pathname, details: context.trim() } : { page: window.location.pathname },
-        entityType: entityType || undefined,
-        entityId: entityId || undefined,
+        context: { page: window.location.pathname },
       };
+
+      if (context.trim() && context.trim() !== `Page: ${window.location.pathname}`) {
+        (payload.context as Record<string, string>).details = context.trim();
+      }
+
+      if (entityType) {
+        payload.entityType = entityType;
+      }
+
+      if (entityId) {
+        payload.entityId = entityId;
+      }
 
       console.log('[FeedbackForm] Submitting:', payload);
 
