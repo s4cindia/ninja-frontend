@@ -100,16 +100,30 @@ export const EPUBAccessibility: React.FC = () => {
     try {
       const response = await api.get(`/epub/job/${summary.jobId}/audit/result`);
       const data = response.data.data || response.data;
+      
+      // API returns combinedIssues, not issues
+      const apiIssues = data.combinedIssues || data.issues || [];
+      console.log('[EPUBAccessibility] API returned issues:', apiIssues.length);
+      
+      // Calculate issuesSummary from actual issues if not provided
+      const calculatedSummary = apiIssues.length > 0 ? {
+        total: apiIssues.length,
+        critical: apiIssues.filter((i: AuditIssue) => i.severity === 'critical').length,
+        serious: apiIssues.filter((i: AuditIssue) => i.severity === 'serious').length,
+        moderate: apiIssues.filter((i: AuditIssue) => i.severity === 'moderate').length,
+        minor: apiIssues.filter((i: AuditIssue) => i.severity === 'minor').length,
+      } : issuesSummary;
+      
       const fullResult: AuditResult = {
         jobId: data.jobId || summary.jobId,
         epubVersion: data.epubVersion || summary.epubVersion || 'EPUB 3.0',
         isValid: data.isValid ?? summary.isValid ?? true,
         accessibilityScore: data.accessibilityScore ?? summary.accessibilityScore ?? 72,
-        issuesSummary: data.issuesSummary || issuesSummary,
-        issues: data.issues || generateDemoIssues(issuesSummary),
+        issuesSummary: data.issuesSummary || calculatedSummary,
+        issues: apiIssues.length > 0 ? apiIssues : (isDemoJob ? generateDemoIssues(issuesSummary) : []),
       };
       setAuditResult(fullResult);
-      setIsDemo(isDemoJob);
+      setIsDemo(isDemoJob || apiIssues.length === 0);
     } catch {
       console.warn('[EPUBAccessibility] Failed to fetch audit result, using summary data. isDemoJob:', isDemoJob);
       const fallbackResult: AuditResult = {
