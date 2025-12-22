@@ -35,6 +35,7 @@ import { EPUBAccessibility } from '@/pages/EPUBAccessibility';
 import { EPUBRemediation } from '@/pages/EPUBRemediation';
 import { EPUBComparison } from '@/pages/EPUBComparison';
 import { FeedbackDashboard } from '@/pages/FeedbackDashboard';
+import { RemediationPage } from '@/pages/Remediation';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -92,6 +93,8 @@ function AppRoutes() {
           <Route path="/epub/remediate/:jobId" element={<EPUBRemediation />} />
           <Route path="/epub/compare/:jobId" element={<EPUBComparison />} />
           <Route path="/feedback" element={<FeedbackDashboard />} />
+          <Route path="/remediation" element={<RemediationPage />} />
+          <Route path="/remediation/:jobId" element={<RemediationPage />} />
         </Route>
 
         <Route path="/unauthorized" element={<Unauthorized />} />
