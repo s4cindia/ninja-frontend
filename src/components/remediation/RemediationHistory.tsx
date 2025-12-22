@@ -122,35 +122,67 @@ export const RemediationHistory: React.FC<RemediationHistoryProps> = ({
         return [];
       };
       
+      // Filter to only show relevant job types (accessibility jobs, not batch processing)
+      const RELEVANT_JOB_TYPES = ['EPUB_ACCESSIBILITY', 'PDF_ACCESSIBILITY', 'ACCESSIBILITY_AUDIT', 'REMEDIATION'];
+      
+      const isRelevantJob = (job: any): boolean => {
+        const jobType = String(job.type || job.jobType || '').toUpperCase();
+        return RELEVANT_JOB_TYPES.some(t => jobType.includes(t));
+      };
+      
       // Derive content type from job type
       const getContentType = (job: any): ContentType => {
         const jobType = String(job.type || job.jobType || '').toUpperCase();
         if (jobType.includes('PDF')) return 'pdf';
-        if (jobType.includes('EPUB')) return 'epub';
-        // Check file extension as fallback
-        const fileName = String(job.fileName || job.filename || job.name || job.originalName || job.file?.name || '');
-        if (fileName.toLowerCase().endsWith('.pdf')) return 'pdf';
         return 'epub';
+      };
+      
+      // Get display name for the job
+      const getJobDisplayName = (job: any): string => {
+        // Try direct file name fields
+        if (job.fileName) return job.fileName;
+        if (job.filename) return job.filename;
+        if (job.name) return job.name;
+        if (job.originalName) return job.originalName;
+        
+        // Try nested file object
+        if (job.file?.name) return job.file.name;
+        if (job.file?.fileName) return job.file.fileName;
+        if (job.file?.originalName) return job.file.originalName;
+        
+        // Try input object
+        if (job.input?.fileName) return job.input.fileName;
+        if (job.input?.name) return job.input.name;
+        
+        // Try metadata
+        if (job.metadata?.fileName) return job.metadata.fileName;
+        if (job.metadata?.name) return job.metadata.name;
+        
+        // Try product
+        if (job.product?.name) return job.product.name;
+        if (job.product?.fileName) return job.product.fileName;
+        
+        // Create a descriptive name from job type
+        const jobType = String(job.type || '').replace(/_/g, ' ').toLowerCase();
+        const date = new Date(job.createdAt || Date.now()).toLocaleDateString();
+        return `${jobType} - ${date}`;
       };
       
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const mapToRemediationJob = (job: any): RemediationJob => {
-        // Try multiple field paths for file name
-        const fileName = job.fileName || job.filename || job.name || job.originalName || 
-                        job.file?.name || job.file?.fileName || job.file?.originalName ||
-                        job.metadata?.fileName || job.metadata?.name || 'Unknown';
-        
         // Try multiple field paths for issues
         const issuesFixed = job.issuesFixed || job.fixedCount || job.fixed || 
                            job.result?.fixed || job.result?.issuesFixed || 
-                           job.stats?.fixed || job.remediation?.fixed || 0;
+                           job.stats?.fixed || job.remediation?.fixed ||
+                           job.output?.fixed || job.output?.issuesFixed || 0;
         const totalIssues = job.totalIssues || job.issueCount || job.total || 
                            job.result?.total || job.result?.totalIssues || 
-                           job.stats?.total || job.audit?.issueCount || 0;
+                           job.stats?.total || job.audit?.issueCount ||
+                           job.output?.total || job.output?.issueCount || 0;
         
         return {
           id: String(job.id || job._id || job.jobId || ''),
-          fileName: String(fileName),
+          fileName: getJobDisplayName(job),
           contentType: getContentType(job),
           status: (String(job.status || 'PENDING').toUpperCase()) as JobStatus,
           issuesFixed: Number(issuesFixed),
@@ -185,8 +217,15 @@ export const RemediationHistory: React.FC<RemediationHistoryProps> = ({
             if (rawJobs.length > 0) {
               console.log(`[RemediationHistory] Found ${rawJobs.length} jobs from ${endpoint}`);
               console.log('[RemediationHistory] First raw job object:', JSON.stringify(rawJobs[0], null, 2));
-              jobsList = rawJobs.map(mapToRemediationJob).filter(job => job.id);
-              console.log('[RemediationHistory] First mapped job:', JSON.stringify(jobsList[0], null, 2));
+              
+              // Filter to relevant job types and map to our format
+              const relevantJobs = rawJobs.filter(isRelevantJob);
+              console.log(`[RemediationHistory] ${relevantJobs.length} relevant jobs after filtering`);
+              
+              jobsList = relevantJobs.map(mapToRemediationJob).filter(job => job.id);
+              if (jobsList.length > 0) {
+                console.log('[RemediationHistory] First mapped job:', JSON.stringify(jobsList[0], null, 2));
+              }
               break;
             }
           } catch (e) {
