@@ -53,8 +53,17 @@ export const BatchResultsSummary: React.FC<BatchResultsSummaryProps> = ({
     setDownloadError(null);
     
     try {
+      const completedJobIds = summary.jobs
+        .filter(j => j.status === 'completed')
+        .map(j => j.jobId);
+      
+      console.log('[BatchResultsSummary] Downloading batch:', batchId, 'jobs:', completedJobIds);
+      
       const response = await api.post('/epub/export-batch', 
-        { batchId },
+        { 
+          batchId,
+          jobIds: completedJobIds,
+        },
         { responseType: 'blob' }
       );
       
@@ -69,7 +78,7 @@ export const BatchResultsSummary: React.FC<BatchResultsSummaryProps> = ({
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error('[BatchResultsSummary] Download failed:', err);
-      setDownloadError('Failed to download batch files. Please try again.');
+      setDownloadError('Failed to download batch files. This feature requires a backend API.');
     } finally {
       setIsDownloading(false);
     }

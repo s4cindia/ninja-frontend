@@ -52,23 +52,32 @@ const BatchRemediationPage: React.FC = () => {
     setError(null);
 
     try {
+      console.log('[BatchRemediation] Creating batch with jobs:', selectedJobs);
+      
       const createResponse = await api.post('/epub/batch', {
         jobIds: selectedJobs,
-        options: {},
+        options: { generateComparison: true },
       });
+      
+      console.log('[BatchRemediation] Create response:', createResponse.data);
       
       const newBatchId = createResponse.data.data?.batchId || 
                           createResponse.data.batchId || 
-                          createResponse.data.batch_id ||
-                          `batch-${Date.now()}`;
+                          createResponse.data.batch_id;
+      
+      if (!newBatchId) {
+        throw new Error('No batch ID returned from API');
+      }
       
       setBatchId(newBatchId);
 
+      console.log('[BatchRemediation] Starting batch:', newBatchId);
       await api.post(`/epub/batch/${newBatchId}/start`);
       
       setState('processing');
     } catch (err) {
       console.error('[BatchRemediation] Failed to start batch:', err);
+      setError('Failed to create batch. Starting in demo mode for preview.');
       const demoBatchId = `demo-batch-${Date.now()}`;
       setBatchId(demoBatchId);
       setState('processing');

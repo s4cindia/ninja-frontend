@@ -80,14 +80,22 @@ export const BatchJobSelector: React.FC<BatchJobSelectorProps> = ({
       setError(null);
       
       try {
+        console.log('[BatchJobSelector] Fetching jobs...');
         const response = await api.get('/jobs', {
-          params: { status: 'audited', limit: 200 },
+          params: { limit: 200 },
         });
+        console.log('[BatchJobSelector] Response:', response.data);
         const data = response.data.data || response.data.jobs || response.data || [];
         const jobList = Array.isArray(data) ? data.map(mapJobData) : [];
-        setJobs(jobList.filter(j => j.status === 'audited' || j.status === 'pending_remediation'));
+        const filteredJobs = jobList.filter(j => 
+          j.status === 'audited' || 
+          j.status === 'pending_remediation' ||
+          j.status === 'completed'
+        );
+        setJobs(filteredJobs.length > 0 ? filteredJobs : jobList);
       } catch (err) {
         console.error('[BatchJobSelector] Failed to fetch jobs:', err);
+        setError('Failed to load jobs. Using demo data.');
         setJobs(generateDemoJobs());
       } finally {
         setIsLoading(false);
