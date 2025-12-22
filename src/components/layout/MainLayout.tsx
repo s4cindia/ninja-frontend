@@ -1,6 +1,7 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth.store';
 import { Logo } from '@/components/ui/Logo';
+import { FeedbackButton } from '@/components/feedback';
 import { 
   Home, 
   FileText, 
@@ -68,6 +69,8 @@ export function MainLayout() {
           <Outlet />
         </main>
       </div>
+
+      <FeedbackButton variant="floating" position="bottom-right" />
     </div>
   );
 }
