@@ -92,6 +92,13 @@ const mapPlanData = (data: Record<string, unknown>): PlanData => ({
   estimatedTime: String(data.estimatedTime ?? data.estimated_time ?? data.eta ?? '~15 mins'),
 });
 
+const mapComparisonData = (data: Record<string, unknown>): ComparisonData => ({
+  originalIssues: Number(data.originalIssues ?? data.original_issues ?? data.originalCount ?? data.original_count ?? data.beforeCount ?? data.before_count ?? 0),
+  remainingIssues: Number(data.remainingIssues ?? data.remaining_issues ?? data.remainingCount ?? data.remaining_count ?? data.afterCount ?? data.after_count ?? 0),
+  fixedIssues: Number(data.fixedIssues ?? data.fixed_issues ?? data.fixedCount ?? data.fixed_count ?? data.resolvedCount ?? data.resolved_count ?? 0),
+  improvementScore: Number(data.improvementScore ?? data.improvement_score ?? data.improvement ?? data.score ?? 0),
+});
+
 export const RemediationWorkflow: React.FC<RemediationWorkflowProps> = ({
   contentType,
   jobId,
@@ -175,8 +182,8 @@ export const RemediationWorkflow: React.FC<RemediationWorkflowProps> = ({
         setIsLoading(true);
         try {
           const response = await api.get(`${apiPrefix}/job/${jobId}/comparison/summary`);
-          const comparison = response.data.data || response.data;
-          setComparisonData(comparison || generateDemoComparison());
+          const comparisonRaw = response.data.data || response.data;
+          setComparisonData(comparisonRaw ? mapComparisonData(comparisonRaw) : generateDemoComparison());
           addCompletedStep('review');
         } catch (err) {
           console.error('[RemediationWorkflow] Failed to fetch comparison:', err);
