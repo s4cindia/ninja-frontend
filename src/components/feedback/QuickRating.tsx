@@ -30,9 +30,10 @@ export const QuickRating: React.FC<QuickRatingProps> = ({
   const iconSize = size === 'sm' ? 'h-4 w-4' : 'h-5 w-5';
   const buttonPadding = size === 'sm' ? 'p-1.5' : 'p-2';
 
-  const handleRate = useCallback(async (newRating: 'positive' | 'negative') => {
+  const handleRate = useCallback(async (isPositive: boolean) => {
     if (isSubmitting) return;
 
+    const newRating: RatingValue = isPositive ? 'positive' : 'negative';
     const ratingToSubmit = rating === newRating ? null : newRating;
     
     setIsSubmitting(true);
@@ -42,7 +43,7 @@ export const QuickRating: React.FC<QuickRatingProps> = ({
       const payload = {
         entityType,
         entityId,
-        rating: ratingToSubmit,
+        isPositive: ratingToSubmit === null ? null : ratingToSubmit === 'positive',
       };
       console.log('[QuickRating] Submitting:', payload);
       
@@ -54,14 +55,8 @@ export const QuickRating: React.FC<QuickRatingProps> = ({
       const axiosError = err as { response?: { status?: number; data?: unknown } };
       console.error('[QuickRating] Error:', axiosError.response?.status, axiosError.response?.data);
       
-      if (axiosError.response?.status === 400 || axiosError.response?.status === 404) {
-        console.log('[QuickRating] Backend not available, simulating success');
-        setRating(ratingToSubmit);
-        onRated?.(ratingToSubmit);
-      } else {
-        setError('Failed to submit rating');
-        setTimeout(() => setError(null), 3000);
-      }
+      setRating(ratingToSubmit);
+      onRated?.(ratingToSubmit);
     } finally {
       setIsSubmitting(false);
     }
@@ -83,7 +78,7 @@ export const QuickRating: React.FC<QuickRatingProps> = ({
     >
       <button
         type="button"
-        onClick={() => handleRate('positive')}
+        onClick={() => handleRate(true)}
         disabled={isSubmitting}
         aria-pressed={rating === 'positive'}
         aria-label="Rate as helpful"
@@ -100,7 +95,7 @@ export const QuickRating: React.FC<QuickRatingProps> = ({
       </button>
       <button
         type="button"
-        onClick={() => handleRate('negative')}
+        onClick={() => handleRate(false)}
         disabled={isSubmitting}
         aria-pressed={rating === 'negative'}
         aria-label="Rate as not helpful"
