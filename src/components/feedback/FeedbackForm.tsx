@@ -60,13 +60,17 @@ export const FeedbackForm: React.FC<FeedbackFormProps> = ({
     setErrorMessage(null);
 
     try {
-      await api.post('/feedback', {
+      const payload = {
         type,
         message: message.trim(),
-        context: context.trim() || undefined,
+        context: context.trim() ? { page: window.location.pathname, details: context.trim() } : { page: window.location.pathname },
         entityType: entityType || undefined,
         entityId: entityId || undefined,
-      });
+      };
+
+      console.log('[FeedbackForm] Submitting:', payload);
+
+      await api.post('/feedback', payload);
 
       setSubmitStatus('success');
       setMessage('');
