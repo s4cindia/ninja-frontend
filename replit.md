@@ -45,6 +45,7 @@ The application features a clean, responsive design built with Tailwind CSS. It 
 ### Feature Specifications
 - **EPUB Accessibility Audit**: Upload EPUB files, receive an accessibility score, and view a detailed list of issues categorized by severity and WCAG criteria.
 - **EPUB Remediation Plan**: Generate a step-by-step remediation plan with auto-fixable and manual tasks. Track progress, cancel ongoing remediation, and view a comparison summary of the fixed EPUB.
+- **Unified Remediation Workflow (FE-3.27)**: Unified PDF/EPUB remediation workflow with visual progress tracking at `/remediation` and `/remediation/:jobId`. Features RemediationStepper (horizontal/vertical step indicator), RemediationWorkflow (5-step process: audit, plan, remediate, review, export), RemediationSummary (circular progress ring), and RemediationHistory (job list with pagination). Content type is determined from URL query param or API fetch for proper routing.
 - **ACR Editor**: Functionality for editing and verifying accessibility conformance remarks, with error handling and persistence of verification status.
 - **Dashboard**: Displays key metrics (total files, processed, pending, failed), compliance scores, and recent activity, with real-time updates.
 - **Compliance Pages**: Dedicated pages for Section 508 and Functional Performance Criteria (FPC) mapping.
