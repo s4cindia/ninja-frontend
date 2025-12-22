@@ -77,6 +77,21 @@ const generateDemoComparison = (): ComparisonData => ({
   improvementScore: 89,
 });
 
+const mapAuditData = (data: Record<string, unknown>): AuditData => ({
+  totalIssues: Number(data.totalIssues ?? data.total_issues ?? data.issueCount ?? data.issue_count ?? 0),
+  criticalCount: Number(data.criticalCount ?? data.critical_count ?? data.critical ?? 0),
+  majorCount: Number(data.majorCount ?? data.major_count ?? data.major ?? data.seriousCount ?? data.serious_count ?? 0),
+  minorCount: Number(data.minorCount ?? data.minor_count ?? data.minor ?? data.moderateCount ?? data.moderate_count ?? 0),
+  score: Number(data.score ?? data.accessibilityScore ?? data.accessibility_score ?? 0),
+});
+
+const mapPlanData = (data: Record<string, unknown>): PlanData => ({
+  totalTasks: Number(data.totalTasks ?? data.total_tasks ?? data.taskCount ?? data.task_count ?? 0),
+  autoTasks: Number(data.autoTasks ?? data.auto_tasks ?? data.autoFixCount ?? data.auto_fix_count ?? data.automated ?? 0),
+  manualTasks: Number(data.manualTasks ?? data.manual_tasks ?? data.manualCount ?? data.manual_count ?? data.manual ?? 0),
+  estimatedTime: String(data.estimatedTime ?? data.estimated_time ?? data.eta ?? '~15 mins'),
+});
+
 export const RemediationWorkflow: React.FC<RemediationWorkflowProps> = ({
   contentType,
   jobId,
@@ -126,15 +141,15 @@ export const RemediationWorkflow: React.FC<RemediationWorkflowProps> = ({
       setIsLoading(true);
       try {
         const auditResponse = await api.get(`${apiPrefix}/job/${jobId}/audit/result`);
-        const audit = auditResponse.data.data || auditResponse.data;
-        setAuditData(audit);
+        const auditRaw = auditResponse.data.data || auditResponse.data;
+        setAuditData(mapAuditData(auditRaw));
         setCompletedSteps(['audit']);
 
         try {
           const planResponse = await api.get(`${apiPrefix}/job/${jobId}/remediation`);
-          const plan = planResponse.data.data || planResponse.data;
-          if (plan) {
-            setPlanData(plan);
+          const planRaw = planResponse.data.data || planResponse.data;
+          if (planRaw) {
+            setPlanData(mapPlanData(planRaw));
             setCompletedSteps(prev => [...prev, 'plan']);
             setCurrentStep('plan');
           }
@@ -180,8 +195,8 @@ export const RemediationWorkflow: React.FC<RemediationWorkflowProps> = ({
     setError(null);
     try {
       const response = await api.post(`${apiPrefix}/job/${jobId}/remediation`);
-      const plan = response.data.data || response.data;
-      setPlanData(plan || generateDemoPlan());
+      const planRaw = response.data.data || response.data;
+      setPlanData(planRaw ? mapPlanData(planRaw) : generateDemoPlan());
       addCompletedStep('plan');
       setCurrentStep('plan');
     } catch (err) {
