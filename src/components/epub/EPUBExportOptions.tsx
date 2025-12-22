@@ -261,26 +261,81 @@ export const EPUBExportOptions: React.FC<EPUBExportOptionsProps> = ({
 ${report.issues.map(issue => `- [${issue.status.toUpperCase()}] (${issue.severity}) ${issue.message}`).join('\n')}
 `.trim();
 
-  const generateComparisonMarkdown = (report: ReturnType<typeof generateDemoComparisonReport>) => `
-# Comparison Report
+  const generateComparisonMarkdown = (report: {
+    jobId?: string;
+    epubFileName?: string;
+    originalFileName?: string;
+    remediatedFileName?: string;
+    generatedAt?: string;
+    beforeScore?: number;
+    afterScore?: number;
+    improvement?: number;
+    fixedCount?: number;
+    summary?: {
+      totalFiles?: number;
+      modifiedFiles?: number;
+      totalChanges?: number;
+    };
+    changes?: Array<{ type: string; description: string }>;
+    modifications?: Array<{ type: string; category?: string; filePath?: string; description: string; wcagCriteria?: string }>;
+  }) => {
+    const fileName = report.epubFileName || report.originalFileName || 'Unknown';
+    const generated = report.generatedAt ? new Date(report.generatedAt).toLocaleString() : new Date().toLocaleString();
+    const before = report.beforeScore ?? beforeScore;
+    const after = report.afterScore ?? afterScore;
+    const improvement = report.improvement ?? (after - before);
+    const fixed = report.fixedCount ?? fixedCount;
+    const changes = report.changes || [];
+    const modifications = report.modifications || [];
 
-**File:** ${report.epubFileName}
-**Generated:** ${new Date(report.generatedAt).toLocaleString()}
+    let md = `# Comparison Report
+
+**Job ID:** ${report.jobId || jobId}
+**File:** ${fileName}
+**Generated:** ${generated}
 
 ## Score Improvement
 
 | Metric | Before | After | Change |
 |--------|--------|-------|--------|
-| Accessibility Score | ${report.beforeScore}% | ${report.afterScore}% | +${report.improvement}% |
+| Accessibility Score | ${before}% | ${after}% | ${improvement >= 0 ? '+' : ''}${improvement}% |
 
 ## Summary
 
-- **Issues Fixed:** ${report.fixedCount}
+- **Issues Fixed:** ${fixed}`;
+
+    if (report.summary) {
+      md += `
+- **Total Files:** ${report.summary.totalFiles || 0}
+- **Modified Files:** ${report.summary.modifiedFiles || 0}
+- **Total Changes:** ${report.summary.totalChanges || 0}`;
+    }
+
+    if (changes.length > 0) {
+      md += `
 
 ## Changes Made
 
-${report.changes.map(change => `- **${change.type}:** ${change.description}`).join('\n')}
-`.trim();
+${changes.map(change => `- **${change.type}:** ${change.description}`).join('\n')}`;
+    }
+
+    if (modifications.length > 0) {
+      md += `
+
+## Modifications
+
+${modifications.map(mod => {
+  let line = `### ${mod.type}`;
+  if (mod.category) line += `\n- **Category:** ${mod.category}`;
+  if (mod.filePath) line += `\n- **File:** ${mod.filePath}`;
+  line += `\n- **Description:** ${mod.description}`;
+  if (mod.wcagCriteria) line += `\n- **WCAG:** ${mod.wcagCriteria}`;
+  return line;
+}).join('\n\n')}`;
+    }
+
+    return md.trim();
+  };
 
   const handlePackageOptionChange = (option: keyof PackageOptions) => {
     setPackageOptions(prev => ({
