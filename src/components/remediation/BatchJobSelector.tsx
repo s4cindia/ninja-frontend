@@ -117,12 +117,14 @@ export const BatchJobSelector: React.FC<BatchJobSelectorProps> = ({
         const data = response.data.data || response.data;
         const jobList = Array.isArray(data) ? data : data.jobs || [];
         
-        console.log('[BatchJobSelector] Job list:', jobList);
-        console.log('[BatchJobSelector] First job sample:', jobList[0]);
+        // Filter for accessibility jobs (EPUB/PDF) - exclude batch/meta jobs
+        const accessibilityJobs = jobList.filter((job: Record<string, unknown>) => {
+          const type = String(job.type || '').toUpperCase();
+          return type.includes('EPUB') || type.includes('PDF') || type.includes('ACCESSIBILITY');
+        });
         
-        // Map all jobs - filter can be adjusted once we know the data structure
-        const mappedJobs = jobList.map(mapJobData);
-        console.log('[BatchJobSelector] Mapped jobs:', mappedJobs);
+        const mappedJobs = accessibilityJobs.map(mapJobData);
+        console.log('[BatchJobSelector] Filtered jobs:', mappedJobs.length, 'of', jobList.length);
         
         setJobs(mappedJobs);
       } catch (err) {
