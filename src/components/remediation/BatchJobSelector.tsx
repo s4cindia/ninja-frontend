@@ -53,17 +53,6 @@ const mapJobData = (data: Record<string, unknown>): Job => ({
   status: String(data.status || 'pending'),
 });
 
-const generateDemoJobs = (): Job[] => [
-  { id: 'job-001', fileName: 'textbook-chapter1.epub', type: 'epub', auditScore: 65, issueCount: 24, createdAt: '2024-01-15T10:30:00Z', status: 'audited' },
-  { id: 'job-002', fileName: 'student-guide.epub', type: 'epub', auditScore: 72, issueCount: 18, createdAt: '2024-01-14T14:20:00Z', status: 'audited' },
-  { id: 'job-003', fileName: 'lab-manual.pdf', type: 'pdf', auditScore: 58, issueCount: 32, createdAt: '2024-01-14T09:15:00Z', status: 'audited' },
-  { id: 'job-004', fileName: 'lecture-notes.epub', type: 'epub', auditScore: 80, issueCount: 12, createdAt: '2024-01-13T16:45:00Z', status: 'audited' },
-  { id: 'job-005', fileName: 'course-syllabus.pdf', type: 'pdf', auditScore: 45, issueCount: 42, createdAt: '2024-01-12T11:00:00Z', status: 'audited' },
-  { id: 'job-006', fileName: 'reference-guide.epub', type: 'epub', auditScore: 88, issueCount: 8, createdAt: '2024-01-11T13:30:00Z', status: 'audited' },
-  { id: 'job-007', fileName: 'workbook-exercises.epub', type: 'epub', auditScore: 55, issueCount: 28, createdAt: '2024-01-10T08:45:00Z', status: 'audited' },
-  { id: 'job-008', fileName: 'assessment-bank.pdf', type: 'pdf', auditScore: 62, issueCount: 22, createdAt: '2024-01-09T15:20:00Z', status: 'audited' },
-];
-
 export const BatchJobSelector: React.FC<BatchJobSelectorProps> = ({
   selectedJobs,
   onSelectionChange,
@@ -81,22 +70,23 @@ export const BatchJobSelector: React.FC<BatchJobSelectorProps> = ({
       
       try {
         console.log('[BatchJobSelector] Fetching jobs...');
-        const response = await api.get('/jobs', {
-          params: { limit: 200 },
-        });
+        const response = await api.get('/jobs');
         console.log('[BatchJobSelector] Response:', response.data);
-        const data = response.data.data || response.data.jobs || response.data || [];
-        const jobList = Array.isArray(data) ? data.map(mapJobData) : [];
-        const filteredJobs = jobList.filter(j => 
-          j.status === 'audited' || 
-          j.status === 'pending_remediation' ||
-          j.status === 'completed'
-        );
-        setJobs(filteredJobs.length > 0 ? filteredJobs : jobList);
+        
+        const data = response.data.data || response.data;
+        const jobList = Array.isArray(data) ? data : data.jobs || [];
+        
+        // Filter for EPUB validation jobs that have output (completed audits)
+        const availableJobs = jobList
+          .filter((job: Record<string, unknown>) => 
+            job.output && (job.type === 'EPUB_VALIDATION' || job.type === 'epub')
+          )
+          .map(mapJobData);
+        
+        setJobs(availableJobs);
       } catch (err) {
         console.error('[BatchJobSelector] Failed to fetch jobs:', err);
-        setError('Failed to load jobs. Using demo data.');
-        setJobs(generateDemoJobs());
+        setError('Failed to load jobs. Please check your connection and try again.');
       } finally {
         setIsLoading(false);
       }
