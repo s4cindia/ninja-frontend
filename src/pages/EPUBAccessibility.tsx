@@ -95,6 +95,8 @@ export const EPUBAccessibility: React.FC = () => {
       minor: 3,
     };
     
+    const isDemoJob = summary.jobId.startsWith('demo-');
+    
     try {
       const response = await api.get(`/epub/job/${summary.jobId}/audit/result`);
       const data = response.data.data || response.data;
@@ -107,9 +109,10 @@ export const EPUBAccessibility: React.FC = () => {
         issues: data.issues || generateDemoIssues(issuesSummary),
       };
       setAuditResult(fullResult);
-      setIsDemo(false);
+      setIsDemo(isDemoJob);
     } catch {
-      const demoResult: AuditResult = {
+      console.warn('[EPUBAccessibility] Failed to fetch audit result, using summary data. isDemoJob:', isDemoJob);
+      const fallbackResult: AuditResult = {
         jobId: summary.jobId,
         epubVersion: summary.epubVersion || 'EPUB 3.0',
         isValid: summary.isValid ?? true,
@@ -117,8 +120,8 @@ export const EPUBAccessibility: React.FC = () => {
         issuesSummary,
         issues: generateDemoIssues(issuesSummary),
       };
-      setAuditResult(demoResult);
-      setIsDemo(true);
+      setAuditResult(fallbackResult);
+      setIsDemo(isDemoJob);
     }
   };
 
@@ -164,12 +167,17 @@ export const EPUBAccessibility: React.FC = () => {
       autoFixableIssues,
       isDemo,
     };
+
+    console.log('[EPUBAccessibility] Creating remediation plan');
+    console.log('[EPUBAccessibility] jobId:', auditResult.jobId);
+    console.log('[EPUBAccessibility] isDemo:', isDemo);
+    console.log('[EPUBAccessibility] autoFixableIssues count:', autoFixableIssues.length);
     
     try {
       await api.post(`/epub/job/${auditResult.jobId}/remediation`);
       navigate(`/epub/remediate/${auditResult.jobId}`, { state: remediationState });
     } catch {
-      console.warn('API unavailable, navigating to remediation page');
+      console.warn('[EPUBAccessibility] API unavailable, navigating to remediation page');
       navigate(`/epub/remediate/${auditResult.jobId}`, { state: remediationState });
     } finally {
       setIsCreatingPlan(false);

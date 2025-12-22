@@ -56,6 +56,9 @@ export const EPUBRemediation: React.FC = () => {
   const location = useLocation();
   const locationState = location.state as LocationState | null;
   const cancelledRef = useRef(false);
+
+  console.log('[EPUBRemediation] jobId from URL:', jobId);
+  console.log('[EPUBRemediation] locationState:', locationState);
   
   const [pageState, setPageState] = useState<PageState>('loading');
   const [plan, setPlan] = useState<PlanViewPlan | null>(null);
@@ -74,8 +77,10 @@ export const EPUBRemediation: React.FC = () => {
       }
 
       const isDemoJob = jobId.startsWith('demo-');
+      console.log('[EPUBRemediation] isDemoJob:', isDemoJob);
 
       if (locationState?.autoFixableIssues && locationState.autoFixableIssues.length > 0) {
+        console.log('[EPUBRemediation] Using locationState autoFixableIssues');
         const tasks: RemediationTask[] = locationState.autoFixableIssues.map(issue => ({
           id: issue.id,
           code: issue.code,
