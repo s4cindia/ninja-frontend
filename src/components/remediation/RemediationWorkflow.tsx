@@ -5,8 +5,10 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
 import { Alert } from '@/components/ui/Alert';
+import { useNavigate } from 'react-router-dom';
 import { RemediationStepper, RemediationStep } from './RemediationStepper';
 import { RemediationSummary } from './RemediationSummary';
+import { ComparisonSummaryCard } from './ComparisonSummaryCard';
 import { api } from '@/services/api';
 
 const downloadBlob = (blob: Blob, filename: string) => {
@@ -105,6 +107,7 @@ export const RemediationWorkflow: React.FC<RemediationWorkflowProps> = ({
   onComplete,
   className,
 }) => {
+  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState<RemediationStep>('audit');
   const [completedSteps, setCompletedSteps] = useState<RemediationStep[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -376,18 +379,37 @@ export const RemediationWorkflow: React.FC<RemediationWorkflowProps> = ({
         );
 
       case 'review':
+        const handleViewFullComparison = () => {
+          const typeParam = `?type=${contentType}`;
+          navigate(`/remediation/${jobId}/comparison${typeParam}`);
+        };
+        
         return (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Review Changes</h3>
             {comparisonData ? (
-              <RemediationSummary
-                contentType={contentType}
-                originalIssueCount={comparisonData.originalIssues}
-                fixedIssueCount={comparisonData.fixedIssues}
-                remainingIssues={comparisonData.remainingIssues}
-                timeTaken="12 mins"
-                jobId={jobId}
-              />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <RemediationSummary
+                  contentType={contentType}
+                  originalIssueCount={comparisonData.originalIssues}
+                  fixedIssueCount={comparisonData.fixedIssues}
+                  remainingIssues={comparisonData.remainingIssues}
+                  timeTaken="12 mins"
+                  jobId={jobId}
+                />
+                <ComparisonSummaryCard
+                  totalFiles={24}
+                  modifiedFiles={8}
+                  totalChanges={comparisonData.fixedIssues}
+                  changesByType={{
+                    metadata: Math.round(comparisonData.fixedIssues * 0.15),
+                    content: Math.round(comparisonData.fixedIssues * 0.45),
+                    structure: Math.round(comparisonData.fixedIssues * 0.20),
+                    accessibility: Math.round(comparisonData.fixedIssues * 0.20),
+                  }}
+                  onViewFullComparison={handleViewFullComparison}
+                />
+              </div>
             ) : (
               <div className="flex items-center justify-center py-8">
                 <Spinner size="md" />

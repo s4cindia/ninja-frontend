@@ -3,3 +3,8 @@ export type { RemediationStep } from './RemediationStepper';
 export { RemediationSummary } from './RemediationSummary';
 export { RemediationHistory } from './RemediationHistory';
 export { RemediationWorkflow } from './RemediationWorkflow';
+export { ComparisonDiff } from './ComparisonDiff';
+export type { Modification } from './ComparisonDiff';
+export { ComparisonSummaryCard } from './ComparisonSummaryCard';
+export { ModificationList } from './ModificationList';
+export { ComparisonView } from './ComparisonView';
