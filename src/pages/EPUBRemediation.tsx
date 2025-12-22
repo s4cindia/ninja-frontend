@@ -154,12 +154,12 @@ export const EPUBRemediation: React.FC = () => {
           jobId: jobId,
           epubFileName: 'sample-book.epub',
           tasks: [
-            { id: '1', code: 'EPUB-META-002', severity: 'moderate', message: '[Demo] Missing accessibility features metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessibilityFeature metadata' },
-            { id: '2', code: 'EPUB-META-003', severity: 'minor', message: '[Demo] Missing accessMode metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessMode metadata' },
-            { id: '3', code: 'EPUB-META-004', severity: 'minor', message: '[Demo] Missing accessibilityHazard metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessibilityHazard metadata' },
-            { id: '4', code: 'EPUB-META-005', severity: 'minor', message: '[Demo] Missing accessibilitySummary metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessibilitySummary metadata' },
-            { id: '5', code: 'EPUB-NAV-001', severity: 'moderate', message: '[Demo] Navigation document missing landmarks', type: 'auto', status: 'pending', suggestion: 'Add epub:type landmarks to nav' },
-            { id: '6', code: 'EPUB-IMG-001', severity: 'serious', message: '[Demo] Image missing alt text', type: 'manual', status: 'pending', location: 'content/chapter1.xhtml, line 42', suggestion: 'Add descriptive alt text' },
+            { id: '1', code: 'EPUB-META-002', severity: 'moderate', message: 'Missing accessibility features metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessibilityFeature metadata' },
+            { id: '2', code: 'EPUB-META-003', severity: 'minor', message: 'Missing accessMode metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessMode metadata' },
+            { id: '3', code: 'EPUB-META-004', severity: 'minor', message: 'Missing accessibilityHazard metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessibilityHazard metadata' },
+            { id: '4', code: 'EPUB-META-005', severity: 'minor', message: 'Missing accessibilitySummary metadata', type: 'auto', status: 'pending', suggestion: 'Add schema:accessibilitySummary metadata' },
+            { id: '5', code: 'EPUB-NAV-001', severity: 'moderate', message: 'Navigation document missing landmarks', type: 'auto', status: 'pending', suggestion: 'Add epub:type landmarks to nav' },
+            { id: '6', code: 'EPUB-IMG-001', severity: 'serious', message: 'Image missing alt text', type: 'manual', status: 'pending', location: 'content/chapter1.xhtml, line 42', suggestion: 'Add descriptive alt text' },
           ],
         };
         setPlan(demoPlan);
