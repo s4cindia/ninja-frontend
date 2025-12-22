@@ -99,7 +99,7 @@ export const RemediationWorkflow: React.FC<RemediationWorkflowProps> = ({
         setCompletedSteps(['audit']);
 
         try {
-          const planResponse = await api.get(`${apiPrefix}/job/${jobId}/remediation/plan`);
+          const planResponse = await api.get(`${apiPrefix}/job/${jobId}/remediation`);
           const plan = planResponse.data.data || planResponse.data;
           if (plan) {
             setPlanData(plan);
@@ -125,7 +125,7 @@ export const RemediationWorkflow: React.FC<RemediationWorkflowProps> = ({
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api.post(`${apiPrefix}/job/${jobId}/remediation/plan`);
+      const response = await api.post(`${apiPrefix}/job/${jobId}/remediation`);
       const plan = response.data.data || response.data;
       setPlanData(plan || generateDemoPlan());
       addCompletedStep('plan');

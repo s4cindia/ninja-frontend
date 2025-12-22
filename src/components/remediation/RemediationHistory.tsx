@@ -195,7 +195,6 @@ export const RemediationHistory: React.FC<RemediationHistoryProps> = ({
       try {
         // Try multiple endpoints in order of preference
         const endpoints = [
-          '/epub/jobs',
           '/jobs',
           '/user/jobs',
           '/files',
