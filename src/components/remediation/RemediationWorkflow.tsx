@@ -352,7 +352,7 @@ export const RemediationWorkflow: React.FC<RemediationWorkflowProps> = ({
               You can now download the fixed file.
             </p>
             <div className="flex justify-center gap-3 mt-6">
-              <Button variant="primary" onClick={() => window.open(`/api/v1${apiPrefix}/job/${jobId}/download`, '_blank')}>
+              <Button variant="primary" onClick={() => window.open(`/api/v1${apiPrefix}/job/${jobId}/download-remediated`, '_blank')}>
                 Download Fixed File
               </Button>
               <Button variant="outline" onClick={onComplete}>

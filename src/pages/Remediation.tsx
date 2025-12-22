@@ -49,7 +49,7 @@ export const RemediationPage: React.FC = () => {
 
   const handleDownload = (id: string, type?: ContentType) => {
     const apiPrefix = type === 'pdf' ? 'pdf' : 'epub';
-    window.open(`/api/v1/${apiPrefix}/job/${id}/download`, '_blank');
+    window.open(`/api/v1/${apiPrefix}/job/${id}/download-remediated`, '_blank');
   };
 
   const handleStartNew = () => {
