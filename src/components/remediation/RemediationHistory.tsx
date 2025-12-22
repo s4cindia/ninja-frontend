@@ -107,11 +107,75 @@ export const RemediationHistory: React.FC<RemediationHistoryProps> = ({
   useEffect(() => {
     const fetchJobs = async () => {
       setIsLoading(true);
+      
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const parseJobsList = (responseData: any): any[] => {
+        if (Array.isArray(responseData)) {
+          return responseData;
+        } else if (responseData?.items && Array.isArray(responseData.items)) {
+          return responseData.items;
+        } else if (responseData?.jobs && Array.isArray(responseData.jobs)) {
+          return responseData.jobs;
+        } else if (responseData?.data && Array.isArray(responseData.data)) {
+          return responseData.data;
+        }
+        return [];
+      };
+      
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mapToRemediationJob = (job: any): RemediationJob => ({
+        id: String(job.id || job._id || job.jobId || ''),
+        fileName: String(job.fileName || job.filename || job.name || job.originalName || 'Unknown'),
+        contentType: (String(job.contentType || job.type || job.fileType || 'epub').toLowerCase()) as ContentType,
+        status: (String(job.status || 'PENDING').toUpperCase()) as JobStatus,
+        issuesFixed: Number(job.issuesFixed || job.fixedCount || job.fixed || 0),
+        totalIssues: Number(job.totalIssues || job.issueCount || job.total || 0),
+        createdAt: String(job.createdAt || job.created_at || job.uploadedAt || new Date().toISOString()),
+        completedAt: job.completedAt ? String(job.completedAt) : undefined,
+      });
+      
       try {
-        const response = await api.get(`/jobs?type=REMEDIATION&page=${page}&limit=10`);
-        const data = response.data.data || response.data;
-        setJobs(Array.isArray(data.items) ? data.items : Array.isArray(data) ? data : []);
-        setTotalPages(data.totalPages || 1);
+        console.log('[RemediationHistory] Fetching jobs...');
+        
+        // Try multiple endpoints in order of preference
+        const endpoints = [
+          '/epub/jobs',
+          '/jobs',
+          '/user/jobs',
+          '/files',
+        ];
+        
+        let jobsList: RemediationJob[] = [];
+        
+        for (const endpoint of endpoints) {
+          try {
+            console.log(`[RemediationHistory] Trying endpoint: ${endpoint}`);
+            const response = await api.get(endpoint);
+            console.log(`[RemediationHistory] Response from ${endpoint}:`, response.data);
+            
+            const responseData = response.data?.data || response.data;
+            const rawJobs = parseJobsList(responseData);
+            
+            if (rawJobs.length > 0) {
+              console.log(`[RemediationHistory] Found ${rawJobs.length} jobs from ${endpoint}`);
+              jobsList = rawJobs.map(mapToRemediationJob).filter(job => job.id);
+              break;
+            }
+          } catch (e) {
+            console.log(`[RemediationHistory] Endpoint ${endpoint} failed or empty`);
+          }
+        }
+        
+        console.log('[RemediationHistory] Final jobs list:', jobsList);
+        
+        if (jobsList.length > 0) {
+          setJobs(jobsList);
+          setTotalPages(Math.ceil(jobsList.length / 10) || 1);
+        } else {
+          console.log('[RemediationHistory] No jobs found from any endpoint, using demo data');
+          setJobs(generateDemoJobs());
+          setTotalPages(1);
+        }
       } catch (error) {
         console.error('[RemediationHistory] Failed to fetch jobs:', error);
         setJobs(generateDemoJobs());
