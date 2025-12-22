@@ -62,7 +62,7 @@ export const FeedbackForm: React.FC<FeedbackFormProps> = ({
     try {
       const payload: Record<string, unknown> = {
         type,
-        message: message.trim(),
+        comment: message.trim(),
         context: { page: window.location.pathname },
       };
 
