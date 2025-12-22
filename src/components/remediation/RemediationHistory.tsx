@@ -122,17 +122,43 @@ export const RemediationHistory: React.FC<RemediationHistoryProps> = ({
         return [];
       };
       
+      // Derive content type from job type
+      const getContentType = (job: any): ContentType => {
+        const jobType = String(job.type || job.jobType || '').toUpperCase();
+        if (jobType.includes('PDF')) return 'pdf';
+        if (jobType.includes('EPUB')) return 'epub';
+        // Check file extension as fallback
+        const fileName = String(job.fileName || job.filename || job.name || job.originalName || job.file?.name || '');
+        if (fileName.toLowerCase().endsWith('.pdf')) return 'pdf';
+        return 'epub';
+      };
+      
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mapToRemediationJob = (job: any): RemediationJob => ({
-        id: String(job.id || job._id || job.jobId || ''),
-        fileName: String(job.fileName || job.filename || job.name || job.originalName || 'Unknown'),
-        contentType: (String(job.contentType || job.type || job.fileType || 'epub').toLowerCase()) as ContentType,
-        status: (String(job.status || 'PENDING').toUpperCase()) as JobStatus,
-        issuesFixed: Number(job.issuesFixed || job.fixedCount || job.fixed || 0),
-        totalIssues: Number(job.totalIssues || job.issueCount || job.total || 0),
-        createdAt: String(job.createdAt || job.created_at || job.uploadedAt || new Date().toISOString()),
-        completedAt: job.completedAt ? String(job.completedAt) : undefined,
-      });
+      const mapToRemediationJob = (job: any): RemediationJob => {
+        // Try multiple field paths for file name
+        const fileName = job.fileName || job.filename || job.name || job.originalName || 
+                        job.file?.name || job.file?.fileName || job.file?.originalName ||
+                        job.metadata?.fileName || job.metadata?.name || 'Unknown';
+        
+        // Try multiple field paths for issues
+        const issuesFixed = job.issuesFixed || job.fixedCount || job.fixed || 
+                           job.result?.fixed || job.result?.issuesFixed || 
+                           job.stats?.fixed || job.remediation?.fixed || 0;
+        const totalIssues = job.totalIssues || job.issueCount || job.total || 
+                           job.result?.total || job.result?.totalIssues || 
+                           job.stats?.total || job.audit?.issueCount || 0;
+        
+        return {
+          id: String(job.id || job._id || job.jobId || ''),
+          fileName: String(fileName),
+          contentType: getContentType(job),
+          status: (String(job.status || 'PENDING').toUpperCase()) as JobStatus,
+          issuesFixed: Number(issuesFixed),
+          totalIssues: Number(totalIssues),
+          createdAt: String(job.createdAt || job.created_at || job.uploadedAt || job.created || new Date().toISOString()),
+          completedAt: job.completedAt ? String(job.completedAt) : undefined,
+        };
+      };
       
       try {
         console.log('[RemediationHistory] Fetching jobs...');
@@ -158,7 +184,9 @@ export const RemediationHistory: React.FC<RemediationHistoryProps> = ({
             
             if (rawJobs.length > 0) {
               console.log(`[RemediationHistory] Found ${rawJobs.length} jobs from ${endpoint}`);
+              console.log('[RemediationHistory] First raw job object:', JSON.stringify(rawJobs[0], null, 2));
               jobsList = rawJobs.map(mapToRemediationJob).filter(job => job.id);
+              console.log('[RemediationHistory] First mapped job:', JSON.stringify(jobsList[0], null, 2));
               break;
             }
           } catch (e) {
