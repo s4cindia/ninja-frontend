@@ -156,7 +156,9 @@ export const FeedbackDashboard: React.FC = () => {
     setSortDirection(direction);
   }, []);
 
-  const positiveRate = stats ? Math.round((stats.positiveCount / (stats.positiveCount + stats.negativeCount)) * 100) : 0;
+  const positiveRate = stats && (stats.positiveCount + stats.negativeCount) > 0 
+    ? Math.round((stats.positiveCount / (stats.positiveCount + stats.negativeCount)) * 100) 
+    : 0;
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -234,26 +236,22 @@ export const FeedbackDashboard: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <FeedbackTrends />
-        </div>
-        <div>
-          <RequiringAttention onViewItem={(item: AttentionItem) => {
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <FeedbackTrends />
+        <RequiringAttention onViewItem={(item: AttentionItem) => {
           const feedbackItem: FeedbackItem = {
             ...item,
             comment: item.comment,
           };
           handleItemClick(feedbackItem);
         }} />
-        </div>
       </div>
 
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card>
-            <CardHeader>
-              <CardTitle>By Type</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">By Type</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
@@ -276,8 +274,8 @@ export const FeedbackDashboard: React.FC = () => {
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>By Status</CardTitle>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">By Status</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
