@@ -193,8 +193,6 @@ export const RemediationHistory: React.FC<RemediationHistoryProps> = ({
       };
       
       try {
-        console.log('[RemediationHistory] Fetching jobs...');
-        
         // Try multiple endpoints in order of preference
         const endpoints = [
           '/epub/jobs',
@@ -207,33 +205,20 @@ export const RemediationHistory: React.FC<RemediationHistoryProps> = ({
         
         for (const endpoint of endpoints) {
           try {
-            console.log(`[RemediationHistory] Trying endpoint: ${endpoint}`);
             const response = await api.get(endpoint);
-            console.log(`[RemediationHistory] Response from ${endpoint}:`, response.data);
-            
             const responseData = response.data?.data || response.data;
             const rawJobs = parseJobsList(responseData);
             
             if (rawJobs.length > 0) {
-              console.log(`[RemediationHistory] Found ${rawJobs.length} jobs from ${endpoint}`);
-              console.log('[RemediationHistory] First raw job object:', JSON.stringify(rawJobs[0], null, 2));
-              
               // Filter to relevant job types and map to our format
               const relevantJobs = rawJobs.filter(isRelevantJob);
-              console.log(`[RemediationHistory] ${relevantJobs.length} relevant jobs after filtering`);
-              
               jobsList = relevantJobs.map(mapToRemediationJob).filter(job => job.id);
-              if (jobsList.length > 0) {
-                console.log('[RemediationHistory] First mapped job:', JSON.stringify(jobsList[0], null, 2));
-              }
               break;
             }
-          } catch (e) {
-            console.log(`[RemediationHistory] Endpoint ${endpoint} failed or empty`);
+          } catch {
+            // Endpoint not available, try next
           }
         }
-        
-        console.log('[RemediationHistory] Final jobs list:', jobsList);
         
         if (jobsList.length > 0) {
           setJobs(jobsList);
