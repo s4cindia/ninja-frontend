@@ -13,6 +13,7 @@ import {
 import { RemediationTask, TaskStatus } from '@/components/epub/RemediationTaskCard';
 import { FixResult } from '@/components/epub/RemediationProgress';
 import { EPUBExportOptions } from '@/components/epub/EPUBExportOptions';
+import { QuickRating } from '@/components/feedback';
 import { api } from '@/services/api';
 
 type PageState = 'loading' | 'ready' | 'running' | 'complete' | 'error';
@@ -389,6 +390,14 @@ export const EPUBRemediation: React.FC = () => {
                   <RotateCcw className="h-4 w-4 mr-2" />
                   Start New Audit
                 </Button>
+              </div>
+
+              <div className="flex items-center gap-3 mt-4 pt-4 border-t border-green-200">
+                <span className="text-sm text-green-700">Was this remediation helpful?</span>
+                <QuickRating 
+                  entityType="remediation" 
+                  entityId={jobId || ''}
+                />
               </div>
             </CardContent>
           </Card>

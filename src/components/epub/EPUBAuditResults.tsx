@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs';
+import { QuickRating } from '../feedback';
 import { cn } from '@/utils/cn';
 
 type Severity = 'critical' | 'serious' | 'moderate' | 'minor';
@@ -192,6 +193,14 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
               <Badge variant="info" size="sm">
                 {epubVersion}
               </Badge>
+            </div>
+            <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100">
+              <span className="text-sm text-gray-500">Was this audit helpful?</span>
+              <QuickRating 
+                entityType="audit" 
+                entityId={result.jobId}
+                size="sm"
+              />
             </div>
           </CardContent>
         </Card>
