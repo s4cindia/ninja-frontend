@@ -43,15 +43,56 @@ const formatDate = (dateStr: string): string => {
   }
 };
 
-const mapJobData = (data: Record<string, unknown>): Job => ({
-  id: String(data.id || data.jobId || data.job_id || ''),
-  fileName: String(data.fileName || data.file_name || data.name || 'Unknown'),
-  type: (data.type || data.contentType || data.content_type || 'epub') as 'epub' | 'pdf',
-  auditScore: Number(data.auditScore || data.audit_score || data.score || 0),
-  issueCount: Number(data.issueCount || data.issue_count || data.issues || 0),
-  createdAt: String(data.createdAt || data.created_at || new Date().toISOString()),
-  status: String(data.status || 'pending'),
-});
+const mapJobData = (data: Record<string, unknown>): Job => {
+  const input = data.input as Record<string, unknown> | undefined;
+  const metadata = data.metadata as Record<string, unknown> | undefined;
+  const output = data.output as Record<string, unknown> | undefined;
+  
+  const fileName = String(
+    data.fileName || 
+    data.file_name || 
+    data.name ||
+    data.originalName ||
+    data.original_name ||
+    input?.fileName ||
+    input?.file_name ||
+    input?.name ||
+    input?.originalName ||
+    metadata?.fileName ||
+    metadata?.name ||
+    output?.fileName ||
+    'Unknown'
+  );
+  
+  const auditScore = Number(
+    data.auditScore || 
+    data.audit_score || 
+    data.score ||
+    output?.score ||
+    output?.auditScore ||
+    0
+  );
+  
+  const issueCount = Number(
+    data.issueCount || 
+    data.issue_count || 
+    data.issues ||
+    output?.issueCount ||
+    output?.issues ||
+    (output?.issues as unknown[])?.length ||
+    0
+  );
+
+  return {
+    id: String(data.id || data.jobId || data.job_id || ''),
+    fileName,
+    type: (data.type || data.contentType || data.content_type || 'epub') as 'epub' | 'pdf',
+    auditScore,
+    issueCount,
+    createdAt: String(data.createdAt || data.created_at || new Date().toISOString()),
+    status: String(data.status || 'pending'),
+  };
+};
 
 export const BatchJobSelector: React.FC<BatchJobSelectorProps> = ({
   selectedJobs,
