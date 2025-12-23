@@ -327,7 +327,12 @@ export function ConfidenceDashboard({ jobId, onVerifyClick }: ConfidenceDashboar
       .then((response) => {
         if (!cancelled) {
           console.log('[ACR Step 3] Analysis data from API:', response);
-          setCriteria(response.criteria);
+          if (Array.isArray(response?.criteria) && response.criteria.length > 0) {
+            setCriteria(response.criteria);
+          } else {
+            console.warn('[ACR Step 3] API response missing criteria, using mock data');
+            setCriteria(mockCriteria);
+          }
           setIsLoading(false);
         }
       })

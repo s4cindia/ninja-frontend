@@ -265,7 +265,8 @@ export const EPUBRemediation: React.FC = () => {
     };
 
     loadRemediationPlan();
-  }, [jobId, locationState, urlStatus, fileName]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId, locationState, urlStatus]);
 
   const handleRunAutoRemediation = async () => {
     if (!plan) return;
