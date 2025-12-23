@@ -302,7 +302,7 @@ function CriterionRow({ criterion, isExpanded, onToggle, onVerifyClick }: Criter
 }
 
 function isDemoJob(jobId: string): boolean {
-  return !jobId || jobId === 'demo' || jobId.startsWith('upload-');
+  return !jobId || jobId === 'demo' || jobId === 'new';
 }
 
 export function ConfidenceDashboard({ jobId, onVerifyClick }: ConfidenceDashboardProps) {
