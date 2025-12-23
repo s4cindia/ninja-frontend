@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { api } from '@/services/api';
+import { api, CriterionConfidence } from '@/services/api';
 import { 
   CheckCircle, 
   ChevronLeft, 
@@ -192,6 +192,11 @@ export function AcrWorkflowPage() {
   const [availableJobs, setAvailableJobs] = useState<AuditJob[]>([]);
   const [isLoadingJobs, setIsLoadingJobs] = useState(false);
   const [jobsError, setJobsError] = useState<string | null>(null);
+  const [analysisResults, setAnalysisResults] = useState<CriterionConfidence[]>([]);
+
+  const handleCriteriaLoaded = useCallback((criteria: CriterionConfidence[]) => {
+    setAnalysisResults(criteria);
+  }, []);
 
   useEffect(() => {
     if (effectiveJobId && effectiveJobId !== state.jobId) {
@@ -584,7 +589,10 @@ export function AcrWorkflowPage() {
                 Review the automated accessibility analysis and confidence scores.
               </p>
             </div>
-            <ConfidenceDashboard jobId={state.jobId || 'demo'} />
+            <ConfidenceDashboard 
+              jobId={state.jobId || 'demo'} 
+              onCriteriaLoaded={handleCriteriaLoaded}
+            />
           </div>
         );
 
@@ -602,6 +610,7 @@ export function AcrWorkflowPage() {
               onComplete={handleVerificationComplete}
               savedVerifications={state.verifications}
               onVerificationUpdate={handleVerificationUpdate}
+              criteriaFromAnalysis={analysisResults}
             />
             {state.verificationComplete && (
               <Alert variant="success">

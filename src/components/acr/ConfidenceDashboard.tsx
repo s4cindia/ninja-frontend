@@ -8,6 +8,7 @@ import { fetchAcrAnalysis, CriterionConfidence } from '@/services/api';
 interface ConfidenceDashboardProps {
   jobId: string;
   onVerifyClick?: (criterionId: string) => void;
+  onCriteriaLoaded?: (criteria: CriterionConfidence[]) => void;
 }
 
 type ConfidenceGroup = 'high' | 'medium' | 'low' | 'manual';
@@ -320,12 +321,18 @@ function normalizeCriterion(c: Partial<CriterionConfidence>, index: number): Cri
   };
 }
 
-export function ConfidenceDashboard({ jobId, onVerifyClick }: ConfidenceDashboardProps) {
+export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: ConfidenceDashboardProps) {
   const [expandedSections, setExpandedSections] = useState<Set<ConfidenceGroup>>(new Set(['high']));
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(!isDemoJob(jobId));
   const [criteria, setCriteria] = useState<CriterionConfidence[]>(isDemoJob(jobId) ? mockCriteria : []);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (criteria.length > 0 && onCriteriaLoaded) {
+      onCriteriaLoaded(criteria);
+    }
+  }, [criteria, onCriteriaLoaded]);
 
   useEffect(() => {
     if (isDemoJob(jobId)) {
