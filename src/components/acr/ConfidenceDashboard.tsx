@@ -305,6 +305,21 @@ function isDemoJob(jobId: string): boolean {
   return !jobId || jobId === 'demo' || jobId === 'new' || jobId.startsWith('upload-') || jobId.startsWith('demo-');
 }
 
+function normalizeCriterion(c: Partial<CriterionConfidence>, index: number): CriterionConfidence {
+  return {
+    id: c.id || `criterion-${index}`,
+    criterionId: c.criterionId || `Unknown-${index}`,
+    name: c.name || 'Unknown Criterion',
+    level: c.level || 'A',
+    confidenceScore: typeof c.confidenceScore === 'number' && !isNaN(c.confidenceScore) ? c.confidenceScore : 0,
+    status: c.status || 'not_tested',
+    needsVerification: c.needsVerification ?? true,
+    remarks: c.remarks,
+    automatedChecks: Array.isArray(c.automatedChecks) ? c.automatedChecks : [],
+    manualChecks: Array.isArray(c.manualChecks) ? c.manualChecks : [],
+  };
+}
+
 export function ConfidenceDashboard({ jobId, onVerifyClick }: ConfidenceDashboardProps) {
   const [expandedSections, setExpandedSections] = useState<Set<ConfidenceGroup>>(new Set(['high']));
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -327,7 +342,8 @@ export function ConfidenceDashboard({ jobId, onVerifyClick }: ConfidenceDashboar
       .then((response) => {
         if (!cancelled) {
           console.log('[ACR Step 3] Analysis data from API:', response);
-          setCriteria(response.criteria);
+          const normalizedCriteria = (response.criteria || []).map((c, i) => normalizeCriterion(c, i));
+          setCriteria(normalizedCriteria);
           setIsLoading(false);
         }
       })
