@@ -362,13 +362,33 @@ const WCAG_NAME_TO_ID: Record<string, string> = {
   'Status Messages': '4.1.3',
 };
 
+function isValidWcagId(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  if (value === '' || value.includes('earl:') || value.includes('@type')) return false;
+  return /^\d+\.\d+(\.\d+)?$/.test(value);
+}
+
+function extractNestedId(obj: Record<string, unknown>): string | null {
+  if (obj.id && isValidWcagId(obj.id)) return obj.id;
+  if (obj.wcagId && isValidWcagId(obj.wcagId)) return obj.wcagId;
+  if (obj.criterionId && isValidWcagId(obj.criterionId)) return obj.criterionId;
+  return null;
+}
+
 function extractCriterionId(c: Partial<CriterionConfidence>, index: number): string {
-  if (c.criterionId && c.criterionId !== '') return c.criterionId;
-  if (c.id && /^\d+\.\d+\.\d+$/.test(c.id)) return c.id;
+  if (c.criterionId && isValidWcagId(c.criterionId)) return c.criterionId;
+  if (c.id && isValidWcagId(c.id)) return c.id;
   if (c.name && WCAG_NAME_TO_ID[c.name]) return WCAG_NAME_TO_ID[c.name];
+  
   const rawData = c as Record<string, unknown>;
-  if (rawData.criterion && typeof rawData.criterion === 'string') return rawData.criterion;
-  if (rawData.wcagCriterion && typeof rawData.wcagCriterion === 'string') return rawData.wcagCriterion;
+  
+  if (rawData.criterion && typeof rawData.criterion === 'object' && rawData.criterion !== null) {
+    const nestedId = extractNestedId(rawData.criterion as Record<string, unknown>);
+    if (nestedId) return nestedId;
+  }
+  if (rawData.criterion && isValidWcagId(rawData.criterion)) return rawData.criterion as string;
+  if (rawData.wcagCriterion && isValidWcagId(rawData.wcagCriterion)) return rawData.wcagCriterion as string;
+  
   return `${index + 1}.0.0`;
 }
 
