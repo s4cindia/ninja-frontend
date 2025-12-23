@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Alert } from '@/components/ui/Alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { 
   RemediationPlanView, 
   RemediationPlan as PlanViewPlan 
@@ -426,6 +427,10 @@ export const EPUBRemediation: React.FC = () => {
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
+      <Breadcrumbs items={[
+        { label: 'EPUB Accessibility', path: '/epub' },
+        { label: 'Remediation' }
+      ]} />
       <div className="flex items-center justify-between">
         <div>
           <Button variant="ghost" size="sm" onClick={() => navigate('/epub')} className="mb-2">

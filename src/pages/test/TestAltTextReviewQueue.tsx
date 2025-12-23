@@ -1,9 +1,14 @@
 import React from 'react';
 import { AltTextReviewQueue } from '@/components/alt-text/AltTextReviewQueue';
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 
 export const TestAltTextReviewQueue: React.FC = () => {
   return (
     <div className="p-6 max-w-4xl mx-auto">
+      <Breadcrumbs items={[
+        { label: 'Alt-Text Generator', path: '/test/alt-text-generator' },
+        { label: 'Review Queue' }
+      ]} />
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Alt Text Review Queue Test</h1>
       <p className="text-gray-600 mb-6">
         Review and approve AI-generated alt text for document images.

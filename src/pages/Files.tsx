@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { FileUploadZone } from '@/components/files/FileUploadZone';
 import { FilesList } from '@/components/files/FilesList';
 import { useFiles, useUploadFile, useDeleteFile } from '@/hooks/useFiles';
@@ -37,6 +38,7 @@ export function Files() {
 
   return (
     <div className="space-y-6">
+      <Breadcrumbs items={[{ label: 'Files' }]} />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Files</h1>

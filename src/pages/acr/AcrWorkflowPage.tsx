@@ -19,6 +19,7 @@ import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Alert } from '@/components/ui/Alert';
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { EditionSelector } from '@/components/acr/EditionSelector';
 import { ConfidenceDashboard } from '@/components/acr/ConfidenceDashboard';
 import { VerificationQueue } from '@/components/acr/VerificationQueue';
@@ -637,6 +638,7 @@ export function AcrWorkflowPage() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
+      <Breadcrumbs items={[{ label: 'ACR Workflow' }]} />
       <div className="mb-8">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold text-gray-900">ACR Generation Workflow</h1>

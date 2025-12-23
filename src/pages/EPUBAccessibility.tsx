@@ -6,6 +6,7 @@ import { EPUBAuditResults, AuditResult, AuditIssue } from '@/components/epub/EPU
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { api } from '@/services/api';
 
 interface UploadSummary {
@@ -240,6 +241,7 @@ export const EPUBAccessibility: React.FC = () => {
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
+      <Breadcrumbs items={[{ label: 'EPUB Accessibility' }]} />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">

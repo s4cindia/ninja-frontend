@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Alert } from '@/components/ui/Alert';
 import { Spinner } from '@/components/ui/Spinner';
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { api } from '@/services/api';
 
 interface ComparisonChange {
@@ -156,6 +157,11 @@ export const EPUBComparison: React.FC = () => {
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
+      <Breadcrumbs items={[
+        { label: 'EPUB Accessibility', path: '/epub' },
+        { label: 'Remediation', path: `/epub/remediate/${jobId}?status=completed` },
+        { label: 'Comparison' }
+      ]} />
       <div className="flex items-center justify-between">
         <div>
           <Button variant="ghost" size="sm" onClick={() => navigate(`/epub/remediate/${jobId}?status=completed`)} className="mb-2">

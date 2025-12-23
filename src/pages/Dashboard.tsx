@@ -5,6 +5,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { getErrorMessage } from '@/services/api';
 
 function StatCard({ 
@@ -206,6 +207,7 @@ export function Dashboard() {
 
   return (
     <div>
+      <Breadcrumbs items={[{ label: 'Dashboard' }]} />
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <div className="flex gap-3">

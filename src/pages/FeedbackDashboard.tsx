@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { MessageSquare, ThumbsUp, Clock, CheckCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { 
   FeedbackList, 
   FeedbackItem,
@@ -164,6 +165,7 @@ export const FeedbackDashboard: React.FC = () => {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <Breadcrumbs items={[{ label: 'Feedback' }]} />
       <div>
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           <MessageSquare className="h-7 w-7 text-primary-600" />

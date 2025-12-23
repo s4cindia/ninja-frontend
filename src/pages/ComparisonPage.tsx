@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Spinner } from '@/components/ui/Spinner';
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { ComparisonView } from '@/components/remediation';
 import { api } from '@/services/api';
 
@@ -60,6 +61,10 @@ export const ComparisonPage: React.FC = () => {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
+      <Breadcrumbs items={[
+        { label: 'Remediation', path: '/remediation' },
+        { label: 'Comparison' }
+      ]} />
       <ComparisonView
         jobId={jobId}
         contentType={contentType}

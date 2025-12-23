@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Wrench, Plus, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { RemediationHistory, RemediationWorkflow } from '@/components/remediation';
 import { api } from '@/services/api';
 
@@ -112,6 +113,7 @@ export const RemediationPage: React.FC = () => {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <Breadcrumbs items={[{ label: 'Remediation' }]} />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
