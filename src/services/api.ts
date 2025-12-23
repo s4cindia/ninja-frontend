@@ -138,3 +138,34 @@ export function getErrorMessage(error: unknown): string {
   }
   return 'An unexpected error occurred';
 }
+
+export interface CriterionCheck {
+  id: string;
+  description: string;
+  passed: boolean;
+}
+
+export interface CriterionConfidence {
+  id: string;
+  criterionId: string;
+  name: string;
+  level: 'A' | 'AA' | 'AAA';
+  confidenceScore: number;
+  status: 'pass' | 'fail' | 'not_applicable' | 'not_tested';
+  needsVerification: boolean;
+  remarks?: string;
+  automatedChecks: CriterionCheck[];
+  manualChecks: string[];
+}
+
+export interface AcrAnalysisResponse {
+  jobId: string;
+  criteria: CriterionConfidence[];
+  overallConfidence: number;
+  analyzedAt: string;
+}
+
+export async function fetchAcrAnalysis(jobId: string): Promise<AcrAnalysisResponse> {
+  const response = await api.get<ApiResponse<AcrAnalysisResponse>>(`/acr/analysis/${jobId}`);
+  return response.data.data;
+}
