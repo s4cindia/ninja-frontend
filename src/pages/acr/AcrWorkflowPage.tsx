@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { api } from '@/services/api';
 import { 
   CheckCircle, 
   ChevronLeft, 
@@ -169,24 +170,70 @@ function ProgressBar({ currentStep, totalSteps }: { currentStep: number; totalSt
   );
 }
 
+interface AuditJob {
+  id: string;
+  input?: { fileName?: string };
+  output?: { fileName?: string; accessibilityScore?: number };
+  createdAt: string;
+}
+
 export function AcrWorkflowPage() {
   const { jobId: urlJobId } = useParams<{ jobId?: string }>();
+  const [searchParams] = useSearchParams();
+  const jobIdFromQuery = searchParams.get('jobId');
   const navigate = useNavigate();
   
-  const [state, setState] = useState<WorkflowState>(() => loadWorkflowState(urlJobId));
+  const effectiveJobId = urlJobId || jobIdFromQuery;
+  
+  const [state, setState] = useState<WorkflowState>(() => loadWorkflowState(effectiveJobId ?? undefined));
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [isLoading] = useState(false);
+  const [availableJobs, setAvailableJobs] = useState<AuditJob[]>([]);
+  const [isLoadingJobs, setIsLoadingJobs] = useState(false);
+  const [jobsError, setJobsError] = useState<string | null>(null);
 
   useEffect(() => {
-    saveWorkflowState(state);
-  }, [state]);
-
-  useEffect(() => {
-    if (urlJobId && urlJobId !== state.jobId) {
-      setState(loadWorkflowState(urlJobId));
+    if (effectiveJobId && effectiveJobId !== state.jobId) {
+      const loadedState = loadWorkflowState(effectiveJobId);
+      setState({
+        ...loadedState,
+        documentSource: 'existing',
+        jobId: effectiveJobId,
+        acrId: `acr-${effectiveJobId}`,
+      });
     }
-  }, [urlJobId]);
+  }, [effectiveJobId]);
+
+  useEffect(() => {
+    const fetchJobs = async () => {
+      setIsLoadingJobs(true);
+      setJobsError(null);
+      try {
+        const response = await api.get('/jobs');
+        const jobs = response.data.data || response.data;
+        const jobsWithAudit = Array.isArray(jobs) 
+          ? jobs.filter((job: AuditJob) => 
+              job.output?.accessibilityScore !== undefined
+            )
+          : [];
+        setAvailableJobs(jobsWithAudit);
+      } catch (error) {
+        console.warn('[ACR] Failed to fetch jobs:', error);
+        setJobsError('Unable to load existing jobs. You can still upload a new document.');
+        setAvailableJobs([]);
+      } finally {
+        setIsLoadingJobs(false);
+      }
+    };
+    fetchJobs();
+  }, []);
+
+  useEffect(() => {
+    if (state.jobId) {
+      saveWorkflowState(state);
+    }
+  }, [state]);
 
   const updateState = (updates: Partial<WorkflowState>) => {
     setState(prev => ({ ...prev, ...updates }));
@@ -266,6 +313,7 @@ export function AcrWorkflowPage() {
       };
       const newJobId = `upload-${Date.now()}`;
       updateState({ 
+        documentSource: 'upload',
         uploadedFile,
         jobId: newJobId,
         acrId: `acr-${newJobId}`,
@@ -284,6 +332,7 @@ export function AcrWorkflowPage() {
       };
       const newJobId = `upload-${Date.now()}`;
       updateState({ 
+        documentSource: 'upload',
         uploadedFile,
         jobId: newJobId,
         acrId: `acr-${newJobId}`,
@@ -297,6 +346,7 @@ export function AcrWorkflowPage() {
 
   const handleClearFile = () => {
     updateState({ 
+      documentSource: null,
       uploadedFile: null,
       jobId: null,
       acrId: null,
@@ -305,6 +355,8 @@ export function AcrWorkflowPage() {
 
   const handleSelectExistingJob = (jobId: string) => {
     updateState({ 
+      documentSource: 'existing',
+      uploadedFile: null,
       jobId, 
       acrId: `acr-${jobId}`,
     });
@@ -359,20 +411,28 @@ export function AcrWorkflowPage() {
         );
 
       case 2: {
-        const MOCK_EXISTING_JOBS = [
-          { id: 'job-001', name: 'Product Catalog EPUB', date: '2024-12-15', status: 'completed' },
-          { id: 'job-002', name: 'User Manual PDF', date: '2024-12-14', status: 'completed' },
-          { id: 'job-003', name: 'Training Materials HTML', date: '2024-12-12', status: 'completed' },
-        ];
+        const getJobDisplayName = (job: AuditJob) => {
+          return job.input?.fileName || job.output?.fileName || 'Untitled Document';
+        };
 
         return (
           <div className="space-y-6">
             <div>
               <h2 className="text-xl font-semibold text-gray-900 mb-2">Document Source</h2>
               <p className="text-gray-600">
-                Upload a document or select an existing validation job.
+                Upload a document or select an existing audited job.
               </p>
             </div>
+
+            {effectiveJobId && (
+              <Alert variant="success">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4" />
+                  Document pre-selected from EPUB Audit:
+                  <Badge variant="info">{effectiveJobId.slice(0, 12)}...</Badge>
+                </div>
+              </Alert>
+            )}
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className={cn(
@@ -440,45 +500,73 @@ export function AcrWorkflowPage() {
               )}>
                 <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
                   <FileText className="h-5 w-5 text-gray-500" />
-                  Select Existing Job
+                  Select Audited Document
                 </h3>
 
-                <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
-                  {MOCK_EXISTING_JOBS.map((job) => (
-                    <div
-                      key={job.id}
-                      className={cn(
-                        'p-3 cursor-pointer transition-colors',
-                        'hover:bg-gray-50',
-                        state.jobId === job.id && state.documentSource === 'existing' && 'bg-primary-50'
-                      )}
-                      onClick={() => handleSelectExistingJob(job.id)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <FileText className="h-4 w-4 text-gray-400" />
-                          <div>
-                            <p className="font-medium text-gray-900 text-sm">{job.name}</p>
-                            <p className="text-xs text-gray-500">Completed on {job.date}</p>
-                          </div>
-                        </div>
-                        {state.jobId === job.id && state.documentSource === 'existing' && (
-                          <CheckCircle className="h-5 w-5 text-primary-600" />
+                {isLoadingJobs ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                    Loading available jobs...
+                  </div>
+                ) : jobsError ? (
+                  <div className="text-center py-8">
+                    <FileText className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                    <p className="text-sm text-amber-600">{jobsError}</p>
+                  </div>
+                ) : availableJobs.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FileText className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                    <p className="text-sm text-amber-600">
+                      No audited documents found.
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Please audit a document first in EPUB Accessibility.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
+                    {availableJobs.map((job) => (
+                      <div
+                        key={job.id}
+                        className={cn(
+                          'p-3 cursor-pointer transition-colors',
+                          'hover:bg-gray-50',
+                          state.jobId === job.id && 'bg-primary-50'
                         )}
+                        onClick={() => handleSelectExistingJob(job.id)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium text-gray-900 text-sm truncate" title={getJobDisplayName(job)}>
+                                {getJobDisplayName(job)}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {new Date(job.createdAt).toLocaleDateString()}
+                                {job.output?.accessibilityScore !== undefined && 
+                                  ` - Score: ${job.output.accessibilityScore}%`}
+                              </p>
+                            </div>
+                          </div>
+                          {state.jobId === job.id && (
+                            <CheckCircle className="h-5 w-5 text-primary-600 flex-shrink-0" />
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
-            {state.jobId && (
+            {state.jobId && !effectiveJobId && (
               <Alert variant="success">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4" />
                   {state.documentSource === 'upload' ? 'Document uploaded' : 'Job selected'}: 
                   <Badge variant="info">
-                    {state.uploadedFile?.name || MOCK_EXISTING_JOBS.find(j => j.id === state.jobId)?.name || state.jobId}
+                    {state.uploadedFile?.name || availableJobs.find(j => j.id === state.jobId)?.input?.fileName || state.jobId}
                   </Badge>
                 </div>
               </Alert>
