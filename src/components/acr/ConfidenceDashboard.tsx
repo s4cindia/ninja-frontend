@@ -306,10 +306,77 @@ function isDemoJob(jobId: string): boolean {
   return !jobId || jobId === 'demo' || jobId === 'new' || jobId.startsWith('upload-') || jobId.startsWith('demo-');
 }
 
+const WCAG_NAME_TO_ID: Record<string, string> = {
+  'Non-text Content': '1.1.1',
+  'Audio-only and Video-only': '1.2.1',
+  'Captions (Prerecorded)': '1.2.2',
+  'Audio Description or Media Alternative': '1.2.3',
+  'Captions (Live)': '1.2.4',
+  'Audio Description (Prerecorded)': '1.2.5',
+  'Info and Relationships': '1.3.1',
+  'Meaningful Sequence': '1.3.2',
+  'Sensory Characteristics': '1.3.3',
+  'Orientation': '1.3.4',
+  'Identify Input Purpose': '1.3.5',
+  'Use of Color': '1.4.1',
+  'Audio Control': '1.4.2',
+  'Contrast (Minimum)': '1.4.3',
+  'Resize Text': '1.4.4',
+  'Images of Text': '1.4.5',
+  'Contrast (Enhanced)': '1.4.6',
+  'Reflow': '1.4.10',
+  'Non-text Contrast': '1.4.11',
+  'Text Spacing': '1.4.12',
+  'Content on Hover or Focus': '1.4.13',
+  'Keyboard': '2.1.1',
+  'No Keyboard Trap': '2.1.2',
+  'Character Key Shortcuts': '2.1.4',
+  'Timing Adjustable': '2.2.1',
+  'Pause, Stop, Hide': '2.2.2',
+  'Three Flashes or Below Threshold': '2.3.1',
+  'Bypass Blocks': '2.4.1',
+  'Page Titled': '2.4.2',
+  'Focus Order': '2.4.3',
+  'Link Purpose (In Context)': '2.4.4',
+  'Link Purpose': '2.4.4',
+  'Multiple Ways': '2.4.5',
+  'Headings and Labels': '2.4.6',
+  'Focus Visible': '2.4.7',
+  'Location': '2.4.8',
+  'Pointer Gestures': '2.5.1',
+  'Pointer Cancellation': '2.5.2',
+  'Label in Name': '2.5.3',
+  'Motion Actuation': '2.5.4',
+  'Language of Page': '3.1.1',
+  'Language of Parts': '3.1.2',
+  'On Focus': '3.2.1',
+  'On Input': '3.2.2',
+  'Consistent Navigation': '3.2.3',
+  'Consistent Identification': '3.2.4',
+  'Error Identification': '3.3.1',
+  'Labels or Instructions': '3.3.2',
+  'Error Suggestion': '3.3.3',
+  'Error Prevention (Legal, Financial, Data)': '3.3.4',
+  'Parsing': '4.1.1',
+  'Name, Role, Value': '4.1.2',
+  'Status Messages': '4.1.3',
+};
+
+function extractCriterionId(c: Partial<CriterionConfidence>, index: number): string {
+  if (c.criterionId && c.criterionId !== '') return c.criterionId;
+  if (c.id && /^\d+\.\d+\.\d+$/.test(c.id)) return c.id;
+  if (c.name && WCAG_NAME_TO_ID[c.name]) return WCAG_NAME_TO_ID[c.name];
+  const rawData = c as Record<string, unknown>;
+  if (rawData.criterion && typeof rawData.criterion === 'string') return rawData.criterion;
+  if (rawData.wcagCriterion && typeof rawData.wcagCriterion === 'string') return rawData.wcagCriterion;
+  return `${index + 1}.0.0`;
+}
+
 function normalizeCriterion(c: Partial<CriterionConfidence>, index: number): CriterionConfidence {
+  const criterionId = extractCriterionId(c, index);
   return {
     id: c.id || `criterion-${index}`,
-    criterionId: c.criterionId || `Unknown-${index}`,
+    criterionId,
     name: c.name || 'Unknown Criterion',
     level: c.level || 'A',
     confidenceScore: typeof c.confidenceScore === 'number' && !isNaN(c.confidenceScore) ? c.confidenceScore : 0,
