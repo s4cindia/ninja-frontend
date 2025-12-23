@@ -1,27 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AlertCircle, CheckCircle, AlertTriangle, HelpCircle, ChevronDown, Bot, User } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
-
-interface CriterionCheck {
-  id: string;
-  description: string;
-  passed: boolean;
-}
-
-interface CriterionConfidence {
-  id: string;
-  criterionId: string;
-  name: string;
-  level: 'A' | 'AA' | 'AAA';
-  confidenceScore: number;
-  status: 'pass' | 'fail' | 'not_applicable' | 'not_tested';
-  needsVerification: boolean;
-  remarks?: string;
-  automatedChecks: CriterionCheck[];
-  manualChecks: string[];
-}
+import { fetchAcrAnalysis, CriterionConfidence } from '@/services/api';
 
 interface ConfidenceDashboardProps {
   jobId: string;
@@ -319,11 +301,54 @@ function CriterionRow({ criterion, isExpanded, onToggle, onVerifyClick }: Criter
   );
 }
 
+function isDemoJob(jobId: string): boolean {
+  return !jobId || jobId === 'demo' || jobId.startsWith('upload-');
+}
+
 export function ConfidenceDashboard({ jobId, onVerifyClick }: ConfidenceDashboardProps) {
   const [expandedSections, setExpandedSections] = useState<Set<ConfidenceGroup>>(new Set(['high']));
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-  const isLoading = false;
-  const criteria = mockCriteria;
+  const [isLoading, setIsLoading] = useState(!isDemoJob(jobId));
+  const [criteria, setCriteria] = useState<CriterionConfidence[]>(isDemoJob(jobId) ? mockCriteria : []);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isDemoJob(jobId)) {
+      setCriteria(mockCriteria);
+      setIsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+
+    fetchAcrAnalysis(jobId)
+      .then((response) => {
+        if (!cancelled) {
+          console.log('[ACR Step 3] Analysis data from API:', response);
+          if (Array.isArray(response?.criteria) && response.criteria.length > 0) {
+            setCriteria(response.criteria);
+          } else {
+            console.warn('[ACR Step 3] API response missing criteria, using mock data');
+            setCriteria(mockCriteria);
+          }
+          setIsLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          console.error('[ACR Step 3] API error, falling back to mock data:', err);
+          setError('Failed to load analysis data. Showing demo data.');
+          setCriteria(mockCriteria);
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [jobId]);
 
   const toggleSection = (group: ConfidenceGroup) => {
     setExpandedSections(prev => {
@@ -380,6 +405,12 @@ export function ConfidenceDashboard({ jobId, onVerifyClick }: ConfidenceDashboar
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 flex items-center gap-2 text-sm text-yellow-800">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          {error}
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-lg border p-4">
           <p className="text-sm text-gray-500 mb-1">Overall Confidence</p>

@@ -1,9 +1,11 @@
 import React from 'react';
 import { AltTextGenerator } from '@/components/alt-text/AltTextGenerator';
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 
 export const TestAltTextGenerator: React.FC = () => {
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-8">
+      <Breadcrumbs items={[{ label: 'Alt-Text Generator' }]} />
       <div>
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Alt Text Generator Test</h1>
         <p className="text-gray-600">

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { Spinner } from '@/components/ui/Spinner';
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { BatchJobSelector } from '@/components/remediation/BatchJobSelector';
 import { BatchProgress } from '@/components/remediation/BatchProgress';
 import { BatchResultsSummary } from '@/components/remediation/BatchResultsSummary';
@@ -146,6 +147,10 @@ const BatchRemediationPage: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <Breadcrumbs items={[
+        { label: 'Remediation', path: '/remediation' },
+        { label: 'Batch Processing' }
+      ]} />
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           {state !== 'processing' && (

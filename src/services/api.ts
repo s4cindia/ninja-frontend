@@ -1,10 +1,12 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '@/stores/auth.store';
 
-const API_BASE_URL = '/api/v1';
+// Use environment variable for production, fallback to proxy path for development
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -135,4 +137,35 @@ export function getErrorMessage(error: unknown): string {
     return error.message;
   }
   return 'An unexpected error occurred';
+}
+
+export interface CriterionCheck {
+  id: string;
+  description: string;
+  passed: boolean;
+}
+
+export interface CriterionConfidence {
+  id: string;
+  criterionId: string;
+  name: string;
+  level: 'A' | 'AA' | 'AAA';
+  confidenceScore: number;
+  status: 'pass' | 'fail' | 'not_applicable' | 'not_tested';
+  needsVerification: boolean;
+  remarks?: string;
+  automatedChecks: CriterionCheck[];
+  manualChecks: string[];
+}
+
+export interface AcrAnalysisResponse {
+  jobId: string;
+  criteria: CriterionConfidence[];
+  overallConfidence: number;
+  analyzedAt: string;
+}
+
+export async function fetchAcrAnalysis(jobId: string): Promise<AcrAnalysisResponse> {
+  const response = await api.get<ApiResponse<AcrAnalysisResponse>>(`/acr/analysis/${jobId}`);
+  return response.data.data;
 }

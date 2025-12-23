@@ -18,18 +18,18 @@ function generateMockResult(imageId: string, fileName?: string): AltTextGenerati
   if (fileName) {
     const lowerName = fileName.toLowerCase();
     if (lowerName.includes('chart') || lowerName.includes('graph') || lowerName.includes('data')) {
-      baseMock.shortAlt = `[Demo] Chart/graph image: ${fileName}`;
+      baseMock.shortAlt = `Chart/graph image: ${fileName}`;
       baseMock.flags = ['DATA_VISUALIZATION', 'NEEDS_MANUAL_REVIEW'];
       baseMock.confidence = 60;
     } else if (lowerName.includes('photo') || lowerName.includes('img') || lowerName.includes('pic')) {
-      baseMock.shortAlt = `[Demo] Photo image: ${fileName}`;
+      baseMock.shortAlt = `Photo image: ${fileName}`;
       baseMock.confidence = 55;
     } else if (lowerName.includes('diagram') || lowerName.includes('flow')) {
-      baseMock.shortAlt = `[Demo] Diagram image: ${fileName}`;
+      baseMock.shortAlt = `Diagram image: ${fileName}`;
       baseMock.flags = ['COMPLEX_IMAGE', 'NEEDS_MANUAL_REVIEW'];
       baseMock.confidence = 55;
     } else {
-      baseMock.shortAlt = `[Demo] Uploaded image: ${fileName}`;
+      baseMock.shortAlt = `Uploaded image: ${fileName}`;
     }
   }
   

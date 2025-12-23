@@ -6,10 +6,12 @@ import { EPUBAuditResults, AuditResult, AuditIssue } from '@/components/epub/EPU
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { api } from '@/services/api';
 
 interface UploadSummary {
   jobId: string;
+  fileName?: string;
   epubVersion: string;
   isValid: boolean;
   accessibilityScore: number;
@@ -30,7 +32,7 @@ const generateDemoIssues = (summary: UploadSummary['issuesSummary']): AuditIssue
       id: `critical-${i}`,
       code: 'EPUB-001',
       severity: 'critical',
-      message: '[Demo] Missing alternative text for image',
+      message: 'Missing alternative text for image',
       location: `content/chapter${i + 1}.xhtml, line 42`,
       suggestion: 'Add descriptive alt text to the img element',
       wcagCriteria: 'WCAG 1.1.1',
@@ -43,7 +45,7 @@ const generateDemoIssues = (summary: UploadSummary['issuesSummary']): AuditIssue
       id: `serious-${i}`,
       code: 'ACE-007',
       severity: 'serious',
-      message: '[Demo] Heading levels should not be skipped',
+      message: 'Heading levels should not be skipped',
       location: `content/chapter${i + 2}.xhtml`,
       suggestion: 'Use sequential heading levels (h1 → h2 → h3)',
       wcagCriteria: 'WCAG 1.3.1',
@@ -56,7 +58,7 @@ const generateDemoIssues = (summary: UploadSummary['issuesSummary']): AuditIssue
       id: `moderate-${i}`,
       code: 'EPUB-015',
       severity: 'moderate',
-      message: '[Demo] Table missing caption or summary',
+      message: 'Table missing caption or summary',
       location: `content/tables.xhtml, table ${i + 1}`,
       suggestion: 'Add a caption element to describe the table contents',
       source: 'js-auditor',
@@ -68,7 +70,7 @@ const generateDemoIssues = (summary: UploadSummary['issuesSummary']): AuditIssue
       id: `minor-${i}`,
       code: 'EPUB-022',
       severity: 'minor',
-      message: '[Demo] Link text could be more descriptive',
+      message: 'Link text could be more descriptive',
       location: `content/navigation.xhtml`,
       suggestion: 'Replace generic link text like "click here" with descriptive text',
       source: 'js-auditor',
@@ -100,20 +102,39 @@ export const EPUBAccessibility: React.FC = () => {
     try {
       const response = await api.get(`/epub/job/${summary.jobId}/audit/result`);
       const data = response.data.data || response.data;
+      
+      // API returns combinedIssues, not issues
+      const apiIssues = data.combinedIssues || data.issues || [];
+      console.log('[EPUBAccessibility] API returned issues:', apiIssues.length);
+      
+      // Calculate issuesSummary from actual issues if not provided
+      const calculatedSummary = apiIssues.length > 0 ? {
+        total: apiIssues.length,
+        critical: apiIssues.filter((i: AuditIssue) => i.severity === 'critical').length,
+        serious: apiIssues.filter((i: AuditIssue) => i.severity === 'serious').length,
+        moderate: apiIssues.filter((i: AuditIssue) => i.severity === 'moderate').length,
+        minor: apiIssues.filter((i: AuditIssue) => i.severity === 'minor').length,
+      } : issuesSummary;
+      
+      const fileName = data.fileName || summary.fileName || 'document.epub';
+      console.log('[EPUBAccessibility] fileName from API:', fileName);
+      
       const fullResult: AuditResult = {
         jobId: data.jobId || summary.jobId,
+        fileName,
         epubVersion: data.epubVersion || summary.epubVersion || 'EPUB 3.0',
         isValid: data.isValid ?? summary.isValid ?? true,
         accessibilityScore: data.accessibilityScore ?? summary.accessibilityScore ?? 72,
-        issuesSummary: data.issuesSummary || issuesSummary,
-        issues: data.issues || generateDemoIssues(issuesSummary),
+        issuesSummary: data.issuesSummary || calculatedSummary,
+        issues: apiIssues.length > 0 ? apiIssues : (isDemoJob ? generateDemoIssues(issuesSummary) : []),
       };
       setAuditResult(fullResult);
-      setIsDemo(isDemoJob);
+      setIsDemo(isDemoJob || apiIssues.length === 0);
     } catch {
       console.warn('[EPUBAccessibility] Failed to fetch audit result, using summary data. isDemoJob:', isDemoJob);
       const fallbackResult: AuditResult = {
         jobId: summary.jobId,
+        fileName: summary.fileName || 'document.epub',
         epubVersion: summary.epubVersion || 'EPUB 3.0',
         isValid: summary.isValid ?? true,
         accessibilityScore: summary.accessibilityScore ?? 72,
@@ -166,6 +187,7 @@ export const EPUBAccessibility: React.FC = () => {
       auditResult,
       autoFixableIssues,
       isDemo,
+      fileName: auditResult.fileName,
     };
 
     console.log('[EPUBAccessibility] Creating remediation plan');
@@ -219,6 +241,7 @@ export const EPUBAccessibility: React.FC = () => {
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
+      <Breadcrumbs items={[{ label: 'EPUB Accessibility' }]} />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">

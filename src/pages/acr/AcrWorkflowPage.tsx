@@ -19,6 +19,7 @@ import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Alert } from '@/components/ui/Alert';
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { EditionSelector } from '@/components/acr/EditionSelector';
 import { ConfidenceDashboard } from '@/components/acr/ConfidenceDashboard';
 import { VerificationQueue } from '@/components/acr/VerificationQueue';
@@ -413,17 +414,19 @@ export function AcrWorkflowPage() {
                   </div>
                 ) : (
                   <div className="border rounded-lg p-4 bg-primary-50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
                           <File className="h-5 w-5 text-primary-600" />
                         </div>
-                        <div>
-                          <p className="font-medium text-gray-900">{state.uploadedFile.name}</p>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-gray-900 truncate" title={state.uploadedFile.name}>
+                            {state.uploadedFile.name}
+                          </p>
                           <p className="text-sm text-gray-500">{formatFileSize(state.uploadedFile.size)}</p>
                         </div>
                       </div>
-                      <Button variant="ghost" size="sm" onClick={handleClearFile}>
+                      <Button variant="ghost" size="sm" onClick={handleClearFile} className="flex-shrink-0">
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
@@ -637,6 +640,7 @@ export function AcrWorkflowPage() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
+      <Breadcrumbs items={[{ label: 'ACR Workflow' }]} />
       <div className="mb-8">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold text-gray-900">ACR Generation Workflow</h1>

@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { VerificationQueue } from '@/components/acr/VerificationQueue';
 
 export function VerificationQueuePage() {
@@ -21,6 +22,10 @@ export function VerificationQueuePage() {
 
   return (
     <div className="p-6">
+      <Breadcrumbs items={[
+        { label: 'ACR Workflow', path: '/acr/workflow' },
+        { label: 'Verification Queue' }
+      ]} />
       <div className="mb-6 flex items-center gap-4">
         <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-4 w-4 mr-2" />

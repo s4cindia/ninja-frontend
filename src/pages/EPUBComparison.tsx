@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Alert } from '@/components/ui/Alert';
 import { Spinner } from '@/components/ui/Spinner';
+import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { api } from '@/services/api';
 
 interface ComparisonChange {
@@ -156,9 +157,14 @@ export const EPUBComparison: React.FC = () => {
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
+      <Breadcrumbs items={[
+        { label: 'EPUB Accessibility', path: '/epub' },
+        { label: 'Remediation', path: `/epub/remediate/${jobId}?status=completed` },
+        { label: 'Comparison' }
+      ]} />
       <div className="flex items-center justify-between">
         <div>
-          <Button variant="ghost" size="sm" onClick={() => navigate(`/epub/remediate/${jobId}`)} className="mb-2">
+          <Button variant="ghost" size="sm" onClick={() => navigate(`/epub/remediate/${jobId}?status=completed`)} className="mb-2">
             <ArrowLeft className="h-4 w-4 mr-1" />
             Back to Remediation
           </Button>
@@ -318,7 +324,7 @@ export const EPUBComparison: React.FC = () => {
       </Card>
 
       <div className="flex justify-center gap-4">
-        <Button onClick={() => navigate(`/epub/remediate/${jobId}`)}>
+        <Button onClick={() => navigate(`/epub/remediate/${jobId}?status=completed`)}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Remediation
         </Button>
