@@ -279,7 +279,6 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
       const converted = convertCriteriaToVerificationItems(criteriaFromAnalysis, savedVerifications);
       setLocalItems(converted);
       setUseLocalItems(true);
-      setUseMockData(true);
     }
   }, [criteriaFromAnalysis, savedVerifications]);
 

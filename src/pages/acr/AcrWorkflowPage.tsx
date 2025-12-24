@@ -208,7 +208,7 @@ export function AcrWorkflowPage() {
         acrId: `acr-${effectiveJobId}`,
       });
     }
-  }, [effectiveJobId]);
+  }, [effectiveJobId, state.jobId]);
 
   useEffect(() => {
     const fetchJobs = async () => {
