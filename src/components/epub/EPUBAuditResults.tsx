@@ -9,7 +9,7 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs';
 import { QuickRating } from '../feedback';
-import { SourceBadge } from '../audit/SourceBadge';
+import { SourceBadge, SummaryBySource } from '../audit';
 import { cn } from '@/utils/cn';
 
 type Severity = 'critical' | 'serious' | 'moderate' | 'minor';
@@ -26,6 +26,21 @@ interface AuditIssue {
   source: IssueSource;
 }
 
+interface SourceSummary {
+  critical: number;
+  serious: number;
+  moderate: number;
+  minor: number;
+  total: number;
+  autoFixable?: number;
+}
+
+interface SummaryBySourceData {
+  epubcheck?: SourceSummary;
+  ace?: SourceSummary;
+  'js-auditor'?: SourceSummary;
+}
+
 interface AuditResult {
   jobId: string;
   fileName?: string;
@@ -40,6 +55,7 @@ interface AuditResult {
     minor: number;
   };
   issues: AuditIssue[];
+  summaryBySource?: SummaryBySourceData;
 }
 
 interface EPUBAuditResultsProps {
@@ -195,24 +211,84 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
     [issues]
   );
 
+  const summaryBySource = useMemo((): SummaryBySourceData => {
+    if (result?.summaryBySource) {
+      return result.summaryBySource;
+    }
+    const sources: Array<'epubcheck' | 'ace' | 'js-auditor'> = ['epubcheck', 'ace', 'js-auditor'];
+    const summary: SummaryBySourceData = {};
+    
+    for (const source of sources) {
+      const sourceIssues = issues.filter(i => i.source === source);
+      if (sourceIssues.length > 0 || source === 'js-auditor') {
+        const autoFixable = sourceIssues.filter(isAutoFixable).length;
+        summary[source] = {
+          critical: sourceIssues.filter(i => i.severity === 'critical').length,
+          serious: sourceIssues.filter(i => i.severity === 'serious').length,
+          moderate: sourceIssues.filter(i => i.severity === 'moderate').length,
+          minor: sourceIssues.filter(i => i.severity === 'minor').length,
+          total: sourceIssues.length,
+          ...(source === 'js-auditor' ? { autoFixable } : {}),
+        };
+      }
+    }
+    return summary;
+  }, [result?.summaryBySource, issues]);
+
+  const [sourceFilter, setSourceFilter] = useState<'epubcheck' | 'ace' | 'js-auditor' | null>(null);
+
   const filteredIssues = useMemo(() => {
+    let filtered = issues;
+    
+    if (sourceFilter) {
+      filtered = filtered.filter(i => i.source === sourceFilter);
+    }
+    
     switch (activeTab) {
       case 'critical':
-        return issues.filter(i => i.severity === 'critical');
+        return filtered.filter(i => i.severity === 'critical');
       case 'serious':
-        return issues.filter(i => i.severity === 'serious');
+        return filtered.filter(i => i.severity === 'serious');
       case 'autofixable':
-        return issues.filter(isAutoFixable);
+        return filtered.filter(isAutoFixable);
       default:
-        return issues;
+        return filtered;
     }
-  }, [issues, activeTab]);
+  }, [issues, activeTab, sourceFilter]);
+
+  const handleSourceClick = (source: 'epubcheck' | 'ace' | 'js-auditor') => {
+    setSourceFilter(prev => prev === source ? null : source);
+  };
 
   const circumference = 2 * Math.PI * 45;
   const scoreOffset = circumference - (accessibilityScore / 100) * circumference;
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Issues by Source</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SummaryBySource 
+            summaryBySource={summaryBySource} 
+            onSourceClick={handleSourceClick}
+          />
+          {sourceFilter && (
+            <div className="mt-3 flex items-center gap-2 text-sm text-gray-600">
+              <span>Filtering by:</span>
+              <SourceBadge source={sourceFilter} />
+              <button 
+                onClick={() => setSourceFilter(null)}
+                className="text-blue-600 hover:text-blue-800 underline"
+              >
+                Clear filter
+              </button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="md:col-span-1">
           <CardContent className="p-6 flex flex-col items-center justify-center">
