@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { VerificationItem } from './VerificationItem';
 import { useVerificationQueue, useSubmitVerification, useBulkVerification } from '@/hooks/useVerification';
+import type { CriterionConfidence } from '@/services/api';
 import type { 
   VerificationItem as VerificationItemType,
   VerificationStatus, 
@@ -26,6 +27,74 @@ interface VerificationQueueProps {
   onComplete: () => void;
   savedVerifications?: { [itemId: string]: SavedVerification };
   onVerificationUpdate?: (itemId: string, status: string, method: string, notes: string) => void;
+  criteriaFromAnalysis?: CriterionConfidence[];
+}
+
+function needsHumanVerification(c: CriterionConfidence): boolean {
+  if (c.needsVerification === true) return true;
+  if (c.needsVerification === false) return false;
+  if (c.status === 'not_applicable') return false;
+  if (c.confidenceScore < 90) return true;
+  return false;
+}
+
+function convertCriteriaToVerificationItems(
+  criteria: CriterionConfidence[],
+  savedVerifications?: { [itemId: string]: SavedVerification }
+): VerificationItemType[] {
+  const filtered = criteria.filter(needsHumanVerification);
+  console.log(`[VerificationQueue] Converting ${criteria.length} criteria → ${filtered.length} verification items`);
+  
+  return filtered.map((c, index) => {
+      const saved = savedVerifications?.[c.id];
+      const score = typeof c.confidenceScore === 'number' ? c.confidenceScore : 0;
+      
+      const confidenceLevel: ConfidenceLevel = 
+        score >= 90 ? 'high' :
+        score >= 60 ? 'medium' :
+        score > 0 ? 'low' : 'manual';
+      
+      const severity: Severity = 
+        c.status === 'fail' ? 'critical' :
+        score < 50 ? 'serious' :
+        score < 70 ? 'moderate' : 'minor';
+
+      const automatedResult: 'pass' | 'fail' | 'warning' | 'not_tested' = 
+        c.status === 'pass' ? 'pass' :
+        c.status === 'fail' ? 'fail' :
+        c.status === 'not_tested' ? 'not_tested' : 'warning';
+
+      const baseItem: VerificationItemType = {
+        id: c.id || `criterion-${index}`,
+        criterionId: c.criterionId || `Unknown-${index}`,
+        criterionName: c.name || 'Unknown Criterion',
+        wcagLevel: c.level || 'A',
+        severity,
+        confidenceLevel,
+        confidenceScore: score,
+        automatedResult,
+        automatedNotes: c.remarks || `Automated analysis flagged this criterion for human review. Confidence: ${score}%`,
+        status: 'pending',
+        history: [],
+      };
+
+      if (saved) {
+        return {
+          ...baseItem,
+          status: saved.status as VerificationStatus,
+          history: [{
+            id: `h-saved-${c.id}`,
+            status: saved.status as VerificationStatus,
+            method: saved.method as VerificationMethod,
+            notes: saved.notes,
+            verifiedBy: 'Current User',
+            verifiedAt: saved.verifiedAt,
+          }],
+        };
+      }
+
+      return baseItem;
+    });
 }
 
 const MOCK_ITEMS: VerificationItemType[] = [
@@ -161,14 +230,20 @@ const VERIFICATION_METHODS: VerificationMethod[] = [
   'WAVE',
 ];
 
-export function VerificationQueue({ jobId, onComplete, savedVerifications, onVerificationUpdate }: VerificationQueueProps) {
+export function VerificationQueue({ jobId, onComplete, savedVerifications, onVerificationUpdate, criteriaFromAnalysis }: VerificationQueueProps) {
   const [filters, setFilters] = useState<VerificationFilters>({});
   const [showFilters, setShowFilters] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState<VerificationStatus>('verified_pass');
   const [bulkMethod, setBulkMethod] = useState<VerificationMethod>('Manual Review');
   const [bulkNotes, setBulkNotes] = useState('');
+  
+  const hasCriteriaFromAnalysis = criteriaFromAnalysis && criteriaFromAnalysis.length > 0;
+  
   const [localItems, setLocalItems] = useState<VerificationItemType[]>(() => {
+    if (hasCriteriaFromAnalysis) {
+      return convertCriteriaToVerificationItems(criteriaFromAnalysis, savedVerifications);
+    }
     if (savedVerifications && Object.keys(savedVerifications).length > 0) {
       return MOCK_ITEMS.map(item => {
         const saved = savedVerifications[item.id];
@@ -191,13 +266,24 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
     }
     return MOCK_ITEMS;
   });
-  const [useMockData, setUseMockData] = useState(true);
+  const [useMockData, setUseMockData] = useState(!hasCriteriaFromAnalysis);
 
   const { data: apiData, isLoading, error } = useVerificationQueue(jobId, filters);
   const submitMutation = useSubmitVerification();
   const bulkMutation = useBulkVerification();
 
+  const [useLocalItems, setUseLocalItems] = useState(hasCriteriaFromAnalysis);
+
   useEffect(() => {
+    if (criteriaFromAnalysis && criteriaFromAnalysis.length > 0) {
+      const converted = convertCriteriaToVerificationItems(criteriaFromAnalysis, savedVerifications);
+      setLocalItems(converted);
+      setUseLocalItems(true);
+    }
+  }, [criteriaFromAnalysis, savedVerifications]);
+
+  useEffect(() => {
+    if (hasCriteriaFromAnalysis || useLocalItems) return;
     if (error) {
       console.warn('Verification API unavailable, using mock data');
       setUseMockData(true);
@@ -205,9 +291,9 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
       setUseMockData(false);
       setLocalItems(apiData.items);
     }
-  }, [apiData, error]);
+  }, [apiData, error, hasCriteriaFromAnalysis, useLocalItems]);
 
-  const items = useMockData ? localItems : (apiData?.items ?? []);
+  const items = useLocalItems || useMockData ? localItems : (apiData?.items ?? []);
   const isSubmitting = submitMutation.isPending || bulkMutation.isPending;
 
   const bulkRequiresNotes = bulkStatus === 'verified_fail' || bulkStatus === 'verified_partial';

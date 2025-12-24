@@ -90,17 +90,39 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
     }
   };
 
+  const handleRowClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('input[type="checkbox"]') || target.closest('button')) {
+      return;
+    }
+    setIsExpanded(!isExpanded);
+  };
+
   return (
     <div className={cn(
       'border rounded-lg overflow-hidden',
       isSelected && 'ring-2 ring-primary-500',
       item.status === 'pending' && 'border-orange-200 bg-orange-50/30'
     )}>
-      <div className="flex items-center gap-3 p-4">
+      <div 
+        className="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+        onClick={handleRowClick}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsExpanded(!isExpanded);
+          }
+        }}
+        aria-expanded={isExpanded}
+        aria-label={`${item.criterionId} ${item.criterionName} - Click to ${isExpanded ? 'collapse' : 'expand'} verification form`}
+      >
         <input
           type="checkbox"
           checked={isSelected}
           onChange={(e) => onSelect(item.id, e.target.checked)}
+          onClick={(e) => e.stopPropagation()}
           className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
           aria-label={`Select ${item.criterionId}`}
         />
@@ -140,7 +162,10 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
           {item.history.length > 0 && (
             <button
               type="button"
-              onClick={() => setShowHistory(!showHistory)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowHistory(!showHistory);
+              }}
               className="p-1 text-gray-400 hover:text-gray-600"
               aria-label="View history"
             >
@@ -148,16 +173,10 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="p-1 text-gray-400 hover:text-gray-600"
-          >
-            <ChevronDown className={cn(
-              'h-5 w-5 transition-transform',
-              isExpanded && 'rotate-180'
-            )} />
-          </button>
+          <ChevronDown className={cn(
+            'h-5 w-5 text-gray-400 transition-transform',
+            isExpanded && 'rotate-180'
+          )} />
         </div>
       </div>
 

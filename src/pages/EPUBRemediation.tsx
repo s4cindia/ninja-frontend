@@ -54,6 +54,72 @@ interface ComparisonSummary {
   afterScore: number;
 }
 
+interface RawAceAssertion {
+  '@type'?: string;
+  id?: string;
+  code?: string;
+  ruleId?: string;
+  rule?: { id?: string; code?: string };
+  test?: { id?: string; code?: string; title?: string };
+  severity?: string;
+  impact?: string;
+  message?: string;
+  description?: string;
+  location?: string;
+  pointer?: string;
+  suggestion?: string;
+  help?: string;
+  isAutoFixable?: boolean;
+  type?: string;
+  status?: string;
+}
+
+function normalizeAceTask(raw: RawAceAssertion, index: number): RemediationTask {
+  const code = raw.code 
+    || raw.ruleId 
+    || raw.rule?.code 
+    || raw.rule?.id 
+    || raw.test?.code 
+    || raw.test?.id 
+    || (raw['@type'] === 'earl:assertion' ? null : raw['@type'])
+    || `EPUB-${String(index + 1).padStart(3, '0')}`;
+  
+  const severityMap: Record<string, 'critical' | 'serious' | 'moderate' | 'minor'> = {
+    'critical': 'critical',
+    'serious': 'serious',
+    'major': 'serious',
+    'moderate': 'moderate',
+    'minor': 'minor',
+    'low': 'minor',
+  };
+  const rawSeverity = (raw.severity || raw.impact || 'moderate').toLowerCase();
+  const severity = severityMap[rawSeverity] || 'moderate';
+  
+  return {
+    id: raw.id || `task-${index}`,
+    code,
+    severity,
+    message: raw.message || raw.description || raw.test?.title || 'Accessibility issue detected',
+    location: raw.location || raw.pointer,
+    suggestion: raw.suggestion || raw.help,
+    type: raw.isAutoFixable !== false ? 'auto' : 'manual',
+    status: (raw.status as TaskStatus) || 'pending',
+  };
+}
+
+function groupAndDeduplicateTasks(tasks: RemediationTask[]): RemediationTask[] {
+  const grouped = new Map<string, RemediationTask>();
+  
+  for (const task of tasks) {
+    const key = `${task.code}-${task.message}`;
+    if (!grouped.has(key)) {
+      grouped.set(key, task);
+    }
+  }
+  
+  return Array.from(grouped.values());
+}
+
 export const EPUBRemediation: React.FC = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
@@ -200,14 +266,21 @@ export const EPUBRemediation: React.FC = () => {
         if (data.tasks && data.tasks.length > 0) {
           const apiFileName = data.epubFileName || data.fileName;
           if (apiFileName && fileName === 'Loading...') setFileName(apiFileName);
+          
+          const normalizedTasks = data.tasks.map((t: RawAceAssertion, i: number) => {
+            const normalized = normalizeAceTask(t, i);
+            return {
+              ...normalized,
+              status: isReturningCompleted ? 'completed' as TaskStatus : normalized.status,
+            };
+          });
+          const dedupedTasks = groupAndDeduplicateTasks(normalizedTasks);
+          console.log('[EPUBRemediation] Normalized tasks:', normalizedTasks.length, '-> Deduped:', dedupedTasks.length);
+          
           setPlan({
             jobId: data.jobId || jobId,
             epubFileName: apiFileName || (fileName !== 'Loading...' ? fileName : 'document.epub'),
-            tasks: data.tasks.map((t: RemediationTask) => ({
-              ...t,
-              type: t.type || 'auto',
-              status: isReturningCompleted ? (t.status || 'completed') : (t.status || 'pending'),
-            })),
+            tasks: dedupedTasks,
           });
           if (!isReturningCompleted) setPageState('ready');
           setIsDemo(false);
@@ -217,19 +290,21 @@ export const EPUBRemediation: React.FC = () => {
         if (data.issues && data.issues.length > 0) {
           const apiFileName = data.epubFileName || data.fileName;
           if (apiFileName && fileName === 'Loading...') setFileName(apiFileName);
+          
+          const normalizedTasks = data.issues.map((issue: RawAceAssertion, i: number) => {
+            const normalized = normalizeAceTask(issue, i);
+            return {
+              ...normalized,
+              status: isReturningCompleted ? 'completed' as TaskStatus : normalized.status,
+            };
+          });
+          const dedupedTasks = groupAndDeduplicateTasks(normalizedTasks);
+          console.log('[EPUBRemediation] Normalized issues:', normalizedTasks.length, '-> Deduped:', dedupedTasks.length);
+          
           setPlan({
             jobId: data.jobId || jobId,
             epubFileName: apiFileName || (fileName !== 'Loading...' ? fileName : 'document.epub'),
-            tasks: data.issues.map((issue: RemediationTask & { isAutoFixable?: boolean }) => ({
-              id: issue.id,
-              code: issue.code,
-              severity: issue.severity,
-              message: issue.message,
-              location: issue.location,
-              suggestion: issue.suggestion,
-              type: issue.isAutoFixable !== false ? 'auto' : 'manual',
-              status: isReturningCompleted ? 'completed' : (issue.status || 'pending'),
-            })),
+            tasks: dedupedTasks,
           });
           if (!isReturningCompleted) setPageState('ready');
           setIsDemo(false);

@@ -1,17 +1,19 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   AlertCircle, AlertTriangle, Info, CheckCircle, 
-  Wrench, Hand, FileDown, ClipboardList, ExternalLink
+  Wrench, Hand, FileDown, ClipboardList, ExternalLink, FileCheck
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs';
 import { QuickRating } from '../feedback';
+import { SourceBadge } from '../audit/SourceBadge';
 import { cn } from '@/utils/cn';
 
 type Severity = 'critical' | 'serious' | 'moderate' | 'minor';
-type IssueSource = 'js-auditor' | 'ace' | 'manual';
+type IssueSource = 'js-auditor' | 'ace' | 'epubcheck' | 'manual';
 
 interface AuditIssue {
   id: string;
@@ -96,6 +98,63 @@ const getScoreRingColor = (score: number): string => {
   return 'stroke-red-500';
 };
 
+interface ActionButtonsProps {
+  jobId: string;
+  onCreateRemediationPlan?: () => void;
+  onDownloadReport?: () => void;
+  isCreatingPlan?: boolean;
+  isDownloading?: boolean;
+}
+
+function ActionButtons({ 
+  jobId, 
+  onCreateRemediationPlan, 
+  onDownloadReport, 
+  isCreatingPlan = false, 
+  isDownloading = false 
+}: ActionButtonsProps) {
+  const navigate = useNavigate();
+
+  return (
+    <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t">
+      <Button 
+        onClick={onCreateRemediationPlan}
+        disabled={isCreatingPlan}
+      >
+        {isCreatingPlan ? (
+          <>Creating Plan...</>
+        ) : (
+          <>
+            <ClipboardList className="h-4 w-4 mr-2" />
+            Create Remediation Plan
+          </>
+        )}
+      </Button>
+      <Button 
+        variant="secondary"
+        onClick={() => navigate(`/acr/workflow?jobId=${jobId}`)}
+      >
+        <FileCheck className="h-4 w-4 mr-2" />
+        Generate ACR Report
+      </Button>
+      <Button 
+        variant="outline" 
+        onClick={onDownloadReport}
+        disabled={isDownloading}
+      >
+        {isDownloading ? (
+          <>Downloading...</>
+        ) : (
+          <>
+            <FileDown className="h-4 w-4 mr-2" />
+            Download Report
+          </>
+        )}
+      </Button>
+    </div>
+  );
+}
+
 export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
   result,
   onCreateRemediationPlan,
@@ -106,6 +165,7 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
   const [activeTab, setActiveTab] = useState('all');
 
   // Defensive data access with fallbacks
+  const jobId = result?.jobId ?? '';
   const issues = result?.issues ?? [];
   const accessibilityScore = result?.accessibilityScore ?? 0;
   const isValid = result?.isValid ?? false;
@@ -244,35 +304,13 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
               />
             </div>
 
-            <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t">
-              <Button 
-                onClick={onCreateRemediationPlan}
-                disabled={isCreatingPlan}
-              >
-                {isCreatingPlan ? (
-                  <>Creating Plan...</>
-                ) : (
-                  <>
-                    <ClipboardList className="h-4 w-4 mr-2" />
-                    Create Remediation Plan
-                  </>
-                )}
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={onDownloadReport}
-                disabled={isDownloading}
-              >
-                {isDownloading ? (
-                  <>Downloading...</>
-                ) : (
-                  <>
-                    <FileDown className="h-4 w-4 mr-2" />
-                    Download Report
-                  </>
-                )}
-              </Button>
-            </div>
+            <ActionButtons 
+              jobId={jobId}
+              onCreateRemediationPlan={onCreateRemediationPlan}
+              onDownloadReport={onDownloadReport}
+              isCreatingPlan={isCreatingPlan}
+              isDownloading={isDownloading}
+            />
           </CardContent>
         </Card>
       </div>
@@ -355,6 +393,7 @@ const IssueCard: React.FC<{ issue: AuditIssue }> = ({ issue }) => {
             <Badge variant={config.variant} size="sm">
               {issue.severity}
             </Badge>
+            <SourceBadge source={issue.source} />
             {autoFix ? (
               <Badge variant="success" size="sm">
                 <Wrench className="h-3 w-3 mr-1" />
