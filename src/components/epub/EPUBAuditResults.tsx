@@ -9,10 +9,11 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs';
 import { QuickRating } from '../feedback';
+import { SourceBadge } from '../audit/SourceBadge';
 import { cn } from '@/utils/cn';
 
 type Severity = 'critical' | 'serious' | 'moderate' | 'minor';
-type IssueSource = 'js-auditor' | 'ace' | 'manual';
+type IssueSource = 'js-auditor' | 'ace' | 'epubcheck' | 'manual';
 
 interface AuditIssue {
   id: string;
@@ -392,6 +393,7 @@ const IssueCard: React.FC<{ issue: AuditIssue }> = ({ issue }) => {
             <Badge variant={config.variant} size="sm">
               {issue.severity}
             </Badge>
+            <SourceBadge source={issue.source} />
             {autoFix ? (
               <Badge variant="success" size="sm">
                 <Wrench className="h-3 w-3 mr-1" />
