@@ -3,7 +3,7 @@ import { FileCode, Eye, Wrench } from 'lucide-react';
 import { Card, CardContent } from '../ui/Card';
 import { cn } from '@/utils/cn';
 
-interface SourceSummary {
+export interface SourceSummary {
   critical: number;
   serious: number;
   moderate: number;
@@ -12,7 +12,7 @@ interface SourceSummary {
   autoFixable?: number;
 }
 
-interface SummaryBySourceData {
+export interface SummaryBySourceData {
   epubcheck?: SourceSummary;
   ace?: SourceSummary;
   'js-auditor'?: SourceSummary;
@@ -70,7 +70,7 @@ const SourceCard: React.FC<SourceCardProps> = ({
         
         <div className="mt-4 text-center">
           <span className={cn('text-3xl font-bold', theme.accent)}>
-            {data.total}
+            {data.autoFixable !== undefined ? data.autoFixable : data.total}
           </span>
           <p className="text-xs text-gray-500 mt-1">
             {data.autoFixable !== undefined ? 'fixable' : 'issues'}

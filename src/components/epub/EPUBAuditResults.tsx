@@ -10,6 +10,7 @@ import { Badge } from '../ui/Badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs';
 import { QuickRating } from '../feedback';
 import { SourceBadge, SummaryBySource } from '../audit';
+import type { SummaryBySourceData } from '../audit';
 import { cn } from '@/utils/cn';
 
 type Severity = 'critical' | 'serious' | 'moderate' | 'minor';
@@ -24,21 +25,6 @@ interface AuditIssue {
   suggestion?: string;
   wcagCriteria?: string;
   source: IssueSource;
-}
-
-interface SourceSummary {
-  critical: number;
-  serious: number;
-  moderate: number;
-  minor: number;
-  total: number;
-  autoFixable?: number;
-}
-
-interface SummaryBySourceData {
-  epubcheck?: SourceSummary;
-  ace?: SourceSummary;
-  'js-auditor'?: SourceSummary;
 }
 
 interface AuditResult {
