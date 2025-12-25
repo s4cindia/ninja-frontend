@@ -10,3 +10,4 @@ export type { RemediationPlan } from './RemediationPlanView';
 export { EPUBExportOptions } from './EPUBExportOptions';
 export { ReAuditSection } from './ReAuditSection';
 export type { ReauditResult } from './ReAuditSection';
+export { TransferToAcrButton } from './TransferToAcrButton';

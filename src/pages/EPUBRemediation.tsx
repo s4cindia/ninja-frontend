@@ -15,6 +15,7 @@ import { RemediationTask, TaskStatus } from '@/components/epub/RemediationTaskCa
 import { FixResult } from '@/components/epub/RemediationProgress';
 import { EPUBExportOptions } from '@/components/epub/EPUBExportOptions';
 import { ReAuditSection, ReauditResult } from '@/components/epub/ReAuditSection';
+import { TransferToAcrButton } from '@/components/epub/TransferToAcrButton';
 import { QuickRating } from '@/components/feedback';
 import { api } from '@/services/api';
 
@@ -654,12 +655,20 @@ export const EPUBRemediation: React.FC = () => {
       />
 
       {pageState !== 'running' && pendingManualCount > 0 && (
-        <ReAuditSection
-          jobId={jobId || 'demo'}
-          pendingCount={pendingManualCount}
-          onReauditComplete={handleReauditComplete}
-          isDemo={isDemo}
-        />
+        <>
+          <ReAuditSection
+            jobId={jobId || 'demo'}
+            pendingCount={pendingManualCount}
+            onReauditComplete={handleReauditComplete}
+            isDemo={isDemo}
+          />
+          
+          <TransferToAcrButton
+            jobId={jobId || 'demo'}
+            pendingCount={pendingManualCount}
+            isDemo={isDemo}
+          />
+        </>
       )}
     </div>
   );
