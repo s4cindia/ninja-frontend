@@ -116,29 +116,111 @@ const wcagMappings: Record<string, string[]> = {
 
 const remediationTemplates: Record<string, { title: string; steps: string[]; resources?: { label: string; url: string }[] }> = {
   'metadata': {
-    title: 'How to add accessibility metadata',
+    title: 'Add Required Metadata',
     steps: [
-      'Open the package.opf file in your EPUB editor',
-      'Locate the <metadata> section',
-      'Add the required schema.org accessibility metadata properties',
-      'Save and validate the EPUB',
+      'Open your EPUB package document (content.opf)',
+      'Ensure required metadata elements are present',
+      'Add accessibility metadata (accessMode, accessibilityFeature, etc.)',
+      'Validate with EPUBCheck after changes',
     ],
     resources: [
       { label: 'A11y Metadata Guide', url: 'https://www.w3.org/2021/a11y-discov-vocab/latest/' },
       { label: 'EPUB Accessibility', url: 'https://www.w3.org/TR/epub-a11y-11/' },
     ],
   },
+  'accessmode': {
+    title: 'Add schema:accessMode Metadata',
+    steps: [
+      'Open your EPUB package document (content.opf or package.opf)',
+      'Locate the <metadata> section',
+      'Add <meta property="schema:accessMode">textual</meta> for text content',
+      'Add additional accessMode values: visual, auditory, tactile as applicable',
+      'Validate with EPUBCheck after changes',
+    ],
+    resources: [
+      { label: 'accessMode Documentation', url: 'https://www.w3.org/2021/a11y-discov-vocab/latest/#accessMode' },
+      { label: 'WCAG 1.1.1', url: 'https://www.w3.org/WAI/WCAG21/Understanding/non-text-content' },
+    ],
+  },
+  'accessibilityfeature': {
+    title: 'Add schema:accessibilityFeature Metadata',
+    steps: [
+      'Open your EPUB package document (content.opf)',
+      'Locate the <metadata> section',
+      'Add <meta property="schema:accessibilityFeature">structuralNavigation</meta>',
+      'Add other features: alternativeText, readingOrder, tableOfContents, etc.',
+      'Validate with EPUBCheck after changes',
+    ],
+    resources: [
+      { label: 'accessibilityFeature Guide', url: 'https://www.w3.org/2021/a11y-discov-vocab/latest/#accessibilityFeature' },
+    ],
+  },
+  'accessibilityhazard': {
+    title: 'Add schema:accessibilityHazard Metadata',
+    steps: [
+      'Open your EPUB package document (content.opf)',
+      'Locate the <metadata> section',
+      'Add <meta property="schema:accessibilityHazard">none</meta> if no hazards',
+      'Or specify hazards: flashing, motionSimulation, sound as applicable',
+      'Validate with EPUBCheck after changes',
+    ],
+    resources: [
+      { label: 'accessibilityHazard Guide', url: 'https://www.w3.org/2021/a11y-discov-vocab/latest/#accessibilityHazard' },
+    ],
+  },
+  'accessibilitysummary': {
+    title: 'Add schema:accessibilitySummary Metadata',
+    steps: [
+      'Open your EPUB package document (content.opf)',
+      'Locate the <metadata> section',
+      'Add <meta property="schema:accessibilitySummary">Human-readable summary</meta>',
+      'Describe accessibility features in plain language for end users',
+      'Validate with EPUBCheck after changes',
+    ],
+    resources: [
+      { label: 'accessibilitySummary Guide', url: 'https://www.w3.org/2021/a11y-discov-vocab/latest/#accessibilitySummary' },
+    ],
+  },
   'alt': {
-    title: 'How to add alt text',
+    title: 'Add Meaningful Alt Text',
     steps: [
       'Open the XHTML file in your EPUB editor',
       'Locate the <img> element',
       'Add an alt attribute with descriptive text',
       'Describe what the image conveys, not just what it shows',
+      'Use alt="" for purely decorative images',
     ],
     resources: [
       { label: 'Alt Text Guide', url: 'https://www.w3.org/WAI/tutorials/images/' },
       { label: 'WCAG 1.1.1', url: 'https://www.w3.org/WAI/WCAG21/Understanding/non-text-content' },
+    ],
+  },
+  'img': {
+    title: 'Fix Image Accessibility',
+    steps: [
+      'Locate the image in your EPUB content file',
+      'Add descriptive alt text that conveys the image meaning',
+      'For complex images, consider adding a longer description',
+      'Use role="img" and aria-label for SVG images',
+      'Validate the EPUB after making changes',
+    ],
+    resources: [
+      { label: 'Image Tutorial', url: 'https://www.w3.org/WAI/tutorials/images/' },
+      { label: 'WCAG 1.1.1', url: 'https://www.w3.org/WAI/WCAG21/Understanding/non-text-content' },
+    ],
+  },
+  'contrast': {
+    title: 'Fix Color Contrast',
+    steps: [
+      'Identify the text and background color combination',
+      'Use a contrast checker tool to verify the ratio',
+      'Normal text requires 4.5:1 contrast ratio minimum',
+      'Large text (18pt+) requires 3:1 contrast ratio minimum',
+      'Adjust colors in your CSS to meet requirements',
+    ],
+    resources: [
+      { label: 'Contrast Checker', url: 'https://webaim.org/resources/contrastchecker/' },
+      { label: 'WCAG 1.4.3', url: 'https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum' },
     ],
   },
   'heading': {
@@ -276,12 +358,24 @@ function normalizeAceTask(raw: RawAceAssertion, index: number): RemediationTask 
   const source = raw.source || getSourceFromCode(code);
   const filePath = raw.filePath || (location ? location.split(',')[0].trim() : undefined);
   
-  // Handle remediation - API may return string or our template returns object
+  // Handle remediation - prefer detailed templates over generic API strings
   let remediation: RemediationTask['remediation'] = undefined;
-  if (raw.remediation) {
+  const templateRemediation = getRemediationFromCode(code, message);
+  
+  if (taskType === 'manual') {
+    if (raw.remediation && typeof raw.remediation === 'object') {
+      // API returned detailed object - use it
+      remediation = raw.remediation;
+    } else if (templateRemediation) {
+      // We have a detailed template - prefer it over generic API string
+      remediation = templateRemediation;
+    } else if (raw.remediation && typeof raw.remediation === 'string') {
+      // No template available, use API string as fallback
+      remediation = raw.remediation;
+    }
+  } else if (raw.remediation) {
+    // For auto tasks, use API remediation if provided
     remediation = raw.remediation;
-  } else if (taskType === 'manual') {
-    remediation = getRemediationFromCode(code, message);
   }
 
   return {
