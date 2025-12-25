@@ -74,6 +74,15 @@ interface RawAceAssertion {
   isAutoFixable?: boolean;
   type?: string;
   status?: string;
+  filePath?: string;
+  selector?: string;
+  wcagCriteria?: string[];
+  source?: string;
+  remediation?: {
+    title: string;
+    steps: string[];
+    resources?: { label: string; url: string }[];
+  };
 }
 
 function normalizeAceTask(raw: RawAceAssertion, index: number): RemediationTask {
@@ -119,6 +128,11 @@ function normalizeAceTask(raw: RawAceAssertion, index: number): RemediationTask 
     suggestion: raw.suggestion || raw.help,
     type: taskType,
     status: (raw.status as TaskStatus) || 'pending',
+    filePath: raw.filePath,
+    selector: raw.selector,
+    wcagCriteria: raw.wcagCriteria,
+    source: raw.source,
+    remediation: raw.remediation,
   };
 }
 
@@ -341,12 +355,64 @@ export const EPUBRemediation: React.FC = () => {
           jobId: jobId,
           epubFileName: demoFileName,
           tasks: [
-            { id: '1', code: 'EPUB-META-002', severity: 'moderate', message: 'Missing accessibility features metadata', type: 'auto', status: isReturningCompleted ? 'completed' : 'pending', suggestion: 'Add schema:accessibilityFeature metadata' },
-            { id: '2', code: 'EPUB-META-003', severity: 'minor', message: 'Missing accessMode metadata', type: 'auto', status: isReturningCompleted ? 'completed' : 'pending', suggestion: 'Add schema:accessMode metadata' },
-            { id: '3', code: 'EPUB-META-004', severity: 'minor', message: 'Missing accessibilityHazard metadata', type: 'auto', status: isReturningCompleted ? 'completed' : 'pending', suggestion: 'Add schema:accessibilityHazard metadata' },
-            { id: '4', code: 'EPUB-META-005', severity: 'minor', message: 'Missing accessibilitySummary metadata', type: 'auto', status: isReturningCompleted ? 'completed' : 'pending', suggestion: 'Add schema:accessibilitySummary metadata' },
-            { id: '5', code: 'EPUB-NAV-001', severity: 'moderate', message: 'Navigation document missing landmarks', type: 'auto', status: isReturningCompleted ? 'completed' : 'pending', suggestion: 'Add epub:type landmarks to nav' },
-            { id: '6', code: 'EPUB-IMG-001', severity: 'serious', message: 'Image missing alt text', type: 'manual', status: 'pending', location: 'content/chapter1.xhtml, line 42', suggestion: 'Add descriptive alt text' },
+            { 
+              id: '1', code: 'EPUB-META-002', severity: 'moderate', 
+              message: 'Publications must declare the schema:accessibilityFeature metadata property in the Package Document', 
+              type: 'auto', status: isReturningCompleted ? 'completed' : 'pending', 
+              suggestion: 'Add schema:accessibilityFeature metadata to package OPF',
+              source: 'ACE', wcagCriteria: ['1.3.1', '4.1.2'],
+            },
+            { 
+              id: '2', code: 'EPUB-META-003', severity: 'minor', 
+              message: 'Publications should declare the schema:accessMode metadata property in the Package Document', 
+              type: 'auto', status: isReturningCompleted ? 'completed' : 'pending', 
+              suggestion: 'Add schema:accessMode metadata (textual, visual, auditory)',
+              source: 'ACE', wcagCriteria: ['1.1.1'],
+            },
+            { 
+              id: '3', code: 'EPUB-META-004', severity: 'minor', 
+              message: 'Publications should declare the schema:accessibilityHazard metadata property', 
+              type: 'auto', status: isReturningCompleted ? 'completed' : 'pending', 
+              suggestion: 'Add schema:accessibilityHazard metadata (none, flashing, motion, sound)',
+              source: 'ACE', wcagCriteria: ['2.3.1'],
+            },
+            { 
+              id: '4', code: 'EPUB-META-005', severity: 'minor', 
+              message: 'Publications should declare the schema:accessibilitySummary metadata property', 
+              type: 'auto', status: isReturningCompleted ? 'completed' : 'pending', 
+              suggestion: 'Add a human-readable accessibility summary',
+              source: 'ACE',
+            },
+            { 
+              id: '5', code: 'EPUB-NAV-001', severity: 'moderate', 
+              message: 'The navigation document should include landmark navigation with epub:type attributes', 
+              type: 'auto', status: isReturningCompleted ? 'completed' : 'pending', 
+              suggestion: 'Add epub:type landmarks (toc, bodymatter, backmatter) to nav',
+              source: 'ACE', wcagCriteria: ['2.4.1', '2.4.5'],
+            },
+            { 
+              id: '6', code: 'EPUB-IMG-001', severity: 'serious', 
+              message: 'Image element is missing required alt attribute for accessibility', 
+              type: 'manual', status: 'pending', 
+              location: 'content/chapter1.xhtml, line 42', 
+              suggestion: 'Add descriptive alt text that conveys the image content',
+              source: 'ACE', wcagCriteria: ['1.1.1'],
+              filePath: 'OEBPS/content/chapter1.xhtml',
+              selector: 'img[src="images/figure1.jpg"]',
+              remediation: {
+                title: 'How to add alt text',
+                steps: [
+                  'Open the XHTML file in your EPUB editor',
+                  'Locate the <img> element at line 42',
+                  'Add an alt attribute with descriptive text',
+                  'Describe what the image conveys, not just what it shows',
+                ],
+                resources: [
+                  { label: 'Alt Text Guide', url: 'https://www.w3.org/WAI/tutorials/images/' },
+                  { label: 'WCAG 1.1.1', url: 'https://www.w3.org/WAI/WCAG21/Understanding/non-text-content' },
+                ],
+              },
+            },
           ],
         };
         setPlan(demoPlan);

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, CheckCircle, XCircle, Loader2, Clock, AlertTriangle, Wrench, Hand } from 'lucide-react';
+import { ChevronDown, ChevronUp, CheckCircle, XCircle, Loader2, Clock, AlertTriangle, Wrench, Hand, ExternalLink, FileCode, BookOpen } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { clsx } from 'clsx';
@@ -18,6 +18,15 @@ export interface RemediationTask {
   status: TaskStatus;
   notes?: string;
   completionMethod?: 'auto' | 'manual';
+  filePath?: string;
+  selector?: string;
+  wcagCriteria?: string[];
+  source?: string;
+  remediation?: {
+    title: string;
+    steps: string[];
+    resources?: { label: string; url: string }[];
+  };
 }
 
 interface RemediationTaskCardProps {
@@ -25,6 +34,7 @@ interface RemediationTaskCardProps {
   isExpanded?: boolean;
   onToggleExpand?: () => void;
   onMarkFixed?: (taskId: string, notes?: string) => Promise<void>;
+  onViewInContext?: (filePath: string, selector?: string) => void;
 }
 
 const statusConfig: Record<TaskStatus, { icon: React.ReactNode; bgColor: string; textColor: string; label: string }> = {
@@ -67,11 +77,83 @@ const severityConfig: Record<string, { variant: 'error' | 'warning' | 'info' | '
   minor: { variant: 'info' },
 };
 
+const sourceConfig: Record<string, { bgColor: string; textColor: string }> = {
+  ace: { bgColor: 'bg-purple-100', textColor: 'text-purple-700' },
+  epubcheck: { bgColor: 'bg-indigo-100', textColor: 'text-indigo-700' },
+  axe: { bgColor: 'bg-teal-100', textColor: 'text-teal-700' },
+  manual: { bgColor: 'bg-gray-100', textColor: 'text-gray-700' },
+};
+
+const WcagBadge: React.FC<{ criterion: string }> = ({ criterion }) => {
+  const wcagUrl = `https://www.w3.org/WAI/WCAG21/Understanding/${criterion.toLowerCase().replace('.', '')}`;
+  
+  return (
+    <a
+      href={wcagUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+      onClick={(e) => e.stopPropagation()}
+    >
+      WCAG {criterion}
+      <ExternalLink className="h-3 w-3" />
+    </a>
+  );
+};
+
+const SourceBadge: React.FC<{ source: string }> = ({ source }) => {
+  const config = sourceConfig[source.toLowerCase()] || sourceConfig.manual;
+  return (
+    <span className={clsx('px-2 py-0.5 text-xs rounded font-medium', config.bgColor, config.textColor)}>
+      {source.toUpperCase()}
+    </span>
+  );
+};
+
+const RemediationGuidance: React.FC<{
+  title: string;
+  steps: string[];
+  resources?: { label: string; url: string }[];
+}> = ({ title, steps, resources }) => (
+  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
+    <h4 className="font-medium text-amber-800 flex items-center gap-2">
+      <BookOpen className="h-4 w-4" />
+      {title}
+    </h4>
+    <ol className="list-decimal list-inside space-y-1 text-sm text-amber-900">
+      {steps.map((step, idx) => (
+        <li key={idx}>{step}</li>
+      ))}
+    </ol>
+    {resources && resources.length > 0 && (
+      <div className="pt-2 border-t border-amber-200">
+        <p className="text-xs font-medium text-amber-700 mb-1">Resources:</p>
+        <div className="flex flex-wrap gap-2">
+          {resources.map((resource, idx) => (
+            <a
+              key={idx}
+              href={resource.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {resource.label}
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+);
+
 export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
   task,
   isExpanded: controlledExpanded,
   onToggleExpand,
   onMarkFixed,
+  onViewInContext,
 }) => {
   const [internalExpanded, setInternalExpanded] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
@@ -96,6 +178,12 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
       setNotes('');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleViewInContext = () => {
+    if (onViewInContext && task.filePath) {
+      onViewInContext(task.filePath, task.selector);
     }
   };
 
@@ -139,15 +227,24 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
                 </>
               )}
             </Badge>
+            {task.source && <SourceBadge source={task.source} />}
             <span className={clsx('text-xs font-medium ml-auto', status.textColor)}>
               {status.label}
             </span>
           </div>
           
-          <p className="text-sm text-gray-800 line-clamp-2">{task.message}</p>
+          <p className="text-sm text-gray-800">{task.message}</p>
           
-          {task.location && !isExpanded && (
-            <p className="text-xs text-gray-500 mt-1 truncate">{task.location}</p>
+          {task.location && (
+            <p className="text-xs text-gray-500 mt-1 font-mono">{task.location}</p>
+          )}
+
+          {task.wcagCriteria && task.wcagCriteria.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {task.wcagCriteria.map(criterion => (
+                <WcagBadge key={criterion} criterion={criterion} />
+              ))}
+            </div>
           )}
         </div>
         
@@ -161,87 +258,106 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
       </button>
       
       {isExpanded && (
-        <div className="px-4 pb-4 pt-0 border-t border-gray-200 bg-white/50">
-          <dl className="space-y-2 text-sm">
-            {task.location && (
+        <div className="px-4 pb-4 pt-0 border-t border-gray-200 bg-white/50 space-y-4">
+          {task.suggestion && (
+            <div>
+              <dt className="text-xs font-medium text-gray-500">Suggestion</dt>
+              <dd className="text-sm text-gray-700 mt-0.5">{task.suggestion}</dd>
+            </div>
+          )}
+
+          {task.filePath && task.type === 'manual' && onViewInContext && (
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleViewInContext();
+              }}
+              variant="outline"
+              size="sm"
+              className="w-full"
+            >
+              <FileCode className="h-4 w-4 mr-2" />
+              View in Context
+              {task.selector && (
+                <span className="ml-2 text-xs text-gray-500 font-mono truncate max-w-[150px]">
+                  {task.selector}
+                </span>
+              )}
+            </Button>
+          )}
+
+          {task.remediation && task.type === 'manual' && (
+            <RemediationGuidance
+              title={task.remediation.title}
+              steps={task.remediation.steps}
+              resources={task.remediation.resources}
+            />
+          )}
+          
+          {task.type === 'manual' && task.status === 'completed' && task.notes && (
+            <div className="flex items-start gap-2 text-green-700 bg-green-50 p-2 rounded">
+              <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
               <div>
-                <dt className="text-xs font-medium text-gray-500">Location</dt>
-                <dd className="text-gray-700 font-mono text-xs mt-0.5">{task.location}</dd>
+                <span className="text-xs font-medium">Fixed manually</span>
+                <p className="text-xs text-green-600 mt-0.5">{task.notes}</p>
               </div>
-            )}
-            
-            {task.suggestion && (
-              <div>
-                <dt className="text-xs font-medium text-gray-500">Suggestion</dt>
-                <dd className="text-gray-700 mt-0.5">{task.suggestion}</dd>
-              </div>
-            )}
-            
-            {task.type === 'manual' && task.status === 'completed' && task.notes && (
-              <div className="flex items-start gap-2 text-green-700 bg-green-50 p-2 rounded mt-2">
-                <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <div>
-                  <span className="text-xs font-medium">Fixed manually</span>
-                  <p className="text-xs text-green-600 mt-0.5">{task.notes}</p>
-                </div>
-              </div>
-            )}
-            
-            {task.type === 'manual' && task.status === 'pending' && onMarkFixed && (
-              <div className="mt-3 pt-3 border-t border-gray-200">
-                {!showNotes ? (
-                  <Button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowNotes(true);
-                    }}
-                    size="sm"
-                    className="w-full"
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Mark as Manually Fixed
-                  </Button>
-                ) : (
-                  <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
-                    <textarea
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Describe what was fixed (optional)..."
-                      className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                      rows={2}
-                      aria-label="Notes about fix"
-                    />
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={handleMarkFixed}
-                        disabled={isSubmitting}
-                        size="sm"
-                      >
-                        {isSubmitting ? 'Saving...' : 'Confirm Fixed'}
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setShowNotes(false);
-                          setNotes('');
-                        }}
-                        variant="outline"
-                        size="sm"
-                      >
-                        Cancel
-                      </Button>
-                    </div>
+            </div>
+          )}
+          
+          {task.type === 'manual' && task.status === 'pending' && onMarkFixed && (
+            <div className="pt-3 border-t border-gray-200">
+              {!showNotes ? (
+                <Button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowNotes(true);
+                  }}
+                  size="sm"
+                  className="w-full"
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Mark as Manually Fixed
+                </Button>
+              ) : (
+                <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Describe what was fixed (optional)..."
+                    className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    rows={2}
+                    aria-label="Notes about fix"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleMarkFixed}
+                      disabled={isSubmitting}
+                      size="sm"
+                    >
+                      {isSubmitting ? 'Saving...' : 'Confirm Fixed'}
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setShowNotes(false);
+                        setNotes('');
+                      }}
+                      variant="outline"
+                      size="sm"
+                    >
+                      Cancel
+                    </Button>
                   </div>
-                )}
-              </div>
-            )}
-            
-            {task.type === 'manual' && task.status === 'pending' && !onMarkFixed && (
-              <div className="flex items-center gap-2 text-amber-600 bg-amber-50 p-2 rounded mt-2">
-                <Hand className="h-4 w-4" />
-                <span className="text-xs font-medium">This issue requires manual intervention</span>
-              </div>
-            )}
-          </dl>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {task.type === 'manual' && task.status === 'pending' && !onMarkFixed && (
+            <div className="flex items-center gap-2 text-amber-600 bg-amber-50 p-2 rounded">
+              <Hand className="h-4 w-4" />
+              <span className="text-xs font-medium">This issue requires manual intervention</span>
+            </div>
+          )}
         </div>
       )}
     </div>
