@@ -22,7 +22,8 @@ export interface RemediationTask {
   selector?: string;
   wcagCriteria?: string[];
   source?: string;
-  remediation?: {
+  html?: string;
+  remediation?: string | {
     title: string;
     steps: string[];
     resources?: { label: string; url: string }[];
@@ -287,11 +288,30 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
           )}
 
           {task.remediation && task.type === 'manual' && (
-            <RemediationGuidance
-              title={task.remediation.title}
-              steps={task.remediation.steps}
-              resources={task.remediation.resources}
-            />
+            typeof task.remediation === 'string' ? (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <h4 className="font-medium text-amber-800 flex items-center gap-2 mb-2">
+                  <BookOpen className="h-4 w-4" />
+                  Remediation Guidance
+                </h4>
+                <p className="text-sm text-amber-900">{task.remediation}</p>
+              </div>
+            ) : (
+              <RemediationGuidance
+                title={task.remediation.title}
+                steps={task.remediation.steps}
+                resources={task.remediation.resources}
+              />
+            )
+          )}
+
+          {task.html && (
+            <div>
+              <dt className="text-xs font-medium text-gray-500 mb-1">Code Snippet</dt>
+              <pre className="text-xs bg-gray-900 text-gray-100 p-2 rounded overflow-x-auto">
+                <code>{task.html}</code>
+              </pre>
+            </div>
           )}
           
           {task.type === 'manual' && task.status === 'completed' && task.notes && (

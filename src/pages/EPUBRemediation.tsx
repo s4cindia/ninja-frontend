@@ -60,12 +60,14 @@ interface RawAceAssertion {
   '@type'?: string;
   id?: string;
   code?: string;
+  issueCode?: string;
   ruleId?: string;
   rule?: { id?: string; code?: string };
   test?: { id?: string; code?: string; title?: string };
   severity?: string;
   impact?: string;
   message?: string;
+  issueMessage?: string;
   description?: string;
   location?: string;
   pointer?: string;
@@ -78,7 +80,8 @@ interface RawAceAssertion {
   selector?: string;
   wcagCriteria?: string[];
   source?: string;
-  remediation?: {
+  html?: string;
+  remediation?: string | {
     title: string;
     steps: string[];
     resources?: { label: string; url: string }[];
@@ -231,7 +234,8 @@ function getSourceFromCode(code: string): string {
 }
 
 function normalizeAceTask(raw: RawAceAssertion, index: number): RemediationTask {
-  const code = raw.code 
+  const code = raw.issueCode
+    || raw.code 
     || raw.ruleId 
     || raw.rule?.code 
     || raw.rule?.id 
@@ -263,14 +267,22 @@ function normalizeAceTask(raw: RawAceAssertion, index: number): RemediationTask 
     taskType = 'manual';
   }
 
-  const message = raw.message || raw.description || raw.test?.title || 'Accessibility issue detected';
-  const location = raw.location || raw.pointer;
+  // Use issueMessage first (new API), fallback to message/description
+  const message = raw.issueMessage || raw.message || raw.description || raw.test?.title || 'Accessibility issue detected';
+  const location = raw.location || raw.pointer || raw.filePath;
   
-  // Derive enhanced fields if not provided
+  // Derive enhanced fields if not provided by API
   const wcagCriteria = raw.wcagCriteria || getWcagCriteriaFromCode(code, message);
   const source = raw.source || getSourceFromCode(code);
-  const remediation = raw.remediation || (taskType === 'manual' ? getRemediationFromCode(code, message) : undefined);
   const filePath = raw.filePath || (location ? location.split(',')[0].trim() : undefined);
+  
+  // Handle remediation - API may return string or our template returns object
+  let remediation: RemediationTask['remediation'] = undefined;
+  if (raw.remediation) {
+    remediation = raw.remediation;
+  } else if (taskType === 'manual') {
+    remediation = getRemediationFromCode(code, message);
+  }
 
   return {
     id: raw.id || `task-${index}`,
@@ -278,13 +290,14 @@ function normalizeAceTask(raw: RawAceAssertion, index: number): RemediationTask 
     severity,
     message,
     location,
-    suggestion: raw.suggestion || raw.help,
+    suggestion: raw.suggestion || raw.help || (typeof raw.remediation === 'string' ? raw.remediation : undefined),
     type: taskType,
     status: (raw.status as TaskStatus) || 'pending',
     filePath,
     selector: raw.selector,
     wcagCriteria: wcagCriteria.length > 0 ? wcagCriteria : undefined,
     source,
+    html: raw.html,
     remediation,
   };
 }
