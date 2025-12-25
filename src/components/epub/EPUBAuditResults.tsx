@@ -467,7 +467,7 @@ const IssueCard: React.FC<{ issue: AuditIssue; jobId: string }> = ({ issue, jobI
                 Manual
               </Badge>
             )}
-            {issue.wcagCriteria && (
+            {issue.wcagCriteria && typeof issue.wcagCriteria === 'string' && (
               <a
                 href={`https://www.w3.org/WAI/WCAG21/Understanding/${issue.wcagCriteria.toLowerCase().replace(/\./g, '')}`}
                 target="_blank"
