@@ -6,27 +6,38 @@ interface RemediationGuidanceProps {
   issueCode: string;
 }
 
+const isValidUrl = (url: string): boolean => {
+  try {
+    new URL(url.startsWith('http') ? url : `https://${url}`);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const formatUrl = (url: string): string => {
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  return `https://${url}`;
+};
+
+const getDisplayUrl = (url: string): string => {
+  try {
+    const urlObj = new URL(formatUrl(url));
+    return urlObj.hostname + urlObj.pathname;
+  } catch {
+    return url;
+  }
+};
+
 export function RemediationGuidance({ issueCode }: RemediationGuidanceProps) {
   const [expanded, setExpanded] = useState(false);
   const guidance = getGuidance(issueCode);
 
   if (!guidance) return null;
 
-  const formatUrl = (url: string): string => {
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return url;
-    }
-    return `https://${url}`;
-  };
-
-  const getDisplayUrl = (url: string): string => {
-    try {
-      const urlObj = new URL(formatUrl(url));
-      return urlObj.hostname + urlObj.pathname;
-    } catch {
-      return url;
-    }
-  };
+  const validResources = guidance.resources?.filter(isValidUrl) || [];
 
   return (
     <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg overflow-hidden">
@@ -52,17 +63,17 @@ export function RemediationGuidance({ issueCode }: RemediationGuidanceProps) {
               <li key={i}>{step}</li>
             ))}
           </ol>
-          {guidance.resources && guidance.resources.length > 0 && (
+          {validResources.length > 0 && (
             <div className="mt-3 pt-2 border-t border-amber-200">
               <span className="text-xs font-medium text-amber-700">Resources:</span>
               <ul className="mt-1 space-y-1">
-                {guidance.resources.map((url, i) => (
+                {validResources.map((url, i) => (
                   <li key={i}>
                     <a 
                       href={formatUrl(url)} 
                       target="_blank" 
                       rel="noopener noreferrer" 
-                      className="inline-flex items-center gap-1 text-xs text-amber-700 underline hover:text-amber-900 hover:bg-amber-100 px-1 py-0.5 rounded transition-colors"
+                      className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 hover:underline transition-colors"
                     >
                       {getDisplayUrl(url)}
                       <ExternalLink className="w-3 h-3 flex-shrink-0" />

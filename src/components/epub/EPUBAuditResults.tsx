@@ -468,10 +468,17 @@ const IssueCard: React.FC<{ issue: AuditIssue; jobId: string }> = ({ issue, jobI
               </Badge>
             )}
             {issue.wcagCriteria && (
-              <Badge variant="info" size="sm">
-                <ExternalLink className="h-3 w-3 mr-1" />
-                {issue.wcagCriteria}
-              </Badge>
+              <a
+                href={`https://www.w3.org/WAI/WCAG21/Understanding/${issue.wcagCriteria.toLowerCase().replace(/\./g, '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block"
+              >
+                <Badge variant="info" size="sm" className="hover:bg-blue-200 cursor-pointer transition-colors">
+                  <ExternalLink className="h-3 w-3 mr-1" />
+                  {issue.wcagCriteria}
+                </Badge>
+              </a>
             )}
           </div>
           
