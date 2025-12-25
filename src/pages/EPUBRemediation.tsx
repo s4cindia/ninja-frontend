@@ -97,6 +97,19 @@ function normalizeAceTask(raw: RawAceAssertion, index: number): RemediationTask 
   const rawSeverity = (raw.severity || raw.impact || 'moderate').toLowerCase();
   const severity = severityMap[rawSeverity] || 'moderate';
   
+  // Determine task type: check raw.type first, then isAutoFixable flag
+  let taskType: 'auto' | 'manual' = 'manual';
+  if (raw.type === 'auto' || raw.type === 'manual') {
+    taskType = raw.type;
+  } else if (raw.isAutoFixable === true) {
+    taskType = 'auto';
+  } else if (raw.isAutoFixable === false) {
+    taskType = 'manual';
+  } else {
+    // Default to manual for safety if neither type nor isAutoFixable is specified
+    taskType = 'manual';
+  }
+
   return {
     id: raw.id || `task-${index}`,
     code,
@@ -104,7 +117,7 @@ function normalizeAceTask(raw: RawAceAssertion, index: number): RemediationTask 
     message: raw.message || raw.description || raw.test?.title || 'Accessibility issue detected',
     location: raw.location || raw.pointer,
     suggestion: raw.suggestion || raw.help,
-    type: raw.isAutoFixable !== false ? 'auto' : 'manual',
+    type: taskType,
     status: (raw.status as TaskStatus) || 'pending',
   };
 }
@@ -271,10 +284,11 @@ export const EPUBRemediation: React.FC = () => {
           
           const normalizedTasks = data.tasks.map((t: RawAceAssertion, i: number) => {
             const normalized = normalizeAceTask(t, i);
-            return {
-              ...normalized,
-              status: isReturningCompleted ? 'completed' as TaskStatus : normalized.status,
-            };
+            // Only mark auto tasks as completed when returning, preserve manual task status
+            if (isReturningCompleted && normalized.type === 'auto' && normalized.status === 'pending') {
+              return { ...normalized, status: 'completed' as TaskStatus };
+            }
+            return normalized;
           });
           const dedupedTasks = groupAndDeduplicateTasks(normalizedTasks);
           console.log('[EPUBRemediation] Normalized tasks:', normalizedTasks.length, '-> Deduped:', dedupedTasks.length);
