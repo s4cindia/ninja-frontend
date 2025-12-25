@@ -20,6 +20,7 @@ interface RemediationPlanViewProps {
   completedFixes: FixResult[];
   onRunAutoRemediation: () => void;
   onCancelRemediation?: () => void;
+  onMarkTaskFixed?: (taskId: string, notes?: string) => Promise<void>;
 }
 
 export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
@@ -29,6 +30,7 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
   completedFixes,
   onRunAutoRemediation,
   onCancelRemediation,
+  onMarkTaskFixed,
 }) => {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
 
@@ -185,6 +187,7 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
                   onToggleExpand={() => 
                     setExpandedTaskId(expandedTaskId === task.id ? null : task.id)
                   }
+                  onMarkFixed={onMarkTaskFixed}
                 />
               ))
             )}

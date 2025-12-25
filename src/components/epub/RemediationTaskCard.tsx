@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, CheckCircle, XCircle, Loader2, Clock, AlertTriangle, Wrench, Hand } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { clsx } from 'clsx';
 
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
@@ -15,12 +16,15 @@ export interface RemediationTask {
   suggestion?: string;
   type: TaskType;
   status: TaskStatus;
+  notes?: string;
+  completionMethod?: 'auto' | 'manual';
 }
 
 interface RemediationTaskCardProps {
   task: RemediationTask;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
+  onMarkFixed?: (taskId: string, notes?: string) => Promise<void>;
 }
 
 const statusConfig: Record<TaskStatus, { icon: React.ReactNode; bgColor: string; textColor: string; label: string }> = {
@@ -67,8 +71,12 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
   task,
   isExpanded: controlledExpanded,
   onToggleExpand,
+  onMarkFixed,
 }) => {
   const [internalExpanded, setInternalExpanded] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
+  const [notes, setNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const isExpanded = controlledExpanded ?? internalExpanded;
   
   const handleToggle = () => {
@@ -76,6 +84,18 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
       onToggleExpand();
     } else {
       setInternalExpanded(!internalExpanded);
+    }
+  };
+
+  const handleMarkFixed = async () => {
+    if (!onMarkFixed) return;
+    setIsSubmitting(true);
+    try {
+      await onMarkFixed(task.id, notes || undefined);
+      setShowNotes(false);
+      setNotes('');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -157,7 +177,65 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
               </div>
             )}
             
-            {task.type === 'manual' && (
+            {task.type === 'manual' && task.status === 'completed' && task.notes && (
+              <div className="flex items-start gap-2 text-green-700 bg-green-50 p-2 rounded mt-2">
+                <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <div>
+                  <span className="text-xs font-medium">Fixed manually</span>
+                  <p className="text-xs text-green-600 mt-0.5">{task.notes}</p>
+                </div>
+              </div>
+            )}
+            
+            {task.type === 'manual' && task.status === 'pending' && onMarkFixed && (
+              <div className="mt-3 pt-3 border-t border-gray-200">
+                {!showNotes ? (
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowNotes(true);
+                    }}
+                    size="sm"
+                    className="w-full"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Mark as Manually Fixed
+                  </Button>
+                ) : (
+                  <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Describe what was fixed (optional)..."
+                      className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      rows={2}
+                      aria-label="Notes about fix"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleMarkFixed}
+                        disabled={isSubmitting}
+                        size="sm"
+                      >
+                        {isSubmitting ? 'Saving...' : 'Confirm Fixed'}
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setShowNotes(false);
+                          setNotes('');
+                        }}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {task.type === 'manual' && task.status === 'pending' && !onMarkFixed && (
               <div className="flex items-center gap-2 text-amber-600 bg-amber-50 p-2 rounded mt-2">
                 <Hand className="h-4 w-4" />
                 <span className="text-xs font-medium">This issue requires manual intervention</span>

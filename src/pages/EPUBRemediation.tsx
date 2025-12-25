@@ -293,10 +293,11 @@ export const EPUBRemediation: React.FC = () => {
           
           const normalizedTasks = data.issues.map((issue: RawAceAssertion, i: number) => {
             const normalized = normalizeAceTask(issue, i);
-            return {
-              ...normalized,
-              status: isReturningCompleted ? 'completed' as TaskStatus : normalized.status,
-            };
+            // Only mark auto tasks as completed when returning, preserve manual task status
+            if (isReturningCompleted && normalized.type === 'auto' && normalized.status === 'pending') {
+              return { ...normalized, status: 'completed' as TaskStatus };
+            }
+            return normalized;
           });
           const dedupedTasks = groupAndDeduplicateTasks(normalizedTasks);
           console.log('[EPUBRemediation] Normalized issues:', normalizedTasks.length, '-> Deduped:', dedupedTasks.length);
@@ -319,18 +320,17 @@ export const EPUBRemediation: React.FC = () => {
       }
 
       if (isDemoJob || isReturningCompleted) {
-        const taskStatus = isReturningCompleted ? 'completed' : 'pending';
         const demoFileName = fileName !== 'Loading...' ? fileName : 'sample-book.epub';
         const demoPlan: PlanViewPlan = {
           jobId: jobId,
           epubFileName: demoFileName,
           tasks: [
-            { id: '1', code: 'EPUB-META-002', severity: 'moderate', message: 'Missing accessibility features metadata', type: 'auto', status: taskStatus as TaskStatus, suggestion: 'Add schema:accessibilityFeature metadata' },
-            { id: '2', code: 'EPUB-META-003', severity: 'minor', message: 'Missing accessMode metadata', type: 'auto', status: taskStatus as TaskStatus, suggestion: 'Add schema:accessMode metadata' },
-            { id: '3', code: 'EPUB-META-004', severity: 'minor', message: 'Missing accessibilityHazard metadata', type: 'auto', status: taskStatus as TaskStatus, suggestion: 'Add schema:accessibilityHazard metadata' },
-            { id: '4', code: 'EPUB-META-005', severity: 'minor', message: 'Missing accessibilitySummary metadata', type: 'auto', status: taskStatus as TaskStatus, suggestion: 'Add schema:accessibilitySummary metadata' },
-            { id: '5', code: 'EPUB-NAV-001', severity: 'moderate', message: 'Navigation document missing landmarks', type: 'auto', status: taskStatus as TaskStatus, suggestion: 'Add epub:type landmarks to nav' },
-            { id: '6', code: 'EPUB-IMG-001', severity: 'serious', message: 'Image missing alt text', type: 'manual', status: taskStatus as TaskStatus, location: 'content/chapter1.xhtml, line 42', suggestion: 'Add descriptive alt text' },
+            { id: '1', code: 'EPUB-META-002', severity: 'moderate', message: 'Missing accessibility features metadata', type: 'auto', status: isReturningCompleted ? 'completed' : 'pending', suggestion: 'Add schema:accessibilityFeature metadata' },
+            { id: '2', code: 'EPUB-META-003', severity: 'minor', message: 'Missing accessMode metadata', type: 'auto', status: isReturningCompleted ? 'completed' : 'pending', suggestion: 'Add schema:accessMode metadata' },
+            { id: '3', code: 'EPUB-META-004', severity: 'minor', message: 'Missing accessibilityHazard metadata', type: 'auto', status: isReturningCompleted ? 'completed' : 'pending', suggestion: 'Add schema:accessibilityHazard metadata' },
+            { id: '4', code: 'EPUB-META-005', severity: 'minor', message: 'Missing accessibilitySummary metadata', type: 'auto', status: isReturningCompleted ? 'completed' : 'pending', suggestion: 'Add schema:accessibilitySummary metadata' },
+            { id: '5', code: 'EPUB-NAV-001', severity: 'moderate', message: 'Navigation document missing landmarks', type: 'auto', status: isReturningCompleted ? 'completed' : 'pending', suggestion: 'Add epub:type landmarks to nav' },
+            { id: '6', code: 'EPUB-IMG-001', severity: 'serious', message: 'Image missing alt text', type: 'manual', status: 'pending', location: 'content/chapter1.xhtml, line 42', suggestion: 'Add descriptive alt text' },
           ],
         };
         setPlan(demoPlan);
@@ -457,6 +457,27 @@ export const EPUBRemediation: React.FC = () => {
   const handleCancelRemediation = () => {
     cancelledRef.current = true;
     setCurrentTask(null);
+  };
+
+  const handleMarkTaskFixed = async (taskId: string, notes?: string) => {
+    if (!plan) return;
+    
+    if (!isDemo && jobId) {
+      try {
+        await api.post(`/epub/job/${jobId}/task/${taskId}/mark-fixed`, { notes });
+      } catch {
+        // Continue with local update even if API fails
+      }
+    }
+    
+    setPlan(prev => prev ? {
+      ...prev,
+      tasks: prev.tasks.map(t => 
+        t.id === taskId 
+          ? { ...t, status: 'completed' as TaskStatus, notes, completionMethod: 'manual' as const }
+          : t
+      ),
+    } : null);
   };
 
   const handleViewComparison = () => {
@@ -598,6 +619,7 @@ export const EPUBRemediation: React.FC = () => {
         completedFixes={completedFixes}
         onRunAutoRemediation={handleRunAutoRemediation}
         onCancelRemediation={handleCancelRemediation}
+        onMarkTaskFixed={handleMarkTaskFixed}
       />
     </div>
   );
