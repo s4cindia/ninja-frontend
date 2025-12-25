@@ -26,6 +26,7 @@ export interface RemediationTask {
   remediation?: string | {
     title: string;
     steps: string[];
+    codeExample?: { before: string; after: string };
     resources?: { label: string; url: string }[];
   };
 }
@@ -114,18 +115,39 @@ const SourceBadge: React.FC<{ source: string }> = ({ source }) => {
 const RemediationGuidance: React.FC<{
   title: string;
   steps: string[];
+  codeExample?: { before: string; after: string };
   resources?: { label: string; url: string }[];
-}> = ({ title, steps, resources }) => (
-  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
+}> = ({ title, steps, codeExample, resources }) => (
+  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-3">
     <h4 className="font-medium text-amber-800 flex items-center gap-2">
       <BookOpen className="h-4 w-4" />
       {title}
     </h4>
-    <ol className="list-decimal list-inside space-y-1 text-sm text-amber-900">
+    <ol className="list-decimal list-inside space-y-1.5 text-sm text-amber-900">
       {steps.map((step, idx) => (
-        <li key={idx}>{step}</li>
+        <li key={idx} className="leading-relaxed" dangerouslySetInnerHTML={{ 
+          __html: step
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/`([^`]+)`/g, '<code class="bg-amber-100 px-1 rounded text-xs font-mono">$1</code>')
+        }} />
       ))}
     </ol>
+    {codeExample && (
+      <div className="mt-3 space-y-2">
+        <div>
+          <p className="text-xs font-medium text-red-600 mb-1">Before:</p>
+          <pre className="p-2 bg-red-50 border border-red-200 rounded text-xs overflow-x-auto font-mono text-red-800">
+            {codeExample.before}
+          </pre>
+        </div>
+        <div>
+          <p className="text-xs font-medium text-green-600 mb-1">After:</p>
+          <pre className="p-2 bg-green-50 border border-green-200 rounded text-xs overflow-x-auto font-mono text-green-800">
+            {codeExample.after}
+          </pre>
+        </div>
+      </div>
+    )}
     {resources && resources.length > 0 && (
       <div className="pt-2 border-t border-amber-200">
         <p className="text-xs font-medium text-amber-700 mb-1">Resources:</p>
@@ -300,6 +322,7 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
               <RemediationGuidance
                 title={task.remediation.title}
                 steps={task.remediation.steps}
+                codeExample={task.remediation.codeExample}
                 resources={task.remediation.resources}
               />
             )

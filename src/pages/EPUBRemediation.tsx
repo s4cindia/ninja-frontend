@@ -84,6 +84,7 @@ interface RawAceAssertion {
   remediation?: string | {
     title: string;
     steps: string[];
+    codeExample?: { before: string; after: string };
     resources?: { label: string; url: string }[];
   };
 }
@@ -119,7 +120,7 @@ const wcagMappings: Record<string, string[]> = {
   'order': ['1.3.2'],
 };
 
-const remediationTemplates: Record<string, { title: string; steps: string[]; resources?: { label: string; url: string }[] }> = {
+const remediationTemplates: Record<string, { title: string; steps: string[]; codeExample?: { before: string; after: string }; resources?: { label: string; url: string }[] }> = {
   'metadata': {
     title: 'Add Required Metadata',
     steps: [
@@ -136,15 +137,26 @@ const remediationTemplates: Record<string, { title: string; steps: string[]; res
   'accessmode': {
     title: 'Add schema:accessMode Metadata',
     steps: [
-      'Open your EPUB package document (content.opf or package.opf)',
-      'Locate the <metadata> section',
-      'Add <meta property="schema:accessMode">textual</meta> for text content',
-      'Add additional accessMode values: visual, auditory, tactile as applicable',
-      'Validate with EPUBCheck after changes',
+      '**Open in Sigil:** File → Open → Select your EPUB',
+      '**Find the OPF file:** In Book Browser, double-click `content.opf` (under Text or at root)',
+      '**Switch to Code View:** Press `F9` if needed',
+      '**Locate the `<metadata>` section** and add the accessMode property',
+      '**Save:** `Ctrl+S` and validate with Tools → Validate EPUB',
     ],
+    codeExample: {
+      before: `<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <dc:title>My Book</dc:title>
+  <!-- Missing accessMode -->
+</metadata>`,
+      after: `<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <dc:title>My Book</dc:title>
+  <meta property="schema:accessMode">textual</meta>
+  <meta property="schema:accessMode">visual</meta>
+</metadata>`,
+    },
     resources: [
       { label: 'accessMode Documentation', url: 'https://www.w3.org/2021/a11y-discov-vocab/latest/#accessMode' },
-      { label: 'WCAG 1.1.1', url: 'https://www.w3.org/WAI/WCAG21/Understanding/non-text-content' },
+      { label: 'Sigil User Guide', url: 'https://sigil-ebook.com/sigil/guide/' },
     ],
   },
   'accessibilityfeature': {
@@ -189,29 +201,42 @@ const remediationTemplates: Record<string, { title: string; steps: string[]; res
   'alt': {
     title: 'Add Meaningful Alt Text',
     steps: [
-      'Open the XHTML file in your EPUB editor',
-      'Locate the <img> element',
-      'Add an alt attribute with descriptive text',
-      'Describe what the image conveys, not just what it shows',
-      'Use alt="" for purely decorative images',
+      '**Open in Sigil:** File → Open → Select your EPUB',
+      '**Find the file:** In Book Browser, expand "Text" and open the file from the issue location',
+      '**Switch to Code View:** Press `F9`',
+      '**Find the image:** Search (`Ctrl+F`) for `<img` or the image filename',
+      '**Add alt attribute** with descriptive text (see example below)',
+      '**Save:** `Ctrl+S`',
     ],
+    codeExample: {
+      before: `<img src="images/figure1.jpg" />`,
+      after: `<img src="images/figure1.jpg" alt="Bar chart showing sales growth from 2020 to 2024, with 15% year-over-year increase" />`,
+    },
     resources: [
-      { label: 'Alt Text Guide', url: 'https://www.w3.org/WAI/tutorials/images/' },
-      { label: 'WCAG 1.1.1', url: 'https://www.w3.org/WAI/WCAG21/Understanding/non-text-content' },
+      { label: 'Alt Text Decision Tree', url: 'https://www.w3.org/WAI/tutorials/images/decision-tree/' },
+      { label: 'Sigil User Guide', url: 'https://sigil-ebook.com/sigil/guide/' },
     ],
   },
   'img': {
     title: 'Fix Image Accessibility',
     steps: [
-      'Locate the image in your EPUB content file',
-      'Add descriptive alt text that conveys the image meaning',
-      'For complex images, consider adding a longer description',
-      'Use role="img" and aria-label for SVG images',
-      'Validate the EPUB after making changes',
+      '**Open in Sigil:** File → Open → Select your EPUB',
+      '**Find the file:** In Book Browser, expand "Text" and open the file from the issue location',
+      '**Switch to Code View:** Press `F9`',
+      '**Locate the `<img>` element** mentioned in the issue',
+      '**Add descriptive alt text** that conveys the image meaning',
+      '**For decorative images:** Use `alt=""`',
+      '**Save:** `Ctrl+S`',
     ],
+    codeExample: {
+      before: `<img src="decorative-divider.png" />
+<img src="diagram.png" />`,
+      after: `<img src="decorative-divider.png" alt="" />
+<img src="diagram.png" alt="Workflow diagram showing 3 steps: Upload, Process, Download" />`,
+    },
     resources: [
       { label: 'Image Tutorial', url: 'https://www.w3.org/WAI/tutorials/images/' },
-      { label: 'WCAG 1.1.1', url: 'https://www.w3.org/WAI/WCAG21/Understanding/non-text-content' },
+      { label: 'Sigil User Guide', url: 'https://sigil-ebook.com/sigil/guide/' },
     ],
   },
   'contrast': {
@@ -229,26 +254,62 @@ const remediationTemplates: Record<string, { title: string; steps: string[]; res
     ],
   },
   'heading': {
-    title: 'How to fix heading structure',
+    title: 'Fix Heading Structure',
     steps: [
-      'Review the document heading hierarchy',
-      'Ensure headings follow logical order (h1 → h2 → h3)',
-      'Do not skip heading levels',
-      'Use headings for structure, not styling',
+      '**Open in Sigil:** File → Open → Select your EPUB',
+      '**Find the file:** Open the file from the issue location in Book Browser',
+      '**Switch to Code View:** Press `F9`',
+      '**Find headings:** Search (`Ctrl+F`) for `<h1`, `<h2`, `<h3`, etc.',
+      '**Ensure logical order:** h1 → h2 → h3 (no skipping levels)',
+      '**Each chapter:** Should have exactly one `<h1>`',
+      '**Save:** `Ctrl+S`',
     ],
+    codeExample: {
+      before: `<h1>Chapter Title</h1>
+<h3>Subsection</h3>  <!-- ERROR: Skipped h2 -->
+<h4>Details</h4>`,
+      after: `<h1>Chapter Title</h1>
+<h2>Subsection</h2>  <!-- Fixed: h2 follows h1 -->
+<h3>Details</h3>`,
+    },
     resources: [
-      { label: 'Heading Structure', url: 'https://www.w3.org/WAI/tutorials/page-structure/headings/' },
+      { label: 'Heading Structure Guide', url: 'https://www.w3.org/WAI/tutorials/page-structure/headings/' },
+      { label: 'Sigil User Guide', url: 'https://sigil-ebook.com/sigil/guide/' },
     ],
   },
   'table': {
-    title: 'How to make tables accessible',
+    title: 'Fix Table Accessibility',
     steps: [
-      'Add <caption> to describe the table purpose',
-      'Use <th> for header cells with scope attribute',
-      'Ensure tables are used for data, not layout',
+      '**Open in Sigil:** File → Open → Select your EPUB',
+      '**Find the file:** Open the file from the issue location',
+      '**Switch to Code View:** Press `F9`',
+      '**Find the table:** Search (`Ctrl+F`) for `<table`',
+      '**Add `<caption>`** to describe the table purpose',
+      '**Use `<th>` for headers** with `scope="col"` or `scope="row"`',
+      '**Save:** `Ctrl+S`',
     ],
+    codeExample: {
+      before: `<table>
+  <tr>
+    <td>Name</td><td>Price</td>
+  </tr>
+  <tr>
+    <td>Widget</td><td>$10</td>
+  </tr>
+</table>`,
+      after: `<table>
+  <caption>Product Price List</caption>
+  <tr>
+    <th scope="col">Name</th><th scope="col">Price</th>
+  </tr>
+  <tr>
+    <td>Widget</td><td>$10</td>
+  </tr>
+</table>`,
+    },
     resources: [
-      { label: 'Table Tutorial', url: 'https://www.w3.org/WAI/tutorials/tables/' },
+      { label: 'Table Accessibility Tutorial', url: 'https://www.w3.org/WAI/tutorials/tables/' },
+      { label: 'Sigil User Guide', url: 'https://sigil-ebook.com/sigil/guide/' },
     ],
   },
   'lang': {
@@ -289,14 +350,30 @@ const remediationTemplates: Record<string, { title: string; steps: string[]; res
   'landmark': {
     title: 'Fix Duplicate Landmarks',
     steps: [
-      'Identify all elements with the same landmark role (e.g., multiple role="navigation")',
-      'Add unique aria-label to each landmark to distinguish them',
-      'Example: <nav role="navigation" aria-label="Main navigation">',
-      'Example: <nav role="navigation" aria-label="Footer navigation">',
-      'Verify each landmark has a unique accessible name',
+      '**Open in Sigil:** File → Open → Select your EPUB',
+      '**Find the file:** In Book Browser (left panel), expand "Text" and open the file from the issue location',
+      '**Switch to Code View:** Press `F9` or View → Code View',
+      '**Find duplicate landmarks:** Search (`Ctrl+F`) for `role="navigation"` or `<nav`',
+      '**Add unique aria-label to each landmark** (see example below)',
+      '**Save:** `Ctrl+S`',
     ],
+    codeExample: {
+      before: `<nav epub:type="toc" role="navigation">
+  <!-- Table of Contents -->
+</nav>
+<nav epub:type="landmarks" role="navigation">
+  <!-- Landmarks -->
+</nav>`,
+      after: `<nav epub:type="toc" role="navigation" aria-label="Table of Contents">
+  <!-- Table of Contents -->
+</nav>
+<nav epub:type="landmarks" role="navigation" aria-label="Landmarks">
+  <!-- Landmarks -->
+</nav>`,
+    },
     resources: [
-      { label: 'ARIA Landmarks', url: 'https://www.w3.org/WAI/ARIA/apg/practices/landmark-regions/' },
+      { label: 'ARIA Landmarks Guide', url: 'https://www.w3.org/WAI/ARIA/apg/practices/landmark-regions/' },
+      { label: 'Sigil User Guide', url: 'https://sigil-ebook.com/sigil/guide/' },
     ],
   },
   'link': {
