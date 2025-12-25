@@ -85,6 +85,151 @@ interface RawAceAssertion {
   };
 }
 
+const wcagMappings: Record<string, string[]> = {
+  'metadata': ['1.3.1'],
+  'accessmode': ['1.1.1'],
+  'accessibilityfeature': ['1.3.1', '4.1.2'],
+  'accessibilityhazard': ['2.3.1'],
+  'accessibilitysummary': ['1.1.1'],
+  'alt': ['1.1.1'],
+  'img': ['1.1.1'],
+  'image': ['1.1.1'],
+  'nav': ['2.4.1', '2.4.5'],
+  'landmark': ['2.4.1'],
+  'heading': ['1.3.1', '2.4.6'],
+  'table': ['1.3.1'],
+  'lang': ['3.1.1', '3.1.2'],
+  'link': ['2.4.4'],
+  'label': ['1.3.1', '4.1.2'],
+  'aria': ['4.1.2'],
+  'contrast': ['1.4.3'],
+  'color': ['1.4.1'],
+  'focus': ['2.4.7'],
+  'keyboard': ['2.1.1'],
+  'title': ['2.4.2'],
+  'pagebreak': ['2.4.1'],
+  'toc': ['2.4.5'],
+};
+
+const remediationTemplates: Record<string, { title: string; steps: string[]; resources?: { label: string; url: string }[] }> = {
+  'metadata': {
+    title: 'How to add accessibility metadata',
+    steps: [
+      'Open the package.opf file in your EPUB editor',
+      'Locate the <metadata> section',
+      'Add the required schema.org accessibility metadata properties',
+      'Save and validate the EPUB',
+    ],
+    resources: [
+      { label: 'A11y Metadata Guide', url: 'https://www.w3.org/2021/a11y-discov-vocab/latest/' },
+      { label: 'EPUB Accessibility', url: 'https://www.w3.org/TR/epub-a11y-11/' },
+    ],
+  },
+  'alt': {
+    title: 'How to add alt text',
+    steps: [
+      'Open the XHTML file in your EPUB editor',
+      'Locate the <img> element',
+      'Add an alt attribute with descriptive text',
+      'Describe what the image conveys, not just what it shows',
+    ],
+    resources: [
+      { label: 'Alt Text Guide', url: 'https://www.w3.org/WAI/tutorials/images/' },
+      { label: 'WCAG 1.1.1', url: 'https://www.w3.org/WAI/WCAG21/Understanding/non-text-content' },
+    ],
+  },
+  'heading': {
+    title: 'How to fix heading structure',
+    steps: [
+      'Review the document heading hierarchy',
+      'Ensure headings follow logical order (h1 → h2 → h3)',
+      'Do not skip heading levels',
+      'Use headings for structure, not styling',
+    ],
+    resources: [
+      { label: 'Heading Structure', url: 'https://www.w3.org/WAI/tutorials/page-structure/headings/' },
+    ],
+  },
+  'table': {
+    title: 'How to make tables accessible',
+    steps: [
+      'Add <caption> to describe the table purpose',
+      'Use <th> for header cells with scope attribute',
+      'Ensure tables are used for data, not layout',
+    ],
+    resources: [
+      { label: 'Table Tutorial', url: 'https://www.w3.org/WAI/tutorials/tables/' },
+    ],
+  },
+  'lang': {
+    title: 'How to set language attributes',
+    steps: [
+      'Add xml:lang attribute to the root html element',
+      'Use correct BCP 47 language codes (e.g., "en", "fr", "es")',
+      'Mark language changes within content with lang attributes',
+    ],
+    resources: [
+      { label: 'Language Guide', url: 'https://www.w3.org/International/questions/qa-html-language-declarations' },
+    ],
+  },
+  'nav': {
+    title: 'How to fix navigation',
+    steps: [
+      'Open the navigation document (nav.xhtml)',
+      'Add epub:type attributes to navigation elements',
+      'Include landmarks: toc, bodymatter, backmatter',
+      'Ensure the table of contents is complete',
+    ],
+    resources: [
+      { label: 'EPUB Navigation', url: 'https://www.w3.org/TR/epub-33/#sec-nav' },
+    ],
+  },
+  'aria': {
+    title: 'How to add ARIA attributes',
+    steps: [
+      'Identify the element that needs ARIA enhancement',
+      'Add appropriate role, aria-label, or aria-describedby',
+      'Test with a screen reader to verify',
+      'Ensure native HTML semantics are used first',
+    ],
+    resources: [
+      { label: 'ARIA Practices', url: 'https://www.w3.org/WAI/ARIA/apg/' },
+    ],
+  },
+};
+
+function getWcagCriteriaFromCode(code: string, message: string): string[] {
+  const lowerCode = code.toLowerCase();
+  const lowerMessage = message.toLowerCase();
+  
+  for (const [keyword, criteria] of Object.entries(wcagMappings)) {
+    if (lowerCode.includes(keyword) || lowerMessage.includes(keyword)) {
+      return criteria;
+    }
+  }
+  return [];
+}
+
+function getRemediationFromCode(code: string, message: string): RemediationTask['remediation'] {
+  const lowerCode = code.toLowerCase();
+  const lowerMessage = message.toLowerCase();
+  
+  for (const [keyword, template] of Object.entries(remediationTemplates)) {
+    if (lowerCode.includes(keyword) || lowerMessage.includes(keyword)) {
+      return template;
+    }
+  }
+  return undefined;
+}
+
+function getSourceFromCode(code: string): string {
+  const upperCode = code.toUpperCase();
+  if (upperCode.startsWith('EPUB-') || upperCode.includes('ACE')) return 'ACE';
+  if (upperCode.startsWith('PKG-') || upperCode.startsWith('OPF-') || upperCode.startsWith('RSC-')) return 'EPUBCheck';
+  if (upperCode.startsWith('AXE-') || upperCode.includes('AXE')) return 'AXE';
+  return 'ACE';
+}
+
 function normalizeAceTask(raw: RawAceAssertion, index: number): RemediationTask {
   const code = raw.code 
     || raw.ruleId 
@@ -115,24 +260,32 @@ function normalizeAceTask(raw: RawAceAssertion, index: number): RemediationTask 
   } else if (raw.isAutoFixable === false) {
     taskType = 'manual';
   } else {
-    // Default to manual for safety if neither type nor isAutoFixable is specified
     taskType = 'manual';
   }
+
+  const message = raw.message || raw.description || raw.test?.title || 'Accessibility issue detected';
+  const location = raw.location || raw.pointer;
+  
+  // Derive enhanced fields if not provided
+  const wcagCriteria = raw.wcagCriteria || getWcagCriteriaFromCode(code, message);
+  const source = raw.source || getSourceFromCode(code);
+  const remediation = raw.remediation || (taskType === 'manual' ? getRemediationFromCode(code, message) : undefined);
+  const filePath = raw.filePath || (location ? location.split(',')[0].trim() : undefined);
 
   return {
     id: raw.id || `task-${index}`,
     code,
     severity,
-    message: raw.message || raw.description || raw.test?.title || 'Accessibility issue detected',
-    location: raw.location || raw.pointer,
+    message,
+    location,
     suggestion: raw.suggestion || raw.help,
     type: taskType,
     status: (raw.status as TaskStatus) || 'pending',
-    filePath: raw.filePath,
+    filePath,
     selector: raw.selector,
-    wcagCriteria: raw.wcagCriteria,
-    source: raw.source,
-    remediation: raw.remediation,
+    wcagCriteria: wcagCriteria.length > 0 ? wcagCriteria : undefined,
+    source,
+    remediation,
   };
 }
 
