@@ -473,6 +473,29 @@ function getRemediationFromCode(code: string, message: string): RemediationTask[
   const lowerCode = code.toLowerCase();
   const lowerMessage = message.toLowerCase();
   
+  // Priority order: more specific keywords first
+  const priorityOrder = [
+    'landmark', 'accessmodesufficient', 'accessibilityfeature', 'accessibilityhazard', 
+    'accessibilitysummary', 'accessmode', 'conformsto', 'pagebreak', 'reading', 
+    'heading', 'contrast', 'language', 'table', 'link', 'img', 'alt', 'nav', 
+    'aria', 'lang', 'metadata'
+  ];
+  
+  // First pass: check code (more specific)
+  for (const keyword of priorityOrder) {
+    if (lowerCode.includes(keyword) && remediationTemplates[keyword]) {
+      return remediationTemplates[keyword];
+    }
+  }
+  
+  // Second pass: check message (fallback)
+  for (const keyword of priorityOrder) {
+    if (lowerMessage.includes(keyword) && remediationTemplates[keyword]) {
+      return remediationTemplates[keyword];
+    }
+  }
+  
+  // Final fallback: check all templates
   for (const [keyword, template] of Object.entries(remediationTemplates)) {
     if (lowerCode.includes(keyword) || lowerMessage.includes(keyword)) {
       return template;
