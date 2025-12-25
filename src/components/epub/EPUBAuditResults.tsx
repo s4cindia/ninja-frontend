@@ -9,7 +9,7 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs';
 import { QuickRating } from '../feedback';
-import { SourceBadge, SummaryBySource } from '../audit';
+import { SourceBadge, SummaryBySource, ViewInContextButton } from '../audit';
 import type { SummaryBySourceData } from '../audit';
 import { cn } from '@/utils/cn';
 
@@ -413,7 +413,7 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
               ) : (
                 <div className="space-y-3">
                   {filteredIssues.map((issue) => (
-                    <IssueCard key={issue.id} issue={issue} />
+                    <IssueCard key={issue.id} issue={issue} jobId={jobId} />
                   ))}
                 </div>
               )}
@@ -437,7 +437,7 @@ const SummaryCard: React.FC<{
   </div>
 );
 
-const IssueCard: React.FC<{ issue: AuditIssue }> = ({ issue }) => {
+const IssueCard: React.FC<{ issue: AuditIssue; jobId: string }> = ({ issue, jobId }) => {
   const config = SEVERITY_CONFIG[issue.severity];
   const autoFix = isAutoFixable(issue);
 
@@ -487,6 +487,17 @@ const IssueCard: React.FC<{ issue: AuditIssue }> = ({ issue }) => {
             <p className="text-xs text-gray-600 mt-2 p-2 bg-white/50 rounded">
               <span className="font-medium">Suggestion:</span> {issue.suggestion}
             </p>
+          )}
+
+          {!autoFix && issue.location && (
+            <div className="mt-2">
+              <ViewInContextButton
+                jobId={jobId}
+                location={issue.location}
+                issueCode={issue.code}
+                isManual={true}
+              />
+            </div>
           )}
         </div>
       </div>
