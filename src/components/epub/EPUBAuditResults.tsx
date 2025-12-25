@@ -169,7 +169,6 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
   // Defensive data access with fallbacks
   const jobId = result?.jobId ?? '';
   const issues = result?.issues ?? [];
-  const accessibilityScore = result?.accessibilityScore ?? 0;
   const isValid = result?.isValid ?? false;
   const epubVersion = result?.epubVersion ?? 'Unknown';
   
@@ -246,10 +245,11 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
     setSourceFilter(prev => prev === source ? null : source);
   };
 
-  const circumference = 2 * Math.PI * 45;
-  const scoreOffset = circumference - (accessibilityScore / 100) * circumference;
-
   const scoreBreakdown = useMemo(() => calculateScoreBreakdown(issuesSummary), [issuesSummary]);
+  
+  const displayScore = scoreBreakdown.finalScore;
+  const circumference = 2 * Math.PI * 45;
+  const scoreOffset = circumference - (displayScore / 100) * circumference;
 
   return (
     <div className="space-y-6">
@@ -301,12 +301,12 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
                     strokeLinecap="round"
                     strokeDasharray={circumference}
                     strokeDashoffset={scoreOffset}
-                    className={cn('transition-all duration-1000', getScoreRingColor(accessibilityScore))}
+                    className={cn('transition-all duration-1000', getScoreRingColor(displayScore))}
                   />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className={cn('text-3xl font-bold', getScoreColor(accessibilityScore))}>
-                    {accessibilityScore}
+                  <span className={cn('text-3xl font-bold', getScoreColor(displayScore))}>
+                    {displayScore}
                   </span>
                   <span className="text-xs text-gray-500">/ 100</span>
                 </div>
