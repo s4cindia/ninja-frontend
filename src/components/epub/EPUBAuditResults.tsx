@@ -9,7 +9,7 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs';
 import { QuickRating } from '../feedback';
-import { SourceBadge, SummaryBySource, ViewInContextButton } from '../audit';
+import { SourceBadge, SummaryBySource, ViewInContextButton, RemediationGuidance } from '../audit';
 import type { SummaryBySourceData } from '../audit';
 import { cn } from '@/utils/cn';
 
@@ -489,15 +489,20 @@ const IssueCard: React.FC<{ issue: AuditIssue; jobId: string }> = ({ issue, jobI
             </p>
           )}
 
-          {!autoFix && issue.location && (
-            <div className="mt-2">
-              <ViewInContextButton
-                jobId={jobId}
-                location={issue.location}
-                issueCode={issue.code}
-                isManual={true}
-              />
-            </div>
+          {!autoFix && (
+            <>
+              <RemediationGuidance issueCode={issue.code} />
+              {issue.location && (
+                <div className="mt-2">
+                  <ViewInContextButton
+                    jobId={jobId}
+                    location={issue.location}
+                    issueCode={issue.code}
+                    isManual={true}
+                  />
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
