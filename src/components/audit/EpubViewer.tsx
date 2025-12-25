@@ -12,6 +12,31 @@ interface EpubViewerProps {
   cssSelector?: string;
 }
 
+const getIssueTypeSelector = (issueCode?: string): string => {
+  if (!issueCode) return '';
+  
+  const issueSelectors: Record<string, string> = {
+    'IMAGE-ALT': 'img[alt=""], img[alt=" "], img:not([alt])',
+    'IMG-ALT': 'img[alt=""], img[alt=" "], img:not([alt])',
+    'LINK-IN-TEXT-BLOCK': 'a',
+    'LINK-TEXT': 'a',
+    'HEADING-ORDER': 'h1, h2, h3, h4, h5, h6',
+    'PAGE-TITLE': 'title',
+    'LANG': 'html',
+    'TABLE-HEADER': 'table',
+    'LIST': 'ul, ol, dl',
+    'LANDMARK': 'main, nav, header, footer, aside',
+  };
+
+  const codeUpper = issueCode.toUpperCase();
+  for (const [key, selector] of Object.entries(issueSelectors)) {
+    if (codeUpper.includes(key)) {
+      return selector;
+    }
+  }
+  return '';
+};
+
 export function EpubViewer({ isOpen, onClose, jobId, filePath, issueCode, cssSelector }: EpubViewerProps) {
   const [content, setContent] = useState<string>('');
   const [loading, setLoading] = useState(true);
@@ -33,9 +58,74 @@ export function EpubViewer({ isOpen, onClose, jobId, filePath, issueCode, cssSel
       });
 
       let html = response.data;
-      if (cssSelector) {
-        const highlightStyle = `<style>[data-issue-highlight] { outline: 3px solid #ef4444 !important; background: #fef2f2 !important; }</style>`;
-        html = html.replace('</head>', `${highlightStyle}</head>`);
+
+      const highlightStyle = `
+        <style>
+          .issue-highlight {
+            outline: 4px solid #ef4444 !important;
+            background-color: #fef2f2 !important;
+            animation: pulse 2s infinite;
+          }
+          @keyframes pulse {
+            0%, 100% { outline-color: #ef4444; }
+            50% { outline-color: #f97316; }
+          }
+        </style>
+      `;
+
+      const escapedSelector = cssSelector ? cssSelector.replace(/'/g, "\\'").replace(/"/g, '\\"') : '';
+      const fallbackSelector = getIssueTypeSelector(issueCode);
+
+      const highlightScript = `
+        <script>
+          document.addEventListener('DOMContentLoaded', function() {
+            let targetElement = null;
+
+            ${escapedSelector ? `
+              try {
+                targetElement = document.querySelector('${escapedSelector}');
+              } catch(e) { console.log('Selector failed:', e); }
+            ` : ''}
+
+            ${fallbackSelector ? `
+              if (!targetElement) {
+                try {
+                  const elements = document.querySelectorAll('${fallbackSelector}');
+                  if (elements.length > 0) targetElement = elements[0];
+                } catch(e) { console.log('Fallback selector failed:', e); }
+              }
+            ` : ''}
+
+            if (!targetElement) {
+              const images = document.querySelectorAll('img[alt=""], img[alt=" "], img:not([alt])');
+              if (images.length > 0) targetElement = images[0];
+            }
+
+            if (!targetElement) {
+              const links = document.querySelectorAll('a');
+              if (links.length > 0) targetElement = links[0];
+            }
+
+            if (targetElement) {
+              targetElement.classList.add('issue-highlight');
+              setTimeout(function() {
+                targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }, 100);
+            }
+          });
+        </script>
+      `;
+
+      if (html.includes('</head>')) {
+        html = html.replace('</head>', highlightStyle + '</head>');
+      } else {
+        html = highlightStyle + html;
+      }
+
+      if (html.includes('</body>')) {
+        html = html.replace('</body>', highlightScript + '</body>');
+      } else {
+        html = html + highlightScript;
       }
 
       setContent(html);
@@ -94,7 +184,7 @@ export function EpubViewer({ isOpen, onClose, jobId, filePath, issueCode, cssSel
             <iframe
               srcDoc={content}
               className="w-full h-full border-0"
-              sandbox="allow-same-origin"
+              sandbox="allow-same-origin allow-scripts"
               title="EPUB Content"
             />
           )}
