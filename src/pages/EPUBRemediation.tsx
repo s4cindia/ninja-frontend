@@ -94,14 +94,17 @@ const wcagMappings: Record<string, string[]> = {
   'accessibilityfeature': ['1.3.1', '4.1.2'],
   'accessibilityhazard': ['2.3.1'],
   'accessibilitysummary': ['1.1.1'],
+  'accessmodesufficient': ['1.1.1'],
+  'conformsto': ['1.1.1'],
   'alt': ['1.1.1'],
   'img': ['1.1.1'],
   'image': ['1.1.1'],
   'nav': ['2.4.1', '2.4.5'],
-  'landmark': ['2.4.1'],
+  'landmark': ['2.4.1', '1.3.6'],
   'heading': ['1.3.1', '2.4.6'],
   'table': ['1.3.1'],
   'lang': ['3.1.1', '3.1.2'],
+  'language': ['3.1.1', '3.1.2'],
   'link': ['2.4.4'],
   'label': ['1.3.1', '4.1.2'],
   'aria': ['4.1.2'],
@@ -112,6 +115,8 @@ const wcagMappings: Record<string, string[]> = {
   'title': ['2.4.2'],
   'pagebreak': ['2.4.1'],
   'toc': ['2.4.5'],
+  'reading': ['1.3.2'],
+  'order': ['1.3.2'],
 };
 
 const remediationTemplates: Record<string, { title: string; steps: string[]; resources?: { label: string; url: string }[] }> = {
@@ -279,6 +284,98 @@ const remediationTemplates: Record<string, { title: string; steps: string[]; res
     ],
     resources: [
       { label: 'ARIA Practices', url: 'https://www.w3.org/WAI/ARIA/apg/' },
+    ],
+  },
+  'landmark': {
+    title: 'Fix Duplicate Landmarks',
+    steps: [
+      'Identify all elements with the same landmark role (e.g., multiple role="navigation")',
+      'Add unique aria-label to each landmark to distinguish them',
+      'Example: <nav role="navigation" aria-label="Main navigation">',
+      'Example: <nav role="navigation" aria-label="Footer navigation">',
+      'Verify each landmark has a unique accessible name',
+    ],
+    resources: [
+      { label: 'ARIA Landmarks', url: 'https://www.w3.org/WAI/ARIA/apg/practices/landmark-regions/' },
+    ],
+  },
+  'link': {
+    title: 'Fix Link Purpose',
+    steps: [
+      'Identify links with vague text like "click here", "read more", "link"',
+      'Replace with descriptive text that explains the destination',
+      'Bad: <a href="...">Click here</a>',
+      'Good: <a href="...">Download the accessibility report (PDF)</a>',
+      'If using images as links, add descriptive alt text',
+    ],
+    resources: [
+      { label: 'Link Purpose', url: 'https://www.w3.org/WAI/WCAG21/Understanding/link-purpose-in-context.html' },
+    ],
+  },
+  'pagebreak': {
+    title: 'Fix Page Break Labels',
+    steps: [
+      'Locate page break elements (epub:type="pagebreak")',
+      'Add aria-label with the page number',
+      'Example: <span epub:type="pagebreak" role="doc-pagebreak" aria-label="Page 42" id="page42"/>',
+      'Ensure id attribute matches the page reference',
+      'Update the page-list nav to reference these IDs',
+    ],
+    resources: [
+      { label: 'EPUB Page Navigation', url: 'https://www.w3.org/publishing/epub32/epub-packages.html#sec-package-nav-def-pagelist' },
+    ],
+  },
+  'conformsto': {
+    title: 'Add Conformance Metadata',
+    steps: [
+      'Open the OPF file (content.opf or package.opf)',
+      'Add dcterms:conformsTo in the metadata section',
+      'For EPUB Accessibility 1.0: <meta property="dcterms:conformsTo">EPUB Accessibility 1.0</meta>',
+      'For WCAG 2.0 AA: <meta property="dcterms:conformsTo">WCAG 2.0 Level AA</meta>',
+      'Only claim conformance levels you actually meet',
+    ],
+    resources: [
+      { label: 'EPUB Accessibility', url: 'https://www.w3.org/publishing/epub-a11y/' },
+    ],
+  },
+  'accessmodesufficient': {
+    title: 'Add Access Mode Sufficient Metadata',
+    steps: [
+      'Open the OPF file',
+      'Add schema:accessModeSufficient metadata',
+      'Indicates which access modes are sufficient to consume the content',
+      'Example: <meta property="schema:accessModeSufficient">textual</meta>',
+      'For visual content with descriptions: textual,visual',
+      'For audio with transcripts: textual,auditory',
+    ],
+    resources: [
+      { label: 'Access Mode Sufficient', url: 'https://www.w3.org/wiki/WebSchemas/Accessibility#accessModeSufficient' },
+    ],
+  },
+  'reading': {
+    title: 'Fix Reading Order',
+    steps: [
+      'Verify content in the document source matches logical reading order',
+      'Reading order should follow visual layout when linearized',
+      'Sidebars and asides should be positioned appropriately in source',
+      'Use CSS for visual positioning, not source reordering',
+      'Test with a screen reader to verify order makes sense',
+    ],
+    resources: [
+      { label: 'Reading Order', url: 'https://www.w3.org/WAI/WCAG21/Understanding/meaningful-sequence.html' },
+    ],
+  },
+  'language': {
+    title: 'Add Language Declaration',
+    steps: [
+      'Add lang attribute to the root html element',
+      'Example: <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">',
+      'Use correct BCP 47 language codes (en, fr, de, es, etc.)',
+      'For multilingual content, add lang to specific elements',
+      'Example: <p lang="fr">Bonjour le monde</p>',
+    ],
+    resources: [
+      { label: 'Language Tags', url: 'https://www.w3.org/International/questions/qa-html-language-declarations' },
     ],
   },
 };
