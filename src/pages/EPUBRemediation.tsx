@@ -14,6 +14,7 @@ import {
 import { RemediationTask, TaskStatus } from '@/components/epub/RemediationTaskCard';
 import { FixResult } from '@/components/epub/RemediationProgress';
 import { EPUBExportOptions } from '@/components/epub/EPUBExportOptions';
+import { ReAuditSection, ReauditResult } from '@/components/epub/ReAuditSection';
 import { QuickRating } from '@/components/feedback';
 import { api } from '@/services/api';
 
@@ -493,6 +494,35 @@ export const EPUBRemediation: React.FC = () => {
     navigate(`/epub/compare/${jobId}`, { state: comparisonData });
   };
 
+  const handleReauditComplete = (result: ReauditResult) => {
+    if (!plan) return;
+    
+    const updatedTasks = plan.tasks.map(task => {
+      if (task.type === 'manual' && task.status === 'pending') {
+        const wasResolved = result.resolved > 0;
+        if (wasResolved) {
+          return { ...task, status: 'completed' as TaskStatus, completionMethod: 'manual' as const };
+        }
+      }
+      return task;
+    });
+    
+    setPlan({ ...plan, tasks: updatedTasks });
+    
+    if (result.stillPending === 0) {
+      setComparisonSummary(prev => prev ? {
+        ...prev,
+        afterScore: result.score || prev.afterScore,
+      } : {
+        fixedCount: result.resolved,
+        failedCount: 0,
+        skippedCount: 0,
+        beforeScore: 45,
+        afterScore: result.score || 85,
+      });
+    }
+  };
+
   if (pageState === 'loading') {
     return (
       <div className="p-6 max-w-4xl mx-auto">
@@ -520,6 +550,7 @@ export const EPUBRemediation: React.FC = () => {
 
   const fixedCount = plan.tasks.filter(t => t.status === 'completed').length;
   const failedCount = plan.tasks.filter(t => t.status === 'failed').length;
+  const pendingManualCount = plan.tasks.filter(t => t.type === 'manual' && t.status === 'pending').length;
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -621,6 +652,15 @@ export const EPUBRemediation: React.FC = () => {
         onCancelRemediation={handleCancelRemediation}
         onMarkTaskFixed={handleMarkTaskFixed}
       />
+
+      {pageState !== 'running' && pendingManualCount > 0 && (
+        <ReAuditSection
+          jobId={jobId || 'demo'}
+          pendingCount={pendingManualCount}
+          onReauditComplete={handleReauditComplete}
+          isDemo={isDemo}
+        />
+      )}
     </div>
   );
 };

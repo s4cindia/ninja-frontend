@@ -8,3 +8,5 @@ export type { FixResult } from './RemediationProgress';
 export { RemediationPlanView } from './RemediationPlanView';
 export type { RemediationPlan } from './RemediationPlanView';
 export { EPUBExportOptions } from './EPUBExportOptions';
+export { ReAuditSection } from './ReAuditSection';
+export type { ReauditResult } from './ReAuditSection';
