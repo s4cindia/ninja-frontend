@@ -9,7 +9,7 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs';
 import { QuickRating } from '../feedback';
-import { SourceBadge, SummaryBySource } from '../audit';
+import { SourceBadge, SummaryBySource, ViewInContextButton, RemediationGuidance, ScoreTooltip, calculateScoreBreakdown } from '../audit';
 import type { SummaryBySourceData } from '../audit';
 import { cn } from '@/utils/cn';
 
@@ -169,7 +169,6 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
   // Defensive data access with fallbacks
   const jobId = result?.jobId ?? '';
   const issues = result?.issues ?? [];
-  const accessibilityScore = result?.accessibilityScore ?? 0;
   const isValid = result?.isValid ?? false;
   const epubVersion = result?.epubVersion ?? 'Unknown';
   
@@ -246,8 +245,11 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
     setSourceFilter(prev => prev === source ? null : source);
   };
 
+  const scoreBreakdown = useMemo(() => calculateScoreBreakdown(issuesSummary), [issuesSummary]);
+  
+  const displayScore = scoreBreakdown.finalScore;
   const circumference = 2 * Math.PI * 45;
-  const scoreOffset = circumference - (accessibilityScore / 100) * circumference;
+  const scoreOffset = circumference - (displayScore / 100) * circumference;
 
   return (
     <div className="space-y-6">
@@ -278,36 +280,38 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="md:col-span-1">
           <CardContent className="p-6 flex flex-col items-center justify-center">
-            <div className="relative w-32 h-32">
-              <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 100 100">
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="45"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="8"
-                  className="text-gray-200"
-                />
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="45"
-                  fill="none"
-                  strokeWidth="8"
-                  strokeLinecap="round"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={scoreOffset}
-                  className={cn('transition-all duration-1000', getScoreRingColor(accessibilityScore))}
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className={cn('text-3xl font-bold', getScoreColor(accessibilityScore))}>
-                  {accessibilityScore}
-                </span>
-                <span className="text-xs text-gray-500">/ 100</span>
+            <ScoreTooltip breakdown={scoreBreakdown}>
+              <div className="relative w-32 h-32">
+                <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 100 100">
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="45"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="8"
+                    className="text-gray-200"
+                  />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="45"
+                    fill="none"
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={scoreOffset}
+                    className={cn('transition-all duration-1000', getScoreRingColor(displayScore))}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className={cn('text-3xl font-bold', getScoreColor(displayScore))}>
+                    {displayScore}
+                  </span>
+                  <span className="text-xs text-gray-500">/ 100</span>
+                </div>
               </div>
-            </div>
+            </ScoreTooltip>
             <p className="mt-3 font-medium text-gray-900">Accessibility Score</p>
             <div className="flex items-center gap-2 mt-2">
               <Badge variant={isValid ? 'success' : 'error'} size="sm">
@@ -413,7 +417,7 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
               ) : (
                 <div className="space-y-3">
                   {filteredIssues.map((issue) => (
-                    <IssueCard key={issue.id} issue={issue} />
+                    <IssueCard key={issue.id} issue={issue} jobId={jobId} />
                   ))}
                 </div>
               )}
@@ -437,7 +441,7 @@ const SummaryCard: React.FC<{
   </div>
 );
 
-const IssueCard: React.FC<{ issue: AuditIssue }> = ({ issue }) => {
+const IssueCard: React.FC<{ issue: AuditIssue; jobId: string }> = ({ issue, jobId }) => {
   const config = SEVERITY_CONFIG[issue.severity];
   const autoFix = isAutoFixable(issue);
 
@@ -467,11 +471,18 @@ const IssueCard: React.FC<{ issue: AuditIssue }> = ({ issue }) => {
                 Manual
               </Badge>
             )}
-            {issue.wcagCriteria && (
-              <Badge variant="info" size="sm">
-                <ExternalLink className="h-3 w-3 mr-1" />
-                {issue.wcagCriteria}
-              </Badge>
+            {issue.wcagCriteria && typeof issue.wcagCriteria === 'string' && (
+              <a
+                href={`https://www.w3.org/WAI/WCAG21/Understanding/${issue.wcagCriteria.toLowerCase().replace(/\./g, '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block"
+              >
+                <Badge variant="info" size="sm" className="hover:bg-blue-200 cursor-pointer transition-colors">
+                  <ExternalLink className="h-3 w-3 mr-1" />
+                  {issue.wcagCriteria}
+                </Badge>
+              </a>
             )}
           </div>
           
@@ -487,6 +498,22 @@ const IssueCard: React.FC<{ issue: AuditIssue }> = ({ issue }) => {
             <p className="text-xs text-gray-600 mt-2 p-2 bg-white/50 rounded">
               <span className="font-medium">Suggestion:</span> {issue.suggestion}
             </p>
+          )}
+
+          {!autoFix && (
+            <>
+              <RemediationGuidance issueCode={issue.code} />
+              {issue.location && (
+                <div className="mt-2">
+                  <ViewInContextButton
+                    jobId={jobId}
+                    location={issue.location}
+                    issueCode={issue.code}
+                    isManual={true}
+                  />
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
