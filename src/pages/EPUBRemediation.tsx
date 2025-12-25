@@ -469,11 +469,58 @@ function getWcagCriteriaFromCode(code: string, message: string): string[] {
   return [];
 }
 
+// Issue code aliases for precise matching
+const issueCodeAliases: Record<string, string> = {
+  'METADATA-ACCESSMODE': 'accessmode',
+  'METADATA-ACCESSIBILITYFEATURE': 'accessibilityfeature',
+  'METADATA-ACCESSIBILITYHAZARD': 'accessibilityhazard',
+  'METADATA-ACCESSIBILITYSUMMARY': 'accessibilitysummary',
+  'METADATA-ACCESSMODESUFFICIENT': 'accessmodesufficient',
+  'EPUB-ACCESSMODE': 'accessmode',
+  'EPUB-001': 'accessmode',
+  'EPUB-002': 'accessibilityfeature',
+  'EPUB-003': 'accessibilityhazard',
+  'EPUB-004': 'accessibilitysummary',
+  'LANDMARK-UNIQUE': 'landmark',
+  'ARIA-LANDMARK-UNIQUE': 'landmark',
+  'COLOR-CONTRAST': 'contrast',
+  'CONTRAST': 'contrast',
+  'IMAGE-ALT': 'alt',
+  'IMG-ALT': 'alt',
+  'HEADING-ORDER': 'heading',
+  'HEADING-SKIP': 'heading',
+  'LANGUAGE': 'language',
+  'HTML-LANG': 'language',
+  'TABLE-STRUCTURE': 'table',
+  'TABLE-HEADERS': 'table',
+  'PAGEBREAK-LABEL': 'pagebreak',
+  'LINK-NAME': 'link',
+  'LINK-PURPOSE': 'link',
+};
+
 function getRemediationFromCode(code: string, message: string): RemediationTask['remediation'] {
+  const upperCode = code.toUpperCase().trim();
   const lowerCode = code.toLowerCase();
   const lowerMessage = message.toLowerCase();
   
-  // Priority order: more specific keywords first
+  // 1. Check alias first (exact code match)
+  if (issueCodeAliases[upperCode]) {
+    const templateKey = issueCodeAliases[upperCode];
+    if (remediationTemplates[templateKey]) {
+      return remediationTemplates[templateKey];
+    }
+  }
+  
+  // 2. Check for partial alias matches (e.g., "LANDMARK-UNIQUE-xyz")
+  for (const [aliasCode, templateKey] of Object.entries(issueCodeAliases)) {
+    if (upperCode.includes(aliasCode) || upperCode.startsWith(aliasCode.split('-')[0] + '-')) {
+      if (remediationTemplates[templateKey]) {
+        return remediationTemplates[templateKey];
+      }
+    }
+  }
+  
+  // 3. Priority-based keyword matching on code
   const priorityOrder = [
     'landmark', 'accessmodesufficient', 'accessibilityfeature', 'accessibilityhazard', 
     'accessibilitysummary', 'accessmode', 'conformsto', 'pagebreak', 'reading', 
@@ -481,26 +528,19 @@ function getRemediationFromCode(code: string, message: string): RemediationTask[
     'aria', 'lang', 'metadata'
   ];
   
-  // First pass: check code (more specific)
   for (const keyword of priorityOrder) {
     if (lowerCode.includes(keyword) && remediationTemplates[keyword]) {
       return remediationTemplates[keyword];
     }
   }
   
-  // Second pass: check message (fallback)
+  // 4. Fallback: check message keywords
   for (const keyword of priorityOrder) {
     if (lowerMessage.includes(keyword) && remediationTemplates[keyword]) {
       return remediationTemplates[keyword];
     }
   }
   
-  // Final fallback: check all templates
-  for (const [keyword, template] of Object.entries(remediationTemplates)) {
-    if (lowerCode.includes(keyword) || lowerMessage.includes(keyword)) {
-      return template;
-    }
-  }
   return undefined;
 }
 
