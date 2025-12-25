@@ -9,7 +9,7 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs';
 import { QuickRating } from '../feedback';
-import { SourceBadge, SummaryBySource, ViewInContextButton, RemediationGuidance } from '../audit';
+import { SourceBadge, SummaryBySource, ViewInContextButton, RemediationGuidance, ScoreTooltip, calculateScoreBreakdown } from '../audit';
 import type { SummaryBySourceData } from '../audit';
 import { cn } from '@/utils/cn';
 
@@ -249,6 +249,8 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
   const circumference = 2 * Math.PI * 45;
   const scoreOffset = circumference - (accessibilityScore / 100) * circumference;
 
+  const scoreBreakdown = useMemo(() => calculateScoreBreakdown(issuesSummary), [issuesSummary]);
+
   return (
     <div className="space-y-6">
       <Card>
@@ -278,36 +280,38 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="md:col-span-1">
           <CardContent className="p-6 flex flex-col items-center justify-center">
-            <div className="relative w-32 h-32">
-              <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 100 100">
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="45"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="8"
-                  className="text-gray-200"
-                />
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="45"
-                  fill="none"
-                  strokeWidth="8"
-                  strokeLinecap="round"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={scoreOffset}
-                  className={cn('transition-all duration-1000', getScoreRingColor(accessibilityScore))}
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className={cn('text-3xl font-bold', getScoreColor(accessibilityScore))}>
-                  {accessibilityScore}
-                </span>
-                <span className="text-xs text-gray-500">/ 100</span>
+            <ScoreTooltip breakdown={scoreBreakdown}>
+              <div className="relative w-32 h-32">
+                <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 100 100">
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="45"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="8"
+                    className="text-gray-200"
+                  />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="45"
+                    fill="none"
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={scoreOffset}
+                    className={cn('transition-all duration-1000', getScoreRingColor(accessibilityScore))}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className={cn('text-3xl font-bold', getScoreColor(accessibilityScore))}>
+                    {accessibilityScore}
+                  </span>
+                  <span className="text-xs text-gray-500">/ 100</span>
+                </div>
               </div>
-            </div>
+            </ScoreTooltip>
             <p className="mt-3 font-medium text-gray-900">Accessibility Score</p>
             <div className="flex items-center gap-2 mt-2">
               <Badge variant={isValid ? 'success' : 'error'} size="sm">
