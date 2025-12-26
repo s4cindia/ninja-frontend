@@ -26,10 +26,10 @@ const EDITION_LABELS: Record<AcrEditionCode, { title: string; subtitle: string }
 };
 
 const DEFAULT_CRITERIA_COUNTS: Record<AcrEditionCode, number> = {
-  'VPAT2.5-508': 50,
+  'VPAT2.5-508': 39,
   'VPAT2.5-WCAG': 50,
-  'VPAT2.5-EU': 55,
-  'VPAT2.5-INT': 60,
+  'VPAT2.5-EU': 52,
+  'VPAT2.5-INT': 78,
 };
 
 type CriteriaStatus = 'not_started' | 'in_progress' | 'complete';
