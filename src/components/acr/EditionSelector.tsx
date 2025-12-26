@@ -40,11 +40,29 @@ interface CriteriaProgress {
   status: CriteriaStatus;
 }
 
-function getCriteriaProgress(edition: AcrEdition): CriteriaProgress {
+function getCriteriaCountForEdition(edition: AcrEdition): number {
+  const code = (edition.code || '').toLowerCase();
+  const name = (edition.name || '').toLowerCase();
+  
+  if (code.includes('508') || name.includes('508')) {
+    return 39;
+  }
+  if (code.includes('int') || name.includes('international')) {
+    return 78;
+  }
+  if (code.includes('eu') || name.includes('eu') || name.includes('en 301')) {
+    return 52;
+  }
+  if (code.includes('wcag') || name.includes('wcag')) {
+    return 50;
+  }
+  
   const editionCode = edition.code as AcrEditionCode;
-  const total = DEFAULT_CRITERIA_COUNTS[editionCode] ?? 
-    edition.criteriaCount ?? 
-    (Array.isArray(edition.criteria) && edition.criteria.length > 0 ? edition.criteria.length : 50);
+  return DEFAULT_CRITERIA_COUNTS[editionCode] ?? 50;
+}
+
+function getCriteriaProgress(edition: AcrEdition): CriteriaProgress {
+  const total = getCriteriaCountForEdition(edition);
   
   let evaluated = 0;
   if (Array.isArray(edition.criteria)) {
