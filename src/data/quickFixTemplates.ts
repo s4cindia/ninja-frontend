@@ -561,6 +561,309 @@ const headingStructureTemplate: QuickFixTemplate = {
   },
 };
 
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const cleanHex = hex.replace('#', '');
+  if (cleanHex.length !== 6) return null;
+  const r = parseInt(cleanHex.substring(0, 2), 16);
+  const g = parseInt(cleanHex.substring(2, 4), 16);
+  const b = parseInt(cleanHex.substring(4, 6), 16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return null;
+  return { r, g, b };
+}
+
+function getLuminance(r: number, g: number, b: number): number {
+  const [rs, gs, bs] = [r, g, b].map(c => {
+    const sRGB = c / 255;
+    return sRGB <= 0.03928 ? sRGB / 12.92 : Math.pow((sRGB + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+}
+
+function calculateContrastRatio(color1: string, color2: string): number | null {
+  const rgb1 = hexToRgb(color1);
+  const rgb2 = hexToRgb(color2);
+  if (!rgb1 || !rgb2) return null;
+  const l1 = getLuminance(rgb1.r, rgb1.g, rgb1.b);
+  const l2 = getLuminance(rgb2.r, rgb2.g, rgb2.b);
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function suggestCompliantColor(foreground: string, background: string, targetRatio = 4.5): string {
+  const bgRgb = hexToRgb(background);
+  const fgRgb = hexToRgb(foreground);
+  if (!bgRgb || !fgRgb) return foreground;
+  
+  const bgLuminance = getLuminance(bgRgb.r, bgRgb.g, bgRgb.b);
+  const fgLuminance = getLuminance(fgRgb.r, fgRgb.g, fgRgb.b);
+  
+  const needsDarker = fgLuminance > bgLuminance;
+  
+  let bestColor = foreground;
+  let bestRatio = calculateContrastRatio(foreground, background) || 0;
+  
+  for (let step = 0; step <= 100; step++) {
+    const factor = step / 100;
+    let r: number, g: number, b: number;
+    
+    if (needsDarker) {
+      r = Math.round(fgRgb.r * (1 - factor));
+      g = Math.round(fgRgb.g * (1 - factor));
+      b = Math.round(fgRgb.b * (1 - factor));
+    } else {
+      r = Math.round(fgRgb.r + (255 - fgRgb.r) * factor);
+      g = Math.round(fgRgb.g + (255 - fgRgb.g) * factor);
+      b = Math.round(fgRgb.b + (255 - fgRgb.b) * factor);
+    }
+    
+    const testColor = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+    const ratio = calculateContrastRatio(testColor, background);
+    
+    if (ratio && ratio >= targetRatio) {
+      return testColor;
+    }
+    
+    if (ratio && ratio > bestRatio) {
+      bestRatio = ratio;
+      bestColor = testColor;
+    }
+  }
+  
+  return bestColor;
+}
+
+const colorContrastTemplate: QuickFixTemplate = {
+  id: 'color-contrast',
+  title: 'Fix Color Contrast',
+  description: 'Adjust colors to meet WCAG contrast requirements (4.5:1 for normal text)',
+  targetFile: 'styles.css',
+  inputs: [
+    {
+      type: 'color-picker',
+      id: 'foregroundColor',
+      label: 'Foreground (Text) Color',
+      helpText: 'The color of the text',
+      default: '#767676',
+    },
+    {
+      type: 'color-picker',
+      id: 'backgroundColor',
+      label: 'Background Color',
+      helpText: 'The background color behind the text',
+      default: '#ffffff',
+    },
+    {
+      type: 'radio-group',
+      id: 'targetLevel',
+      label: 'Target Compliance Level',
+      helpText: 'Choose the WCAG compliance level to meet',
+      options: [
+        { value: 'aa-normal', label: 'AA Normal Text (4.5:1)', description: 'Standard requirement for body text' },
+        { value: 'aa-large', label: 'AA Large Text (3:1)', description: 'For text 18pt+ or 14pt+ bold' },
+        { value: 'aaa-normal', label: 'AAA Normal Text (7:1)', description: 'Enhanced contrast for body text' },
+        { value: 'aaa-large', label: 'AAA Large Text (4.5:1)', description: 'Enhanced contrast for large text' },
+      ],
+      default: 'aa-normal',
+    },
+    {
+      type: 'radio-group',
+      id: 'fixMethod',
+      label: 'Fix Method',
+      options: [
+        { value: 'adjust-foreground', label: 'Adjust Foreground', description: 'Modify text color to meet contrast' },
+        { value: 'adjust-background', label: 'Adjust Background', description: 'Modify background color to meet contrast' },
+        { value: 'use-suggested', label: 'Use Suggested Colors', description: 'Apply automatically suggested compliant colors' },
+      ],
+      default: 'use-suggested',
+    },
+  ],
+  generateFix: (inputs, context): QuickFix => {
+    let foreground = (inputs.foregroundColor as string) || '#767676';
+    const background = (inputs.backgroundColor as string) || '#ffffff';
+    const targetLevel = (inputs.targetLevel as string) || 'aa-normal';
+    const fixMethod = (inputs.fixMethod as string) || 'use-suggested';
+    
+    const targetRatios: Record<string, number> = {
+      'aa-normal': 4.5,
+      'aa-large': 3,
+      'aaa-normal': 7,
+      'aaa-large': 4.5,
+    };
+    const targetRatio = targetRatios[targetLevel] || 4.5;
+    
+    let newForeground = foreground;
+    let newBackground = background;
+    
+    if (fixMethod === 'use-suggested' || fixMethod === 'adjust-foreground') {
+      newForeground = suggestCompliantColor(foreground, background, targetRatio);
+    } else if (fixMethod === 'adjust-background') {
+      newBackground = suggestCompliantColor(background, foreground, targetRatio);
+    }
+    
+    const currentRatio = calculateContrastRatio(foreground, background);
+    const newRatio = calculateContrastRatio(newForeground, newBackground);
+    
+    const cssSelector = context.elementContext || '.text-element';
+    const cssRule = `${cssSelector} {\n  color: ${newForeground};\n  background-color: ${newBackground};\n}`;
+    
+    return {
+      issueId: context.issueId,
+      targetFile: context.filePath || 'styles.css',
+      changes: [{
+        type: 'insert',
+        path: context.filePath || 'styles.css',
+        content: cssRule,
+        description: `Add CSS rule with compliant colors (${newRatio?.toFixed(2)}:1 contrast)`,
+      }],
+      summary: `Improved contrast from ${currentRatio?.toFixed(2)}:1 to ${newRatio?.toFixed(2)}:1`,
+    };
+  },
+};
+
+const imageAltTemplate: QuickFixTemplate = {
+  id: 'image-alt',
+  title: 'Add Image Alternative Text',
+  description: 'Add descriptive alt text to images for screen reader users',
+  targetFile: 'content.xhtml',
+  inputs: [
+    {
+      type: 'radio-group',
+      id: 'imageType',
+      label: 'Image Type',
+      helpText: 'Is this image decorative or does it convey information?',
+      options: [
+        { 
+          value: 'decorative', 
+          label: 'Decorative Image', 
+          description: 'Image is purely visual decoration (will use empty alt="")' 
+        },
+        { 
+          value: 'informative', 
+          label: 'Informative Image', 
+          description: 'Image conveys information that should be described' 
+        },
+        { 
+          value: 'complex', 
+          label: 'Complex Image', 
+          description: 'Chart, graph, or diagram requiring extended description' 
+        },
+      ],
+      default: 'informative',
+    },
+    {
+      type: 'textarea',
+      id: 'altText',
+      label: 'Alternative Text',
+      helpText: 'Describe what the image shows. Be concise but complete.',
+      placeholder: 'e.g., "Bar chart showing sales growth from 2020 to 2024"',
+    },
+    {
+      type: 'textarea',
+      id: 'longDescription',
+      label: 'Long Description (for complex images)',
+      helpText: 'Provide detailed description for charts, graphs, or complex diagrams',
+      placeholder: 'e.g., "The bar chart displays quarterly sales figures..."',
+    },
+    {
+      type: 'radio-group',
+      id: 'descriptionMethod',
+      label: 'Long Description Method',
+      helpText: 'How to include the extended description',
+      options: [
+        { value: 'aria-describedby', label: 'aria-describedby', description: 'Reference a hidden description element' },
+        { value: 'figcaption', label: 'figcaption', description: 'Add visible caption below image' },
+        { value: 'details', label: 'details/summary', description: 'Collapsible description block' },
+      ],
+      default: 'aria-describedby',
+    },
+  ],
+  generateFix: (inputs, context): QuickFix => {
+    const imageType = (inputs.imageType as string) || 'informative';
+    const altText = (inputs.altText as string) || '';
+    const longDescription = (inputs.longDescription as string) || '';
+    const descriptionMethod = (inputs.descriptionMethod as string) || 'aria-describedby';
+    
+    const changes = [];
+    const currentElement = context.currentContent || '<img src="image.jpg">';
+    
+    const escapedAlt = altText
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    
+    if (imageType === 'decorative') {
+      const newElement = currentElement.includes('alt=')
+        ? currentElement.replace(/alt="[^"]*"/, 'alt="" role="presentation"')
+        : currentElement.replace(/<img/, '<img alt="" role="presentation"');
+      
+      changes.push({
+        type: 'replace' as const,
+        path: context.filePath || 'content.xhtml',
+        oldContent: currentElement,
+        content: newElement,
+        description: 'Mark image as decorative with empty alt and presentation role',
+      });
+    } else if (imageType === 'informative') {
+      const newElement = currentElement.includes('alt=')
+        ? currentElement.replace(/alt="[^"]*"/, `alt="${escapedAlt}"`)
+        : currentElement.replace(/<img/, `<img alt="${escapedAlt}"`);
+      
+      changes.push({
+        type: 'replace' as const,
+        path: context.filePath || 'content.xhtml',
+        oldContent: currentElement,
+        content: newElement,
+        description: 'Add descriptive alt text to image',
+      });
+    } else if (imageType === 'complex' && longDescription) {
+      const descId = `desc-${context.issueId.replace(/[^a-zA-Z0-9]/g, '-')}`;
+      const escapedLongDesc = longDescription
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      
+      let newElement: string;
+      let descriptionElement: string;
+      
+      if (descriptionMethod === 'aria-describedby') {
+        newElement = currentElement.includes('alt=')
+          ? currentElement.replace(/alt="[^"]*"/, `alt="${escapedAlt}" aria-describedby="${descId}"`)
+          : currentElement.replace(/<img/, `<img alt="${escapedAlt}" aria-describedby="${descId}"`);
+        descriptionElement = `<div id="${descId}" class="visually-hidden">${escapedLongDesc}</div>`;
+      } else if (descriptionMethod === 'figcaption') {
+        newElement = `<figure>\n  ${currentElement.includes('alt=') 
+          ? currentElement.replace(/alt="[^"]*"/, `alt="${escapedAlt}"`)
+          : currentElement.replace(/<img/, `<img alt="${escapedAlt}"`)}\n  <figcaption>${escapedLongDesc}</figcaption>\n</figure>`;
+        descriptionElement = '';
+      } else {
+        newElement = currentElement.includes('alt=')
+          ? currentElement.replace(/alt="[^"]*"/, `alt="${escapedAlt}"`)
+          : currentElement.replace(/<img/, `<img alt="${escapedAlt}"`);
+        descriptionElement = `<details>\n  <summary>Image description</summary>\n  <p>${escapedLongDesc}</p>\n</details>`;
+      }
+      
+      changes.push({
+        type: 'replace' as const,
+        path: context.filePath || 'content.xhtml',
+        oldContent: currentElement,
+        content: descriptionElement ? `${newElement}\n${descriptionElement}` : newElement,
+        description: 'Add alt text and long description for complex image',
+      });
+    }
+    
+    return {
+      issueId: context.issueId,
+      targetFile: context.filePath || 'content.xhtml',
+      changes,
+      summary: imageType === 'decorative' 
+        ? 'Marked image as decorative' 
+        : `Added alt text (${altText.length} chars)${longDescription ? ' with extended description' : ''}`,
+    };
+  },
+};
+
 export const quickFixTemplates: Record<string, QuickFixTemplate> = {
   'metadata-accessmode': metadataAccessModeTemplate,
   'metadata-accessibilityfeature': metadataAccessibilityFeatureTemplate,
@@ -569,6 +872,8 @@ export const quickFixTemplates: Record<string, QuickFixTemplate> = {
   'landmark-unique': landmarkUniqueTemplate,
   'epub-type-role': epubTypeRoleTemplate,
   'heading-structure': headingStructureTemplate,
+  'color-contrast': colorContrastTemplate,
+  'image-alt': imageAltTemplate,
 };
 
 const issueCodeAliases: Record<string, string> = {
@@ -576,8 +881,13 @@ const issueCodeAliases: Record<string, string> = {
   'METADATA-ACCESSIBILITYFEATURE': 'metadata-accessibilityfeature',
   'METADATA-ACCESSIBILITYHAZARD': 'metadata-accessibilityhazard',
   'METADATA-ACCESSIBILITYSUMMARY': 'metadata-accessibilitysummary',
-  'IMG-ALT-MISSING': 'img-alt-missing',
-  'IMG-ALT-EMPTY': 'img-alt-empty',
+  'IMG-ALT-MISSING': 'image-alt',
+  'IMG-ALT-EMPTY': 'image-alt',
+  'IMG-ALT': 'image-alt',
+  'IMAGE-ALT': 'image-alt',
+  'IMAGE-ALT-MISSING': 'image-alt',
+  'EPUB-IMG-001': 'image-alt',
+  'EPUB-IMG-ALT': 'image-alt',
   'HEADING-ORDER': 'heading-structure',
   'HEADING-SKIP': 'heading-structure',
   'HEADING-SKIPPED': 'heading-structure',
@@ -587,6 +897,10 @@ const issueCodeAliases: Record<string, string> = {
   'TABLE-HEADER-MISSING': 'table-header-missing',
   'ARIA-LABEL-MISSING': 'aria-label-missing',
   'COLOR-CONTRAST': 'color-contrast',
+  'CONTRAST': 'color-contrast',
+  'COLOR-CONTRAST-ENHANCED': 'color-contrast',
+  'WCAG-1-4-3': 'color-contrast',
+  'WCAG-1-4-6': 'color-contrast',
   'EPUB-TYPE-MISSING': 'epub-type-missing',
   'EPUB-TYPE-HAS-MATCHING-ROLE': 'epub-type-role',
   'EPUB-TYPE-ROLE': 'epub-type-role',
