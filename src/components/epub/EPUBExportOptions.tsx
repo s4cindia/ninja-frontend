@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { api } from '@/services/api';
+import { generateCSV, downloadCSV, formatDate } from '@/utils/csvExport';
 
-type ReportFormat = 'json' | 'md';
+type ReportFormat = 'json' | 'md' | 'csv';
 type DownloadType = 'epub' | 'package' | 'accessibility-report' | 'comparison-report';
 
 interface EPUBExportOptionsProps {
@@ -120,6 +121,9 @@ export const EPUBExportOptions: React.FC<EPUBExportOptionsProps> = ({
       if (reportFormat === 'json') {
         const blob = new Blob([JSON.stringify(demoReport, null, 2)], { type: 'application/json' });
         downloadBlob(blob, `${baseFileName}-accessibility-report.json`);
+      } else if (reportFormat === 'csv') {
+        const csvContent = generateAccessibilityCSV(demoReport);
+        downloadCSV(csvContent, `${baseFileName}-accessibility-report-${formatDate(new Date())}.csv`);
       } else {
         const markdown = generateMarkdownReport(demoReport);
         const blob = new Blob([markdown], { type: 'text/markdown' });
@@ -136,16 +140,21 @@ export const EPUBExportOptions: React.FC<EPUBExportOptionsProps> = ({
 
     try {
       const response = await api.get(`/epub/job/${jobId}/report`, {
-        params: { format: reportFormat },
-        responseType: reportFormat === 'json' ? 'json' : 'blob',
+        params: { format: 'json' },
+        responseType: 'json',
       });
 
+      const data = response.data.data || response.data;
+
       if (reportFormat === 'json') {
-        const data = response.data.data || response.data;
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         downloadBlob(blob, `${baseFileName}-accessibility-report.json`);
+      } else if (reportFormat === 'csv') {
+        const csvContent = generateAccessibilityCSV(data);
+        downloadCSV(csvContent, `${baseFileName}-accessibility-report-${formatDate(new Date())}.csv`);
       } else {
-        const blob = new Blob([response.data], { type: 'text/markdown' });
+        const markdown = generateMarkdownReport(data);
+        const blob = new Blob([markdown], { type: 'text/markdown' });
         downloadBlob(blob, `${baseFileName}-accessibility-report.md`);
       }
       setSuccess('Accessibility report downloaded');
@@ -164,6 +173,9 @@ export const EPUBExportOptions: React.FC<EPUBExportOptionsProps> = ({
       if (reportFormat === 'json') {
         const blob = new Blob([JSON.stringify(demoComparison, null, 2)], { type: 'application/json' });
         downloadBlob(blob, `${baseFileName}-comparison-report.json`);
+      } else if (reportFormat === 'csv') {
+        const csvContent = generateComparisonCSV(demoComparison);
+        downloadCSV(csvContent, `${baseFileName}-comparison-${formatDate(new Date())}.csv`);
       } else {
         const markdown = generateComparisonMarkdown(demoComparison);
         const blob = new Blob([markdown], { type: 'text/markdown' });
@@ -185,6 +197,9 @@ export const EPUBExportOptions: React.FC<EPUBExportOptionsProps> = ({
       if (reportFormat === 'json') {
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         downloadBlob(blob, `${baseFileName}-comparison-report.json`);
+      } else if (reportFormat === 'csv') {
+        const csvContent = generateComparisonCSV(data);
+        downloadCSV(csvContent, `${baseFileName}-comparison-${formatDate(new Date())}.csv`);
       } else {
         const markdown = generateComparisonMarkdown(data);
         const blob = new Blob([markdown], { type: 'text/markdown' });
@@ -337,6 +352,143 @@ ${modifications.map(mod => {
     return md.trim();
   };
 
+  const generateAccessibilityCSV = (reportData: {
+    jobId?: string;
+    epubFileName?: string;
+    generatedAt?: string;
+    issuesSummary?: { total?: number; fixed?: number; remaining?: number };
+    issues?: Array<{
+      id?: string;
+      code?: string;
+      severity?: string;
+      message?: string;
+      location?: string;
+      filePath?: string;
+      wcagCriteria?: string;
+      source?: string;
+      type?: string;
+      status?: string;
+    }>;
+  }): string => {
+    const summaryRow = {
+      File: reportData.epubFileName || epubFileName,
+      'Job ID': reportData.jobId || jobId,
+      Date: reportData.generatedAt ? formatDate(reportData.generatedAt) : formatDate(new Date()),
+      'Original Issues': String(reportData.issuesSummary?.total || 0),
+      'Fixed Issues': String(reportData.issuesSummary?.fixed || 0),
+      Remaining: String(reportData.issuesSummary?.remaining || 0),
+      'Fix Rate': reportData.issuesSummary?.total 
+        ? `${Math.round(((reportData.issuesSummary?.fixed || 0) / reportData.issuesSummary.total) * 100)}%`
+        : '0%',
+    };
+
+    const summaryColumns = [
+      { key: 'File', header: 'File' },
+      { key: 'Job ID', header: 'Job ID' },
+      { key: 'Date', header: 'Date' },
+      { key: 'Original Issues', header: 'Original Issues' },
+      { key: 'Fixed Issues', header: 'Fixed Issues' },
+      { key: 'Remaining', header: 'Remaining' },
+      { key: 'Fix Rate', header: 'Fix Rate' },
+    ];
+
+    const issueColumns = [
+      { key: 'Code', header: 'Code' },
+      { key: 'Severity', header: 'Severity' },
+      { key: 'Message', header: 'Message' },
+      { key: 'Location', header: 'Location' },
+      { key: 'FilePath', header: 'FilePath' },
+      { key: 'WCAG', header: 'WCAG Criteria' },
+      { key: 'Source', header: 'Source' },
+      { key: 'Type', header: 'Type' },
+      { key: 'Status', header: 'Status' },
+    ];
+
+    const issues = (reportData.issues || []).map(issue => ({
+      Code: issue.code || '',
+      Severity: issue.severity || '',
+      Message: issue.message || '',
+      Location: issue.location || '',
+      FilePath: issue.filePath || '',
+      WCAG: issue.wcagCriteria || '',
+      Source: issue.source || '',
+      Type: issue.type || 'Manual',
+      Status: issue.status || 'pending',
+    }));
+
+    const summaryCsv = generateCSV([summaryRow], summaryColumns);
+    const issuesCsv = generateCSV(issues, issueColumns);
+    return summaryCsv + '\n\n' + issuesCsv;
+  };
+
+  const generateComparisonCSV = (comparisonData: {
+    beforeScore?: number;
+    afterScore?: number;
+    fixedCount?: number;
+    summary?: {
+      totalFiles?: number;
+      modifiedFiles?: number;
+      totalChanges?: number;
+    };
+    resolutions?: Array<{
+      code?: string;
+      severity?: string;
+      message?: string;
+      location?: string;
+      originalStatus?: string;
+      finalStatus?: string;
+      resolutionType?: string;
+    }>;
+    modifications?: Array<{
+      type?: string;
+      category?: string;
+      filePath?: string;
+      description?: string;
+      wcagCriteria?: string;
+    }>;
+    changes?: Array<{ type: string; description: string }>;
+  }): string => {
+    const summaryRow = {
+      'Before Score': String(comparisonData.beforeScore ?? beforeScore),
+      'After Score': String(comparisonData.afterScore ?? afterScore),
+      'Issues Fixed': String(comparisonData.fixedCount ?? fixedCount),
+      'Total Files': String(comparisonData.summary?.totalFiles || 0),
+      'Modified Files': String(comparisonData.summary?.modifiedFiles || 0),
+    };
+
+    const summaryColumns = [
+      { key: 'Before Score', header: 'Before Score' },
+      { key: 'After Score', header: 'After Score' },
+      { key: 'Issues Fixed', header: 'Issues Fixed' },
+      { key: 'Total Files', header: 'Total Files' },
+      { key: 'Modified Files', header: 'Modified Files' },
+    ];
+
+    const resolutionColumns = [
+      { key: 'Code', header: 'Code' },
+      { key: 'Severity', header: 'Severity' },
+      { key: 'Message', header: 'Message' },
+      { key: 'Location', header: 'Location' },
+      { key: 'OriginalStatus', header: 'Original Status' },
+      { key: 'FinalStatus', header: 'Final Status' },
+      { key: 'ResolutionType', header: 'Resolution Type' },
+    ];
+
+    const resolutions = (comparisonData.resolutions || comparisonData.modifications || []).map(item => ({
+      Code: (item as { code?: string }).code || (item as { type?: string }).type || '',
+      Severity: (item as { severity?: string }).severity || '',
+      Message: (item as { message?: string }).message || (item as { description?: string }).description || '',
+      Location: (item as { location?: string }).location || (item as { filePath?: string }).filePath || '',
+      OriginalStatus: (item as { originalStatus?: string }).originalStatus || 'pending',
+      FinalStatus: (item as { finalStatus?: string }).finalStatus || 'fixed',
+      ResolutionType: (item as { resolutionType?: string }).resolutionType || (item as { category?: string }).category || 'auto',
+    }));
+
+    const summaryCsv = generateCSV([summaryRow], summaryColumns);
+    const resolutionsCsv = generateCSV(resolutions, resolutionColumns);
+    return summaryCsv + '\n\n' + resolutionsCsv;
+  };
+
   const handlePackageOptionChange = (option: keyof PackageOptions) => {
     setPackageOptions(prev => ({
       ...prev,
@@ -487,6 +639,16 @@ ${modifications.map(mod => {
                   onClick={() => setReportFormat('md')}
                 >
                   Markdown
+                </button>
+                <button
+                  className={`px-3 py-1 text-sm transition-colors ${
+                    reportFormat === 'csv'
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setReportFormat('csv')}
+                >
+                  CSV
                 </button>
               </div>
             </div>

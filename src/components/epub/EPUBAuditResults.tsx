@@ -2,8 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   AlertCircle, AlertTriangle, Info, CheckCircle, 
-  Wrench, Hand, FileDown, ClipboardList, ExternalLink, FileCheck
+  Wrench, Hand, FileDown, ClipboardList, ExternalLink, FileCheck, FileSpreadsheet
 } from 'lucide-react';
+import { generateCSV, downloadCSV, formatDate } from '@/utils/csvExport';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -102,6 +103,8 @@ const getScoreRingColor = (score: number): string => {
 
 interface ActionButtonsProps {
   jobId: string;
+  issues: AuditIssue[];
+  fileName?: string;
   onCreateRemediationPlan?: () => void;
   onDownloadReport?: () => void;
   isCreatingPlan?: boolean;
@@ -110,12 +113,44 @@ interface ActionButtonsProps {
 
 function ActionButtons({ 
   jobId, 
+  issues,
+  fileName,
   onCreateRemediationPlan, 
   onDownloadReport, 
   isCreatingPlan = false, 
   isDownloading = false 
 }: ActionButtonsProps) {
   const navigate = useNavigate();
+
+  const handleDownloadIssuesCSV = () => {
+    const columns = [
+      { key: 'code', header: 'Code' },
+      { key: 'severity', header: 'Severity' },
+      { key: 'message', header: 'Message' },
+      { key: 'location', header: 'Location' },
+      { key: 'filePath', header: 'FilePath' },
+      { key: 'wcagCriteria', header: 'WCAG Criteria' },
+      { key: 'source', header: 'Source' },
+      { key: 'type', header: 'Type' },
+      { key: 'status', header: 'Status' },
+    ];
+
+    const data = issues.map(issue => ({
+      code: issue.code,
+      severity: issue.severity,
+      message: issue.message,
+      location: issue.location || '',
+      filePath: (issue as unknown as Record<string, unknown>).filePath || '',
+      wcagCriteria: issue.wcagCriteria || '',
+      source: issue.source,
+      type: isAutoFixable(issue) ? 'Auto-fixable' : 'Manual',
+      status: 'Pending',
+    }));
+
+    const baseName = fileName?.replace(/\.epub$/i, '') || 'epub';
+    const csvContent = generateCSV(data, columns);
+    downloadCSV(csvContent, `${baseName}-issues-${formatDate(new Date())}.csv`);
+  };
 
   return (
     <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t">
@@ -152,6 +187,13 @@ function ActionButtons({
             Download Report
           </>
         )}
+      </Button>
+      <Button 
+        variant="outline" 
+        onClick={handleDownloadIssuesCSV}
+      >
+        <FileSpreadsheet className="h-4 w-4 mr-2" />
+        Download Issues CSV
       </Button>
     </div>
   );
@@ -372,6 +414,8 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
 
             <ActionButtons 
               jobId={jobId}
+              issues={issues}
+              fileName={result?.fileName}
               onCreateRemediationPlan={onCreateRemediationPlan}
               onDownloadReport={onDownloadReport}
               isCreatingPlan={isCreatingPlan}
