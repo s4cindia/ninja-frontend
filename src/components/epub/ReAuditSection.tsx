@@ -16,6 +16,10 @@ export interface ReauditResult {
     severity: string;
   }>;
   score?: number;
+<<<<<<< HEAD
+  resolvedIssueCodes?: string[];
+=======
+>>>>>>> origin/main
 }
 
 interface ReAuditSectionProps {
