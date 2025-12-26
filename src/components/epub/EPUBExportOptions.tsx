@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { Download, Package, FileText, FileJson, Loader2, CheckCircle } from 'lucide-react';
+import { Download, Package, FileText, FileJson, Loader2, CheckCircle, FileSpreadsheet } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { api } from '@/services/api';
+import { generateCSV, downloadCSV, formatDate } from '@/utils/csvExport';
 
 type ReportFormat = 'json' | 'md';
-type DownloadType = 'epub' | 'package' | 'accessibility-report' | 'comparison-report';
+type DownloadType = 'epub' | 'package' | 'accessibility-report' | 'comparison-report' | 'accessibility-csv';
 
 interface EPUBExportOptionsProps {
   jobId: string;
@@ -337,6 +338,102 @@ ${modifications.map(mod => {
     return md.trim();
   };
 
+  const handleDownloadAccessibilityCSV = async () => {
+    setDownloading('accessibility-csv');
+    setError(null);
+    setSuccess(null);
+
+    try {
+      let reportData: {
+        jobId?: string;
+        epubFileName?: string;
+        generatedAt?: string;
+        issuesSummary?: { total?: number; fixed?: number; remaining?: number };
+        issues?: Array<{
+          id?: string;
+          code?: string;
+          severity?: string;
+          message?: string;
+          location?: string;
+          filePath?: string;
+          wcagCriteria?: string;
+          source?: string;
+          type?: string;
+          status?: string;
+        }>;
+      };
+
+      if (isDemo) {
+        reportData = generateDemoAccessibilityReport();
+      } else {
+        const response = await api.get(`/epub/job/${jobId}/report`, {
+          params: { format: 'json' },
+          responseType: 'json',
+        });
+        reportData = response.data.data || response.data;
+      }
+
+      const summaryRow = {
+        File: reportData.epubFileName || epubFileName,
+        'Job ID': reportData.jobId || jobId,
+        Date: reportData.generatedAt ? formatDate(reportData.generatedAt) : formatDate(new Date()),
+        'Original Issues': String(reportData.issuesSummary?.total || 0),
+        'Fixed Issues': String(reportData.issuesSummary?.fixed || 0),
+        Remaining: String(reportData.issuesSummary?.remaining || 0),
+        'Fix Rate': reportData.issuesSummary?.total 
+          ? `${Math.round(((reportData.issuesSummary?.fixed || 0) / reportData.issuesSummary.total) * 100)}%`
+          : '0%',
+      };
+
+      const summaryColumns = [
+        { key: 'File', header: 'File' },
+        { key: 'Job ID', header: 'Job ID' },
+        { key: 'Date', header: 'Date' },
+        { key: 'Original Issues', header: 'Original Issues' },
+        { key: 'Fixed Issues', header: 'Fixed Issues' },
+        { key: 'Remaining', header: 'Remaining' },
+        { key: 'Fix Rate', header: 'Fix Rate' },
+      ];
+
+      const issueColumns = [
+        { key: 'Code', header: 'Code' },
+        { key: 'Severity', header: 'Severity' },
+        { key: 'Message', header: 'Message' },
+        { key: 'Location', header: 'Location' },
+        { key: 'FilePath', header: 'FilePath' },
+        { key: 'WCAG', header: 'WCAG Criteria' },
+        { key: 'Source', header: 'Source' },
+        { key: 'Type', header: 'Type' },
+        { key: 'Status', header: 'Status' },
+      ];
+
+      const issues = (reportData.issues || []).map(issue => ({
+        Code: issue.code || '',
+        Severity: issue.severity || '',
+        Message: issue.message || '',
+        Location: issue.location || '',
+        FilePath: issue.filePath || '',
+        WCAG: issue.wcagCriteria || '',
+        Source: issue.source || '',
+        Type: issue.type || 'Manual',
+        Status: issue.status || 'pending',
+      }));
+
+      const summaryCsv = generateCSV([summaryRow], summaryColumns);
+      const issuesCsv = generateCSV(issues, issueColumns);
+      const fullCsv = summaryCsv + '\n\n' + issuesCsv;
+
+      downloadCSV(fullCsv, `${baseFileName}-accessibility-report-${formatDate(new Date())}.csv`);
+      setSuccess('Accessibility CSV downloaded');
+      setTimeout(() => setSuccess(null), 3000);
+    } catch {
+      setError('Failed to download accessibility CSV');
+      setTimeout(() => setError(null), 3000);
+    } finally {
+      setDownloading(null);
+    }
+  };
+
   const handlePackageOptionChange = (option: keyof PackageOptions) => {
     setPackageOptions(prev => ({
       ...prev,
@@ -526,6 +623,25 @@ ${modifications.map(mod => {
                   <>
                     <FileText className="h-4 w-4 mr-2" />
                     Comparison Report
+                  </>
+                )}
+              </Button>
+
+              <Button
+                onClick={handleDownloadAccessibilityCSV}
+                disabled={downloading !== null}
+                variant="outline"
+                size="sm"
+              >
+                {downloading === 'accessibility-csv' ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Downloading...
+                  </>
+                ) : (
+                  <>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Download Accessibility CSV
                   </>
                 )}
               </Button>
