@@ -493,12 +493,23 @@ const remediationTemplates: Record<string, { title: string; steps: string[]; cod
 function getWcagCriteriaFromCode(code: string, message: string): string[] {
   const lowerCode = code.toLowerCase();
   const lowerMessage = message.toLowerCase();
-  
+
+  // First try exact code match (e.g., "table" or "table-structure")
   for (const [keyword, criteria] of Object.entries(wcagMappings)) {
-    if (lowerCode.includes(keyword) || lowerMessage.includes(keyword)) {
+    if (lowerCode === keyword || lowerCode.includes(`-${keyword}`) || lowerCode.includes(`${keyword}-`)) {
       return criteria;
     }
   }
+
+  // Then try word boundary match in message to prevent false positives
+  // (e.g., "table of contents" won't match "table" keyword)
+  for (const [keyword, criteria] of Object.entries(wcagMappings)) {
+    const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+    if (regex.test(lowerMessage)) {
+      return criteria;
+    }
+  }
+
   return [];
 }
 
