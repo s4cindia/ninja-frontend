@@ -7,7 +7,7 @@ import { api } from '@/services/api';
 import { generateCSV, downloadCSV, formatDate } from '@/utils/csvExport';
 
 type ReportFormat = 'json' | 'md';
-type DownloadType = 'epub' | 'package' | 'accessibility-report' | 'comparison-report' | 'accessibility-csv';
+type DownloadType = 'epub' | 'package' | 'accessibility-report' | 'comparison-report' | 'accessibility-csv' | 'comparison-csv';
 
 interface EPUBExportOptionsProps {
   jobId: string;
@@ -434,6 +434,97 @@ ${modifications.map(mod => {
     }
   };
 
+  const handleDownloadComparisonCSV = async () => {
+    setDownloading('comparison-csv');
+    setError(null);
+    setSuccess(null);
+
+    try {
+      let comparisonData: {
+        beforeScore?: number;
+        afterScore?: number;
+        fixedCount?: number;
+        summary?: {
+          totalFiles?: number;
+          modifiedFiles?: number;
+          totalChanges?: number;
+        };
+        resolutions?: Array<{
+          code?: string;
+          severity?: string;
+          message?: string;
+          location?: string;
+          originalStatus?: string;
+          finalStatus?: string;
+          resolutionType?: string;
+        }>;
+        modifications?: Array<{
+          type?: string;
+          category?: string;
+          filePath?: string;
+          description?: string;
+          wcagCriteria?: string;
+        }>;
+      };
+
+      if (isDemo) {
+        comparisonData = generateDemoComparisonReport();
+      } else {
+        const response = await api.get(`/epub/job/${jobId}/comparison/summary`);
+        comparisonData = response.data.data || response.data;
+      }
+
+      const summaryRow = {
+        'Before Score': String(comparisonData.beforeScore ?? beforeScore),
+        'After Score': String(comparisonData.afterScore ?? afterScore),
+        'Issues Fixed': String(comparisonData.fixedCount ?? fixedCount),
+        'Total Files': String(comparisonData.summary?.totalFiles || 0),
+        'Modified Files': String(comparisonData.summary?.modifiedFiles || 0),
+      };
+
+      const summaryColumns = [
+        { key: 'Before Score', header: 'Before Score' },
+        { key: 'After Score', header: 'After Score' },
+        { key: 'Issues Fixed', header: 'Issues Fixed' },
+        { key: 'Total Files', header: 'Total Files' },
+        { key: 'Modified Files', header: 'Modified Files' },
+      ];
+
+      const resolutionColumns = [
+        { key: 'Code', header: 'Code' },
+        { key: 'Severity', header: 'Severity' },
+        { key: 'Message', header: 'Message' },
+        { key: 'Location', header: 'Location' },
+        { key: 'OriginalStatus', header: 'Original Status' },
+        { key: 'FinalStatus', header: 'Final Status' },
+        { key: 'ResolutionType', header: 'Resolution Type' },
+      ];
+
+      const resolutions = (comparisonData.resolutions || comparisonData.modifications || []).map(item => ({
+        Code: (item as { code?: string }).code || (item as { type?: string }).type || '',
+        Severity: (item as { severity?: string }).severity || '',
+        Message: (item as { message?: string }).message || (item as { description?: string }).description || '',
+        Location: (item as { location?: string }).location || (item as { filePath?: string }).filePath || '',
+        OriginalStatus: (item as { originalStatus?: string }).originalStatus || 'pending',
+        FinalStatus: (item as { finalStatus?: string }).finalStatus || 'fixed',
+        ResolutionType: (item as { resolutionType?: string }).resolutionType || (item as { category?: string }).category || 'auto',
+      }));
+
+      const summaryCsv = generateCSV([summaryRow], summaryColumns);
+      const resolutionsCsv = generateCSV(resolutions, resolutionColumns);
+      const fullCsv = summaryCsv + '\n\n' + resolutionsCsv;
+
+      downloadCSV(fullCsv, `${baseFileName}-comparison-${formatDate(new Date())}.csv`);
+      setSuccess('Comparison CSV downloaded');
+      setTimeout(() => setSuccess(null), 3000);
+    } catch {
+      setError('Failed to download comparison CSV');
+      setTimeout(() => setError(null), 3000);
+    } finally {
+      setDownloading(null);
+    }
+  };
+
   const handlePackageOptionChange = (option: keyof PackageOptions) => {
     setPackageOptions(prev => ({
       ...prev,
@@ -642,6 +733,25 @@ ${modifications.map(mod => {
                   <>
                     <FileSpreadsheet className="h-4 w-4 mr-2" />
                     Download Accessibility CSV
+                  </>
+                )}
+              </Button>
+
+              <Button
+                onClick={handleDownloadComparisonCSV}
+                disabled={downloading !== null}
+                variant="outline"
+                size="sm"
+              >
+                {downloading === 'comparison-csv' ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Downloading...
+                  </>
+                ) : (
+                  <>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Download Comparison CSV
                   </>
                 )}
               </Button>
