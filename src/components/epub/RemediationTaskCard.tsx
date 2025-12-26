@@ -29,6 +29,30 @@ function formatStep(step: string): string {
   return formatted;
 }
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function formatStep(step: string): string {
+  let formatted = step;
+  const codeMatches: string[] = [];
+  formatted = formatted.replace(/`([^`]+)`/g, (_match, code) => {
+    const placeholder = `__CODE_${codeMatches.length}__`;
+    codeMatches.push(code);
+    return placeholder;
+  });
+  formatted = escapeHtml(formatted);
+  codeMatches.forEach((code, i) => {
+    const escapedCode = escapeHtml(code);
+    formatted = formatted.replace(`__CODE_${i}__`, `<code class="bg-amber-100 px-1 rounded text-xs font-mono">${escapedCode}</code>`);
+  });
+  formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  return formatted;
+}
+
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
 export type TaskType = 'auto' | 'manual';
 
@@ -209,7 +233,11 @@ const RemediationGuidance: React.FC<{
     <ol className="list-decimal list-inside space-y-1.5 text-sm text-amber-900">
       {steps.map((step, idx) => (
         <li key={idx} className="leading-relaxed" dangerouslySetInnerHTML={{ 
+<<<<<<< HEAD
           __html: DOMPurify.sanitize(formatStep(step), { ALLOWED_TAGS: ['code', 'strong'], ALLOWED_ATTR: ['class'] })
+=======
+          __html: formatStep(step)
+>>>>>>> origin/main
         }} />
       ))}
     </ol>
@@ -228,7 +256,11 @@ const RemediationGuidance: React.FC<{
           </div>
           <pre 
             className="p-2 bg-green-50 border border-green-200 rounded text-xs overflow-x-auto font-mono text-green-800"
+<<<<<<< HEAD
             dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(highlightCodeChanges(codeExample.before, codeExample.after), { ALLOWED_TAGS: ['span', 'br'], ALLOWED_ATTR: ['class'] }) }}
+=======
+            dangerouslySetInnerHTML={{ __html: highlightCodeChanges(codeExample.before, codeExample.after) }}
+>>>>>>> origin/main
           />
         </div>
       </div>

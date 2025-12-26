@@ -493,6 +493,7 @@ const remediationTemplates: Record<string, { title: string; steps: string[]; cod
 function getWcagCriteriaFromCode(code: string, message: string): string[] {
   const lowerCode = code.toLowerCase();
   const lowerMessage = message.toLowerCase();
+<<<<<<< HEAD
 
   // First try exact code match (e.g., "table" or "table-structure")
   for (const [keyword, criteria] of Object.entries(wcagMappings)) {
@@ -510,6 +511,14 @@ function getWcagCriteriaFromCode(code: string, message: string): string[] {
     }
   }
 
+=======
+  
+  for (const [keyword, criteria] of Object.entries(wcagMappings)) {
+    if (lowerCode.includes(keyword) || lowerMessage.includes(keyword)) {
+      return criteria;
+    }
+  }
+>>>>>>> origin/main
   return [];
 }
 
@@ -1120,6 +1129,7 @@ export const EPUBRemediation: React.FC = () => {
 
   const handleReauditComplete = (result: ReauditResult) => {
     if (!plan) return;
+<<<<<<< HEAD
 
     const resolvedCodes = new Set(result.resolvedIssueCodes || []);
 
@@ -1143,6 +1153,33 @@ export const EPUBRemediation: React.FC = () => {
       beforeScore: prev?.beforeScore || 0,
       afterScore: result.score || prev?.afterScore || 0,
     }));
+=======
+    
+    const updatedTasks = plan.tasks.map(task => {
+      if (task.type === 'manual' && task.status === 'pending') {
+        const wasResolved = result.resolved > 0;
+        if (wasResolved) {
+          return { ...task, status: 'completed' as TaskStatus, completionMethod: 'manual' as const };
+        }
+      }
+      return task;
+    });
+    
+    setPlan({ ...plan, tasks: updatedTasks });
+    
+    if (result.stillPending === 0) {
+      setComparisonSummary(prev => prev ? {
+        ...prev,
+        afterScore: result.score || prev.afterScore,
+      } : {
+        fixedCount: result.resolved,
+        failedCount: 0,
+        skippedCount: 0,
+        beforeScore: 45,
+        afterScore: result.score || 85,
+      });
+    }
+>>>>>>> origin/main
   };
 
   if (pageState === 'loading') {
