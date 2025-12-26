@@ -1,10 +1,16 @@
-import React, { useState, useCallback } from 'react';
-import { Upload, RefreshCw, CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
-import { useDropzone } from 'react-dropzone';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Spinner } from '@/components/ui/Spinner';
-import { api } from '@/services/api';
+import React, { useState, useCallback } from "react";
+import {
+  Upload,
+  RefreshCw,
+  CheckCircle,
+  AlertTriangle,
+  XCircle,
+} from "lucide-react";
+import { useDropzone } from "react-dropzone";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Spinner } from "@/components/ui/Spinner";
+import { api } from "@/services/api";
 
 export interface ReauditResult {
   originalIssues: number;
@@ -16,10 +22,8 @@ export interface ReauditResult {
     severity: string;
   }>;
   score?: number;
-<<<<<<< HEAD
+
   resolvedIssueCodes?: string[];
-=======
->>>>>>> origin/main
 }
 
 interface ReAuditSectionProps {
@@ -39,54 +43,61 @@ export const ReAuditSection: React.FC<ReAuditSectionProps> = ({
   const [result, setResult] = useState<ReauditResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    if (acceptedFiles.length === 0) return;
-    
-    const file = acceptedFiles[0];
-    if (!file.name.toLowerCase().endsWith('.epub')) {
-      setError('Please upload an EPUB file');
-      return;
-    }
+  const onDrop = useCallback(
+    async (acceptedFiles: File[]) => {
+      if (acceptedFiles.length === 0) return;
 
-    setIsUploading(true);
-    setError(null);
-    setResult(null);
-
-    try {
-      if (isDemo) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        const demoResult: ReauditResult = {
-          originalIssues: pendingCount,
-          resolved: Math.floor(pendingCount * 0.7),
-          stillPending: Math.ceil(pendingCount * 0.3),
-          newIssuesFound: [],
-          score: 85,
-        };
-        setResult(demoResult);
-        onReauditComplete(demoResult);
-      } else {
-        const formData = new FormData();
-        formData.append('epub', file);
-
-        const response = await api.post(`/epub/remediation/${jobId}/reaudit`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
-
-        const data = response.data.data || response.data;
-        setResult(data);
-        onReauditComplete(data);
+      const file = acceptedFiles[0];
+      if (!file.name.toLowerCase().endsWith(".epub")) {
+        setError("Please upload an EPUB file");
+        return;
       }
-    } catch (err) {
-      console.error('Re-audit failed:', err);
-      setError('Failed to analyze EPUB. Please try again.');
-    } finally {
-      setIsUploading(false);
-    }
-  }, [jobId, pendingCount, onReauditComplete, isDemo]);
+
+      setIsUploading(true);
+      setError(null);
+      setResult(null);
+
+      try {
+        if (isDemo) {
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+          const demoResult: ReauditResult = {
+            originalIssues: pendingCount,
+            resolved: Math.floor(pendingCount * 0.7),
+            stillPending: Math.ceil(pendingCount * 0.3),
+            newIssuesFound: [],
+            score: 85,
+          };
+          setResult(demoResult);
+          onReauditComplete(demoResult);
+        } else {
+          const formData = new FormData();
+          formData.append("epub", file);
+
+          const response = await api.post(
+            `/epub/remediation/${jobId}/reaudit`,
+            formData,
+            {
+              headers: { "Content-Type": "multipart/form-data" },
+            },
+          );
+
+          const data = response.data.data || response.data;
+          setResult(data);
+          onReauditComplete(data);
+        }
+      } catch (err) {
+        console.error("Re-audit failed:", err);
+        setError("Failed to analyze EPUB. Please try again.");
+      } finally {
+        setIsUploading(false);
+      }
+    },
+    [jobId, pendingCount, onReauditComplete, isDemo],
+  );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'application/epub+zip': ['.epub'] },
+    accept: { "application/epub+zip": [".epub"] },
     maxFiles: 1,
     disabled: isUploading,
   });
@@ -99,7 +110,9 @@ export const ReAuditSection: React.FC<ReAuditSectionProps> = ({
             <CheckCircle className="h-6 w-6" />
             <div>
               <p className="font-medium">All tasks completed!</p>
-              <p className="text-sm text-green-600">Your EPUB is fully remediated.</p>
+              <p className="text-sm text-green-600">
+                Your EPUB is fully remediated.
+              </p>
             </div>
           </div>
         </CardContent>
@@ -117,15 +130,17 @@ export const ReAuditSection: React.FC<ReAuditSectionProps> = ({
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-gray-600">
-          After fixing the <span className="font-medium text-blue-700">{pendingCount}</span> pending 
-          issues manually, upload the fixed EPUB to verify the issues are resolved.
+          After fixing the{" "}
+          <span className="font-medium text-blue-700">{pendingCount}</span>{" "}
+          pending issues manually, upload the fixed EPUB to verify the issues
+          are resolved.
         </p>
 
         <div
           {...getRootProps()}
           className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
-            ${isDragActive ? 'border-blue-500 bg-blue-100' : 'border-blue-300 hover:border-blue-400 bg-white'}
-            ${isUploading ? 'pointer-events-none opacity-75' : ''}`}
+            ${isDragActive ? "border-blue-500 bg-blue-100" : "border-blue-300 hover:border-blue-400 bg-white"}
+            ${isUploading ? "pointer-events-none opacity-75" : ""}`}
           role="button"
           aria-label="Upload fixed EPUB file"
         >
@@ -139,7 +154,9 @@ export const ReAuditSection: React.FC<ReAuditSectionProps> = ({
             <>
               <Upload className="h-10 w-10 mx-auto mb-3 text-blue-400" />
               <p className="text-gray-700 font-medium">
-                {isDragActive ? 'Drop your EPUB here' : 'Drop your manually-fixed EPUB here'}
+                {isDragActive
+                  ? "Drop your EPUB here"
+                  : "Drop your manually-fixed EPUB here"}
               </p>
               <p className="text-sm text-gray-500 mt-1">or click to browse</p>
             </>
@@ -158,19 +175,27 @@ export const ReAuditSection: React.FC<ReAuditSectionProps> = ({
             <h4 className="font-medium text-gray-900 mb-3">Re-Audit Results</h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div className="text-center p-2 bg-gray-50 rounded">
-                <p className="text-xl font-bold text-gray-700">{result.originalIssues}</p>
+                <p className="text-xl font-bold text-gray-700">
+                  {result.originalIssues}
+                </p>
                 <p className="text-xs text-gray-500">Original Issues</p>
               </div>
               <div className="text-center p-2 bg-green-50 rounded">
-                <p className="text-xl font-bold text-green-600">{result.resolved}</p>
+                <p className="text-xl font-bold text-green-600">
+                  {result.resolved}
+                </p>
                 <p className="text-xs text-green-700">Resolved</p>
               </div>
               <div className="text-center p-2 bg-yellow-50 rounded">
-                <p className="text-xl font-bold text-yellow-600">{result.stillPending}</p>
+                <p className="text-xl font-bold text-yellow-600">
+                  {result.stillPending}
+                </p>
                 <p className="text-xs text-yellow-700">Still Pending</p>
               </div>
               <div className="text-center p-2 bg-red-50 rounded">
-                <p className="text-xl font-bold text-red-600">{result.newIssuesFound?.length || 0}</p>
+                <p className="text-xl font-bold text-red-600">
+                  {result.newIssuesFound?.length || 0}
+                </p>
                 <p className="text-xs text-red-700">New Issues</p>
               </div>
             </div>
@@ -184,7 +209,9 @@ export const ReAuditSection: React.FC<ReAuditSectionProps> = ({
                 <ul className="space-y-2">
                   {result.newIssuesFound.map((issue, idx) => (
                     <li key={idx} className="text-sm flex items-start gap-2">
-                      <Badge variant="error" size="sm">{issue.severity}</Badge>
+                      <Badge variant="error" size="sm">
+                        {issue.severity}
+                      </Badge>
                       <span className="text-gray-700">{issue.message}</span>
                     </li>
                   ))}
@@ -195,8 +222,12 @@ export const ReAuditSection: React.FC<ReAuditSectionProps> = ({
             {result.score !== undefined && (
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Updated Accessibility Score</span>
-                  <span className={`text-lg font-bold ${result.score >= 80 ? 'text-green-600' : result.score >= 60 ? 'text-yellow-600' : 'text-red-600'}`}>
+                  <span className="text-sm text-gray-600">
+                    Updated Accessibility Score
+                  </span>
+                  <span
+                    className={`text-lg font-bold ${result.score >= 80 ? "text-green-600" : result.score >= 60 ? "text-yellow-600" : "text-red-600"}`}
+                  >
                     {result.score}%
                   </span>
                 </div>
