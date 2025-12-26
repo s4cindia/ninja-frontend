@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, CheckCircle, XCircle, Loader2, Clock, AlertTria
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { clsx } from 'clsx';
+import DOMPurify from 'dompurify';
 
 function escapeHtml(text: string): string {
   return text
@@ -208,7 +209,7 @@ const RemediationGuidance: React.FC<{
     <ol className="list-decimal list-inside space-y-1.5 text-sm text-amber-900">
       {steps.map((step, idx) => (
         <li key={idx} className="leading-relaxed" dangerouslySetInnerHTML={{ 
-          __html: formatStep(step)
+          __html: DOMPurify.sanitize(formatStep(step), { ALLOWED_TAGS: ['code', 'strong'], ALLOWED_ATTR: ['class'] })
         }} />
       ))}
     </ol>
@@ -227,7 +228,7 @@ const RemediationGuidance: React.FC<{
           </div>
           <pre 
             className="p-2 bg-green-50 border border-green-200 rounded text-xs overflow-x-auto font-mono text-green-800"
-            dangerouslySetInnerHTML={{ __html: highlightCodeChanges(codeExample.before, codeExample.after) }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(highlightCodeChanges(codeExample.before, codeExample.after), { ALLOWED_TAGS: ['span', 'br'], ALLOWED_ATTR: ['class'] }) }}
           />
         </div>
       </div>

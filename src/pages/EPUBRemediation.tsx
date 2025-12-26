@@ -1120,31 +1120,29 @@ export const EPUBRemediation: React.FC = () => {
 
   const handleReauditComplete = (result: ReauditResult) => {
     if (!plan) return;
-    
+
+    const resolvedCodes = new Set(result.resolvedIssueCodes || []);
+
     const updatedTasks = plan.tasks.map(task => {
-      if (task.type === 'manual' && task.status === 'pending') {
-        const wasResolved = result.resolved > 0;
-        if (wasResolved) {
-          return { ...task, status: 'completed' as TaskStatus, completionMethod: 'manual' as const };
-        }
+      if (
+        task.type === 'manual' &&
+        task.status === 'pending' &&
+        resolvedCodes.has(task.code)
+      ) {
+        return { ...task, status: 'completed' as TaskStatus, completionMethod: 'manual' as const };
       }
       return task;
     });
-    
+
     setPlan({ ...plan, tasks: updatedTasks });
-    
-    if (result.stillPending === 0) {
-      setComparisonSummary(prev => prev ? {
-        ...prev,
-        afterScore: result.score || prev.afterScore,
-      } : {
-        fixedCount: result.resolved,
-        failedCount: 0,
-        skippedCount: 0,
-        beforeScore: 45,
-        afterScore: result.score || 85,
-      });
-    }
+
+    setComparisonSummary(prev => ({
+      fixedCount: (prev?.fixedCount || 0) + result.resolved,
+      failedCount: prev?.failedCount || 0,
+      skippedCount: prev?.skippedCount || 0,
+      beforeScore: prev?.beforeScore || 0,
+      afterScore: result.score || prev?.afterScore || 0,
+    }));
   };
 
   if (pageState === 'loading') {
