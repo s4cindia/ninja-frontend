@@ -25,6 +25,72 @@ const EDITION_LABELS: Record<AcrEditionCode, { title: string; subtitle: string }
   'VPAT2.5-INT': { title: 'International', subtitle: 'Comprehensive' },
 };
 
+const DEFAULT_CRITERIA_COUNTS: Record<AcrEditionCode, number> = {
+  'VPAT2.5-508': 50,
+  'VPAT2.5-WCAG': 50,
+  'VPAT2.5-EU': 55,
+  'VPAT2.5-INT': 60,
+};
+
+type CriteriaStatus = 'not_started' | 'in_progress' | 'complete';
+
+interface CriteriaProgress {
+  evaluated: number;
+  total: number;
+  status: CriteriaStatus;
+}
+
+function getCriteriaProgress(edition: AcrEdition): CriteriaProgress {
+  const editionCode = edition.code as AcrEditionCode;
+  const total = edition.criteriaCount ?? 
+    (Array.isArray(edition.criteria) && edition.criteria.length > 0 ? edition.criteria.length : null) ??
+    (DEFAULT_CRITERIA_COUNTS[editionCode] ?? 50);
+  
+  let evaluated = 0;
+  if (Array.isArray(edition.criteria)) {
+    evaluated = edition.criteria.filter(c => 
+      c.conformanceLevel && c.conformanceLevel !== 'not_applicable' && c.remarks && c.remarks.trim().length > 0
+    ).length;
+  }
+
+  let status: CriteriaStatus = 'not_started';
+  if (evaluated > 0 && evaluated < total) {
+    status = 'in_progress';
+  } else if (evaluated >= total && total > 0) {
+    status = 'complete';
+  }
+
+  return { evaluated, total, status };
+}
+
+function getCriteriaLabel(progress: CriteriaProgress): string {
+  const { evaluated, total, status } = progress;
+  
+  switch (status) {
+    case 'not_started':
+      return `${total} criteria to evaluate`;
+    case 'in_progress':
+      return `${evaluated} of ${total} criteria evaluated`;
+    case 'complete':
+      return `${total} criteria complete`;
+    default:
+      return `${total} criteria`;
+  }
+}
+
+function getCriteriaLabelColor(status: CriteriaStatus): string {
+  switch (status) {
+    case 'not_started':
+      return 'text-gray-500';
+    case 'in_progress':
+      return 'text-blue-600';
+    case 'complete':
+      return 'text-green-600';
+    default:
+      return 'text-gray-600';
+  }
+}
+
 export function EditionSelector({ selectedEdition, onSelect, disabled = false }: EditionSelectorProps) {
   const { data: editions, isLoading, error } = useEditions();
   const [hoveredEdition, setHoveredEdition] = useState<string | null>(null);
@@ -64,7 +130,9 @@ export function EditionSelector({ selectedEdition, onSelect, disabled = false }:
           const labels = EDITION_LABELS[edition.code as AcrEditionCode];
           const tooltip = EDITION_TOOLTIPS[edition.code as AcrEditionCode];
           const isRecommended = edition.isRecommended;
-          const criteriaCount = edition.criteriaCount ?? (Array.isArray(edition.criteria) ? edition.criteria.length : 0);
+          const criteriaProgress = getCriteriaProgress(edition);
+          const criteriaLabel = getCriteriaLabel(criteriaProgress);
+          const criteriaColor = getCriteriaLabelColor(criteriaProgress.status);
 
           return (
             <div
@@ -122,8 +190,8 @@ export function EditionSelector({ selectedEdition, onSelect, disabled = false }:
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">
-                    {criteriaCount} criteria
+                  <span className={cn('text-sm font-medium', criteriaColor)}>
+                    {criteriaLabel}
                   </span>
                   <Info className="h-4 w-4 text-gray-400" />
                 </div>
