@@ -455,6 +455,39 @@ const remediationTemplates: Record<string, { title: string; steps: string[]; cod
       { label: 'Language Tags', url: 'https://www.w3.org/International/questions/qa-html-language-declarations' },
     ],
   },
+  'epub-type-role': {
+    title: 'Add ARIA Role to Match epub:type',
+    steps: [
+      '**Open in Sigil:** File → Open → Select your EPUB',
+      '**Find the file:** Open the file from the issue location',
+      '**Switch to Code View:** Press F9',
+      '**Find elements with `epub:type`** that are missing role attributes',
+      '**Add the matching ARIA role** using the mapping table below',
+      '**Save:** Ctrl+S',
+    ],
+    codeExample: {
+      before: `<!-- Missing role attribute -->
+<section epub:type="chapter">
+  <h1>Chapter 1</h1>
+</section>
+
+<aside epub:type="sidebar">
+  <p>Side content</p>
+</aside>`,
+      after: `<!-- Added matching ARIA roles -->
+<section epub:type="chapter" role="doc-chapter">
+  <h1>Chapter 1</h1>
+</section>
+
+<aside epub:type="sidebar" role="doc-sidebar">
+  <p>Side content</p>
+</aside>`,
+    },
+    resources: [
+      { label: 'EPUB Type to ARIA Role Mapping', url: 'https://www.w3.org/TR/epub-aria-authoring/' },
+      { label: 'DPUB-ARIA Roles', url: 'https://www.w3.org/TR/dpub-aria-1.0/' },
+    ],
+  },
 };
 
 function getWcagCriteriaFromCode(code: string, message: string): string[] {
@@ -496,6 +529,8 @@ const issueCodeAliases: Record<string, string> = {
   'PAGEBREAK-LABEL': 'pagebreak',
   'LINK-NAME': 'link',
   'LINK-PURPOSE': 'link',
+  'EPUB-TYPE-HAS-MATCHING-ROLE': 'epub-type-role',
+  'EPUB-TYPE-ROLE': 'epub-type-role',
 };
 
 function getRemediationFromCode(code: string, message: string): RemediationTask['remediation'] {
