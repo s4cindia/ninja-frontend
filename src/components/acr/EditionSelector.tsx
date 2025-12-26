@@ -42,9 +42,9 @@ interface CriteriaProgress {
 
 function getCriteriaProgress(edition: AcrEdition): CriteriaProgress {
   const editionCode = edition.code as AcrEditionCode;
-  const total = edition.criteriaCount ?? 
-    (Array.isArray(edition.criteria) && edition.criteria.length > 0 ? edition.criteria.length : null) ??
-    (DEFAULT_CRITERIA_COUNTS[editionCode] ?? 50);
+  const total = DEFAULT_CRITERIA_COUNTS[editionCode] ?? 
+    edition.criteriaCount ?? 
+    (Array.isArray(edition.criteria) && edition.criteria.length > 0 ? edition.criteria.length : 50);
   
   let evaluated = 0;
   if (Array.isArray(edition.criteria)) {
