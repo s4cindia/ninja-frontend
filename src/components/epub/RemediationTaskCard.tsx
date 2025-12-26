@@ -167,17 +167,44 @@ const CopyButton: React.FC<{ text: string; label?: string }> = ({ text, label = 
   );
 };
 
+function highlightCodeChanges(before: string, after: string): string {
+  const beforeLines = new Set(before.split('\n').map(l => l.trim()));
+  return after.split('\n').map(line => {
+    const trimmed = line.trim();
+    if (trimmed && !beforeLines.has(trimmed) && !trimmed.startsWith('<!--')) {
+      return `<span class="bg-green-200 text-green-900">${escapeHtml(line)}</span>`;
+    }
+    return escapeHtml(line);
+  }).join('\n');
+}
+
 const RemediationGuidance: React.FC<{
   title: string;
   steps: string[];
   codeExample?: { before: string; after: string };
   resources?: { label: string; url: string }[];
-}> = ({ title, steps, codeExample, resources }) => (
+  filePath?: string;
+  onViewFile?: () => void;
+}> = ({ title, steps, codeExample, resources, filePath, onViewFile }) => (
   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-3">
     <h4 className="font-medium text-amber-800 flex items-center gap-2">
       <BookOpen className="h-4 w-4" />
       {title}
     </h4>
+    {filePath && (
+      <div className="flex items-center gap-2 text-xs">
+        <FileCode className="h-3 w-3 text-amber-600" />
+        <span className="font-mono text-amber-700">{filePath}</span>
+        {onViewFile && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onViewFile(); }}
+            className="text-blue-600 hover:underline"
+          >
+            Open File
+          </button>
+        )}
+      </div>
+    )}
     <ol className="list-decimal list-inside space-y-1.5 text-sm text-amber-900">
       {steps.map((step, idx) => (
         <li key={idx} className="leading-relaxed" dangerouslySetInnerHTML={{ 
@@ -195,15 +222,19 @@ const RemediationGuidance: React.FC<{
         </div>
         <div>
           <div className="flex items-center justify-between mb-1">
-            <p className="text-xs font-medium text-green-600">After (Fixed):</p>
+            <p className="text-xs font-medium text-green-600">After (Fixed) - changes highlighted:</p>
             <CopyButton text={codeExample.after} label="Copy Code" />
           </div>
-          <pre className="p-2 bg-green-50 border border-green-200 rounded text-xs overflow-x-auto font-mono text-green-800">
-            {codeExample.after}
-          </pre>
+          <pre 
+            className="p-2 bg-green-50 border border-green-200 rounded text-xs overflow-x-auto font-mono text-green-800"
+            dangerouslySetInnerHTML={{ __html: highlightCodeChanges(codeExample.before, codeExample.after) }}
+          />
         </div>
       </div>
     )}
+    <div className="pt-2 border-t border-amber-200 text-xs text-amber-700">
+      <strong>Validation:</strong> After saving, use <code className="bg-amber-100 px-1 rounded">Tools → Validate EPUB</code> in Sigil to check for errors.
+    </div>
     {resources && resources.length > 0 && (
       <div className="pt-2 border-t border-amber-200">
         <p className="text-xs font-medium text-amber-700 mb-1">Resources:</p>
@@ -380,6 +411,8 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
                 steps={task.remediation.steps}
                 codeExample={task.remediation.codeExample}
                 resources={task.remediation.resources}
+                filePath={task.filePath}
+                onViewFile={task.filePath && onViewInContext ? handleViewInContext : undefined}
               />
             )
           )}
