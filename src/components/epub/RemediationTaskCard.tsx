@@ -1,8 +1,32 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, CheckCircle, XCircle, Loader2, Clock, AlertTriangle, Wrench, Hand, ExternalLink, FileCode, BookOpen } from 'lucide-react';
+import { ChevronDown, ChevronUp, CheckCircle, XCircle, Loader2, Clock, AlertTriangle, Wrench, Hand, ExternalLink, FileCode, BookOpen, Copy, Check } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { clsx } from 'clsx';
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function formatStep(step: string): string {
+  let formatted = step;
+  const codeMatches: string[] = [];
+  formatted = formatted.replace(/`([^`]+)`/g, (_match, code) => {
+    const placeholder = `__CODE_${codeMatches.length}__`;
+    codeMatches.push(code);
+    return placeholder;
+  });
+  formatted = escapeHtml(formatted);
+  codeMatches.forEach((code, i) => {
+    const escapedCode = escapeHtml(code);
+    formatted = formatted.replace(`__CODE_${i}__`, `<code class="bg-amber-100 px-1 rounded text-xs font-mono">${escapedCode}</code>`);
+  });
+  formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  return formatted;
+}
 
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
 export type TaskType = 'auto' | 'manual';
@@ -112,6 +136,37 @@ const SourceBadge: React.FC<{ source: string }> = ({ source }) => {
   );
 };
 
+const CopyButton: React.FC<{ text: string; label?: string }> = ({ text, label = 'Copy' }) => {
+  const [copied, setCopied] = useState(false);
+  
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+  
+  return (
+    <button
+      onClick={handleCopy}
+      className={clsx(
+        'inline-flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors',
+        copied 
+          ? 'bg-green-100 text-green-700' 
+          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+      )}
+      title={copied ? 'Copied!' : label}
+    >
+      {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+      {copied ? 'Copied!' : label}
+    </button>
+  );
+};
+
 const RemediationGuidance: React.FC<{
   title: string;
   steps: string[];
@@ -126,9 +181,7 @@ const RemediationGuidance: React.FC<{
     <ol className="list-decimal list-inside space-y-1.5 text-sm text-amber-900">
       {steps.map((step, idx) => (
         <li key={idx} className="leading-relaxed" dangerouslySetInnerHTML={{ 
-          __html: step
-            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-            .replace(/`([^`]+)`/g, '<code class="bg-amber-100 px-1 rounded text-xs font-mono">$1</code>')
+          __html: formatStep(step)
         }} />
       ))}
     </ol>
@@ -141,7 +194,10 @@ const RemediationGuidance: React.FC<{
           </pre>
         </div>
         <div>
-          <p className="text-xs font-medium text-green-600 mb-1">After:</p>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs font-medium text-green-600">After (Fixed):</p>
+            <CopyButton text={codeExample.after} label="Copy Code" />
+          </div>
           <pre className="p-2 bg-green-50 border border-green-200 rounded text-xs overflow-x-auto font-mono text-green-800">
             {codeExample.after}
           </pre>
