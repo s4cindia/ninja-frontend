@@ -75,6 +75,7 @@ export function QuickFixPanel({
   useEffect(() => {
     async function loadTemplateData() {
       const tpl = getQuickFixTemplate(issue.code);
+      console.log('QuickFixPanel: template for', issue.code, ':', tpl?.id);
       if (!tpl) {
         setTemplate(undefined);
         return;
@@ -82,7 +83,13 @@ export function QuickFixPanel({
       
       setTemplate(tpl);
       
-      if (tpl.requiresAsyncData && tpl.loadAsyncData && jobId) {
+      if (tpl.requiresAsyncData && tpl.loadAsyncData) {
+        console.log('QuickFixPanel: template requires async data, jobId:', jobId);
+        if (!jobId) {
+          console.warn('QuickFixPanel: no jobId provided for async template');
+          setLoadError('Missing job ID for loading data');
+          return;
+        }
         setIsLoadingData(true);
         setLoadError(null);
         
@@ -97,9 +104,10 @@ export function QuickFixPanel({
             jobId,
             issueMessage: issue.message,
           });
+          console.log('QuickFixPanel: async data loaded:', data);
           setAsyncData(data);
         } catch (error) {
-          console.error('Failed to load template data:', error);
+          console.error('QuickFixPanel: Failed to load template data:', error);
           setLoadError('Failed to load Quick Fix data');
         } finally {
           setIsLoadingData(false);

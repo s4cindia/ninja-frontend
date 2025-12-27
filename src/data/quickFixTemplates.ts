@@ -462,16 +462,18 @@ const epubTypeRoleTemplate: QuickFixTemplate = {
   requiresAsyncData: true,
   
   loadAsyncData: async (context) => {
+    console.log('loadAsyncData called for epub:type with jobId:', context.jobId);
     try {
       const { scanEpubTypes } = await import('@/services/quickfix.service');
       const result = await scanEpubTypes(context.jobId || '');
+      console.log('scanEpubTypes result:', result);
       return {
         detectedEpubTypes: result.epubTypes,
         scannedFiles: result.files,
       };
     } catch (error) {
       console.error('Failed to scan epub:types:', error);
-      return { detectedEpubTypes: [], scannedFiles: [], error: 'Failed to scan EPUB' };
+      return { detectedEpubTypes: [], scannedFiles: [], error: 'Failed to load epub:type data from server' };
     }
   },
   
@@ -486,10 +488,13 @@ const epubTypeRoleTemplate: QuickFixTemplate = {
   ],
   
   getInputFields: (context) => {
+    console.log('getInputFields called with context:', context);
     const detectedTypes = context.detectedEpubTypes || [];
+    console.log('detectedTypes from async data:', detectedTypes);
     
     if (detectedTypes.length === 0) {
       const fallbackTypes = detectEpubTypesFromContext(context);
+      console.log('fallbackTypes from local detection:', fallbackTypes);
       
       if (fallbackTypes.length === 0) {
         return [
