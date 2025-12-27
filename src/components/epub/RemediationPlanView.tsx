@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { FileText, Clock, Wrench, CheckCircle, AlertCircle, Zap, FileEdit } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -8,6 +8,8 @@ import { RemediationTaskCard, RemediationTask, TaskStatus } from './RemediationT
 import { RemediationProgress, FixResult } from './RemediationProgress';
 import { hasQuickFixTemplate } from '@/data/quickFixTemplates';
 import { FixTypeBadge } from '@/components/remediation/FixTypeBadge';
+import { applyQuickFixToEpub } from '@/services/quickfix.service';
+import type { QuickFix } from '@/types/quickfix.types';
 
 export interface RemediationPlan {
   jobId: string;
@@ -23,6 +25,8 @@ interface RemediationPlanViewProps {
   onRunAutoRemediation: () => void;
   onCancelRemediation?: () => void;
   onMarkTaskFixed?: (taskId: string, notes?: string) => Promise<void>;
+  onSkipTask?: (taskId: string, reason?: string) => Promise<void>;
+  onRefreshPlan?: () => void;
 }
 
 export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
@@ -33,8 +37,31 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
   onRunAutoRemediation,
   onCancelRemediation,
   onMarkTaskFixed,
+  onSkipTask,
+  onRefreshPlan,
 }) => {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+
+  const handleQuickFixApply = useCallback(async (taskId: string, fix: QuickFix) => {
+    try {
+      const mappedChanges = fix.changes.map(change => ({
+        type: change.type,
+        filePath: change.path,
+        content: change.content,
+        oldContent: change.oldContent,
+        lineNumber: change.lineNumber,
+        description: change.description,
+      }));
+      const result = await applyQuickFixToEpub(plan.jobId, taskId, mappedChanges);
+      if (result.success) {
+        await onMarkTaskFixed?.(taskId, `Quick fix applied to: ${result.modifiedFiles.join(', ')}`);
+        onRefreshPlan?.();
+      }
+    } catch (error) {
+      console.error('Failed to apply quick fix:', error);
+      throw error;
+    }
+  }, [plan.jobId, onMarkTaskFixed, onRefreshPlan]);
 
   const getEffectiveFixType = (task: RemediationTask) => 
     task.fixType || (task.type === 'auto' ? 'auto' : hasQuickFixTemplate(task.code) ? 'quickfix' : 'manual');
@@ -260,6 +287,8 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
                     setExpandedTaskId(expandedTaskId === task.id ? null : task.id)
                   }
                   onMarkFixed={onMarkTaskFixed}
+                  onQuickFixApply={handleQuickFixApply}
+                  onSkipTask={onSkipTask}
                 />
               ))
             )}

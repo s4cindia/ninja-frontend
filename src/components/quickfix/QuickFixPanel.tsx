@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Wrench, X, Eye, Play, Edit3, SkipForward, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { getQuickFixTemplate } from '@/data/quickFixTemplates';
@@ -43,6 +43,7 @@ export function QuickFixPanel({
   onClose,
 }: QuickFixPanelProps) {
   const template = useMemo(() => getQuickFixTemplate(issue.code), [issue.code]);
+  const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const [inputValues, setInputValues] = useState<Record<string, unknown>>(() => 
     template ? getDefaultInputValues(template) : {}
@@ -51,6 +52,14 @@ export function QuickFixPanel({
   const [isApplying, setIsApplying] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const context: QuickFixContext = useMemo(() => ({
     issueId: issue.id,
@@ -95,7 +104,7 @@ export function QuickFixPanel({
       const fix = applyQuickFix(template, inputValues, context);
       await onApplyFix(fix);
       setToast({ type: 'success', message: 'Fix applied successfully!' });
-      setTimeout(() => {
+      closeTimeoutRef.current = setTimeout(() => {
         onClose?.();
       }, 1500);
     } catch (err) {

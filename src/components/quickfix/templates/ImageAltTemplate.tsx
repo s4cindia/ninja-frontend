@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Sparkles, RefreshCw, AlertTriangle, CheckCircle, Info, Image as ImageIcon } from 'lucide-react';
 import { useQuickFixAltText } from '@/hooks/useQuickFixAltText';
 import type { AltTextFlag } from '@/types/alt-text.types';
@@ -75,15 +75,21 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
     },
   });
 
+  const prevValidRef = useRef<boolean | null>(null);
+
   useEffect(() => {
     const isValid = isDecorative === 'yes' || (altText.trim().length > 0 && altText.length <= 125);
-    onValidate(isValid);
+    if (prevValidRef.current !== isValid) {
+      prevValidRef.current = isValid;
+      onValidate(isValid);
+    }
   }, [isDecorative, altText, onValidate]);
 
   const handleDecorativeChange = useCallback((value: string) => {
     setIsDecorative(value);
     if (value === 'yes') {
       setAltText('');
+      setAiUsed(false);
       reset();
     }
     onChange({ altText: value === 'yes' ? '' : altText, isDecorative: value });

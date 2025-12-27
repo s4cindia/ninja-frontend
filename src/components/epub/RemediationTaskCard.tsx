@@ -93,6 +93,7 @@ interface RemediationTaskCardProps {
   onMarkFixed?: (taskId: string, notes?: string) => Promise<void>;
   onViewInContext?: (filePath: string, selector?: string) => void;
   onQuickFixApply?: (taskId: string, fix: QuickFix) => Promise<void>;
+  onSkipTask?: (taskId: string, reason?: string) => Promise<void>;
 }
 
 const statusConfig: Record<
@@ -334,6 +335,7 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
   onMarkFixed,
   onViewInContext,
   onQuickFixApply,
+  onSkipTask,
 }) => {
   const [internalExpanded, setInternalExpanded] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
@@ -500,7 +502,15 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
                 currentContent: task.html,
               }}
               onApplyFix={handleQuickFixApply}
-              onSkip={() => onMarkFixed?.(task.id, "Skipped - will fix manually")}
+              onSkip={async () => {
+                try {
+                  if (onSkipTask) {
+                    await onSkipTask(task.id, "Skipped - will fix manually");
+                  }
+                } catch (err) {
+                  console.error('Failed to skip task:', err);
+                }
+              }}
               onEditManually={() => setShowNotes(true)}
             />
           )}

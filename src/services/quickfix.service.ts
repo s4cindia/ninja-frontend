@@ -69,7 +69,7 @@ export async function applyQuickFixToEpub(
   jobId: string,
   issueId: string,
   changes: FileChange[]
-): Promise<{ success: boolean; modifiedFiles: string[] }> {
+): Promise<{ success: boolean; modifiedFiles: string[]; simulated?: boolean }> {
   try {
     const response = await api.post<ApiResponse<{ success: boolean; modifiedFiles: string[] }>>(
       `/epub/${jobId}/apply-fix`,
@@ -77,10 +77,8 @@ export async function applyQuickFixToEpub(
     );
     return response.data.data;
   } catch (error) {
-    console.warn('Apply fix API unavailable, simulating success:', error);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const modifiedFiles = [...new Set(changes.map(c => c.filePath))];
-    return { success: true, modifiedFiles };
+    console.error('Apply fix API failed:', error);
+    throw new Error('Failed to apply fix - API unavailable');
   }
 }
 

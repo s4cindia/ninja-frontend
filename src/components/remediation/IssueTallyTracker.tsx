@@ -137,7 +137,11 @@ export const IssueTallyTracker: React.FC<IssueTallyTrackerProps> = ({
         {hasDiscrepancy && (
           <div className="mt-3 flex items-center justify-center gap-2 text-sm text-red-600">
             <AlertTriangle className="h-4 w-4" />
-            <span>{tally.audit.total - tally.plan.total} issues missing from plan</span>
+            <span>
+              {tally.audit.total > tally.plan.total
+                ? `${tally.audit.total - tally.plan.total} issues missing from plan`
+                : `${tally.plan.total - tally.audit.total} extra issues in plan`}
+            </span>
           </div>
         )}
       </div>

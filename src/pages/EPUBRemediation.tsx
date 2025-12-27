@@ -1387,6 +1387,54 @@ export const EPUBRemediation: React.FC = () => {
     );
   };
 
+  const handleSkipTask = async (taskId: string, reason?: string) => {
+    if (!plan) return;
+
+    if (!isDemo && jobId) {
+      try {
+        await api.post(`/epub/job/${jobId}/task/${taskId}/skip`, {
+          reason,
+        });
+      } catch {
+        // Continue with local update even if API fails
+      }
+    }
+
+    setPlan((prev) =>
+      prev
+        ? {
+            ...prev,
+            tasks: prev.tasks.map((t) =>
+              t.id === taskId
+                ? {
+                    ...t,
+                    status: "skipped" as TaskStatus,
+                    notes: reason,
+                  }
+                : t,
+            ),
+          }
+        : null,
+    );
+  };
+
+  const handleRefreshPlan = async () => {
+    if (!jobId || isDemo) return;
+    try {
+      const response = await api.get(`/epub/job/${jobId}/remediation`);
+      const data = response.data.data || response.data;
+      if (data.tasks) {
+        const normalizedTasks = data.tasks.map(
+          (t: RawAceAssertion, i: number) => normalizeAceTask(t, i)
+        );
+        const dedupedTasks = groupAndDeduplicateTasks(normalizedTasks);
+        setPlan((prev) => prev ? { ...prev, tasks: dedupedTasks } : null);
+      }
+    } catch {
+      // Silently fail refresh - user can retry
+    }
+  };
+
   const handleViewComparison = () => {
     const comparisonData = {
       epubFileName: plan?.epubFileName || fileName || "document.epub",
@@ -1483,10 +1531,19 @@ export const EPUBRemediation: React.FC = () => {
   const manualTasksCount = apiStats?.byFixType?.manual ?? 
     plan.tasks.filter((t) => getEffectiveFixType(t) === "manual").length;
 
+  const bySourceCounts = {
+    epubCheck: plan.tasks.filter(t => (t.source ?? '').toLowerCase() === 'epubcheck').length,
+    ace: plan.tasks.filter(t => (t.source ?? '').toLowerCase() === 'ace').length,
+    jsAuditor: plan.tasks.filter(t => {
+      const source = (t.source ?? '').toLowerCase();
+      return source === 'js-auditor' || source === 'jsauditor' || source === 'js_auditor';
+    }).length,
+  };
+
   const tallyData: TallyData = {
     audit: {
       total: plan.tasks.length,
-      bySource: { epubCheck: 0, ace: plan.tasks.length, jsAuditor: 0 },
+      bySource: bySourceCounts,
       bySeverity: {
         critical: plan.tasks.filter((t) => t.severity === "critical").length,
         serious: plan.tasks.filter((t) => t.severity === "serious").length,
@@ -1496,7 +1553,7 @@ export const EPUBRemediation: React.FC = () => {
     },
     plan: {
       total: plan.tasks.length,
-      bySource: { epubCheck: 0, ace: plan.tasks.length, jsAuditor: 0 },
+      bySource: bySourceCounts,
       byClassification: {
         autoFixable: autoTasksCount,
         quickFix: quickFixTasksCount,
@@ -1634,6 +1691,8 @@ export const EPUBRemediation: React.FC = () => {
         onRunAutoRemediation={handleRunAutoRemediation}
         onCancelRemediation={handleCancelRemediation}
         onMarkTaskFixed={handleMarkTaskFixed}
+        onSkipTask={handleSkipTask}
+        onRefreshPlan={handleRefreshPlan}
       />
 
       {pageState !== "running" && pendingManualCount > 0 && (
