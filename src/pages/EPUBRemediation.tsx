@@ -993,36 +993,8 @@ export const EPUBRemediation: React.FC = () => {
         isReturningCompleted,
       );
 
-      // If returning with completed status, still load plan but keep complete state
-      if (
-        locationState?.autoFixableIssues &&
-        locationState.autoFixableIssues.length > 0 &&
-        !isReturningCompleted
-      ) {
-        console.log("[EPUBRemediation] Using locationState autoFixableIssues");
-        const tasks: RemediationTask[] = locationState.autoFixableIssues.map(
-          (issue) => ({
-            id: issue.id,
-            code: issue.code,
-            severity: issue.severity,
-            message: issue.message,
-            location: issue.location,
-            suggestion: issue.suggestion,
-            type: "auto" as const,
-            status: "pending" as const,
-          }),
-        );
-
-        setPlan({
-          jobId,
-          epubFileName: fileName !== "Loading..." ? fileName : "document.epub",
-          tasks,
-        });
-        setPageState("ready");
-        setIsDemo(isDemoJob);
-        return;
-      }
-
+      // Always fetch from API to get correct task types and stats
+      // locationState.autoFixableIssues is deprecated - API provides accurate three-tier classification
       try {
         const response = await api.get(`/epub/job/${jobId}/remediation`);
         const data = response.data.data || response.data;
