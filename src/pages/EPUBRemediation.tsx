@@ -765,14 +765,26 @@ function normalizeAceTask(
   const rawSeverity = (raw.severity || raw.impact || "moderate").toLowerCase();
   const severity = severityMap[rawSeverity] || "moderate";
 
-  // Determine task type: check raw.type first, then isAutoFixable flag
+  // Determine task type and fix type from API
+  // API now returns type: "auto" | "quickfix" | "manual"
   let taskType: "auto" | "manual" = "manual";
-  if (raw.type === "auto" || raw.type === "manual") {
-    taskType = raw.type;
+  let fixType: "auto" | "quickfix" | "manual" | undefined = undefined;
+  
+  if (raw.type === "auto") {
+    taskType = "auto";
+    fixType = "auto";
+  } else if (raw.type === "quickfix") {
+    taskType = "manual"; // QuickFix tasks are user-initiated, so type is "manual"
+    fixType = "quickfix";
+  } else if (raw.type === "manual") {
+    taskType = "manual";
+    fixType = "manual";
   } else if (raw.isAutoFixable === true) {
     taskType = "auto";
+    fixType = "auto";
   } else if (raw.isAutoFixable === false) {
     taskType = "manual";
+    // fixType will be determined by frontend hasQuickFixTemplate()
   } else {
     taskType = "manual";
   }
@@ -824,6 +836,7 @@ function normalizeAceTask(
       raw.help ||
       (typeof raw.remediation === "string" ? raw.remediation : undefined),
     type: taskType,
+    fixType,
     status: (raw.status as TaskStatus) || "pending",
     filePath,
     selector: raw.selector,
@@ -838,7 +851,9 @@ function groupAndDeduplicateTasks(tasks: RemediationTask[]): RemediationTask[] {
   const grouped = new Map<string, RemediationTask>();
 
   for (const task of tasks) {
-    const key = `${task.code}-${task.message}`;
+    // Include location/filePath in key to preserve tasks at different locations
+    const locationKey = task.location || task.filePath || '';
+    const key = `${task.code}-${task.message}-${locationKey}`;
     if (!grouped.has(key)) {
       grouped.set(key, task);
     }
