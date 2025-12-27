@@ -159,7 +159,7 @@ export function getDefaultInputValues(
 }
 
 export function formatChangeDescription(change: FileChange): string {
-  const path = change.path || 'unknown file';
+  const path = change.filePath || 'unknown file';
   const line = change.lineNumber ? ` at line ${change.lineNumber}` : '';
   
   switch (change.type) {

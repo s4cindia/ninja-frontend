@@ -56,8 +56,7 @@ export async function generateFileChangesFromTemplate(
 
   return fix.changes.map(change => ({
     type: change.type as FileChange['type'],
-    filePath: change.path || issue.location || 'content.opf',
-    xpath: change.path,
+    filePath: change.filePath || issue.location || 'content.opf',
     content: change.content,
     oldContent: change.oldContent,
     lineNumber: change.lineNumber,

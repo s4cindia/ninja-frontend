@@ -60,11 +60,13 @@ const SEVERITY_CONFIG = {
   },
 };
 
-const STATUS_CONFIG = {
+const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   pending: { label: 'Pending', className: 'bg-gray-100 text-gray-700' },
   in_progress: { label: 'In Progress', className: 'bg-blue-100 text-blue-700' },
   fixed: { label: 'Fixed', className: 'bg-green-100 text-green-700' },
+  completed: { label: 'Completed', className: 'bg-green-100 text-green-700' },
   skipped: { label: 'Skipped', className: 'bg-yellow-100 text-yellow-700' },
+  failed: { label: 'Failed', className: 'bg-red-100 text-red-700' },
   manual_required: { label: 'Manual Fix Required', className: 'bg-red-100 text-red-700' },
 };
 
@@ -93,7 +95,7 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
     try {
       const changes: FileChange[] = fix.changes.map(change => ({
         type: change.type as FileChange['type'],
-        filePath: change.path || fix.targetFile,
+        filePath: change.filePath || fix.targetFile,
         content: change.content,
         oldContent: change.oldContent,
         lineNumber: change.lineNumber,

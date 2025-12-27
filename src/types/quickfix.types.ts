@@ -24,7 +24,7 @@ export interface QuickFixInput {
 
 export interface FileChange {
   type: 'insert' | 'replace' | 'delete';
-  path: string;
+  filePath: string;
   content?: string;
   oldContent?: string;
   lineNumber?: number;

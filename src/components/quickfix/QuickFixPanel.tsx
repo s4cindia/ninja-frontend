@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Wrench, X, Eye, Play, Edit3, SkipForward, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import DOMPurify from 'dompurify';
 import { cn } from '@/utils/cn';
 import { getQuickFixTemplate } from '@/data/quickFixTemplates';
 import { 
@@ -297,7 +298,7 @@ export function QuickFixPanel({
             </div>
             <div 
               className="p-3 bg-gray-900 text-sm font-mono overflow-x-auto"
-              dangerouslySetInnerHTML={{ __html: preview.diff }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(preview.diff) }}
             />
             <style>{`
               .diff-container { white-space: pre-wrap; }

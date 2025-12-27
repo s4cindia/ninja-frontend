@@ -49,7 +49,7 @@ const metadataAccessModeTemplate: QuickFixTemplate = {
       targetFile: 'content.opf',
       changes: [{
         type: 'insert',
-        path: 'content.opf',
+        filePath: 'content.opf',
         content,
         description: 'Add accessMode and accessModeSufficient metadata',
       }],
@@ -107,7 +107,7 @@ const metadataAccessibilityFeatureTemplate: QuickFixTemplate = {
       targetFile: 'content.opf',
       changes: [{
         type: 'insert',
-        path: 'content.opf',
+        filePath: 'content.opf',
         content,
         description: 'Add accessibilityFeature metadata elements',
       }],
@@ -174,7 +174,7 @@ const metadataAccessibilityHazardTemplate: QuickFixTemplate = {
       targetFile: 'content.opf',
       changes: [{
         type: 'insert',
-        path: 'content.opf',
+        filePath: 'content.opf',
         content,
         description: 'Add accessibilityHazard metadata',
       }],
@@ -260,7 +260,7 @@ const metadataAccessibilitySummaryTemplate: QuickFixTemplate = {
       targetFile: 'content.opf',
       changes: [{
         type: 'insert',
-        path: 'content.opf',
+        filePath: 'content.opf',
         content,
         description: 'Add accessibilitySummary metadata',
       }],
@@ -310,7 +310,7 @@ const landmarkUniqueTemplate: QuickFixTemplate = {
     if (tocLabel) {
       changes.push({
         type: 'replace' as const,
-        path: context.filePath || 'nav.xhtml',
+        filePath: context.filePath || 'nav.xhtml',
         oldContent: '<nav epub:type="toc">',
         content: `<nav epub:type="toc" aria-label="${tocLabel}">`,
         description: 'Add aria-label to table of contents nav',
@@ -320,7 +320,7 @@ const landmarkUniqueTemplate: QuickFixTemplate = {
     if (landmarksLabel) {
       changes.push({
         type: 'replace' as const,
-        path: context.filePath || 'nav.xhtml',
+        filePath: context.filePath || 'nav.xhtml',
         oldContent: '<nav epub:type="landmarks">',
         content: `<nav epub:type="landmarks" aria-label="${landmarksLabel}">`,
         description: 'Add aria-label to landmarks nav',
@@ -330,7 +330,7 @@ const landmarkUniqueTemplate: QuickFixTemplate = {
     if (pageListLabel) {
       changes.push({
         type: 'replace' as const,
-        path: context.filePath || 'nav.xhtml',
+        filePath: context.filePath || 'nav.xhtml',
         oldContent: '<nav epub:type="page-list">',
         content: `<nav epub:type="page-list" aria-label="${pageListLabel}">`,
         description: 'Add aria-label to page list nav',
@@ -415,7 +415,7 @@ const epubTypeRoleTemplate: QuickFixTemplate = {
       const role = EPUB_TYPE_TO_ROLE[epubType] || `doc-${epubType}`;
       return {
         type: 'replace' as const,
-        path: context.filePath || 'content.xhtml',
+        filePath: context.filePath || 'content.xhtml',
         oldContent: `epub:type="${epubType}"`,
         content: `epub:type="${epubType}" role="${role}"`,
         description: `Add role="${role}" to epub:type="${epubType}"`,
@@ -539,7 +539,7 @@ const headingStructureTemplate: QuickFixTemplate = {
         
         changes.push({
           type: 'replace' as const,
-          path: context.filePath || 'content.xhtml',
+          filePath: context.filePath || 'content.xhtml',
           oldContent: fullMatch,
           content: `<h${newLevel}${newAttrs}>${content}</h${newLevel}>`,
           lineNumber: lineNum,
@@ -712,7 +712,7 @@ const colorContrastTemplate: QuickFixTemplate = {
       targetFile: context.filePath || 'styles.css',
       changes: [{
         type: 'insert',
-        path: context.filePath || 'styles.css',
+        filePath: context.filePath || 'styles.css',
         content: cssRule,
         description: `Add CSS rule with compliant colors (${newRatio?.toFixed(2)}:1 contrast)`,
       }],
@@ -800,7 +800,7 @@ const imageAltTemplate: QuickFixTemplate = {
       
       changes.push({
         type: 'replace' as const,
-        path: context.filePath || 'content.xhtml',
+        filePath: context.filePath || 'content.xhtml',
         oldContent: currentElement,
         content: newElement,
         description: 'Mark image as decorative with empty alt and presentation role',
@@ -812,7 +812,7 @@ const imageAltTemplate: QuickFixTemplate = {
       
       changes.push({
         type: 'replace' as const,
-        path: context.filePath || 'content.xhtml',
+        filePath: context.filePath || 'content.xhtml',
         oldContent: currentElement,
         content: newElement,
         description: 'Add descriptive alt text to image',
@@ -846,7 +846,7 @@ const imageAltTemplate: QuickFixTemplate = {
       
       changes.push({
         type: 'replace' as const,
-        path: context.filePath || 'content.xhtml',
+        filePath: context.filePath || 'content.xhtml',
         oldContent: currentElement,
         content: descriptionElement ? `${newElement}\n${descriptionElement}` : newElement,
         description: 'Add alt text and long description for complex image',

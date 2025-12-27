@@ -46,7 +46,7 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
     try {
       const mappedChanges = fix.changes.map(change => ({
         type: change.type,
-        filePath: change.path,
+        filePath: change.filePath,
         content: change.content,
         oldContent: change.oldContent,
         lineNumber: change.lineNumber,
