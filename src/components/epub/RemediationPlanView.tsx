@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/Progress';
 import { RemediationTaskCard, RemediationTask, TaskStatus } from './RemediationTaskCard';
 import { RemediationProgress, FixResult } from './RemediationProgress';
 import { hasQuickFixTemplate } from '@/data/quickFixTemplates';
+import { FixTypeBadge } from '@/components/remediation/FixTypeBadge';
 
 export interface RemediationPlan {
   jobId: string;
@@ -176,6 +177,35 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
               {pendingQuickFixTasks.length} issue{pendingQuickFixTasks.length !== 1 ? 's' : ''} can be fixed using the Quick Fix Panel (your input needed)
             </p>
           )}
+
+          {pureManualTasks.filter(t => t.status === 'pending').length > 0 && (
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-center gap-2 text-yellow-700">
+                <FileEdit className="h-4 w-4" />
+                <span className="font-medium text-sm">
+                  {pureManualTasks.filter(t => t.status === 'pending').length} issue{pureManualTasks.filter(t => t.status === 'pending').length !== 1 ? 's' : ''} require manual editing
+                </span>
+              </div>
+              <p className="text-xs text-yellow-600 mt-1 ml-6">
+                These need to be fixed using Sigil or another EPUB editor.
+              </p>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-4 text-xs text-gray-500 pt-3 border-t">
+            <div className="flex items-center gap-1">
+              <FixTypeBadge fixType="auto" size="sm" />
+              <span>= Fixed automatically</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <FixTypeBadge fixType="quickfix" size="sm" />
+              <span>= Use in-app Quick Fix Panel</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <FixTypeBadge fixType="manual" size="sm" />
+              <span>= Requires Sigil/external editor</span>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
