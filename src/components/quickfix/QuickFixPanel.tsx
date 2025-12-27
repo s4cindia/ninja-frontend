@@ -25,6 +25,7 @@ interface QuickFixPanelProps {
     currentContent?: string;
     lineNumber?: number;
   };
+  jobId?: string;
   onApplyFix: (fix: QuickFix) => Promise<void>;
   onEditManually?: () => void;
   onSkip?: () => void;
@@ -38,13 +39,18 @@ type ToastState = {
 
 export function QuickFixPanel({
   issue,
+  jobId,
   onApplyFix,
   onEditManually,
   onSkip,
   onClose,
 }: QuickFixPanelProps) {
-  const template = useMemo(() => getQuickFixTemplate(issue.code), [issue.code]);
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const [template, setTemplate] = useState<ReturnType<typeof getQuickFixTemplate> | undefined>(() => getQuickFixTemplate(issue.code));
+  const [asyncData, setAsyncData] = useState<Record<string, unknown> | null>(null);
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   
   const [inputValues, setInputValues] = useState<Record<string, unknown>>(() => 
     template ? getDefaultInputValues(template) : {}
@@ -54,6 +60,56 @@ export function QuickFixPanel({
   const [toast, setToast] = useState<ToastState>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const context: QuickFixContext = useMemo(() => ({
+    issueId: issue.id,
+    issueCode: issue.code,
+    currentContent: issue.currentContent,
+    filePath: issue.filePath,
+    lineNumber: issue.lineNumber,
+    elementContext: issue.location,
+    jobId,
+    issueMessage: issue.message,
+    ...asyncData,
+  }), [issue, jobId, asyncData]);
+
+  useEffect(() => {
+    async function loadTemplateData() {
+      const tpl = getQuickFixTemplate(issue.code);
+      if (!tpl) {
+        setTemplate(undefined);
+        return;
+      }
+      
+      setTemplate(tpl);
+      
+      if (tpl.requiresAsyncData && tpl.loadAsyncData && jobId) {
+        setIsLoadingData(true);
+        setLoadError(null);
+        
+        try {
+          const data = await tpl.loadAsyncData({
+            issueId: issue.id,
+            issueCode: issue.code,
+            currentContent: issue.currentContent,
+            filePath: issue.filePath,
+            lineNumber: issue.lineNumber,
+            elementContext: issue.location,
+            jobId,
+            issueMessage: issue.message,
+          });
+          setAsyncData(data);
+        } catch (error) {
+          console.error('Failed to load template data:', error);
+          setLoadError('Failed to load Quick Fix data');
+        } finally {
+          setIsLoadingData(false);
+        }
+      }
+    }
+    
+    loadTemplateData();
+  }, [issue.code, issue.id, issue.filePath, issue.currentContent, issue.lineNumber, issue.location, issue.message, jobId]);
+
   useEffect(() => {
     return () => {
       if (closeTimeoutRef.current) {
@@ -62,14 +118,29 @@ export function QuickFixPanel({
     };
   }, []);
 
-  const context: QuickFixContext = useMemo(() => ({
-    issueId: issue.id,
-    issueCode: issue.code,
-    currentContent: issue.currentContent,
-    filePath: issue.filePath,
-    lineNumber: issue.lineNumber,
-    elementContext: issue.location,
-  }), [issue]);
+  const inputFields = useMemo(() => {
+    if (!template) return [];
+    
+    if (template.getInputFields) {
+      return template.getInputFields(context);
+    }
+    
+    return template.inputs || [];
+  }, [template, context]);
+
+  useEffect(() => {
+    if (inputFields.length > 0 && Object.keys(inputValues).length === 0) {
+      const defaults: Record<string, unknown> = {};
+      inputFields.forEach(field => {
+        if (field.default !== undefined) {
+          defaults[field.id] = field.default;
+        }
+      });
+      if (Object.keys(defaults).length > 0) {
+        setInputValues(prev => ({ ...defaults, ...prev }));
+      }
+    }
+  }, [inputFields, inputValues]);
 
   const preview: QuickFixPreview | null = useMemo(() => {
     if (!template || !showPreview) return null;
@@ -194,6 +265,28 @@ export function QuickFixPanel({
     }
   };
 
+  if (isLoadingData) {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <div className="flex items-center justify-center gap-3">
+          <Loader2 className="h-5 w-5 animate-spin text-primary-600" />
+          <span className="text-gray-600">Loading Quick Fix options...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <div className="flex items-center gap-3 text-red-600">
+          <AlertCircle className="h-5 w-5" />
+          <span>{loadError}</span>
+        </div>
+      </div>
+    );
+  }
+
   if (!template) {
     return (
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
@@ -277,9 +370,9 @@ export function QuickFixPanel({
           )}
         </div>
 
-        {template.inputs.length > 0 && (
+        {inputFields.length > 0 && (
           <div className="space-y-4">
-            {template.inputs.map(renderInput)}
+            {inputFields.map(renderInput)}
           </div>
         )}
 

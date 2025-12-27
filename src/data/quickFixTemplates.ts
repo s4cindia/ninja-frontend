@@ -458,51 +458,91 @@ const epubTypeRoleTemplate: QuickFixTemplate = {
   title: 'Add ARIA Roles to epub:type Elements',
   description: 'Add matching ARIA roles to elements with epub:type for better accessibility',
   targetFile: 'content.xhtml',
+  
+  requiresAsyncData: true,
+  
+  loadAsyncData: async (context) => {
+    const { scanEpubTypes } = await import('@/services/quickfix.service');
+    const result = await scanEpubTypes(context.jobId || '', context.filePath);
+    return {
+      detectedEpubTypes: result.epubTypes,
+      scannedFiles: result.files,
+    };
+  },
+  
   inputs: [
     {
       type: 'checkbox-group',
-      id: 'epubTypes',
+      id: 'selectedEpubTypes',
       label: 'Elements to Update',
-      helpText: 'Select which epub:type elements should receive matching ARIA roles. Check the ones that exist in your file.',
-      options: [
-        { value: 'chapter', label: 'chapter → doc-chapter', description: getEpubTypeDescription('chapter') },
-        { value: 'part', label: 'part → doc-part', description: getEpubTypeDescription('part') },
-        { value: 'toc', label: 'toc → doc-toc', description: getEpubTypeDescription('toc') },
-        { value: 'frontmatter', label: 'frontmatter → doc-frontmatter', description: getEpubTypeDescription('frontmatter') },
-        { value: 'bodymatter', label: 'bodymatter → doc-bodymatter', description: getEpubTypeDescription('bodymatter') },
-        { value: 'backmatter', label: 'backmatter → doc-backmatter', description: getEpubTypeDescription('backmatter') },
-        { value: 'dedication', label: 'dedication → doc-dedication', description: getEpubTypeDescription('dedication') },
-        { value: 'epigraph', label: 'epigraph → doc-epigraph', description: getEpubTypeDescription('epigraph') },
-        { value: 'titlepage', label: 'titlepage → doc-titlepage', description: getEpubTypeDescription('titlepage') },
-        { value: 'appendix', label: 'appendix → doc-appendix', description: getEpubTypeDescription('appendix') },
-        { value: 'bibliography', label: 'bibliography → doc-bibliography', description: getEpubTypeDescription('bibliography') },
-        { value: 'glossary', label: 'glossary → doc-glossary', description: getEpubTypeDescription('glossary') },
-        { value: 'index', label: 'index → doc-index', description: getEpubTypeDescription('index') },
-        { value: 'footnote', label: 'footnote → doc-footnote', description: getEpubTypeDescription('footnote') },
-        { value: 'endnote', label: 'endnote → doc-endnote', description: getEpubTypeDescription('endnote') },
-        { value: 'noteref', label: 'noteref → doc-noteref', description: getEpubTypeDescription('noteref') },
-        { value: 'rearnote', label: 'rearnote → doc-endnote', description: getEpubTypeDescription('rearnote') },
-        { value: 'rearnotes', label: 'rearnotes → doc-endnotes', description: getEpubTypeDescription('rearnotes') },
-        { value: 'landmarks', label: 'landmarks → navigation', description: getEpubTypeDescription('landmarks') },
-        { value: 'sidebar', label: 'sidebar → complementary', description: getEpubTypeDescription('sidebar') },
-        { value: 'cover', label: 'cover → doc-cover', description: getEpubTypeDescription('cover') },
-        { value: 'colophon', label: 'colophon → doc-colophon', description: getEpubTypeDescription('colophon') },
-        { value: 'foreword', label: 'foreword → doc-foreword', description: getEpubTypeDescription('foreword') },
-        { value: 'preface', label: 'preface → doc-preface', description: getEpubTypeDescription('preface') },
-        { value: 'introduction', label: 'introduction → doc-introduction', description: getEpubTypeDescription('introduction') },
-        { value: 'epilogue', label: 'epilogue → doc-epilogue', description: getEpubTypeDescription('epilogue') },
-        { value: 'afterword', label: 'afterword → doc-afterword', description: getEpubTypeDescription('afterword') },
-        { value: 'conclusion', label: 'conclusion → doc-conclusion', description: getEpubTypeDescription('conclusion') },
-        { value: 'acknowledgments', label: 'acknowledgments → doc-acknowledgments', description: getEpubTypeDescription('acknowledgments') },
-      ],
-      default: [],
+      helpText: 'Select which epub:type elements should receive matching ARIA roles',
+      options: [],
     },
   ],
-  generateFix: (inputs, context): QuickFix => {
-    let selectedTypes = (inputs.epubTypes as string[]) || [];
+  
+  getInputFields: (context) => {
+    const detectedTypes = context.detectedEpubTypes || [];
     
-    if (selectedTypes.length === 0 && context.currentContent) {
-      selectedTypes = detectEpubTypesFromContext(context);
+    if (detectedTypes.length === 0) {
+      const fallbackTypes = detectEpubTypesFromContext(context);
+      
+      if (fallbackTypes.length === 0) {
+        return [
+          {
+            type: 'text' as const,
+            id: 'noTypesFound',
+            label: 'No epub:type elements found',
+            helpText: 'No epub:type attributes were found in this file. This issue may have already been resolved or the file structure is different than expected.',
+          },
+        ];
+      }
+      
+      return [
+        {
+          type: 'checkbox-group' as const,
+          id: 'selectedEpubTypes',
+          label: 'Elements to Update',
+          helpText: `Found ${fallbackTypes.length} epub:type value(s). Select which should receive ARIA roles:`,
+          options: fallbackTypes.map(epubType => ({
+            value: epubType,
+            label: `${epubType} → ${EPUB_TYPE_TO_ROLE[epubType] || 'doc-' + epubType}`,
+            description: getEpubTypeDescription(epubType),
+          })),
+          default: fallbackTypes,
+        },
+      ];
+    }
+    
+    return [
+      {
+        type: 'checkbox-group' as const,
+        id: 'selectedEpubTypes',
+        label: 'Elements to Update',
+        helpText: `Found ${detectedTypes.length} unique epub:type value(s) in the file. Select which should receive ARIA roles:`,
+        options: detectedTypes.map(item => ({
+          value: item.value,
+          label: `${item.value} → ${item.suggestedRole || EPUB_TYPE_TO_ROLE[item.value] || 'doc-' + item.value}`,
+          description: `${getEpubTypeDescription(item.value)} (${item.count} occurrence${item.count > 1 ? 's' : ''})`,
+        })),
+        default: detectedTypes.map(item => item.value),
+      },
+    ];
+  },
+  
+  validateInput: (inputs) => {
+    const selectedTypes = inputs.selectedEpubTypes as string[];
+    return selectedTypes && selectedTypes.length > 0;
+  },
+  
+  generateFix: (inputs, context) => {
+    const selectedTypes = (inputs.selectedEpubTypes as string[]) || [];
+    
+    if (selectedTypes.length === 0) {
+      return {
+        isValid: false,
+        error: 'Please select at least one epub:type element to update',
+        changes: [],
+      };
     }
     
     const changes = selectedTypes.map(epubType => {
@@ -517,10 +557,11 @@ const epubTypeRoleTemplate: QuickFixTemplate = {
     });
     
     return {
+      isValid: true,
       issueId: context.issueId,
       targetFile: context.filePath || 'content.xhtml',
       changes,
-      summary: `Added ARIA roles to ${changes.length} epub:type element(s)`,
+      summary: `Add ARIA roles to ${selectedTypes.length} epub:type element(s): ${selectedTypes.join(', ')}`,
     };
   },
 };
