@@ -29,6 +29,8 @@ import {
 import { TransferToAcrButton } from "@/components/epub/TransferToAcrButton";
 import { QuickRating } from "@/components/feedback";
 import { api } from "@/services/api";
+import { IssueTallyTracker, TallyData, CompletionStats } from "@/components/remediation/IssueTallyTracker";
+import { hasQuickFixTemplate } from "@/data/quickFixTemplates";
 
 type PageState = "loading" | "ready" | "running" | "complete" | "error";
 
@@ -1460,9 +1462,50 @@ export const EPUBRemediation: React.FC = () => {
 
   const fixedCount = plan.tasks.filter((t) => t.status === "completed").length;
   const failedCount = plan.tasks.filter((t) => t.status === "failed").length;
+  const skippedCount = plan.tasks.filter((t) => t.status === "skipped").length;
+  const pendingCount = plan.tasks.filter((t) => t.status === "pending").length;
   const pendingManualCount = plan.tasks.filter(
     (t) => t.type === "manual" && t.status === "pending",
   ).length;
+
+  const autoTasks = plan.tasks.filter((t) => t.type === "auto");
+  const manualTasks = plan.tasks.filter((t) => t.type === "manual");
+  const quickFixTasks = manualTasks.filter((t) => hasQuickFixTemplate(t.code));
+  const pureManualTasks = manualTasks.filter((t) => !hasQuickFixTemplate(t.code));
+
+  const tallyData: TallyData = {
+    audit: {
+      total: plan.tasks.length,
+      bySource: { epubCheck: 0, ace: plan.tasks.length, jsAuditor: 0 },
+      bySeverity: {
+        critical: plan.tasks.filter((t) => t.severity === "critical").length,
+        serious: plan.tasks.filter((t) => t.severity === "serious").length,
+        moderate: plan.tasks.filter((t) => t.severity === "moderate").length,
+        minor: plan.tasks.filter((t) => t.severity === "minor").length,
+      },
+    },
+    plan: {
+      total: plan.tasks.length,
+      bySource: { epubCheck: 0, ace: plan.tasks.length, jsAuditor: 0 },
+      byClassification: {
+        autoFixable: autoTasks.length,
+        quickFix: quickFixTasks.length,
+        manual: pureManualTasks.length,
+      },
+    },
+    validation: {
+      isValid: true,
+      errors: [],
+      discrepancies: [],
+    },
+  };
+
+  const completionStats: CompletionStats = {
+    fixed: fixedCount,
+    failed: failedCount,
+    skipped: skippedCount,
+    pending: pendingCount,
+  };
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -1567,6 +1610,11 @@ export const EPUBRemediation: React.FC = () => {
           />
         </>
       )}
+
+      <IssueTallyTracker
+        tally={tallyData}
+        completionStats={completionStats}
+      />
 
       <RemediationPlanView
         plan={plan}
