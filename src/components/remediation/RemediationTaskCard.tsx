@@ -16,15 +16,16 @@ import { cn } from '@/utils/cn';
 import { QuickFixPanel } from '@/components/quickfix/QuickFixPanel';
 import { CodePreview } from './CodePreview';
 import { hasQuickFixTemplate } from '@/data/quickFixTemplates';
-import type { RemediationTask, RemediationMode, QuickFixResult, FileChange } from '@/types/remediation.types';
+import type { RemediationTask, RemediationMode } from '@/types/remediation.types';
 import type { QuickFix } from '@/types/quickfix.types';
 
 interface RemediationTaskCardProps {
   task: RemediationTask;
-  jobId: string;
-  onApplyFix: (taskId: string, result: QuickFixResult) => Promise<void>;
-  onSkip: (taskId: string, reason?: string) => void;
-  onEditManually: (taskId: string) => void;
+  jobId?: string;
+  onQuickFixApply?: (taskId: string, fix: QuickFix) => Promise<void>;
+  onSkipTask?: (taskId: string, reason?: string) => Promise<void>;
+  onMarkFixed?: (taskId: string, notes?: string) => Promise<void>;
+  onEditManually?: (taskId: string) => void;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
 }
@@ -73,8 +74,9 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
 export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
   task,
   jobId: _jobId,
-  onApplyFix,
-  onSkip,
+  onQuickFixApply,
+  onSkipTask,
+  onMarkFixed: _onMarkFixed,
   onEditManually,
   isExpanded = false,
   onToggleExpand,
@@ -91,26 +93,18 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
   const hasTemplate = hasQuickFixTemplate(issue.code);
 
   const handleApplyFix = async (fix: QuickFix) => {
+    if (!onQuickFixApply) return;
     setIsApplying(true);
     try {
-      const changes: FileChange[] = fix.changes.map(change => ({
-        type: change.type as FileChange['type'],
-        filePath: change.filePath || fix.targetFile,
-        content: change.content,
-        oldContent: change.oldContent,
-        lineNumber: change.lineNumber,
-        description: change.description,
-      }));
-
-      const result: QuickFixResult = {
-        templateId: fix.issueId,
-        values: {},
-        changes,
-        appliedAt: new Date().toISOString(),
-      };
-      await onApplyFix(task.id, result);
+      await onQuickFixApply(task.id, fix);
     } finally {
       setIsApplying(false);
+    }
+  };
+
+  const handleSkip = async () => {
+    if (onSkipTask) {
+      await onSkipTask(task.id, 'Skipped by user');
     }
   };
 
@@ -250,7 +244,7 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
                 }}
                 onApplyFix={handleApplyFix}
                 onEditManually={() => setMode('editor')}
-                onSkip={() => onSkip(task.id)}
+                onSkip={handleSkip}
               />
             )}
 
@@ -287,7 +281,7 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
                   The Monaco code editor will be implemented in Phase 2.
                 </p>
                 <button
-                  onClick={() => onEditManually(task.id)}
+                  onClick={() => onEditManually?.(task.id)}
                   className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
                   Open in External Editor
@@ -298,7 +292,7 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
 
           <div className="flex justify-end gap-2 px-4 py-3 bg-gray-50 border-t">
             <button
-              onClick={() => onSkip(task.id)}
+              onClick={handleSkip}
               className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800"
             >
               <SkipForward className="h-4 w-4" />
