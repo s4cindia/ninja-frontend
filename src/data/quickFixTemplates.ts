@@ -380,7 +380,78 @@ const EPUB_TYPE_TO_ROLE: Record<string, string> = {
   'credits': 'doc-credits',
   'endnote': 'doc-endnote',
   'subtitle': 'doc-subtitle',
+  'frontmatter': 'doc-frontmatter',
+  'bodymatter': 'doc-bodymatter',
+  'backmatter': 'doc-backmatter',
+  'titlepage': 'doc-titlepage',
+  'epigraph': 'doc-epigraph',
+  'footnotes': 'doc-footnotes',
+  'rearnote': 'doc-endnote',
+  'rearnotes': 'doc-endnotes',
+  'landmarks': 'navigation',
+  'loi': 'doc-loi',
+  'lot': 'doc-lot',
+  'nav': 'navigation',
 };
+
+function getEpubTypeDescription(epubType: string): string {
+  const descriptions: Record<string, string> = {
+    'chapter': 'Main chapter content',
+    'part': 'Major division of content',
+    'toc': 'Table of contents',
+    'frontmatter': 'Front matter section',
+    'bodymatter': 'Main body content',
+    'backmatter': 'Back matter section',
+    'dedication': 'Dedication page',
+    'epigraph': 'Quotation at start',
+    'titlepage': 'Title page',
+    'landmarks': 'Navigation landmarks',
+    'noteref': 'Note reference',
+    'rearnote': 'End/rear note',
+    'rearnotes': 'End/rear notes section',
+    'footnote': 'Footnote content',
+    'footnotes': 'Footnotes section',
+    'endnote': 'Endnote content',
+    'endnotes': 'Endnotes section',
+    'appendix': 'Supplementary content',
+    'bibliography': 'List of references',
+    'glossary': 'Term definitions',
+    'index': 'Alphabetical index',
+    'foreword': 'Foreword section',
+    'preface': 'Preface section',
+    'introduction': 'Introduction section',
+    'epilogue': 'Epilogue section',
+    'afterword': 'Afterword section',
+    'conclusion': 'Conclusion section',
+    'sidebar': 'Sidebar content',
+    'cover': 'Cover page',
+    'colophon': 'Colophon page',
+    'acknowledgments': 'Acknowledgments section',
+  };
+  return descriptions[epubType] || `${epubType} content`;
+}
+
+function detectEpubTypesFromContext(context: { currentContent?: string; issueMessage?: string }): string[] {
+  let detectedTypes: string[] = [];
+
+  if (context.issueMessage) {
+    const match = context.issueMessage.match(/epub:type[=:]\s*["']?(\w+)["']?/i);
+    if (match) {
+      detectedTypes.push(match[1]);
+    }
+  }
+
+  if (context.currentContent) {
+    const matches = context.currentContent.match(/epub:type\s*=\s*["']([^"']+)["']/g) || [];
+    const extracted = matches.map(m => {
+      const val = m.match(/["']([^"']+)["']/);
+      return val ? val[1] : '';
+    }).filter(Boolean);
+    detectedTypes = [...new Set([...detectedTypes, ...extracted])];
+  }
+
+  return detectedTypes;
+}
 
 const epubTypeRoleTemplate: QuickFixTemplate = {
   id: 'epub-type-role',
@@ -392,24 +463,47 @@ const epubTypeRoleTemplate: QuickFixTemplate = {
       type: 'checkbox-group',
       id: 'epubTypes',
       label: 'Elements to Update',
-      helpText: 'Select which epub:type elements should receive matching ARIA roles',
+      helpText: 'Select which epub:type elements should receive matching ARIA roles. Check the ones that exist in your file.',
       options: [
-        { value: 'chapter', label: 'chapter → doc-chapter', description: 'Main chapter content' },
-        { value: 'part', label: 'part → doc-part', description: 'Major division of content' },
-        { value: 'appendix', label: 'appendix → doc-appendix', description: 'Supplementary content' },
-        { value: 'bibliography', label: 'bibliography → doc-bibliography', description: 'List of references' },
-        { value: 'glossary', label: 'glossary → doc-glossary', description: 'Term definitions' },
-        { value: 'index', label: 'index → doc-index', description: 'Alphabetical index' },
-        { value: 'toc', label: 'toc → doc-toc', description: 'Table of contents' },
-        { value: 'footnote', label: 'footnote → doc-footnote', description: 'Footnote content' },
-        { value: 'endnote', label: 'endnote → doc-endnote', description: 'Endnote content' },
-        { value: 'sidebar', label: 'sidebar → complementary', description: 'Sidebar content' },
+        { value: 'chapter', label: 'chapter → doc-chapter', description: getEpubTypeDescription('chapter') },
+        { value: 'part', label: 'part → doc-part', description: getEpubTypeDescription('part') },
+        { value: 'toc', label: 'toc → doc-toc', description: getEpubTypeDescription('toc') },
+        { value: 'frontmatter', label: 'frontmatter → doc-frontmatter', description: getEpubTypeDescription('frontmatter') },
+        { value: 'bodymatter', label: 'bodymatter → doc-bodymatter', description: getEpubTypeDescription('bodymatter') },
+        { value: 'backmatter', label: 'backmatter → doc-backmatter', description: getEpubTypeDescription('backmatter') },
+        { value: 'dedication', label: 'dedication → doc-dedication', description: getEpubTypeDescription('dedication') },
+        { value: 'epigraph', label: 'epigraph → doc-epigraph', description: getEpubTypeDescription('epigraph') },
+        { value: 'titlepage', label: 'titlepage → doc-titlepage', description: getEpubTypeDescription('titlepage') },
+        { value: 'appendix', label: 'appendix → doc-appendix', description: getEpubTypeDescription('appendix') },
+        { value: 'bibliography', label: 'bibliography → doc-bibliography', description: getEpubTypeDescription('bibliography') },
+        { value: 'glossary', label: 'glossary → doc-glossary', description: getEpubTypeDescription('glossary') },
+        { value: 'index', label: 'index → doc-index', description: getEpubTypeDescription('index') },
+        { value: 'footnote', label: 'footnote → doc-footnote', description: getEpubTypeDescription('footnote') },
+        { value: 'endnote', label: 'endnote → doc-endnote', description: getEpubTypeDescription('endnote') },
+        { value: 'noteref', label: 'noteref → doc-noteref', description: getEpubTypeDescription('noteref') },
+        { value: 'rearnote', label: 'rearnote → doc-endnote', description: getEpubTypeDescription('rearnote') },
+        { value: 'rearnotes', label: 'rearnotes → doc-endnotes', description: getEpubTypeDescription('rearnotes') },
+        { value: 'landmarks', label: 'landmarks → navigation', description: getEpubTypeDescription('landmarks') },
+        { value: 'sidebar', label: 'sidebar → complementary', description: getEpubTypeDescription('sidebar') },
+        { value: 'cover', label: 'cover → doc-cover', description: getEpubTypeDescription('cover') },
+        { value: 'colophon', label: 'colophon → doc-colophon', description: getEpubTypeDescription('colophon') },
+        { value: 'foreword', label: 'foreword → doc-foreword', description: getEpubTypeDescription('foreword') },
+        { value: 'preface', label: 'preface → doc-preface', description: getEpubTypeDescription('preface') },
+        { value: 'introduction', label: 'introduction → doc-introduction', description: getEpubTypeDescription('introduction') },
+        { value: 'epilogue', label: 'epilogue → doc-epilogue', description: getEpubTypeDescription('epilogue') },
+        { value: 'afterword', label: 'afterword → doc-afterword', description: getEpubTypeDescription('afterword') },
+        { value: 'conclusion', label: 'conclusion → doc-conclusion', description: getEpubTypeDescription('conclusion') },
+        { value: 'acknowledgments', label: 'acknowledgments → doc-acknowledgments', description: getEpubTypeDescription('acknowledgments') },
       ],
-      default: ['chapter', 'part', 'appendix', 'bibliography', 'glossary', 'index', 'toc'],
+      default: [],
     },
   ],
   generateFix: (inputs, context): QuickFix => {
-    const selectedTypes = (inputs.epubTypes as string[]) || [];
+    let selectedTypes = (inputs.epubTypes as string[]) || [];
+    
+    if (selectedTypes.length === 0 && context.currentContent) {
+      selectedTypes = detectEpubTypesFromContext(context);
+    }
     
     const changes = selectedTypes.map(epubType => {
       const role = EPUB_TYPE_TO_ROLE[epubType] || `doc-${epubType}`;
