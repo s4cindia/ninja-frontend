@@ -1047,6 +1047,7 @@ const issueCodeAliases: Record<string, string> = {
   'EPUB-TYPE-HAS-MATCHING-ROLE': 'epub-type-role',
   'EPUB-TYPE-ROLE': 'epub-type-role',
   'EPUB-TYPE-NEEDS-ROLE': 'epub-type-role',
+  'EPUB-SEM-003': 'epub-type-role',
   'PAGE-BREAK-MISSING': 'page-break-missing',
   'TOC-MISSING': 'toc-missing',
   'LANDMARKS-MISSING': 'landmarks-missing',
