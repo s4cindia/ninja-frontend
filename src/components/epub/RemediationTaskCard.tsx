@@ -437,6 +437,20 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
               ))}
             </div>
           )}
+
+          {task.status === "pending" && task.type === "manual" && (
+            <div className="mt-2 text-xs">
+              {hasQuickFixTemplate(task.code) ? (
+                <span className="text-blue-600">
+                  Click to open Quick Fix Panel
+                </span>
+              ) : (
+                <span className="text-yellow-600">
+                  Requires external editor (Sigil)
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex-shrink-0 text-gray-400">
