@@ -1,6 +1,8 @@
 import React from 'react';
-import { Zap, Wrench, FileEdit } from 'lucide-react';
+import { Zap, Wrench, FileEdit, CheckCircle } from 'lucide-react';
 import type { FixType } from '@/types/remediation.types';
+
+export type { FixType };
 
 interface FixTypeBadgeProps {
   fixType: FixType;
@@ -28,6 +30,13 @@ const CONFIG = {
     bgColor: 'bg-yellow-100',
     textColor: 'text-yellow-700',
     borderColor: 'border-yellow-300',
+  },
+  fixed: {
+    icon: CheckCircle,
+    label: 'Fixed',
+    bgColor: 'bg-green-100',
+    textColor: 'text-green-700',
+    borderColor: 'border-green-300',
   },
 };
 

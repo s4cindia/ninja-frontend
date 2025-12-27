@@ -4,7 +4,7 @@ export type RemediationStatus = 'pending' | 'in_progress' | 'fixed' | 'skipped' 
 
 export type RemediationMode = 'quickfix' | 'preview' | 'editor';
 
-export type FixType = 'auto' | 'quickfix' | 'manual';
+export type FixType = 'auto' | 'quickfix' | 'manual' | 'fixed';
 
 export interface RemediationTask {
   id: string;

@@ -7,7 +7,6 @@ import {
   Loader2,
   Clock,
   AlertTriangle,
-  Wrench,
   Hand,
   ExternalLink,
   FileCode,
@@ -21,6 +20,7 @@ import { clsx } from "clsx";
 import DOMPurify from "dompurify";
 import { hasQuickFixTemplate } from "@/data/quickFixTemplates";
 import { QuickFixPanel } from "@/components/quickfix/QuickFixPanel";
+import { FixTypeBadge } from "@/components/remediation/FixTypeBadge";
 import type { QuickFix } from "@/types/quickfix.types";
 
 function escapeHtml(text: string): string {
@@ -402,22 +402,18 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
             <Badge variant={severity.variant} size="sm">
               {task.severity}
             </Badge>
-            <Badge
-              variant={task.type === "auto" ? "success" : "info"}
+            <FixTypeBadge
+              fixType={
+                task.status === "completed"
+                  ? "fixed"
+                  : task.type === "auto"
+                    ? "auto"
+                    : hasQuickFixTemplate(task.code)
+                      ? "quickfix"
+                      : "manual"
+              }
               size="sm"
-            >
-              {task.type === "auto" ? (
-                <>
-                  <Wrench className="h-3 w-3 mr-1" />
-                  Auto
-                </>
-              ) : (
-                <>
-                  <Hand className="h-3 w-3 mr-1" />
-                  Manual
-                </>
-              )}
-            </Badge>
+            />
             {task.source && <SourceBadge source={task.source} />}
             <span
               className={clsx("text-xs font-medium ml-auto", status.textColor)}
