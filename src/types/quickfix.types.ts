@@ -76,6 +76,7 @@ export interface QuickFixContext {
   }>;
   scannedFiles?: string[];
   issueMessage?: string;
+  [key: string]: unknown;
 }
 
 export interface QuickFixPreview {
