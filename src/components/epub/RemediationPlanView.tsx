@@ -305,6 +305,7 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
                 >
                   <RemediationTaskCard
                     task={task}
+                    jobId={plan.jobId}
                     isExpanded={expandedTaskId === task.id}
                     onToggleExpand={() => 
                       setExpandedTaskId(expandedTaskId === task.id ? null : task.id)

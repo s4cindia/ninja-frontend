@@ -88,6 +88,7 @@ export interface RemediationTask {
 
 interface RemediationTaskCardProps {
   task: RemediationTask;
+  jobId?: string;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
   onMarkFixed?: (taskId: string, notes?: string) => Promise<void>;
@@ -330,6 +331,7 @@ const RemediationGuidance: React.FC<{
 
 export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
   task,
+  jobId,
   isExpanded: controlledExpanded,
   onToggleExpand,
   onMarkFixed,
@@ -501,6 +503,7 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
                 filePath: task.filePath,
                 currentContent: task.html,
               }}
+              jobId={jobId}
               onApplyFix={handleQuickFixApply}
               onSkip={async () => {
                 try {

@@ -73,7 +73,7 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
 
 export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
   task,
-  jobId: _jobId,
+  jobId,
   onQuickFixApply,
   onSkipTask,
   onMarkFixed: _onMarkFixed,
@@ -242,6 +242,7 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
                   currentContent: issue.currentContent,
                   lineNumber: issue.lineNumber,
                 }}
+                jobId={jobId}
                 onApplyFix={handleApplyFix}
                 onEditManually={() => setMode('editor')}
                 onSkip={handleSkip}
