@@ -515,7 +515,27 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
             />
           )}
 
-          {task.type === "manual" && (!canUseQuickFix || task.status !== "pending") && task.remediation &&
+          {task.status === "completed" && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 text-green-700 mb-2">
+                <CheckCircle className="h-5 w-5" />
+                <span className="font-medium">Issue Resolved</span>
+              </div>
+              {task.completionMethod && (
+                <p className="text-sm text-green-600">
+                  Method: {task.completionMethod === "auto" ? "Auto-Remediation" : 
+                           task.completionMethod === "manual" ? "Manual Fix" : "Quick Fix"}
+                </p>
+              )}
+              {task.notes && (
+                <p className="text-sm text-gray-600 mt-2">
+                  <span className="font-medium">Notes:</span> {task.notes}
+                </p>
+              )}
+            </div>
+          )}
+
+          {task.type === "manual" && task.status === "pending" && !canUseQuickFix && task.remediation &&
             (typeof task.remediation === "string" ? (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <h4 className="font-medium text-amber-800 flex items-center gap-2 mb-2">
@@ -550,17 +570,6 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
             </div>
           )}
 
-          {task.type === "manual" &&
-            task.status === "completed" &&
-            task.notes && (
-              <div className="flex items-start gap-2 text-green-700 bg-green-50 p-2 rounded">
-                <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <div>
-                  <span className="text-xs font-medium">Fixed manually</span>
-                  <p className="text-xs text-green-600 mt-0.5">{task.notes}</p>
-                </div>
-              </div>
-            )}
 
           {task.type === "manual" &&
             task.status === "pending" &&
