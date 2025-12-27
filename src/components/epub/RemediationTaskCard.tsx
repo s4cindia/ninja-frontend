@@ -462,7 +462,7 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
 
       {isExpanded && (
         <div className="px-4 pb-4 pt-0 border-t border-gray-200 bg-white/50 space-y-4">
-          {task.suggestion && (
+          {task.status !== "completed" && task.suggestion && (
             <div>
               <dt className="text-xs font-medium text-gray-500">Suggestion</dt>
               <dd className="text-sm text-gray-700 mt-0.5">
