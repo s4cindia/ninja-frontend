@@ -255,17 +255,24 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
     for (const source of sources) {
       const sourceIssues = issues.filter(i => i.source === source);
       if (sourceIssues.length > 0 || source === 'js-auditor') {
-        // Use API stats.byFixType.auto if available, otherwise fall back to local calculation
+        // Use API stats.byFixType if available for JS Auditor
+        const apiStats = result?.stats?.byFixType;
         const autoFixable = source === 'js-auditor' 
-          ? (result?.stats?.byFixType?.auto ?? sourceIssues.filter(isAutoFixable).length)
+          ? (apiStats?.auto ?? sourceIssues.filter(isAutoFixable).length)
           : sourceIssues.filter(isAutoFixable).length;
+        const quickFixable = source === 'js-auditor' ? (apiStats?.quickfix ?? 0) : 0;
+        // Combined fixable = auto + quickfix (excludes manual)
+        const fixable = source === 'js-auditor' 
+          ? (apiStats ? (apiStats.auto + apiStats.quickfix) : autoFixable)
+          : undefined;
+        
         summary[source] = {
           critical: sourceIssues.filter(i => i.severity === 'critical').length,
           serious: sourceIssues.filter(i => i.severity === 'serious').length,
           moderate: sourceIssues.filter(i => i.severity === 'moderate').length,
           minor: sourceIssues.filter(i => i.severity === 'minor').length,
           total: sourceIssues.length,
-          ...(source === 'js-auditor' ? { autoFixable } : {}),
+          ...(source === 'js-auditor' ? { autoFixable, quickFixable, fixable } : {}),
         };
       }
     }

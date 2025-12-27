@@ -10,6 +10,8 @@ export interface SourceSummary {
   minor: number;
   total: number;
   autoFixable?: number;
+  quickFixable?: number;
+  fixable?: number; // Combined auto + quickfix count
 }
 
 export interface SummaryBySourceData {
@@ -70,10 +72,10 @@ const SourceCard: React.FC<SourceCardProps> = ({
         
         <div className="mt-4 text-center">
           <span className={cn('text-3xl font-bold', theme.accent)}>
-            {data.autoFixable !== undefined ? data.autoFixable : data.total}
+            {data.fixable !== undefined ? data.fixable : (data.autoFixable !== undefined ? data.autoFixable : data.total)}
           </span>
           <p className="text-xs text-gray-500 mt-1">
-            {data.autoFixable !== undefined ? 'fixable' : 'issues'}
+            {(data.fixable !== undefined || data.autoFixable !== undefined) ? 'fixable' : 'issues'}
           </p>
         </div>
         
@@ -136,7 +138,7 @@ const SOURCE_CONFIG = {
   },
   'js-auditor': {
     title: 'JS Auditor',
-    subtitle: 'Auto-fixable Issues',
+    subtitle: 'Auto + Quick Fix Issues',
     icon: <Wrench className="h-5 w-5" />,
     theme: {
       bg: 'bg-green-50',
