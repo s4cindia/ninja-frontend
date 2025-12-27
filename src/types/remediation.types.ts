@@ -1,12 +1,20 @@
 import type { AccessibilityIssue } from './accessibility.types';
 
-export type RemediationStatus = 'pending' | 'in_progress' | 'fixed' | 'skipped' | 'manual_required';
+export type RemediationStatus = 'pending' | 'in_progress' | 'fixed' | 'skipped' | 'manual_required' | 'failed';
 
 export type RemediationMode = 'quickfix' | 'preview' | 'editor';
+
+export type FixType = 'auto' | 'quickfix' | 'manual';
 
 export interface RemediationTask {
   id: string;
   issue: AccessibilityIssue;
+  issueCode?: string;
+  message?: string;
+  severity?: 'critical' | 'serious' | 'moderate' | 'minor';
+  location?: string;
+  fixType?: FixType;
+  fixTypeLabel?: string;
   status: RemediationStatus;
   fixApplied?: QuickFixResult;
   fixedAt?: string;
@@ -57,4 +65,27 @@ export interface RemediationProgress {
   inProgress: number;
   failed: number;
   percentage: number;
+}
+
+export interface RemediationPlanStats {
+  total: number;
+  autoFixable: number;
+  quickFixable: number;
+  manual: number;
+}
+
+export interface RemediationPlan {
+  id: string;
+  jobId: string;
+  tasks: RemediationTask[];
+  stats: RemediationPlanStats;
+}
+
+export interface AutoRemediationResult {
+  attempted: number;
+  fixed: number;
+  failed: number;
+  skipped: number;
+  quickFixPending: number;
+  manualPending: number;
 }
