@@ -43,6 +43,13 @@ interface AuditResult {
   };
   issues: AuditIssue[];
   summaryBySource?: SummaryBySourceData;
+  stats?: {
+    byFixType?: {
+      auto: number;
+      quickfix: number;
+      manual: number;
+    };
+  };
 }
 
 interface EPUBAuditResultsProps {
@@ -248,7 +255,10 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
     for (const source of sources) {
       const sourceIssues = issues.filter(i => i.source === source);
       if (sourceIssues.length > 0 || source === 'js-auditor') {
-        const autoFixable = sourceIssues.filter(isAutoFixable).length;
+        // Use API stats.byFixType.auto if available, otherwise fall back to local calculation
+        const autoFixable = source === 'js-auditor' 
+          ? (result?.stats?.byFixType?.auto ?? sourceIssues.filter(isAutoFixable).length)
+          : sourceIssues.filter(isAutoFixable).length;
         summary[source] = {
           critical: sourceIssues.filter(i => i.severity === 'critical').length,
           serious: sourceIssues.filter(i => i.severity === 'serious').length,
@@ -260,7 +270,7 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
       }
     }
     return summary;
-  }, [result?.summaryBySource, issues]);
+  }, [result?.summaryBySource, result?.stats?.byFixType, issues]);
 
   const [sourceFilter, setSourceFilter] = useState<'epubcheck' | 'ace' | 'js-auditor' | null>(null);
 
