@@ -900,6 +900,10 @@ export const EPUBRemediation: React.FC = () => {
   const [comparisonSummary, setComparisonSummary] =
     useState<ComparisonSummary | null>(null);
   const [fileName, setFileName] = useState<string>(getInitialFileName());
+  // Store API stats to use instead of local calculation
+  const [apiStats, setApiStats] = useState<{
+    byFixType?: { auto: number; quickfix: number; manual: number };
+  } | null>(null);
 
   // Persist filename to localStorage when it changes
   useEffect(() => {
@@ -1028,6 +1032,12 @@ export const EPUBRemediation: React.FC = () => {
           if (apiFileName && fileName === "Loading...")
             setFileName(apiFileName);
 
+          // Store API stats if available
+          if (data.stats?.byFixType) {
+            console.log("[EPUBRemediation] Using API stats.byFixType:", data.stats.byFixType);
+            setApiStats({ byFixType: data.stats.byFixType });
+          }
+
           const normalizedTasks = data.tasks.map(
             (t: RawAceAssertion, i: number) => {
               const normalized = normalizeAceTask(t, i);
@@ -1066,6 +1076,12 @@ export const EPUBRemediation: React.FC = () => {
           const apiFileName = data.epubFileName || data.fileName;
           if (apiFileName && fileName === "Loading...")
             setFileName(apiFileName);
+
+          // Store API stats if available
+          if (data.stats?.byFixType) {
+            console.log("[EPUBRemediation] Using API stats.byFixType from issues:", data.stats.byFixType);
+            setApiStats({ byFixType: data.stats.byFixType });
+          }
 
           const normalizedTasks = data.issues.map(
             (issue: RawAceAssertion, i: number) => {
@@ -1483,12 +1499,17 @@ export const EPUBRemediation: React.FC = () => {
     (t) => t.type === "manual" && t.status === "pending",
   ).length;
 
+  // Use API stats if available, otherwise calculate from tasks (fallback for backward compatibility)
   const getEffectiveFixType = (t: PlanViewPlan['tasks'][0]) =>
     t.fixType || (t.type === 'auto' ? 'auto' : hasQuickFixTemplate(t.code) ? 'quickfix' : 'manual');
 
-  const autoTasks = plan.tasks.filter((t) => getEffectiveFixType(t) === "auto");
-  const quickFixTasks = plan.tasks.filter((t) => getEffectiveFixType(t) === "quickfix");
-  const pureManualTasks = plan.tasks.filter((t) => getEffectiveFixType(t) === "manual");
+  // Prefer API stats.byFixType over local calculation
+  const autoTasksCount = apiStats?.byFixType?.auto ?? 
+    plan.tasks.filter((t) => getEffectiveFixType(t) === "auto").length;
+  const quickFixTasksCount = apiStats?.byFixType?.quickfix ?? 
+    plan.tasks.filter((t) => getEffectiveFixType(t) === "quickfix").length;
+  const manualTasksCount = apiStats?.byFixType?.manual ?? 
+    plan.tasks.filter((t) => getEffectiveFixType(t) === "manual").length;
 
   const tallyData: TallyData = {
     audit: {
@@ -1505,9 +1526,9 @@ export const EPUBRemediation: React.FC = () => {
       total: plan.tasks.length,
       bySource: { epubCheck: 0, ace: plan.tasks.length, jsAuditor: 0 },
       byClassification: {
-        autoFixable: autoTasks.length,
-        quickFix: quickFixTasks.length,
-        manual: pureManualTasks.length,
+        autoFixable: autoTasksCount,
+        quickFix: quickFixTasksCount,
+        manual: manualTasksCount,
       },
     },
     validation: {
