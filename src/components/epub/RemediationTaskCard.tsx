@@ -57,6 +57,7 @@ export type TaskStatus =
   | "failed"
   | "skipped";
 export type TaskType = "auto" | "manual";
+export type FixTypeValue = "auto" | "quickfix" | "manual";
 
 export interface RemediationTask {
   id: string;
@@ -66,6 +67,7 @@ export interface RemediationTask {
   location?: string;
   suggestion?: string;
   type: TaskType;
+  fixType?: FixTypeValue;
   status: TaskStatus;
   notes?: string;
   completionMethod?: "auto" | "manual";
@@ -339,7 +341,9 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isExpanded = controlledExpanded ?? internalExpanded;
   
-  const canUseQuickFix = hasQuickFixTemplate(task.code);
+  const effectiveFixType: FixTypeValue = task.fixType || 
+    (task.type === 'auto' ? 'auto' : hasQuickFixTemplate(task.code) ? 'quickfix' : 'manual');
+  const canUseQuickFix = effectiveFixType === 'quickfix';
   
   const handleQuickFixApply = async (fix: QuickFix) => {
     if (!onQuickFixApply) return;
@@ -403,15 +407,7 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
               {task.severity}
             </Badge>
             <FixTypeBadge
-              fixType={
-                task.status === "completed"
-                  ? "fixed"
-                  : task.type === "auto"
-                    ? "auto"
-                    : hasQuickFixTemplate(task.code)
-                      ? "quickfix"
-                      : "manual"
-              }
+              fixType={task.status === "completed" ? "fixed" : effectiveFixType}
               size="sm"
             />
             {task.source && <SourceBadge source={task.source} />}
@@ -438,9 +434,9 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
             </div>
           )}
 
-          {task.status === "pending" && task.type === "manual" && (
+          {task.status === "pending" && effectiveFixType !== "auto" && (
             <div className="mt-2 text-xs">
-              {hasQuickFixTemplate(task.code) ? (
+              {effectiveFixType === "quickfix" ? (
                 <span className="text-blue-600">
                   Click to open Quick Fix Panel
                 </span>

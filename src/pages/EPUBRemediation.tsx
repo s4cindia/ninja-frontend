@@ -1468,10 +1468,12 @@ export const EPUBRemediation: React.FC = () => {
     (t) => t.type === "manual" && t.status === "pending",
   ).length;
 
-  const autoTasks = plan.tasks.filter((t) => t.type === "auto");
-  const manualTasks = plan.tasks.filter((t) => t.type === "manual");
-  const quickFixTasks = manualTasks.filter((t) => hasQuickFixTemplate(t.code));
-  const pureManualTasks = manualTasks.filter((t) => !hasQuickFixTemplate(t.code));
+  const getEffectiveFixType = (t: PlanViewPlan['tasks'][0]) =>
+    t.fixType || (t.type === 'auto' ? 'auto' : hasQuickFixTemplate(t.code) ? 'quickfix' : 'manual');
+
+  const autoTasks = plan.tasks.filter((t) => getEffectiveFixType(t) === "auto");
+  const quickFixTasks = plan.tasks.filter((t) => getEffectiveFixType(t) === "quickfix");
+  const pureManualTasks = plan.tasks.filter((t) => getEffectiveFixType(t) === "manual");
 
   const tallyData: TallyData = {
     audit: {

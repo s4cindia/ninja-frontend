@@ -36,11 +36,13 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
 }) => {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
 
+  const getEffectiveFixType = (task: RemediationTask) => 
+    task.fixType || (task.type === 'auto' ? 'auto' : hasQuickFixTemplate(task.code) ? 'quickfix' : 'manual');
+
   const totalTasks = plan.tasks.length;
-  const autoTasks = plan.tasks.filter(t => t.type === 'auto');
-  const manualTasks = plan.tasks.filter(t => t.type === 'manual');
-  const quickFixTasks = manualTasks.filter(t => hasQuickFixTemplate(t.code));
-  const pureManualTasks = manualTasks.filter(t => !hasQuickFixTemplate(t.code));
+  const autoTasks = plan.tasks.filter(t => getEffectiveFixType(t) === 'auto');
+  const quickFixTasks = plan.tasks.filter(t => getEffectiveFixType(t) === 'quickfix');
+  const pureManualTasks = plan.tasks.filter(t => getEffectiveFixType(t) === 'manual');
   const completedTasks = plan.tasks.filter(t => t.status === 'completed');
   const failedTasks = plan.tasks.filter(t => t.status === 'failed');
   const pendingAutoTasks = autoTasks.filter(t => t.status === 'pending');
