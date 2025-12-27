@@ -462,12 +462,17 @@ const epubTypeRoleTemplate: QuickFixTemplate = {
   requiresAsyncData: true,
   
   loadAsyncData: async (context) => {
-    const { scanEpubTypes } = await import('@/services/quickfix.service');
-    const result = await scanEpubTypes(context.jobId || '', context.filePath);
-    return {
-      detectedEpubTypes: result.epubTypes,
-      scannedFiles: result.files,
-    };
+    try {
+      const { scanEpubTypes } = await import('@/services/quickfix.service');
+      const result = await scanEpubTypes(context.jobId || '');
+      return {
+        detectedEpubTypes: result.epubTypes,
+        scannedFiles: result.files,
+      };
+    } catch (error) {
+      console.error('Failed to scan epub:types:', error);
+      return { detectedEpubTypes: [], scannedFiles: [], error: 'Failed to scan EPUB' };
+    }
   },
   
   inputs: [

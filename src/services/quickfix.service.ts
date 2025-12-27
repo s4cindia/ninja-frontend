@@ -124,14 +124,10 @@ export function isQuickFixable(issueCode: string): boolean {
   return getQuickFixableIssueCodes().includes(issueCode.toUpperCase());
 }
 
-export async function scanEpubTypes(
-  jobId: string,
-  filePath?: string
-): Promise<ScanEpubTypesResult> {
+export async function scanEpubTypes(jobId: string): Promise<ScanEpubTypesResult> {
   try {
-    const params = filePath ? `?filePath=${encodeURIComponent(filePath)}` : '';
     const response = await api.get<ApiResponse<ScanEpubTypesResult>>(
-      `/epub/job/${jobId}/scan-epub-types${params}`
+      `/epub/job/${jobId}/scan-epub-types`
     );
     return response.data.data;
   } catch (error) {
