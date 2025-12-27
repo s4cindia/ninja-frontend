@@ -1,11 +1,15 @@
-import React, { useState } from 'react';
-import { FileText, Clock, Wrench, Hand, CheckCircle, AlertCircle } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { FileText, Clock, Wrench, CheckCircle, AlertCircle, Zap, FileEdit } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Progress } from '@/components/ui/Progress';
 import { RemediationTaskCard, RemediationTask, TaskStatus } from './RemediationTaskCard';
 import { RemediationProgress, FixResult } from './RemediationProgress';
+import { hasQuickFixTemplate } from '@/data/quickFixTemplates';
+import { FixTypeBadge } from '@/components/remediation/FixTypeBadge';
+import { applyQuickFixToEpub } from '@/services/quickfix.service';
+import type { QuickFix } from '@/types/quickfix.types';
 
 export interface RemediationPlan {
   jobId: string;
@@ -21,6 +25,8 @@ interface RemediationPlanViewProps {
   onRunAutoRemediation: () => void;
   onCancelRemediation?: () => void;
   onMarkTaskFixed?: (taskId: string, notes?: string) => Promise<void>;
+  onSkipTask?: (taskId: string, reason?: string) => Promise<void>;
+  onRefreshPlan?: () => void;
 }
 
 export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
@@ -31,15 +37,43 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
   onRunAutoRemediation,
   onCancelRemediation,
   onMarkTaskFixed,
+  onSkipTask,
+  onRefreshPlan,
 }) => {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
 
+  const handleQuickFixApply = useCallback(async (taskId: string, fix: QuickFix) => {
+    try {
+      const mappedChanges = fix.changes.map(change => ({
+        type: change.type,
+        filePath: change.filePath,
+        content: change.content,
+        oldContent: change.oldContent,
+        lineNumber: change.lineNumber,
+        description: change.description,
+      }));
+      const result = await applyQuickFixToEpub(plan.jobId, taskId, mappedChanges);
+      if (result.success) {
+        await onMarkTaskFixed?.(taskId, `Quick fix applied to: ${result.modifiedFiles.join(', ')}`);
+        onRefreshPlan?.();
+      }
+    } catch (error) {
+      console.error('Failed to apply quick fix:', error);
+      throw error;
+    }
+  }, [plan.jobId, onMarkTaskFixed, onRefreshPlan]);
+
+  const getEffectiveFixType = (task: RemediationTask) => 
+    task.fixType || (task.type === 'auto' ? 'auto' : hasQuickFixTemplate(task.code) ? 'quickfix' : 'manual');
+
   const totalTasks = plan.tasks.length;
-  const autoTasks = plan.tasks.filter(t => t.type === 'auto');
-  const manualTasks = plan.tasks.filter(t => t.type === 'manual');
+  const autoTasks = plan.tasks.filter(t => getEffectiveFixType(t) === 'auto');
+  const quickFixTasks = plan.tasks.filter(t => getEffectiveFixType(t) === 'quickfix');
+  const pureManualTasks = plan.tasks.filter(t => getEffectiveFixType(t) === 'manual');
   const completedTasks = plan.tasks.filter(t => t.status === 'completed');
   const failedTasks = plan.tasks.filter(t => t.status === 'failed');
   const pendingAutoTasks = autoTasks.filter(t => t.status === 'pending');
+  const pendingQuickFixTasks = quickFixTasks.filter(t => t.status === 'pending');
 
   const completionPercent = totalTasks > 0 
     ? Math.round((completedTasks.length / totalTasks) * 100) 
@@ -76,22 +110,38 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-3 bg-blue-50 rounded-lg">
-              <p className="text-2xl font-bold text-blue-700">{totalTasks}</p>
-              <p className="text-xs text-blue-600">Total Tasks</p>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="text-center p-3 bg-gray-50 rounded-lg">
+              <p className="text-2xl font-bold text-gray-700">{totalTasks}</p>
+              <p className="text-xs text-gray-600">Total Tasks</p>
             </div>
-            <div className="text-center p-3 bg-green-50 rounded-lg">
+            <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
               <p className="text-2xl font-bold text-green-700">{autoTasks.length}</p>
-              <p className="text-xs text-green-600">Auto-Fixable</p>
+              <p className="text-xs text-green-600 flex items-center justify-center gap-1">
+                <Zap className="h-3 w-3" />
+                Auto-Fixable
+              </p>
             </div>
-            <div className="text-center p-3 bg-amber-50 rounded-lg">
-              <p className="text-2xl font-bold text-amber-700">{manualTasks.length}</p>
-              <p className="text-xs text-amber-600">Manual</p>
+            <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <p className="text-2xl font-bold text-blue-700">{quickFixTasks.length}</p>
+              <p className="text-xs text-blue-600 flex items-center justify-center gap-1">
+                <Wrench className="h-3 w-3" />
+                Quick Fix
+              </p>
             </div>
-            <div className="text-center p-3 bg-purple-50 rounded-lg">
+            <div className="text-center p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+              <p className="text-2xl font-bold text-yellow-700">{pureManualTasks.length}</p>
+              <p className="text-xs text-yellow-600 flex items-center justify-center gap-1">
+                <FileEdit className="h-3 w-3" />
+                Manual
+              </p>
+            </div>
+            <div className="text-center p-3 bg-purple-50 rounded-lg border border-purple-200">
               <p className="text-2xl font-bold text-purple-700">{completionPercent}%</p>
-              <p className="text-xs text-purple-600">Complete</p>
+              <p className="text-xs text-purple-600 flex items-center justify-center gap-1">
+                <CheckCircle className="h-3 w-3" />
+                Complete
+              </p>
             </div>
           </div>
 
@@ -136,10 +186,55 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
               className="w-full"
               size="lg"
             >
-              <Wrench className="h-5 w-5 mr-2" />
+              <Zap className="h-5 w-5 mr-2" />
               Run Auto-Remediation ({pendingAutoTasks.length} tasks)
             </Button>
           )}
+
+          {!isRunningRemediation && pendingAutoTasks.length === 0 && pendingQuickFixTasks.length > 0 && (
+            <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-700">
+                <Wrench className="h-4 w-4 inline mr-1" />
+                No auto-fixable tasks remaining. Use the Quick Fix Panel below to resolve {pendingQuickFixTasks.length} issue{pendingQuickFixTasks.length !== 1 ? 's' : ''}.
+              </p>
+            </div>
+          )}
+
+          {pendingQuickFixTasks.length > 0 && (
+            <p className="text-sm text-blue-600">
+              <Wrench className="h-4 w-4 inline mr-1" />
+              {pendingQuickFixTasks.length} issue{pendingQuickFixTasks.length !== 1 ? 's' : ''} can be fixed using the Quick Fix Panel (your input needed)
+            </p>
+          )}
+
+          {pureManualTasks.filter(t => t.status === 'pending').length > 0 && (
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-center gap-2 text-yellow-700">
+                <FileEdit className="h-4 w-4" />
+                <span className="font-medium text-sm">
+                  {pureManualTasks.filter(t => t.status === 'pending').length} issue{pureManualTasks.filter(t => t.status === 'pending').length !== 1 ? 's' : ''} require manual editing
+                </span>
+              </div>
+              <p className="text-xs text-yellow-600 mt-1 ml-6">
+                These need to be fixed using Sigil or another EPUB editor.
+              </p>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-4 text-xs text-gray-500 pt-3 border-t">
+            <div className="flex items-center gap-1">
+              <FixTypeBadge fixType="auto" size="sm" />
+              <span>= Fixed automatically</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <FixTypeBadge fixType="quickfix" size="sm" />
+              <span>= Use in-app Quick Fix Panel</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <FixTypeBadge fixType="manual" size="sm" />
+              <span>= Requires Sigil/external editor</span>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -160,12 +255,16 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
             <span>Tasks ({totalTasks})</span>
             <div className="flex gap-2">
               <Badge variant="success" size="sm">
-                <Wrench className="h-3 w-3 mr-1" />
+                <Zap className="h-3 w-3 mr-1" />
                 {autoTasks.length} Auto
               </Badge>
               <Badge variant="info" size="sm">
-                <Hand className="h-3 w-3 mr-1" />
-                {manualTasks.length} Manual
+                <Wrench className="h-3 w-3 mr-1" />
+                {quickFixTasks.length} Quick Fix
+              </Badge>
+              <Badge variant="warning" size="sm">
+                <FileEdit className="h-3 w-3 mr-1" />
+                {pureManualTasks.length} Manual
               </Badge>
             </div>
           </CardTitle>
@@ -188,6 +287,8 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
                     setExpandedTaskId(expandedTaskId === task.id ? null : task.id)
                   }
                   onMarkFixed={onMarkTaskFixed}
+                  onQuickFixApply={handleQuickFixApply}
+                  onSkipTask={onSkipTask}
                 />
               ))
             )}

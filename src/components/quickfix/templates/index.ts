@@ -1,0 +1,1 @@
+export { ImageAltTemplate } from './ImageAltTemplate';

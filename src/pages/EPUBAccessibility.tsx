@@ -119,6 +119,19 @@ export const EPUBAccessibility: React.FC = () => {
       const fileName = data.fileName || summary.fileName || 'document.epub';
       console.log('[EPUBAccessibility] fileName from API:', fileName);
       
+      // Fetch remediation stats to get accurate fix type breakdown
+      let fixTypeStats: { auto: number; quickfix: number; manual: number } | undefined;
+      try {
+        const remediationResponse = await api.get(`/epub/job/${summary.jobId}/remediation`);
+        const remediationData = remediationResponse.data.data || remediationResponse.data;
+        if (remediationData.stats?.byFixType) {
+          fixTypeStats = remediationData.stats.byFixType;
+          console.log('[EPUBAccessibility] Got fix type stats from API:', fixTypeStats);
+        }
+      } catch {
+        console.log('[EPUBAccessibility] Remediation stats not available yet');
+      }
+
       const fullResult: AuditResult = {
         jobId: data.jobId || summary.jobId,
         fileName,
@@ -127,6 +140,7 @@ export const EPUBAccessibility: React.FC = () => {
         accessibilityScore: data.accessibilityScore ?? summary.accessibilityScore ?? 72,
         issuesSummary: data.issuesSummary || calculatedSummary,
         issues: apiIssues.length > 0 ? apiIssues : (isDemoJob ? generateDemoIssues(issuesSummary) : []),
+        stats: fixTypeStats ? { byFixType: fixTypeStats } : undefined,
       };
       setAuditResult(fullResult);
       setIsDemo(isDemoJob || apiIssues.length === 0);

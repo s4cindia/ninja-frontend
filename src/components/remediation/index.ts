@@ -11,3 +11,6 @@ export { ComparisonView } from './ComparisonView';
 export { BatchJobSelector } from './BatchJobSelector';
 export { BatchProgress } from './BatchProgress';
 export { BatchResultsSummary } from './BatchResultsSummary';
+export { CodePreview } from './CodePreview';
+export { RemediationTaskCard } from './RemediationTaskCard';
+export { RemediationSessionView } from './RemediationSessionView';

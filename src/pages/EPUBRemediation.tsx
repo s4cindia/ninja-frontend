@@ -29,6 +29,8 @@ import {
 import { TransferToAcrButton } from "@/components/epub/TransferToAcrButton";
 import { QuickRating } from "@/components/feedback";
 import { api } from "@/services/api";
+import { IssueTallyTracker, TallyData, CompletionStats } from "@/components/remediation/IssueTallyTracker";
+import { hasQuickFixTemplate } from "@/data/quickFixTemplates";
 
 type PageState = "loading" | "ready" | "running" | "complete" | "error";
 
@@ -763,14 +765,26 @@ function normalizeAceTask(
   const rawSeverity = (raw.severity || raw.impact || "moderate").toLowerCase();
   const severity = severityMap[rawSeverity] || "moderate";
 
-  // Determine task type: check raw.type first, then isAutoFixable flag
+  // Determine task type and fix type from API
+  // API now returns type: "auto" | "quickfix" | "manual"
   let taskType: "auto" | "manual" = "manual";
-  if (raw.type === "auto" || raw.type === "manual") {
-    taskType = raw.type;
+  let fixType: "auto" | "quickfix" | "manual" | undefined = undefined;
+  
+  if (raw.type === "auto") {
+    taskType = "auto";
+    fixType = "auto";
+  } else if (raw.type === "quickfix") {
+    taskType = "manual"; // QuickFix tasks are user-initiated, so type is "manual"
+    fixType = "quickfix";
+  } else if (raw.type === "manual") {
+    taskType = "manual";
+    fixType = "manual";
   } else if (raw.isAutoFixable === true) {
     taskType = "auto";
+    fixType = "auto";
   } else if (raw.isAutoFixable === false) {
     taskType = "manual";
+    // fixType will be determined by frontend hasQuickFixTemplate()
   } else {
     taskType = "manual";
   }
@@ -822,6 +836,7 @@ function normalizeAceTask(
       raw.help ||
       (typeof raw.remediation === "string" ? raw.remediation : undefined),
     type: taskType,
+    fixType,
     status: (raw.status as TaskStatus) || "pending",
     filePath,
     selector: raw.selector,
@@ -836,7 +851,9 @@ function groupAndDeduplicateTasks(tasks: RemediationTask[]): RemediationTask[] {
   const grouped = new Map<string, RemediationTask>();
 
   for (const task of tasks) {
-    const key = `${task.code}-${task.message}`;
+    // Include location/filePath in key to preserve tasks at different locations
+    const locationKey = task.location || task.filePath || '';
+    const key = `${task.code}-${task.message}-${locationKey}`;
     if (!grouped.has(key)) {
       grouped.set(key, task);
     }
@@ -883,6 +900,10 @@ export const EPUBRemediation: React.FC = () => {
   const [comparisonSummary, setComparisonSummary] =
     useState<ComparisonSummary | null>(null);
   const [fileName, setFileName] = useState<string>(getInitialFileName());
+  // Store API stats to use instead of local calculation
+  const [apiStats, setApiStats] = useState<{
+    byFixType?: { auto: number; quickfix: number; manual: number };
+  } | null>(null);
 
   // Persist filename to localStorage when it changes
   useEffect(() => {
@@ -972,36 +993,8 @@ export const EPUBRemediation: React.FC = () => {
         isReturningCompleted,
       );
 
-      // If returning with completed status, still load plan but keep complete state
-      if (
-        locationState?.autoFixableIssues &&
-        locationState.autoFixableIssues.length > 0 &&
-        !isReturningCompleted
-      ) {
-        console.log("[EPUBRemediation] Using locationState autoFixableIssues");
-        const tasks: RemediationTask[] = locationState.autoFixableIssues.map(
-          (issue) => ({
-            id: issue.id,
-            code: issue.code,
-            severity: issue.severity,
-            message: issue.message,
-            location: issue.location,
-            suggestion: issue.suggestion,
-            type: "auto" as const,
-            status: "pending" as const,
-          }),
-        );
-
-        setPlan({
-          jobId,
-          epubFileName: fileName !== "Loading..." ? fileName : "document.epub",
-          tasks,
-        });
-        setPageState("ready");
-        setIsDemo(isDemoJob);
-        return;
-      }
-
+      // Always fetch from API to get correct task types and stats
+      // locationState.autoFixableIssues is deprecated - API provides accurate three-tier classification
       try {
         const response = await api.get(`/epub/job/${jobId}/remediation`);
         const data = response.data.data || response.data;
@@ -1010,6 +1003,12 @@ export const EPUBRemediation: React.FC = () => {
           const apiFileName = data.epubFileName || data.fileName;
           if (apiFileName && fileName === "Loading...")
             setFileName(apiFileName);
+
+          // Store API stats if available
+          if (data.stats?.byFixType) {
+            console.log("[EPUBRemediation] Using API stats.byFixType:", data.stats.byFixType);
+            setApiStats({ byFixType: data.stats.byFixType });
+          }
 
           const normalizedTasks = data.tasks.map(
             (t: RawAceAssertion, i: number) => {
@@ -1049,6 +1048,12 @@ export const EPUBRemediation: React.FC = () => {
           const apiFileName = data.epubFileName || data.fileName;
           if (apiFileName && fileName === "Loading...")
             setFileName(apiFileName);
+
+          // Store API stats if available
+          if (data.stats?.byFixType) {
+            console.log("[EPUBRemediation] Using API stats.byFixType from issues:", data.stats.byFixType);
+            setApiStats({ byFixType: data.stats.byFixType });
+          }
 
           const normalizedTasks = data.issues.map(
             (issue: RawAceAssertion, i: number) => {
@@ -1382,6 +1387,54 @@ export const EPUBRemediation: React.FC = () => {
     );
   };
 
+  const handleSkipTask = async (taskId: string, reason?: string) => {
+    if (!plan) return;
+
+    if (!isDemo && jobId) {
+      try {
+        await api.post(`/epub/job/${jobId}/task/${taskId}/skip`, {
+          reason,
+        });
+      } catch {
+        // Continue with local update even if API fails
+      }
+    }
+
+    setPlan((prev) =>
+      prev
+        ? {
+            ...prev,
+            tasks: prev.tasks.map((t) =>
+              t.id === taskId
+                ? {
+                    ...t,
+                    status: "skipped" as TaskStatus,
+                    notes: reason,
+                  }
+                : t,
+            ),
+          }
+        : null,
+    );
+  };
+
+  const handleRefreshPlan = async () => {
+    if (!jobId || isDemo) return;
+    try {
+      const response = await api.get(`/epub/job/${jobId}/remediation`);
+      const data = response.data.data || response.data;
+      if (data.tasks) {
+        const normalizedTasks = data.tasks.map(
+          (t: RawAceAssertion, i: number) => normalizeAceTask(t, i)
+        );
+        const dedupedTasks = groupAndDeduplicateTasks(normalizedTasks);
+        setPlan((prev) => prev ? { ...prev, tasks: dedupedTasks } : null);
+      }
+    } catch {
+      // Silently fail refresh - user can retry
+    }
+  };
+
   const handleViewComparison = () => {
     const comparisonData = {
       epubFileName: plan?.epubFileName || fileName || "document.epub",
@@ -1460,9 +1513,66 @@ export const EPUBRemediation: React.FC = () => {
 
   const fixedCount = plan.tasks.filter((t) => t.status === "completed").length;
   const failedCount = plan.tasks.filter((t) => t.status === "failed").length;
+  const skippedCount = plan.tasks.filter((t) => t.status === "skipped").length;
+  const pendingCount = plan.tasks.filter((t) => t.status === "pending").length;
   const pendingManualCount = plan.tasks.filter(
     (t) => t.type === "manual" && t.status === "pending",
   ).length;
+
+  // Use API stats if available, otherwise calculate from tasks (fallback for backward compatibility)
+  const getEffectiveFixType = (t: PlanViewPlan['tasks'][0]) =>
+    t.fixType || (t.type === 'auto' ? 'auto' : hasQuickFixTemplate(t.code) ? 'quickfix' : 'manual');
+
+  // Prefer API stats.byFixType over local calculation
+  const autoTasksCount = apiStats?.byFixType?.auto ?? 
+    plan.tasks.filter((t) => getEffectiveFixType(t) === "auto").length;
+  const quickFixTasksCount = apiStats?.byFixType?.quickfix ?? 
+    plan.tasks.filter((t) => getEffectiveFixType(t) === "quickfix").length;
+  const manualTasksCount = apiStats?.byFixType?.manual ?? 
+    plan.tasks.filter((t) => getEffectiveFixType(t) === "manual").length;
+
+  const bySourceCounts = {
+    epubCheck: plan.tasks.filter(t => (t.source ?? '').toLowerCase() === 'epubcheck').length,
+    ace: plan.tasks.filter(t => (t.source ?? '').toLowerCase() === 'ace').length,
+    jsAuditor: plan.tasks.filter(t => {
+      const source = (t.source ?? '').toLowerCase();
+      return source === 'js-auditor' || source === 'jsauditor' || source === 'js_auditor';
+    }).length,
+  };
+
+  const tallyData: TallyData = {
+    audit: {
+      total: plan.tasks.length,
+      bySource: bySourceCounts,
+      bySeverity: {
+        critical: plan.tasks.filter((t) => t.severity === "critical").length,
+        serious: plan.tasks.filter((t) => t.severity === "serious").length,
+        moderate: plan.tasks.filter((t) => t.severity === "moderate").length,
+        minor: plan.tasks.filter((t) => t.severity === "minor").length,
+      },
+    },
+    plan: {
+      total: plan.tasks.length,
+      bySource: bySourceCounts,
+      byClassification: {
+        autoFixable: autoTasksCount,
+        quickFix: quickFixTasksCount,
+        manual: manualTasksCount,
+      },
+    },
+    validation: {
+      isValid: true,
+      errors: [],
+      discrepancies: [],
+    },
+  };
+
+  const completionStats: CompletionStats = {
+    fixed: fixedCount,
+    failed: failedCount,
+    skipped: skippedCount,
+    pending: pendingCount,
+  };
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -1568,6 +1678,11 @@ export const EPUBRemediation: React.FC = () => {
         </>
       )}
 
+      <IssueTallyTracker
+        tally={tallyData}
+        completionStats={completionStats}
+      />
+
       <RemediationPlanView
         plan={plan}
         isRunningRemediation={pageState === "running"}
@@ -1576,6 +1691,8 @@ export const EPUBRemediation: React.FC = () => {
         onRunAutoRemediation={handleRunAutoRemediation}
         onCancelRemediation={handleCancelRemediation}
         onMarkTaskFixed={handleMarkTaskFixed}
+        onSkipTask={handleSkipTask}
+        onRefreshPlan={handleRefreshPlan}
       />
 
       {pageState !== "running" && pendingManualCount > 0 && (

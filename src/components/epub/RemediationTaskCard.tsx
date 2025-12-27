@@ -7,7 +7,6 @@ import {
   Loader2,
   Clock,
   AlertTriangle,
-  Wrench,
   Hand,
   ExternalLink,
   FileCode,
@@ -19,6 +18,10 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { clsx } from "clsx";
 import DOMPurify from "dompurify";
+import { hasQuickFixTemplate } from "@/data/quickFixTemplates";
+import { QuickFixPanel } from "@/components/quickfix/QuickFixPanel";
+import { FixTypeBadge } from "@/components/remediation/FixTypeBadge";
+import type { QuickFix } from "@/types/quickfix.types";
 
 function escapeHtml(text: string): string {
   return text
@@ -54,6 +57,7 @@ export type TaskStatus =
   | "failed"
   | "skipped";
 export type TaskType = "auto" | "manual";
+export type FixTypeValue = "auto" | "quickfix" | "manual";
 
 export interface RemediationTask {
   id: string;
@@ -63,6 +67,7 @@ export interface RemediationTask {
   location?: string;
   suggestion?: string;
   type: TaskType;
+  fixType?: FixTypeValue;
   status: TaskStatus;
   notes?: string;
   completionMethod?: "auto" | "manual";
@@ -87,6 +92,8 @@ interface RemediationTaskCardProps {
   onToggleExpand?: () => void;
   onMarkFixed?: (taskId: string, notes?: string) => Promise<void>;
   onViewInContext?: (filePath: string, selector?: string) => void;
+  onQuickFixApply?: (taskId: string, fix: QuickFix) => Promise<void>;
+  onSkipTask?: (taskId: string, reason?: string) => Promise<void>;
 }
 
 const statusConfig: Record<
@@ -327,12 +334,23 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
   onToggleExpand,
   onMarkFixed,
   onViewInContext,
+  onQuickFixApply,
+  onSkipTask,
 }) => {
   const [internalExpanded, setInternalExpanded] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isExpanded = controlledExpanded ?? internalExpanded;
+  
+  const effectiveFixType: FixTypeValue = task.fixType || 
+    (task.type === 'auto' ? 'auto' : hasQuickFixTemplate(task.code) ? 'quickfix' : 'manual');
+  const canUseQuickFix = effectiveFixType === 'quickfix';
+  
+  const handleQuickFixApply = async (fix: QuickFix) => {
+    if (!onQuickFixApply) return;
+    await onQuickFixApply(task.id, fix);
+  };
 
   const handleToggle = () => {
     if (onToggleExpand) {
@@ -390,22 +408,10 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
             <Badge variant={severity.variant} size="sm">
               {task.severity}
             </Badge>
-            <Badge
-              variant={task.type === "auto" ? "success" : "info"}
+            <FixTypeBadge
+              fixType={task.status === "completed" ? "fixed" : effectiveFixType}
               size="sm"
-            >
-              {task.type === "auto" ? (
-                <>
-                  <Wrench className="h-3 w-3 mr-1" />
-                  Auto
-                </>
-              ) : (
-                <>
-                  <Hand className="h-3 w-3 mr-1" />
-                  Manual
-                </>
-              )}
-            </Badge>
+            />
             {task.source && <SourceBadge source={task.source} />}
             <span
               className={clsx("text-xs font-medium ml-auto", status.textColor)}
@@ -427,6 +433,20 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
               {task.wcagCriteria.map((criterion) => (
                 <WcagBadge key={criterion} criterion={criterion} />
               ))}
+            </div>
+          )}
+
+          {task.status === "pending" && effectiveFixType !== "auto" && (
+            <div className="mt-2 text-xs">
+              {effectiveFixType === "quickfix" ? (
+                <span className="text-blue-600">
+                  Click to open Quick Fix Panel
+                </span>
+              ) : (
+                <span className="text-yellow-600">
+                  Requires external editor (Sigil)
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -471,8 +491,31 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
             </Button>
           )}
 
-          {task.remediation &&
-            task.type === "manual" &&
+          {task.type === "manual" && task.status === "pending" && canUseQuickFix && (
+            <QuickFixPanel
+              issue={{
+                id: task.id,
+                code: task.code,
+                message: task.message,
+                location: task.location,
+                filePath: task.filePath,
+                currentContent: task.html,
+              }}
+              onApplyFix={handleQuickFixApply}
+              onSkip={async () => {
+                try {
+                  if (onSkipTask) {
+                    await onSkipTask(task.id, "Skipped - will fix manually");
+                  }
+                } catch (err) {
+                  console.error('Failed to skip task:', err);
+                }
+              }}
+              onEditManually={() => setShowNotes(true)}
+            />
+          )}
+
+          {task.type === "manual" && (!canUseQuickFix || task.status !== "pending") && task.remediation &&
             (typeof task.remediation === "string" ? (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <h4 className="font-medium text-amber-800 flex items-center gap-2 mb-2">
