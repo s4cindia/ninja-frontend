@@ -108,3 +108,34 @@ export function getQuickFixableIssueCodes(): string[] {
 export function isQuickFixable(issueCode: string): boolean {
   return getQuickFixableIssueCodes().includes(issueCode.toUpperCase());
 }
+
+export async function scanEpubTypes(
+  jobId: string,
+  filePath?: string
+): Promise<{
+  epubTypes: Array<{
+    value: string;
+    file: string;
+    count: number;
+    suggestedRole: string;
+  }>;
+  files: string[];
+}> {
+  try {
+    const params = filePath ? `?filePath=${encodeURIComponent(filePath)}` : '';
+    const response = await api.get<ApiResponse<{
+      epubTypes: Array<{
+        value: string;
+        file: string;
+        count: number;
+        suggestedRole: string;
+      }>;
+      files: string[];
+    }>>(`/epub/job/${jobId}/scan-epub-types${params}`);
+
+    return response.data.data;
+  } catch (error) {
+    console.error('Failed to scan epub:types:', error);
+    return { epubTypes: [], files: [] };
+  }
+}
