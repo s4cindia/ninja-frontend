@@ -544,6 +544,28 @@ const epubTypeRoleTemplate: QuickFixTemplate = {
     return selectedTypes && selectedTypes.length > 0;
   },
   
+  generatePayload: (values, asyncData) => {
+    const selectedTypes = (values.selectedEpubTypes as string[]) || [];
+    const detected = (asyncData?.detectedEpubTypes as Array<{ value: string; suggestedRole?: string }>) || [];
+    
+    const epubTypesToFix = selectedTypes
+      .filter((type: string) => type)
+      .map((type: string) => {
+        const found = detected.find(et => et.value === type);
+        return {
+          epubType: type,
+          role: found?.suggestedRole || EPUB_TYPE_TO_ROLE[type] || `doc-${type}`,
+        };
+      });
+    
+    return {
+      fixCode: 'EPUB-SEM-003',
+      options: {
+        epubTypes: epubTypesToFix,
+      },
+    };
+  },
+  
   generateFix: (inputs, context) => {
     const selectedTypes = (inputs.selectedEpubTypes as string[]) || [];
     

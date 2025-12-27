@@ -47,6 +47,11 @@ export interface QuickFixResult {
   summary?: string;
 }
 
+export interface QuickFixPayload {
+  fixCode: string;
+  options: Record<string, unknown>;
+}
+
 export interface QuickFixTemplate {
   id: string;
   title: string;
@@ -57,6 +62,7 @@ export interface QuickFixTemplate {
   loadAsyncData?: (context: QuickFixContext) => Promise<Record<string, unknown>>;
   getInputFields?: (context: QuickFixContext) => QuickFixInput[];
   generateFix: (inputs: Record<string, unknown>, context: QuickFixContext) => QuickFix | QuickFixResult;
+  generatePayload?: (values: Record<string, unknown>, asyncData: Record<string, unknown> | null) => QuickFixPayload;
   validateInput?: (inputs: Record<string, unknown>) => boolean;
 }
 

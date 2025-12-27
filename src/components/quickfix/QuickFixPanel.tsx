@@ -27,6 +27,7 @@ interface QuickFixPanelProps {
   };
   jobId?: string;
   onApplyFix: (fix: QuickFix) => Promise<void>;
+  onFixApplied?: () => void;
   onEditManually?: () => void;
   onSkip?: () => void;
   onClose?: () => void;
@@ -41,6 +42,7 @@ export function QuickFixPanel({
   issue,
   jobId,
   onApplyFix,
+  onFixApplied,
   onEditManually,
   onSkip,
   onClose,
@@ -182,8 +184,19 @@ export function QuickFixPanel({
 
     try {
       const fix = applyQuickFix(template, inputValues, context);
+      console.log('Applying fix with payload:', {
+        ...fix,
+        taskId: issue.id,
+        jobId,
+      });
+      
       await onApplyFix(fix);
       setToast({ type: 'success', message: 'Fix applied successfully!' });
+      
+      if (onFixApplied) {
+        onFixApplied();
+      }
+      
       closeTimeoutRef.current = setTimeout(() => {
         onClose?.();
       }, 1500);
