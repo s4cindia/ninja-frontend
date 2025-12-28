@@ -1423,10 +1423,6 @@ export const EPUBRemediation: React.FC = () => {
     if (!jobId || isDemo) return;
     try {
       const response = await api.get(`/epub/job/${jobId}/remediation`, {
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
-        },
         params: {
           _t: Date.now(),
         },
