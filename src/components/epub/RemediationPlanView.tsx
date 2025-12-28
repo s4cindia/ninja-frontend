@@ -313,6 +313,7 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
                     onMarkFixed={onMarkTaskFixed}
                     onQuickFixApply={handleQuickFixApply}
                     onSkipTask={onSkipTask}
+                    onFixApplied={onRefreshPlan}
                   />
                 </div>
               ))

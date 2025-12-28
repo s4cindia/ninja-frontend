@@ -206,6 +206,7 @@ export function QuickFixPanel({
       }
       
       if (onFixApplied) {
+        console.log('Triggering data refresh via onFixApplied');
         onFixApplied();
       }
       

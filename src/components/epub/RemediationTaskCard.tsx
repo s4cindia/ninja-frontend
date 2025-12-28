@@ -95,6 +95,7 @@ interface RemediationTaskCardProps {
   onViewInContext?: (filePath: string, selector?: string) => void;
   onQuickFixApply?: (taskId: string, fix: QuickFix) => Promise<void>;
   onSkipTask?: (taskId: string, reason?: string) => Promise<void>;
+  onFixApplied?: () => void;
 }
 
 const statusConfig: Record<
@@ -338,6 +339,7 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
   onViewInContext,
   onQuickFixApply,
   onSkipTask,
+  onFixApplied,
 }) => {
   const [internalExpanded, setInternalExpanded] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
@@ -505,6 +507,7 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
               }}
               jobId={jobId}
               onApplyFix={handleQuickFixApply}
+              onFixApplied={onFixApplied}
               onSkip={async () => {
                 try {
                   if (onSkipTask) {
