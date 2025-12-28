@@ -546,28 +546,38 @@ const epubTypeRoleTemplate: QuickFixTemplate = {
   
   generatePayload: (values, asyncData) => {
     const selectedTypes = (values.selectedEpubTypes as string[]) || [];
-    const detected = (asyncData?.detectedEpubTypes as Array<{ value: string; suggestedRole?: string }>) || [];
+    const detected = (asyncData?.detectedEpubTypes as Array<{ value: string; file: string; suggestedRole: string }>) || [];
     
-    const epubTypesToFix = selectedTypes
-      .filter((type: string) => type)
-      .map((type: string) => {
-        const found = detected.find(et => et.value === type);
+    const changes = selectedTypes
+      .map((epubType: string) => {
+        const found = detected.find(et => et.value === epubType);
+        if (!found) return null;
+        
+        const role = found.suggestedRole;
+        const filePath = found.file.includes(',') ? found.file.split(',')[0].trim() : found.file;
+        
         return {
-          epubType: type,
-          role: found?.suggestedRole || EPUB_TYPE_TO_ROLE[type] || `doc-${type}`,
+          type: 'replace',
+          filePath,
+          epubType,
+          role,
+          oldContent: `epub:type="${epubType}"`,
+          newContent: `epub:type="${epubType}" role="${role}"`,
         };
-      });
+      })
+      .filter(Boolean);
     
     return {
       fixCode: 'EPUB-SEM-003',
       options: {
-        epubTypes: epubTypesToFix,
+        changes,
       },
     };
   },
   
   generateFix: (inputs, context) => {
     const selectedTypes = (inputs.selectedEpubTypes as string[]) || [];
+    const detected = (context.detectedEpubTypes as Array<{ value: string; file: string; suggestedRole: string }>) || [];
     
     if (selectedTypes.length === 0) {
       return {
@@ -578,10 +588,15 @@ const epubTypeRoleTemplate: QuickFixTemplate = {
     }
     
     const changes = selectedTypes.map(epubType => {
-      const role = EPUB_TYPE_TO_ROLE[epubType] || `doc-${epubType}`;
+      const found = detected.find(et => et.value === epubType);
+      const role = found?.suggestedRole || EPUB_TYPE_TO_ROLE[epubType] || `doc-${epubType}`;
+      const filePath = found?.file 
+        ? (found.file.includes(',') ? found.file.split(',')[0].trim() : found.file)
+        : (context.filePath || 'content.xhtml');
+      
       return {
         type: 'replace' as const,
-        filePath: context.filePath || 'content.xhtml',
+        filePath,
         oldContent: `epub:type="${epubType}"`,
         content: `epub:type="${epubType}" role="${role}"`,
         description: `Add role="${role}" to epub:type="${epubType}"`,
