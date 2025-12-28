@@ -300,6 +300,18 @@ const landmarkUniqueTemplate: QuickFixTemplate = {
       default: 'Page List',
     },
   ],
+  
+  generatePayload: (values) => {
+    return {
+      fixCode: 'EPUB-NAV-002',
+      options: {
+        tocLabel: (values.tocLabel as string) || 'Table of Contents',
+        landmarksLabel: (values.landmarksLabel as string) || 'Landmarks',
+        pageListLabel: (values.pageListLabel as string) || 'Page List',
+      },
+    };
+  },
+  
   generateFix: (inputs, context): QuickFix => {
     const tocLabel = (inputs.tocLabel as string) || 'Table of Contents';
     const landmarksLabel = (inputs.landmarksLabel as string) || 'Landmarks';
@@ -311,9 +323,9 @@ const landmarkUniqueTemplate: QuickFixTemplate = {
       changes.push({
         type: 'replace' as const,
         filePath: context.filePath || 'nav.xhtml',
-        oldContent: '<nav epub:type="toc">',
-        content: `<nav epub:type="toc" aria-label="${tocLabel}">`,
-        description: 'Add aria-label to table of contents nav',
+        oldContent: '<nav epub:type="toc" ...>',
+        content: `aria-label="${tocLabel}"`,
+        description: `Add aria-label="${tocLabel}" to table of contents nav`,
       });
     }
     
@@ -321,9 +333,9 @@ const landmarkUniqueTemplate: QuickFixTemplate = {
       changes.push({
         type: 'replace' as const,
         filePath: context.filePath || 'nav.xhtml',
-        oldContent: '<nav epub:type="landmarks">',
-        content: `<nav epub:type="landmarks" aria-label="${landmarksLabel}">`,
-        description: 'Add aria-label to landmarks nav',
+        oldContent: '<nav epub:type="landmarks" ...>',
+        content: `aria-label="${landmarksLabel}"`,
+        description: `Add aria-label="${landmarksLabel}" to landmarks nav`,
       });
     }
     
@@ -331,9 +343,9 @@ const landmarkUniqueTemplate: QuickFixTemplate = {
       changes.push({
         type: 'replace' as const,
         filePath: context.filePath || 'nav.xhtml',
-        oldContent: '<nav epub:type="page-list">',
-        content: `<nav epub:type="page-list" aria-label="${pageListLabel}">`,
-        description: 'Add aria-label to page list nav',
+        oldContent: '<nav epub:type="page-list" ...>',
+        content: `aria-label="${pageListLabel}"`,
+        description: `Add aria-label="${pageListLabel}" to page-list nav`,
       });
     }
     
@@ -341,7 +353,7 @@ const landmarkUniqueTemplate: QuickFixTemplate = {
       issueId: context.issueId,
       targetFile: context.filePath || 'nav.xhtml',
       changes,
-      summary: `Added unique labels to ${changes.length} navigation landmark(s)`,
+      summary: `Add unique aria-labels to ${changes.length} navigation landmark(s)`,
     };
   },
 };
