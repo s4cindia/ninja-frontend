@@ -9,6 +9,7 @@ import {
   validateInputs, 
   getDefaultInputValues 
 } from '@/utils/quickFixUtils';
+import { api } from '@/services/api';
 import type { QuickFix, QuickFixContext, QuickFixPreview, QuickFixInput } from '@/types/quickfix.types';
 import { QuickFixCheckboxGroup } from './QuickFixCheckboxGroup';
 import { QuickFixRadioGroup } from './QuickFixRadioGroup';
@@ -192,6 +193,17 @@ export function QuickFixPanel({
       
       await onApplyFix(fix);
       setToast({ type: 'success', message: 'Fix applied successfully!' });
+      
+      if (jobId && issue.id) {
+        try {
+          await api.post(`/epub/job/${jobId}/task/${issue.id}/mark-fixed`, {
+            resolution: `Applied quick fix: ${template.title}`,
+          });
+          console.log('Task marked as fixed');
+        } catch (markErr) {
+          console.warn('mark-fixed failed (may be auto-completed):', markErr);
+        }
+      }
       
       if (onFixApplied) {
         onFixApplied();
