@@ -237,28 +237,36 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
 
     const token = localStorage.getItem('accessToken');
     if (!token) {
-      console.warn('[SSE] No auth token, falling back to polling');
+      console.warn('[SSE] No auth token available, falling back to polling');
       setUseSSE(false);
       return;
     }
 
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
-      const sseUrl = `${apiBaseUrl}/sse/batch/${batchId}/progress`;
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
+      // Pass token as query parameter since EventSource doesn't support headers
+      const sseUrl = `${apiBaseUrl}/sse/batch/${batchId}/progress?token=${encodeURIComponent(token)}`;
 
-      const eventSource = new EventSource(sseUrl, { withCredentials: true });
+      console.log('[SSE] Connecting to:', sseUrl.replace(token, 'TOKEN_HIDDEN'));
+
+      const eventSource = new EventSource(sseUrl);
       eventSourceRef.current = eventSource;
+
+      eventSource.onopen = () => {
+        console.log('[SSE] Connection established');
+      };
 
       eventSource.onmessage = handleSSEMessage;
 
-      eventSource.onerror = () => {
-        console.warn('[SSE] Connection error, falling back to polling');
+      eventSource.onerror = (err) => {
+        console.warn('[SSE] Connection error, falling back to polling:', err);
         eventSource.close();
         eventSourceRef.current = null;
         setUseSSE(false);
       };
 
       return () => {
+        console.log('[SSE] Closing connection');
         eventSource.close();
         eventSourceRef.current = null;
       };
