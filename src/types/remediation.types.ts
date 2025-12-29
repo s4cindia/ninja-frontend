@@ -89,3 +89,13 @@ export interface AutoRemediationResult {
   quickFixPending: number;
   manualPending: number;
 }
+
+export interface RemediationConfig {
+  colorContrastAutoFix: boolean;
+}
+
+export interface RemediationConfigResponse {
+  success: boolean;
+  data: RemediationConfig;
+  message?: string;
+}

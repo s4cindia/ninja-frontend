@@ -38,6 +38,7 @@ import { FeedbackDashboard } from '@/pages/FeedbackDashboard';
 import { RemediationPage } from '@/pages/Remediation';
 import { ComparisonPage } from '@/pages/ComparisonPage';
 import BatchRemediationPage from '@/pages/BatchRemediation';
+import Settings from '@/pages/Settings';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -99,6 +100,7 @@ function AppRoutes() {
           <Route path="/remediation/batch" element={<BatchRemediationPage />} />
           <Route path="/remediation/:jobId" element={<RemediationPage />} />
           <Route path="/remediation/:jobId/comparison" element={<ComparisonPage />} />
+          <Route path="/settings" element={<Settings />} />
         </Route>
 
         <Route path="/unauthorized" element={<Unauthorized />} />
