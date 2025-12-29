@@ -132,7 +132,21 @@ const getApiBaseUrl = (): string => {
 };
 
 const isSecureConnection = (url: string): boolean => {
-  return url.startsWith('https://') || url.includes('localhost') || url.includes('127.0.0.1');
+  try {
+    const parsedUrl = new URL(url);
+    // HTTPS is always secure
+    if (parsedUrl.protocol === 'https:') {
+      return true;
+    }
+    // HTTP only allowed for actual localhost in development
+    if (parsedUrl.protocol === 'http:') {
+      const hostname = parsedUrl.hostname;
+      return hostname === 'localhost' || hostname === '127.0.0.1';
+    }
+    return false;
+  } catch {
+    return false;
+  }
 };
 
 const sseManager = {
@@ -173,12 +187,22 @@ const sseManager = {
       return; // Fall back to polling instead
     }
 
+    // Warn in development about HTTP usage
+    if (apiBaseUrl.startsWith('http://')) {
+      console.warn('[SSE Manager] WARNING: Using HTTP for SSE in development. Token will be visible in network logs. Use HTTPS in production.');
+    }
+
     // SECURITY NOTE: EventSource API doesn't support custom headers, so we must pass
-    // the token via query parameter. This is a known limitation. Mitigations:
-    // 1. Backend should NOT log query parameters for this endpoint
-    // 2. Tokens should have short expiry times
-    // 3. Consider implementing a session-cookie based alternative for production
-    // 4. SSE connections should only be over HTTPS in production
+    // the token via query parameter. This is a known limitation.
+    //
+    // Current mitigations:
+    // 1. HTTPS enforced in production (HTTP only allowed for localhost)
+    // 2. URL parsing prevents false-positive localhost checks
+    //
+    // Planned improvements (see GitHub issue #49):
+    // - Implement short-lived SSE-specific tokens
+    // - Backend query parameter logging restrictions
+    // - Session-cookie based alternative for production
     const sseUrl = `${apiBaseUrl}/sse/batch/${batchId}/progress?token=${encodeURIComponent(token)}`;
 
     console.log('[SSE Manager] Connecting:', batchId);
