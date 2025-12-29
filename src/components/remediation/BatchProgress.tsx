@@ -126,7 +126,7 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
   const [retryCount, setRetryCount] = useState(0);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
-  const batchIdRef = useRef<string | null>(null);
+  const pendingConnectionRef = useRef<string | null>(null);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -165,121 +165,94 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
     }
   }, [batchId, onComplete, retryCount]);
 
-  // SSE Connection Effect
+  // SSE Connection Effect - NO cleanup to persist across re-renders
   useEffect(() => {
-    // Skip conditions
-    if (!batchId || batchId.startsWith('demo-')) {
+    // Skip if no batch or demo
+    if (!batchId || batchId.startsWith('demo-') || !accessToken) {
       return;
     }
 
-    if (!accessToken) {
-      console.warn('[SSE] No token');
+    // Skip if already connecting/connected to this batch
+    if (pendingConnectionRef.current === batchId) {
+      console.log('[SSE] Already connecting to:', batchId);
       return;
     }
 
-    // Already have active connection to this batch
-    if (eventSourceRef.current &&
-        eventSourceRef.current.readyState !== EventSource.CLOSED &&
-        batchIdRef.current === batchId) {
-      console.log('[SSE] Reusing existing connection');
+    // Skip if already connected
+    if (eventSourceRef.current && eventSourceRef.current.readyState === EventSource.OPEN) {
+      console.log('[SSE] Already connected');
       return;
     }
 
     // Close any existing connection
     if (eventSourceRef.current) {
-      console.log('[SSE] Closing old connection');
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
 
-    batchIdRef.current = batchId;
+    // Mark as pending
+    pendingConnectionRef.current = batchId;
 
     const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
     const sseUrl = `${apiBaseUrl}/sse/batch/${batchId}/progress?token=${encodeURIComponent(accessToken)}`;
 
-    console.log('[SSE] Creating connection for:', batchId);
+    console.log('[SSE] Connecting:', batchId);
 
-    const eventSource = new EventSource(sseUrl);
+    const es = new EventSource(sseUrl);
+    eventSourceRef.current = es;
 
-    eventSource.onopen = () => {
-      console.log('[SSE] Connected!');
-      // Only set ref after connection is established
-      eventSourceRef.current = eventSource;
+    es.onopen = () => {
+      console.log('[SSE] OPEN');
     };
 
-    eventSource.onmessage = (event) => {
+    es.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log('[SSE] Message:', data.type);
+        console.log('[SSE] MSG:', data.type);
 
-        switch (data.type) {
-          case 'connected':
-            console.log('[SSE] Server ACK');
-            break;
-          case 'job_started':
-            setBatchStatus(prev => prev ? {
-              ...prev,
-              jobs: prev.jobs.map(j => j.jobId === data.jobId ? { ...j, status: 'processing' as const } : j),
-            } : prev);
-            break;
-          case 'job_completed':
-            setBatchStatus(prev => {
-              if (!prev) return prev;
-              const jobs = prev.jobs.map(j =>
-                j.jobId === data.jobId ? { ...j, status: 'completed' as const, issuesFixed: data.issuesFixed } : j
-              );
-              return { ...prev, jobs, completedJobs: jobs.filter(j => j.status === 'completed').length };
-            });
-            break;
-          case 'job_failed':
-            setBatchStatus(prev => {
-              if (!prev) return prev;
-              const jobs = prev.jobs.map(j =>
-                j.jobId === data.jobId ? { ...j, status: 'failed' as const, error: data.error } : j
-              );
-              return { ...prev, jobs, failedJobs: jobs.filter(j => j.status === 'failed').length };
-            });
-            break;
-          case 'batch_completed':
-            setBatchStatus(prev => prev ? { ...prev, status: data.status, summary: data.summary } : prev);
-            break;
+        if (data.type === 'job_started') {
+          setBatchStatus(prev => prev ? {
+            ...prev,
+            jobs: prev.jobs.map(j => j.jobId === data.jobId ? { ...j, status: 'processing' as const } : j),
+          } : prev);
+        } else if (data.type === 'job_completed') {
+          setBatchStatus(prev => {
+            if (!prev) return prev;
+            const jobs = prev.jobs.map(j =>
+              j.jobId === data.jobId ? { ...j, status: 'completed' as const, issuesFixed: data.issuesFixed } : j
+            );
+            return { ...prev, jobs, completedJobs: jobs.filter(j => j.status === 'completed').length };
+          });
+        } else if (data.type === 'job_failed') {
+          setBatchStatus(prev => {
+            if (!prev) return prev;
+            const jobs = prev.jobs.map(j =>
+              j.jobId === data.jobId ? { ...j, status: 'failed' as const, error: data.error } : j
+            );
+            return { ...prev, jobs, failedJobs: jobs.filter(j => j.status === 'failed').length };
+          });
+        } else if (data.type === 'batch_completed') {
+          setBatchStatus(prev => prev ? { ...prev, status: data.status, summary: data.summary } : prev);
         }
       } catch (e) {
         console.error('[SSE] Parse error:', e);
       }
     };
 
-    eventSource.onerror = () => {
-      console.warn('[SSE] Error, readyState:', eventSource.readyState);
-      if (eventSource.readyState === EventSource.CLOSED) {
-        console.log('[SSE] Connection closed by server');
-        eventSourceRef.current = null;
-      }
-      // EventSource auto-reconnects on error, don't close manually
+    es.onerror = () => {
+      console.warn('[SSE] Error - readyState:', es.readyState);
     };
 
-    // Cleanup - delayed to handle StrictMode
-    return () => {
-      setTimeout(() => {
-        if (eventSource.readyState !== EventSource.CLOSED) {
-          // Check if this is still our active connection
-          if (eventSourceRef.current === eventSource || eventSourceRef.current === null) {
-            console.log('[SSE] Cleanup: closing connection');
-            eventSource.close();
-            if (eventSourceRef.current === eventSource) {
-              eventSourceRef.current = null;
-            }
-          }
-        }
-      }, 50);
-    };
+    // NO cleanup - let the connection persist across re-renders
+    // It will be closed when component truly unmounts via the separate effect below
   }, [batchId, accessToken]);
 
-  // Separate cleanup effect for true unmount
+  // Cleanup ONLY on true unmount
   useEffect(() => {
     return () => {
+      console.log('[SSE] Unmount cleanup');
+      pendingConnectionRef.current = null;
       if (eventSourceRef.current) {
-        console.log('[SSE] Component unmount: closing connection');
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
