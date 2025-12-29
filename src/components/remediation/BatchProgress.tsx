@@ -126,9 +126,7 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
   const [retryCount, setRetryCount] = useState(0);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
-  const isSSEConnectedRef = useRef(false);
   const batchIdRef = useRef<string | null>(null);
-  const cleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -167,31 +165,29 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
     }
   }, [batchId, onComplete, retryCount]);
 
-  // SSE Connection Effect - handles React StrictMode double-invoke
+  // SSE Connection Effect
   useEffect(() => {
-    // Clear any pending cleanup from previous render (StrictMode handling)
-    if (cleanupTimeoutRef.current) {
-      clearTimeout(cleanupTimeoutRef.current);
-      cleanupTimeoutRef.current = null;
-    }
-
+    // Skip conditions
     if (!batchId || batchId.startsWith('demo-')) {
       return;
     }
 
-    // If already connected to this batch, skip
-    if (eventSourceRef.current && batchIdRef.current === batchId) {
-      console.log('[SSE] Already connected to batch:', batchId);
-      return;
-    }
-
     if (!accessToken) {
-      console.warn('[SSE] No auth token');
+      console.warn('[SSE] No token');
       return;
     }
 
-    // Close any existing connection to different batch
-    if (eventSourceRef.current && batchIdRef.current !== batchId) {
+    // Already have active connection to this batch
+    if (eventSourceRef.current &&
+        eventSourceRef.current.readyState !== EventSource.CLOSED &&
+        batchIdRef.current === batchId) {
+      console.log('[SSE] Reusing existing connection');
+      return;
+    }
+
+    // Close any existing connection
+    if (eventSourceRef.current) {
+      console.log('[SSE] Closing old connection');
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
@@ -201,14 +197,14 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
     const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
     const sseUrl = `${apiBaseUrl}/sse/batch/${batchId}/progress?token=${encodeURIComponent(accessToken)}`;
 
-    console.log('[SSE] Opening connection for batch:', batchId);
+    console.log('[SSE] Creating connection for:', batchId);
 
     const eventSource = new EventSource(sseUrl);
-    eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => {
-      console.log('[SSE] Connection OPEN');
-      isSSEConnectedRef.current = true;
+      console.log('[SSE] Connected!');
+      // Only set ref after connection is established
+      eventSourceRef.current = eventSource;
     };
 
     eventSource.onmessage = (event) => {
@@ -218,7 +214,7 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
 
         switch (data.type) {
           case 'connected':
-            console.log('[SSE] Server ACK:', data.clientId);
+            console.log('[SSE] Server ACK');
             break;
           case 'job_started':
             setBatchStatus(prev => prev ? {
@@ -254,50 +250,55 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
     };
 
     eventSource.onerror = () => {
-      console.warn('[SSE] Error - will auto-reconnect');
-      isSSEConnectedRef.current = false;
+      console.warn('[SSE] Error, readyState:', eventSource.readyState);
+      if (eventSource.readyState === EventSource.CLOSED) {
+        console.log('[SSE] Connection closed by server');
+        eventSourceRef.current = null;
+      }
+      // EventSource auto-reconnects on error, don't close manually
     };
 
-    // Delayed cleanup to handle StrictMode double-invoke
+    // Cleanup - delayed to handle StrictMode
     return () => {
-      console.log('[SSE] Scheduling cleanup...');
-      cleanupTimeoutRef.current = setTimeout(() => {
-        // Only close if this is still the current connection
-        if (eventSourceRef.current === eventSource) {
-          console.log('[SSE] Closing connection');
-          eventSource.close();
-          eventSourceRef.current = null;
-          batchIdRef.current = null;
-          isSSEConnectedRef.current = false;
+      setTimeout(() => {
+        if (eventSource.readyState !== EventSource.CLOSED) {
+          // Check if this is still our active connection
+          if (eventSourceRef.current === eventSource || eventSourceRef.current === null) {
+            console.log('[SSE] Cleanup: closing connection');
+            eventSource.close();
+            if (eventSourceRef.current === eventSource) {
+              eventSourceRef.current = null;
+            }
+          }
         }
-      }, 100); // Small delay to allow re-mount to cancel cleanup
+      }, 50);
     };
   }, [batchId, accessToken]);
 
-  // Cleanup timeout on unmount
+  // Separate cleanup effect for true unmount
   useEffect(() => {
     return () => {
-      if (cleanupTimeoutRef.current) {
-        clearTimeout(cleanupTimeoutRef.current);
-      }
       if (eventSourceRef.current) {
+        console.log('[SSE] Component unmount: closing connection');
         eventSourceRef.current.close();
+        eventSourceRef.current = null;
       }
     };
   }, []);
 
-  // Polling fallback effect
+  // Polling fallback effect - runs when SSE not connected
   useEffect(() => {
-    // Skip polling if SSE is connected
-    if (isSSEConnectedRef.current) {
-      // Still fetch initial status once
-      fetchStatus();
-      return;
-    }
-
-    // Polling fallback
+    // Check if SSE is connected using readyState
+    const sseConnected = eventSourceRef.current && 
+                         eventSourceRef.current.readyState !== EventSource.CLOSED;
+    
+    // Always fetch initial status
     fetchStatus();
-    pollRef.current = setInterval(fetchStatus, POLL_INTERVAL);
+    
+    // Only poll if SSE not connected
+    if (!sseConnected) {
+      pollRef.current = setInterval(fetchStatus, POLL_INTERVAL);
+    }
 
     return () => {
       if (pollRef.current) {
@@ -385,7 +386,7 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
               aria-hidden="true" 
             />
             Batch Remediation Progress
-            {isSSEConnectedRef.current && eventSourceRef.current && (
+            {eventSourceRef.current && eventSourceRef.current.readyState === EventSource.OPEN && (
               <span className="text-xs text-green-600 flex items-center gap-1">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                 Live
