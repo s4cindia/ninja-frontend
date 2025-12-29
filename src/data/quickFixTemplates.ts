@@ -1133,8 +1133,23 @@ export function getQuickFixTemplate(issueCode: string): QuickFixTemplate | undef
   return quickFixTemplates[normalizedCode];
 }
 
+const BACKEND_HANDLED_FIX_CODES = new Set([
+  'EPUB-STRUCT-002',
+  'EPUB-META-002',
+  'EPUB-META-004',
+  'EPUB-NAV-001',
+  'EPUB-STRUCT-004',
+]);
+
+export function isBackendHandledFixCode(issueCode: string): boolean {
+  return BACKEND_HANDLED_FIX_CODES.has(issueCode.toUpperCase());
+}
+
 export function hasQuickFixTemplate(issueCode: string): boolean {
-  return getQuickFixTemplate(issueCode) !== undefined;
+  if (getQuickFixTemplate(issueCode) !== undefined) {
+    return true;
+  }
+  return isBackendHandledFixCode(issueCode);
 }
 
 export function registerQuickFixTemplate(template: QuickFixTemplate): void {

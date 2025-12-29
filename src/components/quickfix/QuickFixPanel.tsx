@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { Wrench, X, Eye, Play, Edit3, SkipForward, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Wrench, X, Eye, Play, Edit3, SkipForward, Loader2, CheckCircle, AlertCircle, Zap } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { cn } from '@/utils/cn';
 import { getQuickFixTemplate } from '@/data/quickFixTemplates';
@@ -15,6 +15,29 @@ import { QuickFixCheckboxGroup } from './QuickFixCheckboxGroup';
 import { QuickFixRadioGroup } from './QuickFixRadioGroup';
 import { QuickFixTextInput } from './QuickFixTextInput';
 import { QuickFixColorPicker } from './QuickFixColorPicker';
+
+const BACKEND_HANDLED_FIX_CODES: Record<string, { title: string; description: string }> = {
+  'EPUB-STRUCT-002': { 
+    title: 'Add Table Headers', 
+    description: 'Automatically adds <th> header elements to tables missing proper headers' 
+  },
+  'EPUB-META-002': { 
+    title: 'Add Accessibility Metadata', 
+    description: 'Adds required accessibility metadata to the EPUB package' 
+  },
+  'EPUB-META-004': { 
+    title: 'Add Access Modes', 
+    description: 'Adds accessMode and accessModeSufficient metadata' 
+  },
+  'EPUB-NAV-001': { 
+    title: 'Add Skip Navigation', 
+    description: 'Adds skip navigation links for keyboard users' 
+  },
+  'EPUB-STRUCT-004': { 
+    title: 'Add ARIA Landmarks', 
+    description: 'Adds ARIA landmark roles to improve navigation' 
+  },
+};
 
 interface QuickFixPanelProps {
   issue: {
@@ -316,6 +339,131 @@ export function QuickFixPanel({
         <div className="flex items-center gap-3 text-red-600">
           <AlertCircle className="h-5 w-5" />
           <span>{loadError}</span>
+        </div>
+      </div>
+    );
+  }
+
+  const backendFixInfo = BACKEND_HANDLED_FIX_CODES[issue.code];
+
+  const handleApplyBackendFix = async () => {
+    if (!jobId) {
+      setToast({ type: 'error', message: 'Missing job ID' });
+      return;
+    }
+
+    setIsApplying(true);
+    setToast(null);
+
+    try {
+      await api.post(`/epub/job/${jobId}/apply-fix`, { 
+        fixCode: issue.code,
+        taskId: issue.id,
+      });
+      
+      setToast({ type: 'success', message: 'Fix applied successfully!' });
+      
+      if (onFixApplied) {
+        onFixApplied();
+      }
+      
+      closeTimeoutRef.current = setTimeout(() => {
+        onClose?.();
+      }, 1500);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to apply fix';
+      setToast({ type: 'error', message });
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  if (!template && backendFixInfo) {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+        <div className="flex items-center gap-3 p-4 border-b border-gray-200">
+          <div className="p-2 bg-green-100 rounded-lg">
+            <Zap className="h-5 w-5 text-green-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-gray-900">{backendFixInfo.title}</h3>
+            <p className="text-sm text-gray-500 truncate">{backendFixInfo.description}</p>
+          </div>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-1 text-gray-400 hover:text-gray-600 rounded"
+              aria-label="Close panel"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+
+        <div className="p-4 space-y-4">
+          <div className="p-3 bg-gray-50 rounded-lg">
+            <p className="text-sm text-gray-700">
+              <span className="font-medium">Issue:</span> {issue.message}
+            </p>
+            {issue.location && (
+              <p className="text-sm text-gray-500 mt-1">
+                <span className="font-medium">Location:</span> {issue.location}
+              </p>
+            )}
+          </div>
+
+          <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+            <p className="text-sm text-green-800">
+              This fix is handled automatically by the backend. Click "Apply Fix" to let the system fix this issue for you.
+            </p>
+          </div>
+
+          {toast && (
+            <div
+              className={cn(
+                'flex items-center gap-2 p-3 rounded-lg',
+                toast.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+              )}
+              role="alert"
+            >
+              {toast.type === 'success' ? (
+                <CheckCircle className="h-5 w-5 flex-shrink-0" />
+              ) : (
+                <AlertCircle className="h-5 w-5 flex-shrink-0" />
+              )}
+              <span className="text-sm">{toast.message}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 p-4 border-t border-gray-200 bg-gray-50">
+          <button
+            onClick={handleApplyBackendFix}
+            disabled={isApplying || !jobId}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors',
+              'bg-green-600 text-white hover:bg-green-700',
+              'disabled:opacity-50 disabled:cursor-not-allowed'
+            )}
+          >
+            {isApplying ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Zap className="h-4 w-4" />
+            )}
+            {isApplying ? 'Applying...' : 'Apply Fix'}
+          </button>
+          
+          {onSkip && (
+            <button
+              onClick={onSkip}
+              disabled={isApplying}
+              className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors disabled:opacity-50"
+            >
+              <SkipForward className="h-4 w-4" />
+              Skip
+            </button>
+          )}
         </div>
       </div>
     );
