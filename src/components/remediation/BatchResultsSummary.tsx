@@ -13,6 +13,8 @@ import {
   FileText,
   AlertTriangle,
   Trophy,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 
 interface JobResult {
@@ -37,16 +39,19 @@ interface BatchResultsSummaryProps {
   batchId: string;
   summary: BatchSummary;
   className?: string;
+  onRetryComplete?: () => void;
 }
 
 export const BatchResultsSummary: React.FC<BatchResultsSummaryProps> = ({
   batchId,
   summary,
   className = '',
+  onRetryComplete,
 }) => {
   const navigate = useNavigate();
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [retryingJob, setRetryingJob] = useState<string | null>(null);
 
   const handleDownloadAll = async () => {
     setIsDownloading(true);
@@ -86,6 +91,20 @@ export const BatchResultsSummary: React.FC<BatchResultsSummaryProps> = ({
 
   const handleViewJob = (jobId: string) => {
     navigate(`/remediation/${jobId}`);
+  };
+
+  const handleRetryJob = async (jobId: string) => {
+    setRetryingJob(jobId);
+    try {
+      await api.post(`/epub/batch/${batchId}/retry/${jobId}`);
+      if (onRetryComplete) {
+        onRetryComplete();
+      }
+    } catch (err) {
+      console.error('Failed to retry job:', err);
+    } finally {
+      setRetryingJob(null);
+    }
   };
 
   const successfulJobs = summary.jobs.filter(j => j.status === 'completed');
@@ -203,15 +222,36 @@ export const BatchResultsSummary: React.FC<BatchResultsSummaryProps> = ({
                       )}
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleViewJob(job.jobId)}
-                    aria-label={`View ${job.fileName}`}
-                  >
-                    <ExternalLink className="h-3 w-3 mr-1" aria-hidden="true" />
-                    Retry
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRetryJob(job.jobId)}
+                      disabled={retryingJob === job.jobId}
+                      aria-label={`Retry ${job.fileName}`}
+                    >
+                      {retryingJob === job.jobId ? (
+                        <>
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" aria-hidden="true" />
+                          Retrying...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-3 w-3 mr-1" aria-hidden="true" />
+                          Retry
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleViewJob(job.jobId)}
+                      aria-label={`View ${job.fileName}`}
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" aria-hidden="true" />
+                      View
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

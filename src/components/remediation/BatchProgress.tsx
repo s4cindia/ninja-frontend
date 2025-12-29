@@ -5,14 +5,17 @@ import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
 import { Alert } from '@/components/ui/Alert';
 import { api } from '@/services/api';
+import { useAuthStore } from '../../stores/auth.store';
 import { 
   Loader2, 
   CheckCircle, 
   XCircle, 
   Clock, 
   AlertTriangle,
+  AlertCircle,
   StopCircle,
   Play,
+  RefreshCw,
 } from 'lucide-react';
 
 interface JobStatus {
@@ -99,58 +102,186 @@ const mapBatchStatus = (data: Record<string, unknown>): BatchStatus => {
   };
 };
 
-const generateDemoBatchStatus = (
-  batchId: string, 
-  progress: number, 
-  selectedJobs?: SelectedJob[]
-): BatchStatus => {
-  const baseJobs = selectedJobs && selectedJobs.length > 0
-    ? selectedJobs.map((job) => ({
-        jobId: job.jobId,
-        fileName: job.fileName,
-        issuesFixed: 15 + Math.floor(Math.random() * 20),
-      }))
-    : [
-        { jobId: 'job-001', fileName: 'textbook-chapter1.epub', issuesFixed: 24 },
-        { jobId: 'job-002', fileName: 'student-guide.epub', issuesFixed: 18 },
-      ];
+const MAX_RETRIES = 3;
 
-  const totalJobs = baseJobs.length;
-  const completedJobs = Math.min(totalJobs, Math.floor((progress / 100) * totalJobs));
-  const isCompleted = progress >= 100;
-  const currentIndex = isCompleted ? undefined : completedJobs;
+// Module-level SSE manager - persists across StrictMode mount/unmount cycles
+type SSEListener = (data: SSEMessage) => void;
+interface SSEMessage {
+  type: string;
+  jobId?: string;
+  issuesFixed?: number;
+  error?: string;
+  status?: string;
+  summary?: { totalIssuesFixed: number; successRate: number };
+  clientId?: string;
+  completedJobs?: number;
+  failedJobs?: number;
+}
 
-  const jobs: JobStatus[] = baseJobs.map((job, idx) => {
-    const isJobCompleted = idx < completedJobs || isCompleted;
-    const isJobProcessing = !isCompleted && idx === completedJobs;
+const getApiBaseUrl = (): string => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  // In development, localhost is acceptable
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:5000/api/v1';
+  }
+  // In production, require HTTPS - use current origin
+  console.warn('[SSE] VITE_API_URL not set, using current origin');
+  return `${window.location.origin}/api/v1`;
+};
+
+// DESIGN DECISION: HTTP allowed for localhost development
+//
+// Rationale:
+// - Setting up HTTPS for localhost adds friction for developers
+// - Production deployments MUST use HTTPS (enforced by isSecureConnection)
+// - Development tokens should use test/sandbox credentials anyway
+// - Short-lived SSE tokens (GitHub #49) will further mitigate this
+//
+// If stricter security is needed, developers can:
+// - Use mkcert to create local HTTPS certificates
+// - Set VITE_API_URL to an HTTPS endpoint
+// - Set VITE_STRICT_HTTPS=true to enforce HTTPS everywhere
+const isSecureConnection = (url: string): boolean => {
+  // Allow opting into strict HTTPS-only mode
+  if (import.meta.env.VITE_STRICT_HTTPS === 'true') {
+    try {
+      return new URL(url).protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
+
+  try {
+    const parsedUrl = new URL(url);
+    // HTTPS is always secure
+    if (parsedUrl.protocol === 'https:') {
+      return true;
+    }
+    // HTTP only allowed for actual localhost in development
+    if (parsedUrl.protocol === 'http:') {
+      const hostname = parsedUrl.hostname;
+      return hostname === 'localhost' || hostname === '127.0.0.1';
+    }
+    return false;
+  } catch {
+    return false;
+  }
+};
+
+const sseManager = {
+  eventSource: null as EventSource | null,
+  batchId: null as string | null,
+  listeners: new Set<SSEListener>(),
+  isConnecting: false,
+
+  connect(batchId: string, token: string): void {
+    // Already connected to this batch
+    if (this.batchId === batchId && this.eventSource?.readyState === EventSource.OPEN) {
+      console.log('[SSE Manager] Already connected to:', batchId);
+      return;
+    }
+
+    // Already connecting to this batch
+    if (this.isConnecting && this.batchId === batchId) {
+      console.log('[SSE Manager] Already connecting to:', batchId);
+      return;
+    }
+
+    // Close existing connection if different batch
+    if (this.eventSource) {
+      console.log('[SSE Manager] Closing old connection');
+      this.eventSource.close();
+      this.eventSource = null;
+    }
+
+    this.batchId = batchId;
+    this.isConnecting = true;
+
+    const apiBaseUrl = getApiBaseUrl();
     
-    return {
-      jobId: job.jobId,
-      fileName: job.fileName,
-      status: isJobCompleted ? 'completed' : isJobProcessing ? 'processing' : 'pending',
-      issuesFixed: isJobCompleted ? job.issuesFixed : undefined,
+    // Security check: refuse to send token over insecure connection
+    if (!isSecureConnection(apiBaseUrl)) {
+      console.error('[SSE Manager] Refusing to send token over insecure connection');
+      this.isConnecting = false;
+      return; // Fall back to polling instead
+    }
+
+    // Warn about HTTP in development (after isSecureConnection check)
+    const parsedUrl = new URL(apiBaseUrl);
+    if (parsedUrl.protocol === 'http:') {
+      // Development-only HTTP - log warning once per session
+      const warningKey = 'sse-http-warning-shown';
+      if (!sessionStorage.getItem(warningKey)) {
+        console.warn(
+          '%c[SSE Security Warning]%c Token transmitted over HTTP (localhost development only). ' +
+          'This is acceptable for local development but NEVER use HTTP in production. ' +
+          'Ensure VITE_API_URL uses HTTPS for deployed environments.',
+          'color: orange; font-weight: bold',
+          'color: inherit'
+        );
+        sessionStorage.setItem(warningKey, 'true');
+      }
+    }
+
+    // SECURITY NOTE: EventSource API doesn't support custom headers, so we must pass
+    // the token via query parameter. This is a known limitation.
+    //
+    // Current mitigations:
+    // 1. HTTPS enforced in production (HTTP only allowed for localhost)
+    // 2. URL parsing prevents false-positive localhost checks
+    //
+    // Planned improvements (see GitHub issue #49):
+    // - Implement short-lived SSE-specific tokens
+    // - Backend query parameter logging restrictions
+    // - Session-cookie based alternative for production
+    const sseUrl = `${apiBaseUrl}/sse/batch/${batchId}/progress?token=${encodeURIComponent(token)}`;
+
+    console.log('[SSE Manager] Connecting:', batchId);
+
+    const es = new EventSource(sseUrl);
+    this.eventSource = es;
+
+    es.onopen = () => {
+      console.log('[SSE Manager] OPEN');
+      this.isConnecting = false;
     };
-  });
 
-  const actualCompleted = isCompleted ? totalJobs : completedJobs;
-  const totalIssuesFixed = jobs
-    .filter(j => j.status === 'completed')
-    .reduce((sum, j) => sum + (j.issuesFixed || 0), 0);
+    es.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data) as SSEMessage;
+        console.log('[SSE Manager] MSG:', data.type);
+        this.listeners.forEach(listener => listener(data));
+      } catch (e) {
+        console.error('[SSE Manager] Parse error:', e);
+      }
+    };
 
-  return {
-    batchId,
-    status: isCompleted ? 'completed' : 'processing',
-    totalJobs,
-    completedJobs: actualCompleted,
-    failedJobs: 0,
-    jobs,
-    summary: {
-      totalIssuesFixed,
-      successRate: 100,
-    },
-    estimatedTimeRemaining: isCompleted ? 0 : Math.max(0, (totalJobs - completedJobs) * 30),
-    currentJobIndex: currentIndex,
-  };
+    es.onerror = () => {
+      console.warn('[SSE Manager] Error - readyState:', es.readyState);
+      this.isConnecting = false;
+    };
+  },
+
+  subscribe(listener: SSEListener): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  },
+
+  disconnect(): void {
+    console.log('[SSE Manager] Disconnect');
+    if (this.eventSource) {
+      this.eventSource.close();
+      this.eventSource = null;
+    }
+    this.batchId = null;
+    this.isConnecting = false;
+  },
+
+  isConnected(): boolean {
+    return this.eventSource?.readyState === EventSource.OPEN;
+  },
 };
 
 const formatTimeRemaining = (seconds: number): string => {
@@ -162,16 +293,25 @@ const formatTimeRemaining = (seconds: number): string => {
 
 export const BatchProgress: React.FC<BatchProgressProps> = ({
   batchId,
-  selectedJobs,
+  selectedJobs: _selectedJobs,
   onComplete,
   onCancel,
   className = '',
 }) => {
+  const { accessToken } = useAuthStore();
   const [batchStatus, setBatchStatus] = useState<BatchStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
-  const demoProgressRef = useRef(0);
+  const isMountedRef = useRef(true);
+  const onCompleteRef = useRef(onComplete);
+  
+  // Keep onComplete ref in sync with prop
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -179,6 +319,7 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
       const data = response.data.data || response.data;
       const status = mapBatchStatus(data);
       setBatchStatus(status);
+      setRetryCount(0);
       
       if (status.status === 'completed' || status.status === 'failed' || status.status === 'cancelled') {
         if (pollRef.current) {
@@ -191,32 +332,117 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
       }
     } catch (err) {
       console.error('[BatchProgress] Failed to fetch status:', err);
-      demoProgressRef.current = Math.min(100, demoProgressRef.current + 20);
-      const demoStatus = generateDemoBatchStatus(batchId, demoProgressRef.current, selectedJobs);
-      setBatchStatus(demoStatus);
-      
-      if (demoProgressRef.current >= 100) {
+
+      if (retryCount < MAX_RETRIES) {
+        setRetryCount(prev => prev + 1);
+      } else {
         if (pollRef.current) {
           clearInterval(pollRef.current);
           pollRef.current = null;
         }
-        if (onComplete) {
-          onComplete(demoStatus);
-        }
+        const errorMessage = err instanceof Error
+          ? err.message
+          : 'Failed to fetch batch status. Please check your connection.';
+        setError(errorMessage);
       }
     } finally {
       setIsLoading(false);
     }
-  }, [batchId, selectedJobs, onComplete]);
+  }, [batchId, onComplete, retryCount]);
 
+  // SSE Connection via module-level manager
   useEffect(() => {
+    isMountedRef.current = true;
+
+    // Skip if no batch or demo
+    if (!batchId || batchId.startsWith('demo-') || !accessToken) {
+      return;
+    }
+
+    // Connect using the module-level manager
+    sseManager.connect(batchId, accessToken);
+
+    // Subscribe to SSE events with mount guard
+    const unsubscribe = sseManager.subscribe((data) => {
+      if (!isMountedRef.current) return;
+
+      if (data.type === 'job_started') {
+        setBatchStatus(prev => prev ? {
+          ...prev,
+          jobs: prev.jobs.map(j => j.jobId === data.jobId ? { ...j, status: 'processing' as const } : j),
+        } : prev);
+      } else if (data.type === 'job_completed') {
+        setBatchStatus(prev => {
+          if (!prev) return prev;
+          const jobs = prev.jobs.map(j =>
+            j.jobId === data.jobId ? { ...j, status: 'completed' as const, issuesFixed: data.issuesFixed } : j
+          );
+          return { ...prev, jobs, completedJobs: jobs.filter(j => j.status === 'completed').length };
+        });
+      } else if (data.type === 'job_failed') {
+        setBatchStatus(prev => {
+          if (!prev) return prev;
+          const jobs = prev.jobs.map(j =>
+            j.jobId === data.jobId ? { ...j, status: 'failed' as const, error: data.error } : j
+          );
+          return { ...prev, jobs, failedJobs: jobs.filter(j => j.status === 'failed').length };
+        });
+      } else if (data.type === 'batch_completed') {
+        setBatchStatus(prev => {
+          if (!prev) return prev;
+          const updated = { 
+            ...prev, 
+            status: (data.status as BatchStatus['status']) || 'completed',
+            summary: data.summary || prev.summary,
+            completedJobs: typeof data.completedJobs === 'number' ? data.completedJobs : prev.completedJobs,
+            failedJobs: typeof data.failedJobs === 'number' ? data.failedJobs : prev.failedJobs,
+          };
+          
+          // Call onComplete callback via ref
+          if (onCompleteRef.current) {
+            onCompleteRef.current(updated);
+          }
+          
+          return updated;
+        });
+        
+        // Close SSE connection when batch is done
+        sseManager.disconnect();
+      }
+    });
+
+    // Only unsubscribe on unmount, don't disconnect (let other mounts reuse)
+    return () => {
+      isMountedRef.current = false;
+      unsubscribe();
+    };
+  }, [batchId, accessToken]);
+
+  // Polling fallback effect - runs when SSE not connected
+  useEffect(() => {
+    // Always fetch initial status
     fetchStatus();
-    pollRef.current = setInterval(fetchStatus, POLL_INTERVAL);
     
+    // Only start polling if SSE not connected
+    if (!sseManager.isConnected()) {
+      pollRef.current = setInterval(fetchStatus, POLL_INTERVAL);
+    }
+
+    // Check periodically if SSE connected and stop polling
+    const checkSSE = setInterval(() => {
+      if (sseManager.isConnected() && pollRef.current) {
+        console.log('[BatchProgress] SSE connected, stopping polling');
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    }, 1000);
+
     return () => {
       if (pollRef.current) {
         clearInterval(pollRef.current);
+        pollRef.current = null;
       }
+      clearInterval(checkSSE);
     };
   }, [fetchStatus]);
 
@@ -265,8 +491,39 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
   const isProcessing = batchStatus.status === 'processing';
 
   return (
-    <Card className={className}>
-      <CardHeader>
+    <>
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-red-700">
+              <AlertCircle className="h-5 w-5" />
+              <span>{error}</span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setError(null);
+                setRetryCount(0);
+                
+                // Clear existing interval before creating new one
+                if (pollRef.current) {
+                  clearInterval(pollRef.current);
+                  pollRef.current = null;
+                }
+                
+                fetchStatus();
+                pollRef.current = setInterval(fetchStatus, POLL_INTERVAL);
+              }}
+            >
+              <RefreshCw className="h-4 w-4 mr-1" />
+              Retry
+            </Button>
+          </div>
+        </div>
+      )}
+      <Card className={className}>
+        <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <StatusIcon 
@@ -274,6 +531,12 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
               aria-hidden="true" 
             />
             Batch Remediation Progress
+            {sseManager.isConnected() && (
+              <span className="text-xs text-green-600 flex items-center gap-1">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                Live
+              </span>
+            )}
           </CardTitle>
           {isProcessing && (
             <Button
@@ -384,6 +647,7 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
           </div>
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </>
   );
 };
