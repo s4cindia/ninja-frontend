@@ -131,7 +131,28 @@ const getApiBaseUrl = (): string => {
   return `${window.location.origin}/api/v1`;
 };
 
+// DESIGN DECISION: HTTP allowed for localhost development
+//
+// Rationale:
+// - Setting up HTTPS for localhost adds friction for developers
+// - Production deployments MUST use HTTPS (enforced by isSecureConnection)
+// - Development tokens should use test/sandbox credentials anyway
+// - Short-lived SSE tokens (GitHub #49) will further mitigate this
+//
+// If stricter security is needed, developers can:
+// - Use mkcert to create local HTTPS certificates
+// - Set VITE_API_URL to an HTTPS endpoint
+// - Set VITE_STRICT_HTTPS=true to enforce HTTPS everywhere
 const isSecureConnection = (url: string): boolean => {
+  // Allow opting into strict HTTPS-only mode
+  if (import.meta.env.VITE_STRICT_HTTPS === 'true') {
+    try {
+      return new URL(url).protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
+
   try {
     const parsedUrl = new URL(url);
     // HTTPS is always secure
@@ -187,9 +208,21 @@ const sseManager = {
       return; // Fall back to polling instead
     }
 
-    // Warn in development about HTTP usage
-    if (apiBaseUrl.startsWith('http://')) {
-      console.warn('[SSE Manager] WARNING: Using HTTP for SSE in development. Token will be visible in network logs. Use HTTPS in production.');
+    // Warn about HTTP in development (after isSecureConnection check)
+    const parsedUrl = new URL(apiBaseUrl);
+    if (parsedUrl.protocol === 'http:') {
+      // Development-only HTTP - log warning once per session
+      const warningKey = 'sse-http-warning-shown';
+      if (!sessionStorage.getItem(warningKey)) {
+        console.warn(
+          '%c[SSE Security Warning]%c Token transmitted over HTTP (localhost development only). ' +
+          'This is acceptable for local development but NEVER use HTTP in production. ' +
+          'Ensure VITE_API_URL uses HTTPS for deployed environments.',
+          'color: orange; font-weight: bold',
+          'color: inherit'
+        );
+        sessionStorage.setItem(warningKey, 'true');
+      }
     }
 
     // SECURITY NOTE: EventSource API doesn't support custom headers, so we must pass
