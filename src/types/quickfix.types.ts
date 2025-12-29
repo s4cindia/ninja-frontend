@@ -38,13 +38,32 @@ export interface QuickFix {
   summary?: string;
 }
 
+export interface QuickFixResult {
+  isValid?: boolean;
+  error?: string;
+  issueId?: string;
+  targetFile?: string;
+  changes: FileChange[];
+  summary?: string;
+}
+
+export interface QuickFixPayload {
+  fixCode: string;
+  options: Record<string, unknown>;
+}
+
 export interface QuickFixTemplate {
   id: string;
   title: string;
   description: string;
   targetFile: string;
   inputs: QuickFixInput[];
-  generateFix: (inputs: Record<string, unknown>, context: QuickFixContext) => QuickFix;
+  requiresAsyncData?: boolean;
+  loadAsyncData?: (context: QuickFixContext) => Promise<Record<string, unknown>>;
+  getInputFields?: (context: QuickFixContext) => QuickFixInput[];
+  generateFix: (inputs: Record<string, unknown>, context: QuickFixContext) => QuickFix | QuickFixResult;
+  generatePayload?: (values: Record<string, unknown>, asyncData: Record<string, unknown> | null) => QuickFixPayload;
+  validateInput?: (inputs: Record<string, unknown>) => boolean;
 }
 
 export interface QuickFixContext {
@@ -54,6 +73,16 @@ export interface QuickFixContext {
   filePath?: string;
   lineNumber?: number;
   elementContext?: string;
+  jobId?: string;
+  detectedEpubTypes?: Array<{
+    value: string;
+    file: string;
+    count: number;
+    suggestedRole: string;
+  }>;
+  scannedFiles?: string[];
+  issueMessage?: string;
+  [key: string]: unknown;
 }
 
 export interface QuickFixPreview {

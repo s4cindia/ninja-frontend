@@ -300,6 +300,18 @@ const landmarkUniqueTemplate: QuickFixTemplate = {
       default: 'Page List',
     },
   ],
+  
+  generatePayload: (values) => {
+    return {
+      fixCode: 'EPUB-NAV-002',
+      options: {
+        tocLabel: (values.tocLabel as string) || 'Table of Contents',
+        landmarksLabel: (values.landmarksLabel as string) || 'Landmarks',
+        pageListLabel: (values.pageListLabel as string) || 'Page List',
+      },
+    };
+  },
+  
   generateFix: (inputs, context): QuickFix => {
     const tocLabel = (inputs.tocLabel as string) || 'Table of Contents';
     const landmarksLabel = (inputs.landmarksLabel as string) || 'Landmarks';
@@ -311,9 +323,9 @@ const landmarkUniqueTemplate: QuickFixTemplate = {
       changes.push({
         type: 'replace' as const,
         filePath: context.filePath || 'nav.xhtml',
-        oldContent: '<nav epub:type="toc">',
-        content: `<nav epub:type="toc" aria-label="${tocLabel}">`,
-        description: 'Add aria-label to table of contents nav',
+        oldContent: '<nav epub:type="toc" ...>',
+        content: `aria-label="${tocLabel}"`,
+        description: `Add aria-label="${tocLabel}" to table of contents nav`,
       });
     }
     
@@ -321,9 +333,9 @@ const landmarkUniqueTemplate: QuickFixTemplate = {
       changes.push({
         type: 'replace' as const,
         filePath: context.filePath || 'nav.xhtml',
-        oldContent: '<nav epub:type="landmarks">',
-        content: `<nav epub:type="landmarks" aria-label="${landmarksLabel}">`,
-        description: 'Add aria-label to landmarks nav',
+        oldContent: '<nav epub:type="landmarks" ...>',
+        content: `aria-label="${landmarksLabel}"`,
+        description: `Add aria-label="${landmarksLabel}" to landmarks nav`,
       });
     }
     
@@ -331,9 +343,9 @@ const landmarkUniqueTemplate: QuickFixTemplate = {
       changes.push({
         type: 'replace' as const,
         filePath: context.filePath || 'nav.xhtml',
-        oldContent: '<nav epub:type="page-list">',
-        content: `<nav epub:type="page-list" aria-label="${pageListLabel}">`,
-        description: 'Add aria-label to page list nav',
+        oldContent: '<nav epub:type="page-list" ...>',
+        content: `aria-label="${pageListLabel}"`,
+        description: `Add aria-label="${pageListLabel}" to page-list nav`,
       });
     }
     
@@ -341,7 +353,7 @@ const landmarkUniqueTemplate: QuickFixTemplate = {
       issueId: context.issueId,
       targetFile: context.filePath || 'nav.xhtml',
       changes,
-      summary: `Added unique labels to ${changes.length} navigation landmark(s)`,
+      summary: `Add unique aria-labels to ${changes.length} navigation landmark(s)`,
     };
   },
 };
@@ -380,42 +392,223 @@ const EPUB_TYPE_TO_ROLE: Record<string, string> = {
   'credits': 'doc-credits',
   'endnote': 'doc-endnote',
   'subtitle': 'doc-subtitle',
+  'frontmatter': 'doc-frontmatter',
+  'bodymatter': 'doc-bodymatter',
+  'backmatter': 'doc-backmatter',
+  'titlepage': 'doc-titlepage',
+  'epigraph': 'doc-epigraph',
+  'footnotes': 'doc-footnotes',
+  'rearnote': 'doc-endnote',
+  'rearnotes': 'doc-endnotes',
+  'landmarks': 'navigation',
+  'loi': 'doc-loi',
+  'lot': 'doc-lot',
+  'nav': 'navigation',
 };
+
+function getEpubTypeDescription(epubType: string): string {
+  const descriptions: Record<string, string> = {
+    'chapter': 'Main chapter content',
+    'part': 'Major division of content',
+    'toc': 'Table of contents',
+    'frontmatter': 'Front matter section',
+    'bodymatter': 'Main body content',
+    'backmatter': 'Back matter section',
+    'dedication': 'Dedication page',
+    'epigraph': 'Quotation at start',
+    'titlepage': 'Title page',
+    'landmarks': 'Navigation landmarks',
+    'noteref': 'Note reference',
+    'rearnote': 'End/rear note',
+    'rearnotes': 'End/rear notes section',
+    'footnote': 'Footnote content',
+    'footnotes': 'Footnotes section',
+    'endnote': 'Endnote content',
+    'endnotes': 'Endnotes section',
+    'appendix': 'Supplementary content',
+    'bibliography': 'List of references',
+    'glossary': 'Term definitions',
+    'index': 'Alphabetical index',
+    'foreword': 'Foreword section',
+    'preface': 'Preface section',
+    'introduction': 'Introduction section',
+    'epilogue': 'Epilogue section',
+    'afterword': 'Afterword section',
+    'conclusion': 'Conclusion section',
+    'sidebar': 'Sidebar content',
+    'cover': 'Cover page',
+    'colophon': 'Colophon page',
+    'acknowledgments': 'Acknowledgments section',
+  };
+  return descriptions[epubType] || `${epubType} content`;
+}
+
+function detectEpubTypesFromContext(context: { currentContent?: string; issueMessage?: string }): string[] {
+  let detectedTypes: string[] = [];
+
+  if (context.issueMessage) {
+    const match = context.issueMessage.match(/epub:type[=:]\s*["']?(\w+)["']?/i);
+    if (match) {
+      detectedTypes.push(match[1]);
+    }
+  }
+
+  if (context.currentContent) {
+    const matches = context.currentContent.match(/epub:type\s*=\s*["']([^"']+)["']/g) || [];
+    const extracted = matches.map(m => {
+      const val = m.match(/["']([^"']+)["']/);
+      return val ? val[1] : '';
+    }).filter(Boolean);
+    detectedTypes = [...new Set([...detectedTypes, ...extracted])];
+  }
+
+  return detectedTypes;
+}
 
 const epubTypeRoleTemplate: QuickFixTemplate = {
   id: 'epub-type-role',
   title: 'Add ARIA Roles to epub:type Elements',
   description: 'Add matching ARIA roles to elements with epub:type for better accessibility',
   targetFile: 'content.xhtml',
+  
+  requiresAsyncData: true,
+  
+  loadAsyncData: async (context) => {
+    console.log('loadAsyncData called for epub:type with jobId:', context.jobId);
+    try {
+      const { scanEpubTypes } = await import('@/services/quickfix.service');
+      const result = await scanEpubTypes(context.jobId || '');
+      console.log('scanEpubTypes result:', result);
+      return {
+        detectedEpubTypes: result.epubTypes,
+        scannedFiles: result.files,
+      };
+    } catch (error) {
+      console.error('Failed to scan epub:types:', error);
+      return { detectedEpubTypes: [], scannedFiles: [], error: 'Failed to load epub:type data from server' };
+    }
+  },
+  
   inputs: [
     {
       type: 'checkbox-group',
-      id: 'epubTypes',
+      id: 'selectedEpubTypes',
       label: 'Elements to Update',
       helpText: 'Select which epub:type elements should receive matching ARIA roles',
-      options: [
-        { value: 'chapter', label: 'chapter → doc-chapter', description: 'Main chapter content' },
-        { value: 'part', label: 'part → doc-part', description: 'Major division of content' },
-        { value: 'appendix', label: 'appendix → doc-appendix', description: 'Supplementary content' },
-        { value: 'bibliography', label: 'bibliography → doc-bibliography', description: 'List of references' },
-        { value: 'glossary', label: 'glossary → doc-glossary', description: 'Term definitions' },
-        { value: 'index', label: 'index → doc-index', description: 'Alphabetical index' },
-        { value: 'toc', label: 'toc → doc-toc', description: 'Table of contents' },
-        { value: 'footnote', label: 'footnote → doc-footnote', description: 'Footnote content' },
-        { value: 'endnote', label: 'endnote → doc-endnote', description: 'Endnote content' },
-        { value: 'sidebar', label: 'sidebar → complementary', description: 'Sidebar content' },
-      ],
-      default: ['chapter', 'part', 'appendix', 'bibliography', 'glossary', 'index', 'toc'],
+      options: [],
     },
   ],
-  generateFix: (inputs, context): QuickFix => {
-    const selectedTypes = (inputs.epubTypes as string[]) || [];
+  
+  getInputFields: (context) => {
+    console.log('getInputFields called with context:', context);
+    const detectedTypes = context.detectedEpubTypes || [];
+    console.log('detectedTypes from async data:', detectedTypes);
+    
+    if (detectedTypes.length === 0) {
+      const fallbackTypes = detectEpubTypesFromContext(context);
+      console.log('fallbackTypes from local detection:', fallbackTypes);
+      
+      if (fallbackTypes.length === 0) {
+        return [
+          {
+            type: 'text' as const,
+            id: 'noTypesFound',
+            label: 'No epub:type elements found',
+            helpText: 'No epub:type attributes were found in this file. This issue may have already been resolved or the file structure is different than expected.',
+          },
+        ];
+      }
+      
+      return [
+        {
+          type: 'checkbox-group' as const,
+          id: 'selectedEpubTypes',
+          label: 'Elements to Update',
+          helpText: `Found ${fallbackTypes.length} epub:type value(s). Select which should receive ARIA roles:`,
+          options: fallbackTypes.map(epubType => ({
+            value: epubType,
+            label: `${epubType} → ${EPUB_TYPE_TO_ROLE[epubType] || 'doc-' + epubType}`,
+            description: getEpubTypeDescription(epubType),
+          })),
+          default: fallbackTypes,
+        },
+      ];
+    }
+    
+    return [
+      {
+        type: 'checkbox-group' as const,
+        id: 'selectedEpubTypes',
+        label: 'Elements to Update',
+        helpText: `Found ${detectedTypes.length} unique epub:type value(s) in the file. Select which should receive ARIA roles:`,
+        options: detectedTypes.map(item => ({
+          value: item.value,
+          label: `${item.value} → ${item.suggestedRole || EPUB_TYPE_TO_ROLE[item.value] || 'doc-' + item.value}`,
+          description: `${getEpubTypeDescription(item.value)} (${item.count} occurrence${item.count > 1 ? 's' : ''})`,
+        })),
+        default: detectedTypes.map(item => item.value),
+      },
+    ];
+  },
+  
+  validateInput: (inputs) => {
+    const selectedTypes = inputs.selectedEpubTypes as string[];
+    return selectedTypes && selectedTypes.length > 0;
+  },
+  
+  generatePayload: (values, asyncData) => {
+    const selectedTypes = (values.selectedEpubTypes as string[]) || [];
+    const detected = (asyncData?.detectedEpubTypes as Array<{ value: string; file: string; suggestedRole: string }>) || [];
+    
+    const changes = selectedTypes
+      .map((epubType: string) => {
+        const found = detected.find(et => et.value === epubType);
+        if (!found) return null;
+        
+        const role = found.suggestedRole;
+        const filePath = found.file.includes(',') ? found.file.split(',')[0].trim() : found.file;
+        
+        return {
+          type: 'replace',
+          filePath,
+          epubType,
+          role,
+          oldContent: `epub:type="${epubType}"`,
+          newContent: `epub:type="${epubType}" role="${role}"`,
+        };
+      })
+      .filter(Boolean);
+    
+    return {
+      fixCode: 'EPUB-SEM-003',
+      options: {
+        changes,
+      },
+    };
+  },
+  
+  generateFix: (inputs, context) => {
+    const selectedTypes = (inputs.selectedEpubTypes as string[]) || [];
+    const detected = (context.detectedEpubTypes as Array<{ value: string; file: string; suggestedRole: string }>) || [];
+    
+    if (selectedTypes.length === 0) {
+      return {
+        isValid: false,
+        error: 'Please select at least one epub:type element to update',
+        changes: [],
+      };
+    }
     
     const changes = selectedTypes.map(epubType => {
-      const role = EPUB_TYPE_TO_ROLE[epubType] || `doc-${epubType}`;
+      const found = detected.find(et => et.value === epubType);
+      const role = found?.suggestedRole || EPUB_TYPE_TO_ROLE[epubType] || `doc-${epubType}`;
+      const filePath = found?.file 
+        ? (found.file.includes(',') ? found.file.split(',')[0].trim() : found.file)
+        : (context.filePath || 'content.xhtml');
+      
       return {
         type: 'replace' as const,
-        filePath: context.filePath || 'content.xhtml',
+        filePath,
         oldContent: `epub:type="${epubType}"`,
         content: `epub:type="${epubType}" role="${role}"`,
         description: `Add role="${role}" to epub:type="${epubType}"`,
@@ -423,10 +616,11 @@ const epubTypeRoleTemplate: QuickFixTemplate = {
     });
     
     return {
+      isValid: true,
       issueId: context.issueId,
       targetFile: context.filePath || 'content.xhtml',
       changes,
-      summary: `Added ARIA roles to ${changes.length} epub:type element(s)`,
+      summary: `Add ARIA roles to ${selectedTypes.length} epub:type element(s): ${selectedTypes.join(', ')}`,
     };
   },
 };
@@ -878,16 +1072,23 @@ export const quickFixTemplates: Record<string, QuickFixTemplate> = {
 
 const issueCodeAliases: Record<string, string> = {
   'METADATA-ACCESSMODE': 'metadata-accessmode',
+  'METADATA-ACCESSMODESUFFICIENT': 'metadata-accessmode',
   'METADATA-ACCESSIBILITYFEATURE': 'metadata-accessibilityfeature',
   'METADATA-ACCESSIBILITYHAZARD': 'metadata-accessibilityhazard',
   'METADATA-ACCESSIBILITYSUMMARY': 'metadata-accessibilitysummary',
+  'EPUB-META-001': 'metadata-accessmode',
+  'EPUB-META-002': 'metadata-accessibilityfeature',
+  'EPUB-META-003': 'metadata-accessibilitysummary',
+  'EPUB-META-004': 'metadata-accessibilityhazard',
   'IMG-ALT-MISSING': 'image-alt',
   'IMG-ALT-EMPTY': 'image-alt',
   'IMG-ALT': 'image-alt',
+  'IMG-001': 'image-alt',
   'IMAGE-ALT': 'image-alt',
   'IMAGE-ALT-MISSING': 'image-alt',
   'EPUB-IMG-001': 'image-alt',
   'EPUB-IMG-ALT': 'image-alt',
+  'ACE-IMG-001': 'image-alt',
   'HEADING-ORDER': 'heading-structure',
   'HEADING-SKIP': 'heading-structure',
   'HEADING-SKIPPED': 'heading-structure',
@@ -905,10 +1106,15 @@ const issueCodeAliases: Record<string, string> = {
   'EPUB-TYPE-HAS-MATCHING-ROLE': 'epub-type-role',
   'EPUB-TYPE-ROLE': 'epub-type-role',
   'EPUB-TYPE-NEEDS-ROLE': 'epub-type-role',
+  'EPUB-SEM-003': 'epub-type-role',
   'PAGE-BREAK-MISSING': 'page-break-missing',
   'TOC-MISSING': 'toc-missing',
   'LANDMARKS-MISSING': 'landmarks-missing',
   'LANDMARK-UNIQUE': 'landmark-unique',
+  'EPUB-NAV-002': 'landmark-unique',
+  'NAV-LABEL-MISSING': 'landmark-unique',
+  'NAV-ARIA-LABEL': 'landmark-unique',
+  'LANDMARK-UNIQUE-LABEL': 'landmark-unique',
   'LANDMARK-NO-DUPLICATE-CONTENTINFO': 'landmark-unique',
   'LANDMARK-NO-DUPLICATE-BANNER': 'landmark-unique',
   'NAV-LABEL-UNIQUE': 'landmark-unique',
@@ -927,8 +1133,53 @@ export function getQuickFixTemplate(issueCode: string): QuickFixTemplate | undef
   return quickFixTemplates[normalizedCode];
 }
 
+export interface BackendFixInfo {
+  title: string;
+  description: string;
+}
+
+const BACKEND_HANDLED_FIX_CODES: Record<string, BackendFixInfo> = {
+  'EPUB-STRUCT-002': { 
+    title: 'Add Table Headers', 
+    description: 'Automatically adds <th> header elements to tables missing proper headers' 
+  },
+  'EPUB-META-002': { 
+    title: 'Add Accessibility Metadata', 
+    description: 'Adds required accessibility metadata to the EPUB package' 
+  },
+  'EPUB-META-004': { 
+    title: 'Add Access Modes', 
+    description: 'Adds accessMode and accessModeSufficient metadata' 
+  },
+  'EPUB-NAV-001': { 
+    title: 'Add Skip Navigation', 
+    description: 'Adds skip navigation links for keyboard users' 
+  },
+  'EPUB-STRUCT-004': { 
+    title: 'Add ARIA Landmarks', 
+    description: 'Adds ARIA landmark roles to improve navigation' 
+  },
+};
+
+function normalizeBackendFixCode(issueCode: string): string {
+  return issueCode.toUpperCase().replace(/_/g, '-');
+}
+
+export function isBackendHandledFixCode(issueCode: string): boolean {
+  const normalized = normalizeBackendFixCode(issueCode);
+  return normalized in BACKEND_HANDLED_FIX_CODES;
+}
+
+export function getBackendFixInfo(issueCode: string): BackendFixInfo | undefined {
+  const normalized = normalizeBackendFixCode(issueCode);
+  return BACKEND_HANDLED_FIX_CODES[normalized];
+}
+
 export function hasQuickFixTemplate(issueCode: string): boolean {
-  return getQuickFixTemplate(issueCode) !== undefined;
+  if (getQuickFixTemplate(issueCode) !== undefined) {
+    return true;
+  }
+  return isBackendHandledFixCode(issueCode);
 }
 
 export function registerQuickFixTemplate(template: QuickFixTemplate): void {

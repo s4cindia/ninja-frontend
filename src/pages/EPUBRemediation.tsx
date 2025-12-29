@@ -1419,9 +1419,14 @@ export const EPUBRemediation: React.FC = () => {
   };
 
   const handleRefreshPlan = async () => {
+    console.log('handleRefreshPlan - forcing fresh data fetch');
     if (!jobId || isDemo) return;
     try {
-      const response = await api.get(`/epub/job/${jobId}/remediation`);
+      const response = await api.get(`/epub/job/${jobId}/remediation`, {
+        params: {
+          _t: Date.now(),
+        },
+      });
       const data = response.data.data || response.data;
       if (data.tasks) {
         const normalizedTasks = data.tasks.map(
@@ -1429,9 +1434,10 @@ export const EPUBRemediation: React.FC = () => {
         );
         const dedupedTasks = groupAndDeduplicateTasks(normalizedTasks);
         setPlan((prev) => prev ? { ...prev, tasks: dedupedTasks } : null);
+        console.log('Plan refreshed with', dedupedTasks.length, 'tasks');
       }
-    } catch {
-      // Silently fail refresh - user can retry
+    } catch (err) {
+      console.warn('Failed to refresh plan:', err);
     }
   };
 

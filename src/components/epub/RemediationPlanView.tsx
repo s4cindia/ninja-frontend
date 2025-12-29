@@ -1,5 +1,6 @@
-import React, { useState, useCallback } from 'react';
-import { FileText, Clock, Wrench, CheckCircle, AlertCircle, Zap, FileEdit } from 'lucide-react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { FileText, Clock, Wrench, CheckCircle, AlertCircle, Zap, FileEdit, Settings } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -9,6 +10,7 @@ import { RemediationProgress, FixResult } from './RemediationProgress';
 import { hasQuickFixTemplate } from '@/data/quickFixTemplates';
 import { FixTypeBadge } from '@/components/remediation/FixTypeBadge';
 import { applyQuickFixToEpub } from '@/services/quickfix.service';
+import { useRemediationConfig } from '@/hooks/useRemediationConfig';
 import type { QuickFix } from '@/types/quickfix.types';
 
 export interface RemediationPlan {
@@ -41,6 +43,18 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
   onRefreshPlan,
 }) => {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const taskRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const { data: config } = useRemediationConfig();
+  const colorContrastAutoFix = config?.colorContrastAutoFix ?? true;
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleQuickFixApply = useCallback(async (taskId: string, fix: QuickFix) => {
     try {
@@ -55,13 +69,31 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
       const result = await applyQuickFixToEpub(plan.jobId, taskId, mappedChanges);
       if (result.success) {
         await onMarkTaskFixed?.(taskId, `Quick fix applied to: ${result.modifiedFiles.join(', ')}`);
+
+        const currentIndex = plan.tasks.findIndex(t => t.id === taskId);
+        const nextPendingTask = plan.tasks.slice(currentIndex + 1).find(t =>
+          t.status === 'pending' && (t.fixType === 'quickfix' || (t.type === 'manual' && hasQuickFixTemplate(t.code)))
+        );
+
+        if (nextPendingTask) {
+          timeoutRef.current = setTimeout(() => {
+            setExpandedTaskId(nextPendingTask.id);
+            taskRefs.current[nextPendingTask.id]?.scrollIntoView({
+              behavior: 'smooth',
+              block: 'center',
+            });
+          }, 300);
+        } else {
+          setExpandedTaskId(null);
+        }
+
         onRefreshPlan?.();
       }
     } catch (error) {
       console.error('Failed to apply quick fix:', error);
       throw error;
     }
-  }, [plan.jobId, onMarkTaskFixed, onRefreshPlan]);
+  }, [plan.jobId, plan.tasks, onMarkTaskFixed, onRefreshPlan]);
 
   const getEffectiveFixType = (task: RemediationTask) => 
     task.fixType || (task.type === 'auto' ? 'auto' : hasQuickFixTemplate(task.code) ? 'quickfix' : 'manual');
@@ -108,6 +140,24 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
               <p className="font-medium text-gray-900">{plan.epubFileName}</p>
               <p className="text-sm text-gray-500">{totalTasks} issues to address</p>
             </div>
+          </div>
+
+          <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+            <div className="flex items-center gap-2">
+              <Settings className="h-4 w-4 text-slate-500" />
+              <span className="text-sm text-slate-700">Color Contrast:</span>
+              {colorContrastAutoFix ? (
+                <Badge variant="success" size="sm">Auto-Fix</Badge>
+              ) : (
+                <Badge variant="info" size="sm">Manual Review</Badge>
+              )}
+            </div>
+            <Link
+              to="/settings"
+              className="text-xs text-primary-600 hover:text-primary-700 hover:underline"
+            >
+              Change in Settings
+            </Link>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -279,17 +329,24 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
               </div>
             ) : (
               plan.tasks.map((task) => (
-                <RemediationTaskCard
+                <div
                   key={task.id}
-                  task={task}
-                  isExpanded={expandedTaskId === task.id}
-                  onToggleExpand={() => 
-                    setExpandedTaskId(expandedTaskId === task.id ? null : task.id)
-                  }
-                  onMarkFixed={onMarkTaskFixed}
-                  onQuickFixApply={handleQuickFixApply}
-                  onSkipTask={onSkipTask}
-                />
+                  ref={(el) => { taskRefs.current[task.id] = el; }}
+                  id={`task-${task.id}`}
+                >
+                  <RemediationTaskCard
+                    task={task}
+                    jobId={plan.jobId}
+                    isExpanded={expandedTaskId === task.id}
+                    onToggleExpand={() => 
+                      setExpandedTaskId(expandedTaskId === task.id ? null : task.id)
+                    }
+                    onMarkFixed={onMarkTaskFixed}
+                    onQuickFixApply={handleQuickFixApply}
+                    onSkipTask={onSkipTask}
+                    onFixApplied={onRefreshPlan}
+                  />
+                </div>
               ))
             )}
           </div>

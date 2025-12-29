@@ -1,14 +1,15 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { Wrench, X, Eye, Play, Edit3, SkipForward, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Wrench, X, Eye, Play, Edit3, SkipForward, Loader2, CheckCircle, AlertCircle, Zap } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { cn } from '@/utils/cn';
-import { getQuickFixTemplate } from '@/data/quickFixTemplates';
+import { getQuickFixTemplate, getBackendFixInfo } from '@/data/quickFixTemplates';
 import { 
   generateFixPreview, 
   applyQuickFix, 
   validateInputs, 
   getDefaultInputValues 
 } from '@/utils/quickFixUtils';
+import { api } from '@/services/api';
 import type { QuickFix, QuickFixContext, QuickFixPreview, QuickFixInput } from '@/types/quickfix.types';
 import { QuickFixCheckboxGroup } from './QuickFixCheckboxGroup';
 import { QuickFixRadioGroup } from './QuickFixRadioGroup';
@@ -25,7 +26,10 @@ interface QuickFixPanelProps {
     currentContent?: string;
     lineNumber?: number;
   };
+  jobId?: string;
   onApplyFix: (fix: QuickFix) => Promise<void>;
+  onFixApplied?: () => void;
+  onMarkFixed?: (taskId: string, notes?: string) => Promise<void>;
   onEditManually?: () => void;
   onSkip?: () => void;
   onClose?: () => void;
@@ -38,13 +42,20 @@ type ToastState = {
 
 export function QuickFixPanel({
   issue,
+  jobId,
   onApplyFix,
+  onFixApplied,
+  onMarkFixed,
   onEditManually,
   onSkip,
   onClose,
 }: QuickFixPanelProps) {
-  const template = useMemo(() => getQuickFixTemplate(issue.code), [issue.code]);
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const [template, setTemplate] = useState<ReturnType<typeof getQuickFixTemplate> | undefined>(() => getQuickFixTemplate(issue.code));
+  const [asyncData, setAsyncData] = useState<Record<string, unknown> | null>(null);
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   
   const [inputValues, setInputValues] = useState<Record<string, unknown>>(() => 
     template ? getDefaultInputValues(template) : {}
@@ -54,6 +65,64 @@ export function QuickFixPanel({
   const [toast, setToast] = useState<ToastState>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const context: QuickFixContext = useMemo(() => ({
+    issueId: issue.id,
+    issueCode: issue.code,
+    currentContent: issue.currentContent,
+    filePath: issue.filePath,
+    lineNumber: issue.lineNumber,
+    elementContext: issue.location,
+    jobId,
+    issueMessage: issue.message,
+    ...asyncData,
+  }), [issue, jobId, asyncData]);
+
+  useEffect(() => {
+    async function loadTemplateData() {
+      const tpl = getQuickFixTemplate(issue.code);
+      console.log('QuickFixPanel: template for', issue.code, ':', tpl?.id);
+      if (!tpl) {
+        setTemplate(undefined);
+        return;
+      }
+      
+      setTemplate(tpl);
+      
+      if (tpl.requiresAsyncData && tpl.loadAsyncData) {
+        console.log('QuickFixPanel: template requires async data, jobId:', jobId);
+        if (!jobId) {
+          console.warn('QuickFixPanel: no jobId provided for async template');
+          setLoadError('Missing job ID for loading data');
+          return;
+        }
+        setIsLoadingData(true);
+        setLoadError(null);
+        
+        try {
+          const data = await tpl.loadAsyncData({
+            issueId: issue.id,
+            issueCode: issue.code,
+            currentContent: issue.currentContent,
+            filePath: issue.filePath,
+            lineNumber: issue.lineNumber,
+            elementContext: issue.location,
+            jobId,
+            issueMessage: issue.message,
+          });
+          console.log('QuickFixPanel: async data loaded:', data);
+          setAsyncData(data);
+        } catch (error) {
+          console.error('QuickFixPanel: Failed to load template data:', error);
+          setLoadError('Failed to load Quick Fix data');
+        } finally {
+          setIsLoadingData(false);
+        }
+      }
+    }
+    
+    loadTemplateData();
+  }, [issue.code, issue.id, issue.filePath, issue.currentContent, issue.lineNumber, issue.location, issue.message, jobId]);
+
   useEffect(() => {
     return () => {
       if (closeTimeoutRef.current) {
@@ -62,14 +131,29 @@ export function QuickFixPanel({
     };
   }, []);
 
-  const context: QuickFixContext = useMemo(() => ({
-    issueId: issue.id,
-    issueCode: issue.code,
-    currentContent: issue.currentContent,
-    filePath: issue.filePath,
-    lineNumber: issue.lineNumber,
-    elementContext: issue.location,
-  }), [issue]);
+  const inputFields = useMemo(() => {
+    if (!template) return [];
+    
+    if (template.getInputFields) {
+      return template.getInputFields(context);
+    }
+    
+    return template.inputs || [];
+  }, [template, context]);
+
+  useEffect(() => {
+    if (inputFields.length > 0 && Object.keys(inputValues).length === 0) {
+      const defaults: Record<string, unknown> = {};
+      inputFields.forEach(field => {
+        if (field.default !== undefined) {
+          defaults[field.id] = field.default;
+        }
+      });
+      if (Object.keys(defaults).length > 0) {
+        setInputValues(prev => ({ ...defaults, ...prev }));
+      }
+    }
+  }, [inputFields, inputValues]);
 
   const preview: QuickFixPreview | null = useMemo(() => {
     if (!template || !showPreview) return null;
@@ -103,8 +187,31 @@ export function QuickFixPanel({
 
     try {
       const fix = applyQuickFix(template, inputValues, context);
+      console.log('Applying fix with payload:', {
+        ...fix,
+        taskId: issue.id,
+        jobId,
+      });
+      
       await onApplyFix(fix);
       setToast({ type: 'success', message: 'Fix applied successfully!' });
+      
+      if (jobId && issue.id) {
+        try {
+          await api.post(`/epub/job/${jobId}/task/${issue.id}/mark-fixed`, {
+            resolution: `Applied quick fix: ${template.title}`,
+          });
+          console.log('Task marked as fixed');
+        } catch (markErr) {
+          console.warn('mark-fixed failed (may be auto-completed):', markErr);
+        }
+      }
+      
+      if (onFixApplied) {
+        console.log('Triggering data refresh via onFixApplied');
+        onFixApplied();
+      }
+      
       closeTimeoutRef.current = setTimeout(() => {
         onClose?.();
       }, 1500);
@@ -194,6 +301,164 @@ export function QuickFixPanel({
     }
   };
 
+  if (isLoadingData) {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <div className="flex items-center justify-center gap-3">
+          <Loader2 className="h-5 w-5 animate-spin text-primary-600" />
+          <span className="text-gray-600">Loading Quick Fix options...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <div className="flex items-center gap-3 text-red-600">
+          <AlertCircle className="h-5 w-5" />
+          <span>{loadError}</span>
+        </div>
+      </div>
+    );
+  }
+
+  const backendFixInfo = getBackendFixInfo(issue.code);
+
+  const handleApplyBackendFix = async () => {
+    if (!jobId) {
+      setToast({ type: 'error', message: 'Missing job ID' });
+      return;
+    }
+
+    setIsApplying(true);
+    setToast(null);
+
+    try {
+      const normalizedCode = issue.code.toUpperCase().replace(/_/g, '-');
+      await api.post(`/epub/job/${jobId}/apply-fix`, { 
+        fixCode: normalizedCode,
+        taskId: issue.id,
+      });
+      
+      setToast({ type: 'success', message: 'Fix applied successfully!' });
+      
+      if (onMarkFixed) {
+        await onMarkFixed(issue.id, `Backend fix applied: ${issue.code}`);
+        onFixApplied?.();
+      } else {
+        try {
+          await api.post(`/epub/job/${jobId}/task/${issue.id}/mark-fixed`, {
+            notes: `Backend fix applied: ${issue.code}`,
+          });
+        } catch {
+          console.warn('Failed to mark task as fixed');
+        }
+        onFixApplied?.();
+      }
+      
+      closeTimeoutRef.current = setTimeout(() => {
+        onClose?.();
+      }, 1500);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to apply fix';
+      setToast({ type: 'error', message });
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  if (!template && backendFixInfo) {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+        <div className="flex items-center gap-3 p-4 border-b border-gray-200">
+          <div className="p-2 bg-green-100 rounded-lg">
+            <Zap className="h-5 w-5 text-green-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-gray-900">{backendFixInfo.title}</h3>
+            <p className="text-sm text-gray-500 truncate">{backendFixInfo.description}</p>
+          </div>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-1 text-gray-400 hover:text-gray-600 rounded"
+              aria-label="Close panel"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+
+        <div className="p-4 space-y-4">
+          <div className="p-3 bg-gray-50 rounded-lg">
+            <p className="text-sm text-gray-700">
+              <span className="font-medium">Issue:</span> {issue.message}
+            </p>
+            {issue.location && (
+              <p className="text-sm text-gray-500 mt-1">
+                <span className="font-medium">Location:</span> {issue.location}
+              </p>
+            )}
+          </div>
+
+          <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+            <p className="text-sm text-green-800">
+              This fix is handled automatically by the backend. Click "Apply Fix" to let the system fix this issue for you.
+            </p>
+          </div>
+
+          {toast && (
+            <div
+              className={cn(
+                'flex items-center gap-2 p-3 rounded-lg',
+                toast.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+              )}
+              role="alert"
+            >
+              {toast.type === 'success' ? (
+                <CheckCircle className="h-5 w-5 flex-shrink-0" />
+              ) : (
+                <AlertCircle className="h-5 w-5 flex-shrink-0" />
+              )}
+              <span className="text-sm">{toast.message}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 p-4 border-t border-gray-200 bg-gray-50">
+          <button
+            onClick={handleApplyBackendFix}
+            disabled={isApplying || !jobId}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors',
+              'bg-green-600 text-white hover:bg-green-700',
+              'disabled:opacity-50 disabled:cursor-not-allowed'
+            )}
+          >
+            {isApplying ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Zap className="h-4 w-4" />
+            )}
+            {isApplying ? 'Applying...' : 'Apply Fix'}
+          </button>
+          
+          {onSkip && (
+            <button
+              onClick={onSkip}
+              disabled={isApplying}
+              className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors disabled:opacity-50"
+            >
+              <SkipForward className="h-4 w-4" />
+              Skip
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (!template) {
     return (
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
@@ -277,9 +542,9 @@ export function QuickFixPanel({
           )}
         </div>
 
-        {template.inputs.length > 0 && (
+        {inputFields.length > 0 && (
           <div className="space-y-4">
-            {template.inputs.map(renderInput)}
+            {inputFields.map(renderInput)}
           </div>
         )}
 

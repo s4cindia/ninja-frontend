@@ -3,6 +3,19 @@ import type { AccessibilityIssue } from '@/types/accessibility.types';
 import type { FileChange } from '@/types/remediation.types';
 import { api, ApiResponse } from './api';
 
+export interface DetectedEpubType {
+  value: string;
+  file: string;
+  count: number;
+  suggestedRole: string;
+  elementType?: string;
+}
+
+export interface ScanEpubTypesResult {
+  epubTypes: DetectedEpubType[];
+  files: string[];
+}
+
 export async function generateFixPreviewFromTemplate(
   template: QuickFixTemplate,
   values: Record<string, unknown>,
@@ -89,6 +102,7 @@ export function getQuickFixableIssueCodes(): string[] {
     'EPUB-META-004',
     'EPUB-SEM-001',
     'EPUB-SEM-002',
+    'EPUB-SEM-003',
     'EPUB-IMG-001',
     'EPUB-STRUCT-002',
     'EPUB-CONTRAST-001',
@@ -102,9 +116,39 @@ export function getQuickFixableIssueCodes(): string[] {
     'HEADING-ORDER',
     'LANDMARK-UNIQUE',
     'EPUB-TYPE-ROLE',
+    'EPUB-TYPE-HAS-MATCHING-ROLE',
   ];
 }
 
 export function isQuickFixable(issueCode: string): boolean {
   return getQuickFixableIssueCodes().includes(issueCode.toUpperCase());
+}
+
+export async function scanEpubTypes(jobId: string): Promise<ScanEpubTypesResult> {
+  try {
+    const response = await api.get<ApiResponse<ScanEpubTypesResult>>(
+      `/epub/job/${jobId}/scan-epub-types`
+    );
+    return response.data.data;
+  } catch (error) {
+    console.error('Failed to scan epub:types:', error);
+    return { epubTypes: [], files: [] };
+  }
+}
+
+export async function applyQuickFix(
+  jobId: string,
+  fixCode: string,
+  options?: Record<string, unknown>
+): Promise<{ success: boolean; results: unknown[] }> {
+  try {
+    const response = await api.post<ApiResponse<{ fixCode: string; results: unknown[] }>>(
+      `/epub/job/${jobId}/apply-fix`,
+      { fixCode, options }
+    );
+    return { success: true, results: response.data.data.results };
+  } catch (error) {
+    console.error('Apply quick fix failed:', error);
+    throw new Error('Failed to apply quick fix');
+  }
 }

@@ -88,12 +88,14 @@ export interface RemediationTask {
 
 interface RemediationTaskCardProps {
   task: RemediationTask;
+  jobId?: string;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
   onMarkFixed?: (taskId: string, notes?: string) => Promise<void>;
   onViewInContext?: (filePath: string, selector?: string) => void;
   onQuickFixApply?: (taskId: string, fix: QuickFix) => Promise<void>;
   onSkipTask?: (taskId: string, reason?: string) => Promise<void>;
+  onFixApplied?: () => void;
 }
 
 const statusConfig: Record<
@@ -330,12 +332,14 @@ const RemediationGuidance: React.FC<{
 
 export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
   task,
+  jobId,
   isExpanded: controlledExpanded,
   onToggleExpand,
   onMarkFixed,
   onViewInContext,
   onQuickFixApply,
   onSkipTask,
+  onFixApplied,
 }) => {
   const [internalExpanded, setInternalExpanded] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
@@ -462,7 +466,7 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
 
       {isExpanded && (
         <div className="px-4 pb-4 pt-0 border-t border-gray-200 bg-white/50 space-y-4">
-          {task.suggestion && (
+          {task.status !== "completed" && task.suggestion && (
             <div>
               <dt className="text-xs font-medium text-gray-500">Suggestion</dt>
               <dd className="text-sm text-gray-700 mt-0.5">
@@ -501,7 +505,10 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
                 filePath: task.filePath,
                 currentContent: task.html,
               }}
+              jobId={jobId}
               onApplyFix={handleQuickFixApply}
+              onFixApplied={onFixApplied}
+              onMarkFixed={onMarkFixed}
               onSkip={async () => {
                 try {
                   if (onSkipTask) {
@@ -515,7 +522,27 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
             />
           )}
 
-          {task.type === "manual" && (!canUseQuickFix || task.status !== "pending") && task.remediation &&
+          {task.status === "completed" && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 text-green-700 mb-2">
+                <CheckCircle className="h-5 w-5" />
+                <span className="font-medium">Issue Resolved</span>
+              </div>
+              {task.completionMethod && (
+                <p className="text-sm text-green-600">
+                  Method: {task.completionMethod === "auto" ? "Auto-Remediation" : 
+                           task.completionMethod === "manual" ? "Manual Fix" : "Quick Fix"}
+                </p>
+              )}
+              {task.notes && (
+                <p className="text-sm text-gray-600 mt-2">
+                  <span className="font-medium">Notes:</span> {task.notes}
+                </p>
+              )}
+            </div>
+          )}
+
+          {task.type === "manual" && task.status === "pending" && !canUseQuickFix && task.remediation &&
             (typeof task.remediation === "string" ? (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <h4 className="font-medium text-amber-800 flex items-center gap-2 mb-2">
@@ -550,17 +577,6 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
             </div>
           )}
 
-          {task.type === "manual" &&
-            task.status === "completed" &&
-            task.notes && (
-              <div className="flex items-start gap-2 text-green-700 bg-green-50 p-2 rounded">
-                <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <div>
-                  <span className="text-xs font-medium">Fixed manually</span>
-                  <p className="text-xs text-green-600 mt-0.5">{task.notes}</p>
-                </div>
-              </div>
-            )}
 
           {task.type === "manual" &&
             task.status === "pending" &&
