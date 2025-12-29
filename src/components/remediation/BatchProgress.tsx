@@ -11,8 +11,10 @@ import {
   XCircle, 
   Clock, 
   AlertTriangle,
+  AlertCircle,
   StopCircle,
   Play,
+  RefreshCw,
 } from 'lucide-react';
 
 interface JobStatus {
@@ -99,59 +101,7 @@ const mapBatchStatus = (data: Record<string, unknown>): BatchStatus => {
   };
 };
 
-const generateDemoBatchStatus = (
-  batchId: string, 
-  progress: number, 
-  selectedJobs?: SelectedJob[]
-): BatchStatus => {
-  const baseJobs = selectedJobs && selectedJobs.length > 0
-    ? selectedJobs.map((job) => ({
-        jobId: job.jobId,
-        fileName: job.fileName,
-        issuesFixed: 15 + Math.floor(Math.random() * 20),
-      }))
-    : [
-        { jobId: 'job-001', fileName: 'textbook-chapter1.epub', issuesFixed: 24 },
-        { jobId: 'job-002', fileName: 'student-guide.epub', issuesFixed: 18 },
-      ];
-
-  const totalJobs = baseJobs.length;
-  const completedJobs = Math.min(totalJobs, Math.floor((progress / 100) * totalJobs));
-  const isCompleted = progress >= 100;
-  const currentIndex = isCompleted ? undefined : completedJobs;
-
-  const jobs: JobStatus[] = baseJobs.map((job, idx) => {
-    const isJobCompleted = idx < completedJobs || isCompleted;
-    const isJobProcessing = !isCompleted && idx === completedJobs;
-    
-    return {
-      jobId: job.jobId,
-      fileName: job.fileName,
-      status: isJobCompleted ? 'completed' : isJobProcessing ? 'processing' : 'pending',
-      issuesFixed: isJobCompleted ? job.issuesFixed : undefined,
-    };
-  });
-
-  const actualCompleted = isCompleted ? totalJobs : completedJobs;
-  const totalIssuesFixed = jobs
-    .filter(j => j.status === 'completed')
-    .reduce((sum, j) => sum + (j.issuesFixed || 0), 0);
-
-  return {
-    batchId,
-    status: isCompleted ? 'completed' : 'processing',
-    totalJobs,
-    completedJobs: actualCompleted,
-    failedJobs: 0,
-    jobs,
-    summary: {
-      totalIssuesFixed,
-      successRate: 100,
-    },
-    estimatedTimeRemaining: isCompleted ? 0 : Math.max(0, (totalJobs - completedJobs) * 30),
-    currentJobIndex: currentIndex,
-  };
-};
+const MAX_RETRIES = 3;
 
 const formatTimeRemaining = (seconds: number): string => {
   if (seconds < 60) return `${seconds}s`;
@@ -162,7 +112,7 @@ const formatTimeRemaining = (seconds: number): string => {
 
 export const BatchProgress: React.FC<BatchProgressProps> = ({
   batchId,
-  selectedJobs,
+  selectedJobs: _selectedJobs,
   onComplete,
   onCancel,
   className = '',
@@ -170,8 +120,9 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
   const [batchStatus, setBatchStatus] = useState<BatchStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
-  const demoProgressRef = useRef(0);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -179,6 +130,7 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
       const data = response.data.data || response.data;
       const status = mapBatchStatus(data);
       setBatchStatus(status);
+      setRetryCount(0);
       
       if (status.status === 'completed' || status.status === 'failed' || status.status === 'cancelled') {
         if (pollRef.current) {
@@ -191,23 +143,23 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
       }
     } catch (err) {
       console.error('[BatchProgress] Failed to fetch status:', err);
-      demoProgressRef.current = Math.min(100, demoProgressRef.current + 20);
-      const demoStatus = generateDemoBatchStatus(batchId, demoProgressRef.current, selectedJobs);
-      setBatchStatus(demoStatus);
-      
-      if (demoProgressRef.current >= 100) {
+
+      if (retryCount < MAX_RETRIES) {
+        setRetryCount(prev => prev + 1);
+      } else {
         if (pollRef.current) {
           clearInterval(pollRef.current);
           pollRef.current = null;
         }
-        if (onComplete) {
-          onComplete(demoStatus);
-        }
+        const errorMessage = err instanceof Error
+          ? err.message
+          : 'Failed to fetch batch status. Please check your connection.';
+        setError(errorMessage);
       }
     } finally {
       setIsLoading(false);
     }
-  }, [batchId, selectedJobs, onComplete]);
+  }, [batchId, onComplete, retryCount]);
 
   useEffect(() => {
     fetchStatus();
@@ -265,8 +217,32 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
   const isProcessing = batchStatus.status === 'processing';
 
   return (
-    <Card className={className}>
-      <CardHeader>
+    <>
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-red-700">
+              <AlertCircle className="h-5 w-5" />
+              <span>{error}</span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setError(null);
+                setRetryCount(0);
+                fetchStatus();
+                pollRef.current = setInterval(fetchStatus, POLL_INTERVAL);
+              }}
+            >
+              <RefreshCw className="h-4 w-4 mr-1" />
+              Retry
+            </Button>
+          </div>
+        </div>
+      )}
+      <Card className={className}>
+        <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <StatusIcon 
@@ -384,6 +360,7 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
           </div>
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </>
   );
 };
