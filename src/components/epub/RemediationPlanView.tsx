@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { FileText, Clock, Wrench, CheckCircle, AlertCircle, Zap, FileEdit } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { FileText, Clock, Wrench, CheckCircle, AlertCircle, Zap, FileEdit, Settings } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -9,6 +10,7 @@ import { RemediationProgress, FixResult } from './RemediationProgress';
 import { hasQuickFixTemplate } from '@/data/quickFixTemplates';
 import { FixTypeBadge } from '@/components/remediation/FixTypeBadge';
 import { applyQuickFixToEpub } from '@/services/quickfix.service';
+import { useRemediationConfig } from '@/hooks/useRemediationConfig';
 import type { QuickFix } from '@/types/quickfix.types';
 
 export interface RemediationPlan {
@@ -42,6 +44,8 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
 }) => {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const taskRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const { data: config } = useRemediationConfig();
+  const colorContrastAutoFix = config?.colorContrastAutoFix ?? true;
 
   const handleQuickFixApply = useCallback(async (taskId: string, fix: QuickFix) => {
     try {
@@ -127,6 +131,24 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
               <p className="font-medium text-gray-900">{plan.epubFileName}</p>
               <p className="text-sm text-gray-500">{totalTasks} issues to address</p>
             </div>
+          </div>
+
+          <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+            <div className="flex items-center gap-2">
+              <Settings className="h-4 w-4 text-slate-500" />
+              <span className="text-sm text-slate-700">Color Contrast:</span>
+              {colorContrastAutoFix ? (
+                <Badge variant="success" size="sm">Auto-Fix</Badge>
+              ) : (
+                <Badge variant="info" size="sm">Manual Review</Badge>
+              )}
+            </div>
+            <Link
+              to="/settings"
+              className="text-xs text-primary-600 hover:text-primary-700 hover:underline"
+            >
+              Change in Settings
+            </Link>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
