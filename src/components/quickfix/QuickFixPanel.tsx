@@ -29,6 +29,7 @@ interface QuickFixPanelProps {
   jobId?: string;
   onApplyFix: (fix: QuickFix) => Promise<void>;
   onFixApplied?: () => void;
+  onMarkFixed?: (taskId: string, notes?: string) => Promise<void>;
   onEditManually?: () => void;
   onSkip?: () => void;
   onClose?: () => void;
@@ -44,6 +45,7 @@ export function QuickFixPanel({
   jobId,
   onApplyFix,
   onFixApplied,
+  onMarkFixed,
   onEditManually,
   onSkip,
   onClose,
@@ -340,8 +342,17 @@ export function QuickFixPanel({
       
       setToast({ type: 'success', message: 'Fix applied successfully!' });
       
-      if (onFixApplied) {
-        onFixApplied();
+      if (onMarkFixed) {
+        await onMarkFixed(issue.id, `Backend fix applied: ${issue.code}`);
+      } else {
+        try {
+          await api.post(`/epub/job/${jobId}/task/${issue.id}/mark-fixed`, {
+            notes: `Backend fix applied: ${issue.code}`,
+          });
+        } catch {
+          console.warn('Failed to mark task as fixed');
+        }
+        onFixApplied?.();
       }
       
       closeTimeoutRef.current = setTimeout(() => {

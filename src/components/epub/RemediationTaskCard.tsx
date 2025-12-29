@@ -508,6 +508,7 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
               jobId={jobId}
               onApplyFix={handleQuickFixApply}
               onFixApplied={onFixApplied}
+              onMarkFixed={onMarkFixed}
               onSkip={async () => {
                 try {
                   if (onSkipTask) {
