@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { FileText, Clock, Wrench, CheckCircle, AlertCircle, Zap, FileEdit, Settings } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
@@ -44,8 +44,17 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
 }) => {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const taskRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { data: config } = useRemediationConfig();
   const colorContrastAutoFix = config?.colorContrastAutoFix ?? true;
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleQuickFixApply = useCallback(async (taskId: string, fix: QuickFix) => {
     try {
@@ -67,7 +76,7 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
         );
 
         if (nextPendingTask) {
-          setTimeout(() => {
+          timeoutRef.current = setTimeout(() => {
             setExpandedTaskId(nextPendingTask.id);
             taskRefs.current[nextPendingTask.id]?.scrollIntoView({
               behavior: 'smooth',

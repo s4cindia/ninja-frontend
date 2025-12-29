@@ -335,8 +335,9 @@ export function QuickFixPanel({
     setToast(null);
 
     try {
+      const normalizedCode = issue.code.toUpperCase().replace(/_/g, '-');
       await api.post(`/epub/job/${jobId}/apply-fix`, { 
-        fixCode: issue.code,
+        fixCode: normalizedCode,
         taskId: issue.id,
       });
       
@@ -344,6 +345,7 @@ export function QuickFixPanel({
       
       if (onMarkFixed) {
         await onMarkFixed(issue.id, `Backend fix applied: ${issue.code}`);
+        onFixApplied?.();
       } else {
         try {
           await api.post(`/epub/job/${jobId}/task/${issue.id}/mark-fixed`, {
