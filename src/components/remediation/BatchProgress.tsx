@@ -118,6 +118,23 @@ interface SSEMessage {
   failedJobs?: number;
 }
 
+const getApiBaseUrl = (): string => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  // In development, localhost is acceptable
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:5000/api/v1';
+  }
+  // In production, require HTTPS - use current origin
+  console.warn('[SSE] VITE_API_URL not set, using current origin');
+  return `${window.location.origin}/api/v1`;
+};
+
+const isSecureConnection = (url: string): boolean => {
+  return url.startsWith('https://') || url.includes('localhost') || url.includes('127.0.0.1');
+};
+
 const sseManager = {
   eventSource: null as EventSource | null,
   batchId: null as string | null,
@@ -147,7 +164,21 @@ const sseManager = {
     this.batchId = batchId;
     this.isConnecting = true;
 
-    const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
+    const apiBaseUrl = getApiBaseUrl();
+    
+    // Security check: refuse to send token over insecure connection
+    if (!isSecureConnection(apiBaseUrl)) {
+      console.error('[SSE Manager] Refusing to send token over insecure connection');
+      this.isConnecting = false;
+      return; // Fall back to polling instead
+    }
+
+    // SECURITY NOTE: EventSource API doesn't support custom headers, so we must pass
+    // the token via query parameter. This is a known limitation. Mitigations:
+    // 1. Backend should NOT log query parameters for this endpoint
+    // 2. Tokens should have short expiry times
+    // 3. Consider implementing a session-cookie based alternative for production
+    // 4. SSE connections should only be over HTTPS in production
     const sseUrl = `${apiBaseUrl}/sse/batch/${batchId}/progress?token=${encodeURIComponent(token)}`;
 
     console.log('[SSE Manager] Connecting:', batchId);
