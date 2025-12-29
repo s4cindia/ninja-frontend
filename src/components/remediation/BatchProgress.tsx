@@ -124,10 +124,10 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
   const [isCancelling, setIsCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [useSSE, setUseSSE] = useState(true);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
-  const isConnectingRef = useRef(false);
+  const isSSEConnectedRef = useRef(false);
+  const batchIdRef = useRef<string | null>(null);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -166,29 +166,68 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
     }
   }, [batchId, onComplete, retryCount]);
 
-  const handleSSEMessage = useCallback((event: MessageEvent) => {
-    try {
-      const data = JSON.parse(event.data);
-      console.log('[SSE] Parsed message:', data.type);
+  // SSE Connection Effect - runs only when batchId changes
+  useEffect(() => {
+    // Skip if no batchId or demo mode
+    if (!batchId || batchId.startsWith('demo-')) {
+      return;
+    }
 
-      switch (data.type) {
-        case 'connected':
-          console.log('[SSE] Server confirmed connection:', data.clientId);
-          break;
+    // Skip if already connected to this batch
+    if (batchIdRef.current === batchId && isSSEConnectedRef.current) {
+      return;
+    }
 
-        case 'job_started':
+    // Close existing connection if connecting to different batch
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+      isSSEConnectedRef.current = false;
+    }
+
+    if (!accessToken) {
+      console.warn('[SSE] No auth token available');
+      return;
+    }
+
+    batchIdRef.current = batchId;
+
+    const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
+    const sseUrl = `${apiBaseUrl}/sse/batch/${batchId}/progress?token=${encodeURIComponent(accessToken)}`;
+
+    console.log('[SSE] Opening connection for batch:', batchId);
+
+    const eventSource = new EventSource(sseUrl);
+    eventSourceRef.current = eventSource;
+
+    eventSource.onopen = () => {
+      console.log('[SSE] Connection established');
+      isSSEConnectedRef.current = true;
+    };
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('[SSE] Event received:', data.type);
+
+        if (data.type === 'connected') {
+          console.log('[SSE] Server confirmed:', data.clientId);
+          return;
+        }
+
+        if (data.type === 'job_started') {
           setBatchStatus(prev => {
             if (!prev) return prev;
-            const updatedJobs = prev.jobs.map(job =>
-              job.jobId === data.jobId
-                ? { ...job, status: 'processing' as const }
-                : job
-            );
-            return { ...prev, jobs: updatedJobs };
+            return {
+              ...prev,
+              jobs: prev.jobs.map(job =>
+                job.jobId === data.jobId ? { ...job, status: 'processing' as const } : job
+              ),
+            };
           });
-          break;
+        }
 
-        case 'job_completed':
+        if (data.type === 'job_completed') {
           setBatchStatus(prev => {
             if (!prev) return prev;
             const updatedJobs = prev.jobs.map(job =>
@@ -202,9 +241,9 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
               completedJobs: updatedJobs.filter(j => j.status === 'completed').length,
             };
           });
-          break;
+        }
 
-        case 'job_failed':
+        if (data.type === 'job_failed') {
           setBatchStatus(prev => {
             if (!prev) return prev;
             const updatedJobs = prev.jobs.map(job =>
@@ -218,96 +257,48 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
               failedJobs: updatedJobs.filter(j => j.status === 'failed').length,
             };
           });
-          break;
+        }
 
-        case 'batch_completed':
+        if (data.type === 'batch_completed') {
           setBatchStatus(prev => prev ? {
             ...prev,
             status: data.status,
             summary: data.summary,
           } : prev);
-          break;
-
-        default:
-          console.log('[SSE] Unknown message type:', data.type);
-      }
-    } catch (err) {
-      console.error('[SSE] Failed to parse message:', err);
-    }
-  }, []); // Empty deps - uses setState updater functions which don't need deps
-
-  useEffect(() => {
-    // Skip if not using SSE, no batchId, or demo mode
-    if (!useSSE || !batchId || batchId.startsWith('demo-') || batchId.startsWith('batch-demo')) {
-      return;
-    }
-
-    // Prevent duplicate connections
-    if (isConnectingRef.current || eventSourceRef.current) {
-      return;
-    }
-
-    if (!accessToken) {
-      console.warn('[SSE] No auth token available, falling back to polling');
-      setUseSSE(false);
-      return;
-    }
-
-    isConnectingRef.current = true;
-
-    const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
-    const sseUrl = `${apiBaseUrl}/sse/batch/${batchId}/progress?token=${encodeURIComponent(accessToken)}`;
-
-    console.log('[SSE] Connecting to:', sseUrl.replace(accessToken, 'TOKEN_HIDDEN'));
-
-    try {
-      const eventSource = new EventSource(sseUrl);
-      eventSourceRef.current = eventSource;
-
-      eventSource.onopen = () => {
-        console.log('[SSE] Connection established');
-        isConnectingRef.current = false;
-      };
-
-      eventSource.onmessage = (event) => {
-        console.log('[SSE] Message received:', event.data);
-        handleSSEMessage(event);
-      };
-
-      eventSource.onerror = (err) => {
-        console.warn('[SSE] Connection error:', err);
-        isConnectingRef.current = false;
-
-        // Only fall back to polling if connection is truly closed
-        if (eventSource.readyState === EventSource.CLOSED) {
-          console.warn('[SSE] Connection closed, falling back to polling');
-          eventSourceRef.current = null;
-          setUseSSE(false);
         }
-      };
-    } catch (err) {
-      console.warn('[SSE] Failed to connect:', err);
-      isConnectingRef.current = false;
-      setUseSSE(false);
-    }
+      } catch (err) {
+        console.error('[SSE] Parse error:', err);
+      }
+    };
 
-    // Cleanup function
+    eventSource.onerror = (err) => {
+      console.warn('[SSE] Error:', err);
+      isSSEConnectedRef.current = false;
+      // Don't close on error - EventSource will auto-reconnect
+    };
+
+    // Cleanup only on unmount or batchId change
     return () => {
+      console.log('[SSE] Cleanup for batch:', batchIdRef.current);
       if (eventSourceRef.current) {
-        console.log('[SSE] Closing connection (cleanup)');
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
-      isConnectingRef.current = false;
+      isSSEConnectedRef.current = false;
+      batchIdRef.current = null;
     };
-  }, [batchId, accessToken]); // Remove useSSE and handleSSEMessage from deps to prevent re-runs
+  }, [batchId, accessToken]); // Only depend on batchId and accessToken
 
+  // Polling fallback effect
   useEffect(() => {
-    if (useSSE && eventSourceRef.current) {
+    // Skip polling if SSE is connected
+    if (isSSEConnectedRef.current) {
+      // Still fetch initial status once
       fetchStatus();
       return;
     }
 
+    // Polling fallback
     fetchStatus();
     pollRef.current = setInterval(fetchStatus, POLL_INTERVAL);
 
@@ -317,7 +308,7 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
         pollRef.current = null;
       }
     };
-  }, [fetchStatus, useSSE]);
+  }, [fetchStatus]);
 
   const handleCancel = async () => {
     setIsCancelling(true);
@@ -397,7 +388,7 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
               aria-hidden="true" 
             />
             Batch Remediation Progress
-            {useSSE && eventSourceRef.current && (
+            {isSSEConnectedRef.current && eventSourceRef.current && (
               <span className="text-xs text-green-600 flex items-center gap-1">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                 Live
