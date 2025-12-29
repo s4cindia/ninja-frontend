@@ -1133,16 +1133,46 @@ export function getQuickFixTemplate(issueCode: string): QuickFixTemplate | undef
   return quickFixTemplates[normalizedCode];
 }
 
-const BACKEND_HANDLED_FIX_CODES = new Set([
-  'EPUB-STRUCT-002',
-  'EPUB-META-002',
-  'EPUB-META-004',
-  'EPUB-NAV-001',
-  'EPUB-STRUCT-004',
-]);
+export interface BackendFixInfo {
+  title: string;
+  description: string;
+}
+
+const BACKEND_HANDLED_FIX_CODES: Record<string, BackendFixInfo> = {
+  'EPUB-STRUCT-002': { 
+    title: 'Add Table Headers', 
+    description: 'Automatically adds <th> header elements to tables missing proper headers' 
+  },
+  'EPUB-META-002': { 
+    title: 'Add Accessibility Metadata', 
+    description: 'Adds required accessibility metadata to the EPUB package' 
+  },
+  'EPUB-META-004': { 
+    title: 'Add Access Modes', 
+    description: 'Adds accessMode and accessModeSufficient metadata' 
+  },
+  'EPUB-NAV-001': { 
+    title: 'Add Skip Navigation', 
+    description: 'Adds skip navigation links for keyboard users' 
+  },
+  'EPUB-STRUCT-004': { 
+    title: 'Add ARIA Landmarks', 
+    description: 'Adds ARIA landmark roles to improve navigation' 
+  },
+};
+
+function normalizeBackendFixCode(issueCode: string): string {
+  return issueCode.toUpperCase().replace(/_/g, '-');
+}
 
 export function isBackendHandledFixCode(issueCode: string): boolean {
-  return BACKEND_HANDLED_FIX_CODES.has(issueCode.toUpperCase());
+  const normalized = normalizeBackendFixCode(issueCode);
+  return normalized in BACKEND_HANDLED_FIX_CODES;
+}
+
+export function getBackendFixInfo(issueCode: string): BackendFixInfo | undefined {
+  const normalized = normalizeBackendFixCode(issueCode);
+  return BACKEND_HANDLED_FIX_CODES[normalized];
 }
 
 export function hasQuickFixTemplate(issueCode: string): boolean {

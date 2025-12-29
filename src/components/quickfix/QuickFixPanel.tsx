@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Wrench, X, Eye, Play, Edit3, SkipForward, Loader2, CheckCircle, AlertCircle, Zap } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { cn } from '@/utils/cn';
-import { getQuickFixTemplate } from '@/data/quickFixTemplates';
+import { getQuickFixTemplate, getBackendFixInfo } from '@/data/quickFixTemplates';
 import { 
   generateFixPreview, 
   applyQuickFix, 
@@ -15,29 +15,6 @@ import { QuickFixCheckboxGroup } from './QuickFixCheckboxGroup';
 import { QuickFixRadioGroup } from './QuickFixRadioGroup';
 import { QuickFixTextInput } from './QuickFixTextInput';
 import { QuickFixColorPicker } from './QuickFixColorPicker';
-
-const BACKEND_HANDLED_FIX_CODES: Record<string, { title: string; description: string }> = {
-  'EPUB-STRUCT-002': { 
-    title: 'Add Table Headers', 
-    description: 'Automatically adds <th> header elements to tables missing proper headers' 
-  },
-  'EPUB-META-002': { 
-    title: 'Add Accessibility Metadata', 
-    description: 'Adds required accessibility metadata to the EPUB package' 
-  },
-  'EPUB-META-004': { 
-    title: 'Add Access Modes', 
-    description: 'Adds accessMode and accessModeSufficient metadata' 
-  },
-  'EPUB-NAV-001': { 
-    title: 'Add Skip Navigation', 
-    description: 'Adds skip navigation links for keyboard users' 
-  },
-  'EPUB-STRUCT-004': { 
-    title: 'Add ARIA Landmarks', 
-    description: 'Adds ARIA landmark roles to improve navigation' 
-  },
-};
 
 interface QuickFixPanelProps {
   issue: {
@@ -344,7 +321,7 @@ export function QuickFixPanel({
     );
   }
 
-  const backendFixInfo = BACKEND_HANDLED_FIX_CODES[issue.code];
+  const backendFixInfo = getBackendFixInfo(issue.code);
 
   const handleApplyBackendFix = async () => {
     if (!jobId) {
