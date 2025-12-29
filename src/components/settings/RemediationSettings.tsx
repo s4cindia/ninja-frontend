@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Settings, RotateCcw, Loader2, CheckCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Settings, RotateCcw, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
@@ -14,9 +14,18 @@ export function RemediationSettings() {
   const updateMutation = useUpdateRemediationConfig();
   const resetMutation = useResetRemediationConfig();
   const [showSaved, setShowSaved] = useState(false);
+  const [mutationError, setMutationError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (mutationError) {
+      const timer = setTimeout(() => setMutationError(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [mutationError]);
 
   const handleToggleColorContrast = async () => {
     if (!config) return;
+    setMutationError(null);
 
     try {
       await updateMutation.mutateAsync({
@@ -25,16 +34,20 @@ export function RemediationSettings() {
       setShowSaved(true);
       setTimeout(() => setShowSaved(false), 2000);
     } catch (err) {
+      setMutationError('Failed to save setting. Please try again.');
       console.error('Failed to update config:', err);
     }
   };
 
   const handleReset = async () => {
+    setMutationError(null);
+    
     try {
       await resetMutation.mutateAsync();
       setShowSaved(true);
       setTimeout(() => setShowSaved(false), 2000);
     } catch (err) {
+      setMutationError('Failed to reset settings. Please try again.');
       console.error('Failed to reset config:', err);
     }
   };
@@ -71,6 +84,13 @@ export function RemediationSettings() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {mutationError && (
+          <Alert variant="error" className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" />
+            {mutationError}
+          </Alert>
+        )}
+
         <div className="space-y-4">
           <h3 className="text-sm font-medium text-gray-900">Color Contrast Handling</h3>
           

@@ -22,8 +22,22 @@ export function useUpdateRemediationConfig() {
 
   return useMutation({
     mutationFn: (updates: Partial<RemediationConfig>) => updateRemediationConfig(updates),
-    onSuccess: (data) => {
-      queryClient.setQueryData(QUERY_KEY, data);
+    onMutate: async (updates) => {
+      await queryClient.cancelQueries({ queryKey: QUERY_KEY });
+      const previousConfig = queryClient.getQueryData<RemediationConfig>(QUERY_KEY);
+      queryClient.setQueryData<RemediationConfig>(QUERY_KEY, (old) => ({
+        ...(old ?? { colorContrastAutoFix: true }),
+        ...updates,
+      }));
+      return { previousConfig };
+    },
+    onError: (_err, _updates, context) => {
+      if (context?.previousConfig) {
+        queryClient.setQueryData(QUERY_KEY, context.previousConfig);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
     },
   });
 }
@@ -33,8 +47,19 @@ export function useResetRemediationConfig() {
 
   return useMutation({
     mutationFn: resetRemediationConfig,
-    onSuccess: (data) => {
-      queryClient.setQueryData(QUERY_KEY, data);
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: QUERY_KEY });
+      const previousConfig = queryClient.getQueryData<RemediationConfig>(QUERY_KEY);
+      queryClient.setQueryData<RemediationConfig>(QUERY_KEY, { colorContrastAutoFix: true });
+      return { previousConfig };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousConfig) {
+        queryClient.setQueryData(QUERY_KEY, context.previousConfig);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
     },
   });
 }
