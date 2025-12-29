@@ -104,6 +104,96 @@ const mapBatchStatus = (data: Record<string, unknown>): BatchStatus => {
 
 const MAX_RETRIES = 3;
 
+// Module-level SSE manager - persists across StrictMode mount/unmount cycles
+type SSEListener = (data: SSEMessage) => void;
+interface SSEMessage {
+  type: string;
+  jobId?: string;
+  issuesFixed?: number;
+  error?: string;
+  status?: string;
+  summary?: { totalIssuesFixed: number; successRate: number };
+  clientId?: string;
+}
+
+const sseManager = {
+  eventSource: null as EventSource | null,
+  batchId: null as string | null,
+  listeners: new Set<SSEListener>(),
+  isConnecting: false,
+
+  connect(batchId: string, token: string): void {
+    // Already connected to this batch
+    if (this.batchId === batchId && this.eventSource?.readyState === EventSource.OPEN) {
+      console.log('[SSE Manager] Already connected to:', batchId);
+      return;
+    }
+
+    // Already connecting to this batch
+    if (this.isConnecting && this.batchId === batchId) {
+      console.log('[SSE Manager] Already connecting to:', batchId);
+      return;
+    }
+
+    // Close existing connection if different batch
+    if (this.eventSource) {
+      console.log('[SSE Manager] Closing old connection');
+      this.eventSource.close();
+      this.eventSource = null;
+    }
+
+    this.batchId = batchId;
+    this.isConnecting = true;
+
+    const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
+    const sseUrl = `${apiBaseUrl}/sse/batch/${batchId}/progress?token=${encodeURIComponent(token)}`;
+
+    console.log('[SSE Manager] Connecting:', batchId);
+
+    const es = new EventSource(sseUrl);
+    this.eventSource = es;
+
+    es.onopen = () => {
+      console.log('[SSE Manager] OPEN');
+      this.isConnecting = false;
+    };
+
+    es.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data) as SSEMessage;
+        console.log('[SSE Manager] MSG:', data.type);
+        this.listeners.forEach(listener => listener(data));
+      } catch (e) {
+        console.error('[SSE Manager] Parse error:', e);
+      }
+    };
+
+    es.onerror = () => {
+      console.warn('[SSE Manager] Error - readyState:', es.readyState);
+      this.isConnecting = false;
+    };
+  },
+
+  subscribe(listener: SSEListener): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  },
+
+  disconnect(): void {
+    console.log('[SSE Manager] Disconnect');
+    if (this.eventSource) {
+      this.eventSource.close();
+      this.eventSource = null;
+    }
+    this.batchId = null;
+    this.isConnecting = false;
+  },
+
+  isConnected(): boolean {
+    return this.eventSource?.readyState === EventSource.OPEN;
+  },
+};
+
 const formatTimeRemaining = (seconds: number): string => {
   if (seconds < 60) return `${seconds}s`;
   const mins = Math.floor(seconds / 60);
@@ -125,8 +215,7 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const pendingConnectionRef = useRef<string | null>(null);
+  const isMountedRef = useRef(true);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -165,111 +254,69 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
     }
   }, [batchId, onComplete, retryCount]);
 
-  // SSE Connection Effect - NO cleanup to persist across re-renders
+  // SSE Connection via module-level manager
   useEffect(() => {
+    isMountedRef.current = true;
+
     // Skip if no batch or demo
     if (!batchId || batchId.startsWith('demo-') || !accessToken) {
       return;
     }
 
-    // Skip if already connecting/connected to this batch
-    if (pendingConnectionRef.current === batchId) {
-      console.log('[SSE] Already connecting to:', batchId);
-      return;
-    }
+    // Connect using the module-level manager
+    sseManager.connect(batchId, accessToken);
 
-    // Skip if already connected
-    if (eventSourceRef.current && eventSourceRef.current.readyState === EventSource.OPEN) {
-      console.log('[SSE] Already connected');
-      return;
-    }
+    // Subscribe to SSE events with mount guard
+    const unsubscribe = sseManager.subscribe((data) => {
+      if (!isMountedRef.current) return;
 
-    // Close any existing connection
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-
-    // Mark as pending
-    pendingConnectionRef.current = batchId;
-
-    const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
-    const sseUrl = `${apiBaseUrl}/sse/batch/${batchId}/progress?token=${encodeURIComponent(accessToken)}`;
-
-    console.log('[SSE] Connecting:', batchId);
-
-    const es = new EventSource(sseUrl);
-    eventSourceRef.current = es;
-
-    es.onopen = () => {
-      console.log('[SSE] OPEN');
-    };
-
-    es.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.log('[SSE] MSG:', data.type);
-
-        if (data.type === 'job_started') {
-          setBatchStatus(prev => prev ? {
-            ...prev,
-            jobs: prev.jobs.map(j => j.jobId === data.jobId ? { ...j, status: 'processing' as const } : j),
-          } : prev);
-        } else if (data.type === 'job_completed') {
-          setBatchStatus(prev => {
-            if (!prev) return prev;
-            const jobs = prev.jobs.map(j =>
-              j.jobId === data.jobId ? { ...j, status: 'completed' as const, issuesFixed: data.issuesFixed } : j
-            );
-            return { ...prev, jobs, completedJobs: jobs.filter(j => j.status === 'completed').length };
-          });
-        } else if (data.type === 'job_failed') {
-          setBatchStatus(prev => {
-            if (!prev) return prev;
-            const jobs = prev.jobs.map(j =>
-              j.jobId === data.jobId ? { ...j, status: 'failed' as const, error: data.error } : j
-            );
-            return { ...prev, jobs, failedJobs: jobs.filter(j => j.status === 'failed').length };
-          });
-        } else if (data.type === 'batch_completed') {
-          setBatchStatus(prev => prev ? { ...prev, status: data.status, summary: data.summary } : prev);
-        }
-      } catch (e) {
-        console.error('[SSE] Parse error:', e);
+      if (data.type === 'job_started') {
+        setBatchStatus(prev => prev ? {
+          ...prev,
+          jobs: prev.jobs.map(j => j.jobId === data.jobId ? { ...j, status: 'processing' as const } : j),
+        } : prev);
+      } else if (data.type === 'job_completed') {
+        setBatchStatus(prev => {
+          if (!prev) return prev;
+          const jobs = prev.jobs.map(j =>
+            j.jobId === data.jobId ? { ...j, status: 'completed' as const, issuesFixed: data.issuesFixed } : j
+          );
+          return { ...prev, jobs, completedJobs: jobs.filter(j => j.status === 'completed').length };
+        });
+      } else if (data.type === 'job_failed') {
+        setBatchStatus(prev => {
+          if (!prev) return prev;
+          const jobs = prev.jobs.map(j =>
+            j.jobId === data.jobId ? { ...j, status: 'failed' as const, error: data.error } : j
+          );
+          return { ...prev, jobs, failedJobs: jobs.filter(j => j.status === 'failed').length };
+        });
+      } else if (data.type === 'batch_completed') {
+        setBatchStatus(prev => {
+          if (!prev) return prev;
+          return { 
+            ...prev, 
+            status: (data.status as BatchStatus['status']) || 'completed',
+            summary: data.summary || prev.summary
+          };
+        });
       }
-    };
+    });
 
-    es.onerror = () => {
-      console.warn('[SSE] Error - readyState:', es.readyState);
-    };
-
-    // NO cleanup - let the connection persist across re-renders
-    // It will be closed when component truly unmounts via the separate effect below
-  }, [batchId, accessToken]);
-
-  // Cleanup ONLY on true unmount
-  useEffect(() => {
+    // Only unsubscribe on unmount, don't disconnect (let other mounts reuse)
     return () => {
-      console.log('[SSE] Unmount cleanup');
-      pendingConnectionRef.current = null;
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
+      isMountedRef.current = false;
+      unsubscribe();
     };
-  }, []);
+  }, [batchId, accessToken]);
 
   // Polling fallback effect - runs when SSE not connected
   useEffect(() => {
-    // Check if SSE is connected using readyState
-    const sseConnected = eventSourceRef.current && 
-                         eventSourceRef.current.readyState !== EventSource.CLOSED;
-    
     // Always fetch initial status
     fetchStatus();
     
     // Only poll if SSE not connected
-    if (!sseConnected) {
+    if (!sseManager.isConnected()) {
       pollRef.current = setInterval(fetchStatus, POLL_INTERVAL);
     }
 
@@ -359,7 +406,7 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
               aria-hidden="true" 
             />
             Batch Remediation Progress
-            {eventSourceRef.current && eventSourceRef.current.readyState === EventSource.OPEN && (
+            {sseManager.isConnected() && (
               <span className="text-xs text-green-600 flex items-center gap-1">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                 Live
