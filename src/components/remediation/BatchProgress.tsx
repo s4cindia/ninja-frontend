@@ -122,7 +122,9 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
   const [isCancelling, setIsCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [useSSE, setUseSSE] = useState(true);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -161,16 +163,127 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
     }
   }, [batchId, onComplete, retryCount]);
 
+  const handleSSEMessage = useCallback((event: MessageEvent) => {
+    try {
+      const data = JSON.parse(event.data);
+
+      switch (data.type) {
+        case 'connected':
+          console.log('[SSE] Connected:', data.clientId);
+          break;
+
+        case 'job_started':
+          setBatchStatus(prev => {
+            if (!prev) return prev;
+            const updatedJobs = prev.jobs.map(job =>
+              job.jobId === data.jobId
+                ? { ...job, status: 'processing' as const }
+                : job
+            );
+            return { ...prev, jobs: updatedJobs };
+          });
+          break;
+
+        case 'job_completed':
+          setBatchStatus(prev => {
+            if (!prev) return prev;
+            const updatedJobs = prev.jobs.map(job =>
+              job.jobId === data.jobId
+                ? { ...job, status: 'completed' as const, issuesFixed: data.issuesFixed }
+                : job
+            );
+            return {
+              ...prev,
+              jobs: updatedJobs,
+              completedJobs: updatedJobs.filter(j => j.status === 'completed').length,
+            };
+          });
+          break;
+
+        case 'job_failed':
+          setBatchStatus(prev => {
+            if (!prev) return prev;
+            const updatedJobs = prev.jobs.map(job =>
+              job.jobId === data.jobId
+                ? { ...job, status: 'failed' as const, error: data.error }
+                : job
+            );
+            return {
+              ...prev,
+              jobs: updatedJobs,
+              failedJobs: updatedJobs.filter(j => j.status === 'failed').length,
+            };
+          });
+          break;
+
+        case 'batch_completed':
+          setBatchStatus(prev => prev ? {
+            ...prev,
+            status: data.status,
+            summary: data.summary,
+          } : prev);
+          if (onComplete && data.status) {
+            fetchStatus();
+          }
+          break;
+      }
+    } catch (err) {
+      console.error('[SSE] Failed to parse message:', err);
+    }
+  }, [onComplete, fetchStatus]);
+
   useEffect(() => {
+    if (!useSSE || !batchId || batchId.startsWith('demo-')) return;
+
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      console.warn('[SSE] No auth token, falling back to polling');
+      setUseSSE(false);
+      return;
+    }
+
+    try {
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
+      const sseUrl = `${apiBaseUrl}/sse/batch/${batchId}/progress`;
+
+      const eventSource = new EventSource(sseUrl, { withCredentials: true });
+      eventSourceRef.current = eventSource;
+
+      eventSource.onmessage = handleSSEMessage;
+
+      eventSource.onerror = () => {
+        console.warn('[SSE] Connection error, falling back to polling');
+        eventSource.close();
+        eventSourceRef.current = null;
+        setUseSSE(false);
+      };
+
+      return () => {
+        eventSource.close();
+        eventSourceRef.current = null;
+      };
+    } catch (err) {
+      console.warn('[SSE] Failed to connect, falling back to polling:', err);
+      setUseSSE(false);
+    }
+  }, [batchId, useSSE, handleSSEMessage]);
+
+  useEffect(() => {
+    if (useSSE && eventSourceRef.current) {
+      fetchStatus();
+      return;
+    }
+
     fetchStatus();
     pollRef.current = setInterval(fetchStatus, POLL_INTERVAL);
-    
+
     return () => {
       if (pollRef.current) {
         clearInterval(pollRef.current);
+        pollRef.current = null;
       }
     };
-  }, [fetchStatus]);
+  }, [fetchStatus, useSSE]);
 
   const handleCancel = async () => {
     setIsCancelling(true);
@@ -250,6 +363,12 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
               aria-hidden="true" 
             />
             Batch Remediation Progress
+            {useSSE && eventSourceRef.current && (
+              <span className="text-xs text-green-600 flex items-center gap-1">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                Live
+              </span>
+            )}
           </CardTitle>
           {isProcessing && (
             <Button
