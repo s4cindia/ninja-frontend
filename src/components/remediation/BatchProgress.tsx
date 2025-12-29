@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
 import { Alert } from '@/components/ui/Alert';
 import { api } from '@/services/api';
+import { useAuthStore } from '../../stores/auth.store';
 import { 
   Loader2, 
   CheckCircle, 
@@ -117,6 +118,7 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
   onCancel,
   className = '',
 }) => {
+  const { accessToken } = useAuthStore();
   const [batchStatus, setBatchStatus] = useState<BatchStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -235,8 +237,8 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
   useEffect(() => {
     if (!useSSE || !batchId || batchId.startsWith('demo-')) return;
 
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
+    // Use token from Zustand store
+    if (!accessToken) {
       console.warn('[SSE] No auth token available, falling back to polling');
       setUseSSE(false);
       return;
@@ -245,9 +247,9 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
     try {
       const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
       // Pass token as query parameter since EventSource doesn't support headers
-      const sseUrl = `${apiBaseUrl}/sse/batch/${batchId}/progress?token=${encodeURIComponent(token)}`;
+      const sseUrl = `${apiBaseUrl}/sse/batch/${batchId}/progress?token=${encodeURIComponent(accessToken)}`;
 
-      console.log('[SSE] Connecting to:', sseUrl.replace(token, 'TOKEN_HIDDEN'));
+      console.log('[SSE] Connecting to:', sseUrl.replace(accessToken, 'TOKEN_HIDDEN'));
 
       const eventSource = new EventSource(sseUrl);
       eventSourceRef.current = eventSource;
@@ -274,7 +276,7 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
       console.warn('[SSE] Failed to connect, falling back to polling:', err);
       setUseSSE(false);
     }
-  }, [batchId, useSSE, handleSSEMessage]);
+  }, [batchId, useSSE, accessToken, handleSSEMessage]);
 
   useEffect(() => {
     if (useSSE && eventSourceRef.current) {
