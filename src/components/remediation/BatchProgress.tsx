@@ -114,6 +114,8 @@ interface SSEMessage {
   status?: string;
   summary?: { totalIssuesFixed: number; successRate: number };
   clientId?: string;
+  completedJobs?: number;
+  failedJobs?: number;
 }
 
 const sseManager = {
@@ -216,6 +218,12 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
   const [retryCount, setRetryCount] = useState(0);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
+  const onCompleteRef = useRef(onComplete);
+  
+  // Keep onComplete ref in sync with prop
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -294,12 +302,24 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
       } else if (data.type === 'batch_completed') {
         setBatchStatus(prev => {
           if (!prev) return prev;
-          return { 
+          const updated = { 
             ...prev, 
             status: (data.status as BatchStatus['status']) || 'completed',
-            summary: data.summary || prev.summary
+            summary: data.summary || prev.summary,
+            completedJobs: typeof data.completedJobs === 'number' ? data.completedJobs : prev.completedJobs,
+            failedJobs: typeof data.failedJobs === 'number' ? data.failedJobs : prev.failedJobs,
           };
+          
+          // Call onComplete callback via ref
+          if (onCompleteRef.current) {
+            onCompleteRef.current(updated);
+          }
+          
+          return updated;
         });
+        
+        // Close SSE connection when batch is done
+        sseManager.disconnect();
       }
     });
 
@@ -315,16 +335,26 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
     // Always fetch initial status
     fetchStatus();
     
-    // Only poll if SSE not connected
+    // Only start polling if SSE not connected
     if (!sseManager.isConnected()) {
       pollRef.current = setInterval(fetchStatus, POLL_INTERVAL);
     }
+
+    // Check periodically if SSE connected and stop polling
+    const checkSSE = setInterval(() => {
+      if (sseManager.isConnected() && pollRef.current) {
+        console.log('[BatchProgress] SSE connected, stopping polling');
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    }, 1000);
 
     return () => {
       if (pollRef.current) {
         clearInterval(pollRef.current);
         pollRef.current = null;
       }
+      clearInterval(checkSSE);
     };
   }, [fetchStatus]);
 
@@ -387,6 +417,13 @@ export const BatchProgress: React.FC<BatchProgressProps> = ({
               onClick={() => {
                 setError(null);
                 setRetryCount(0);
+                
+                // Clear existing interval before creating new one
+                if (pollRef.current) {
+                  clearInterval(pollRef.current);
+                  pollRef.current = null;
+                }
+                
                 fetchStatus();
                 pollRef.current = setInterval(fetchStatus, POLL_INTERVAL);
               }}
