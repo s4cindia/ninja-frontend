@@ -29,7 +29,7 @@ jobs:
       - name: Build staging bundle
         run: npm run build
         env:
-          VITE_API_URL: http://ninja-alb-staging-823993315.ap-south-1.elb.amazonaws.com
+          VITE_API_URL:  https://d1ruc3qmc844x9.cloudfront.net
           VITE_ENV: staging
 
       - name: Configure AWS credentials
