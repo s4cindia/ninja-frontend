@@ -103,7 +103,14 @@ export function applyQuickFix(
   inputs: Record<string, unknown>,
   context: QuickFixContext
 ): QuickFix {
-  return template.generateFix(inputs, context);
+  const result = template.generateFix(inputs, context);
+  
+  return {
+    issueId: result.issueId ?? context.issueId,
+    targetFile: result.targetFile ?? context.filePath ?? '',
+    changes: result.changes,
+    summary: result.summary,
+  };
 }
 
 export function validateInputs(

@@ -9,8 +9,9 @@ import {
 import { RemediationTaskCard } from './RemediationTaskCard';
 import { applyQuickFixToEpub } from '@/services/quickfix.service';
 import { hasQuickFixTemplate } from '@/data/quickFixTemplates';
-import type { RemediationTask, QuickFixResult, RemediationSession } from '@/types/remediation.types';
+import type { RemediationTask, RemediationSession } from '@/types/remediation.types';
 import type { AccessibilityIssue } from '@/types/accessibility.types';
+import type { QuickFix } from '@/types/quickfix.types';
 
 interface RemediationSessionViewProps {
   jobId: string;
@@ -44,19 +45,24 @@ export const RemediationSessionView: React.FC<RemediationSessionViewProps> = ({
     pending: tasks.filter(t => t.status === 'pending').length,
   };
 
-  const handleApplyFix = useCallback(async (taskId: string, result: QuickFixResult) => {
+  const handleApplyFix = useCallback(async (taskId: string, fix: QuickFix) => {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
 
     try {
-      await applyQuickFixToEpub(jobId, task.issue.id || taskId, result.changes);
+      await applyQuickFixToEpub(jobId, task.issue.id || taskId, fix.changes);
 
       setTasks(prev => prev.map(t =>
         t.id === taskId
           ? {
               ...t,
               status: 'fixed',
-              fixApplied: result,
+              fixApplied: {
+                templateId: fix.issueId,
+                values: {},
+                changes: fix.changes,
+                appliedAt: new Date().toISOString(),
+              },
               fixedAt: new Date().toISOString(),
               fixedBy: 'quickfix',
             }
@@ -71,7 +77,7 @@ export const RemediationSessionView: React.FC<RemediationSessionViewProps> = ({
     }
   }, [jobId, tasks]);
 
-  const handleSkip = useCallback((taskId: string, reason?: string) => {
+  const handleSkip = useCallback(async (taskId: string, reason?: string): Promise<void> => {
     setTasks(prev => prev.map(t =>
       t.id === taskId
         ? { ...t, status: 'skipped', notes: reason }
@@ -196,8 +202,8 @@ export const RemediationSessionView: React.FC<RemediationSessionViewProps> = ({
             key={task.id}
             task={task}
             jobId={jobId}
-            onApplyFix={handleApplyFix}
-            onSkip={handleSkip}
+            onQuickFixApply={handleApplyFix}
+            onSkipTask={handleSkip}
             onEditManually={handleEditManually}
             isExpanded={expandedTaskId === task.id}
             onToggleExpand={() => setExpandedTaskId(
