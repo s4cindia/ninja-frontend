@@ -5,6 +5,7 @@ import { Progress } from '../ui/Progress';
 import { Alert } from '../ui/Alert';
 import { cn } from '@/utils/cn';
 import { api } from '@/services/api';
+import { uploadService } from '@/services/upload.service';
 
 type UploadState = 'idle' | 'uploading' | 'auditing' | 'complete' | 'error';
 
@@ -104,43 +105,43 @@ export const EPUBUploader: React.FC<EPUBUploaderProps> = ({
     setProgress(0);
     setError(null);
 
-    let progressInterval: ReturnType<typeof setInterval> | null = null;
-
     try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-
-      progressInterval = setInterval(() => {
-        setProgress(prev => Math.min(prev + 10, 90));
-      }, 200);
-
-      const response = await api.post('/epub/audit-upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+      const { fileId } = await uploadService.uploadFile(selectedFile, (uploadProgress) => {
+        setProgress(Math.round(uploadProgress.percentage * 0.8));
       });
 
-      if (progressInterval) {
-        clearInterval(progressInterval);
-        progressInterval = null;
-      }
-      setProgress(95);
+      setProgress(85);
       setState('auditing');
 
-      const result: AuditSummary = response.data.data || response.data;
-      result.fileName = result.fileName || selectedFile.name;
+      const response = await api.post('/jobs', {
+        fileId,
+        type: 'EPUB_ACCESSIBILITY',
+      });
+
       setProgress(100);
       setState('complete');
+
+      const jobData = response.data.data || response.data;
+      const result: AuditSummary = {
+        jobId: jobData.id || jobData.jobId,
+        fileName: selectedFile.name,
+        epubVersion: jobData.epubVersion || '3.0',
+        isValid: jobData.isValid ?? true,
+        accessibilityScore: jobData.accessibilityScore || jobData.score || 0,
+        issuesSummary: jobData.issuesSummary || {
+          total: 0,
+          critical: 0,
+          serious: 0,
+          moderate: 0,
+          minor: 0,
+        },
+      };
       onUploadComplete?.(result);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Upload failed';
       setError(errorMessage);
       setState('error');
       onError?.(errorMessage);
-    } finally {
-      if (progressInterval) {
-        clearInterval(progressInterval);
-      }
     }
   };
 
