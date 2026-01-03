@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Upload, FileText, CheckCircle, AlertCircle, Loader2, X } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Progress } from '../ui/Progress';
@@ -6,8 +6,9 @@ import { Alert } from '../ui/Alert';
 import { cn } from '@/utils/cn';
 import { api } from '@/services/api';
 import { uploadService } from '@/services/upload.service';
+import { useJobPolling, JobData } from '@/hooks/useJobPolling';
 
-type UploadState = 'idle' | 'uploading' | 'auditing' | 'complete' | 'error';
+type UploadState = 'idle' | 'uploading' | 'queued' | 'processing' | 'complete' | 'error';
 
 interface AuditSummary {
   jobId: string;
@@ -41,6 +42,51 @@ export const EPUBUploader: React.FC<EPUBUploaderProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileNameRef = useRef<string>('');
+
+  const handleJobComplete = useCallback((jobData: JobData) => {
+    setState('complete');
+    setProgress(100);
+    
+    const output = jobData.output || {};
+    const result: AuditSummary = {
+      jobId: jobData.id,
+      fileName: fileNameRef.current,
+      epubVersion: (output.epubVersion as string) || '3.0',
+      isValid: (output.isValid as boolean) ?? true,
+      accessibilityScore: (output.accessibilityScore as number) || (output.score as number) || 0,
+      issuesSummary: (output.issuesSummary as AuditSummary['issuesSummary']) || {
+        total: 0,
+        critical: 0,
+        serious: 0,
+        moderate: 0,
+        minor: 0,
+      },
+    };
+    onUploadComplete?.(result);
+  }, [onUploadComplete]);
+
+  const handleJobError = useCallback((errorMsg: string) => {
+    setState('error');
+    setError(errorMsg);
+    onError?.(errorMsg);
+  }, [onError]);
+
+  const { status: jobStatus, startPolling } = useJobPolling({
+    interval: 2000,
+    onComplete: handleJobComplete,
+    onError: handleJobError,
+  });
+
+  useEffect(() => {
+    if (jobStatus === 'QUEUED') {
+      setState('queued');
+      setProgress(88);
+    } else if (jobStatus === 'PROCESSING') {
+      setState('processing');
+      setProgress(92);
+    }
+  }, [jobStatus]);
 
   const validateFile = (file: File): string | null => {
     if (!file.name.toLowerCase().endsWith('.epub')) {
@@ -104,6 +150,7 @@ export const EPUBUploader: React.FC<EPUBUploaderProps> = ({
     setState('uploading');
     setProgress(0);
     setError(null);
+    fileNameRef.current = selectedFile.name;
 
     try {
       const { fileId } = await uploadService.uploadFile(selectedFile, (uploadProgress) => {
@@ -111,31 +158,20 @@ export const EPUBUploader: React.FC<EPUBUploaderProps> = ({
       });
 
       setProgress(85);
-      setState('auditing');
+      setState('queued');
 
       const response = await api.post('/epub/audit-file', {
         fileId,
       });
 
-      setProgress(100);
-      setState('complete');
+      const responseData = response.data.data || response.data;
+      const jobId = responseData.jobId || responseData.id;
 
-      const jobData = response.data.data || response.data;
-      const result: AuditSummary = {
-        jobId: jobData.id || jobData.jobId,
-        fileName: selectedFile.name,
-        epubVersion: jobData.epubVersion || '3.0',
-        isValid: jobData.isValid ?? true,
-        accessibilityScore: jobData.accessibilityScore || jobData.score || 0,
-        issuesSummary: jobData.issuesSummary || {
-          total: 0,
-          critical: 0,
-          serious: 0,
-          moderate: 0,
-          minor: 0,
-        },
-      };
-      onUploadComplete?.(result);
+      if (jobId) {
+        startPolling(jobId);
+      } else {
+        throw new Error('No job ID returned from audit endpoint');
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Upload failed';
       setError(errorMessage);
@@ -169,7 +205,7 @@ export const EPUBUploader: React.FC<EPUBUploaderProps> = ({
           isDragging && 'border-primary-500 bg-primary-100',
           selectedFile && 'border-primary-300 bg-primary-50',
           state === 'error' && 'border-red-300 bg-red-50',
-          (state === 'uploading' || state === 'auditing') && 'pointer-events-none opacity-75'
+          (state === 'uploading' || state === 'queued' || state === 'processing') && 'pointer-events-none opacity-75'
         )}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
@@ -224,19 +260,21 @@ export const EPUBUploader: React.FC<EPUBUploaderProps> = ({
           </div>
         )}
 
-        {(state === 'uploading' || state === 'auditing') && (
+        {(state === 'uploading' || state === 'queued' || state === 'processing') && (
           <div className="space-y-4">
             <Loader2 className="h-12 w-12 mx-auto text-primary-600 animate-spin" />
             <p className="font-medium text-gray-900">
-              {state === 'uploading' ? 'Uploading EPUB...' : 'Running accessibility audit...'}
+              {state === 'uploading' && 'Uploading EPUB...'}
+              {state === 'queued' && 'Audit queued...'}
+              {state === 'processing' && 'Running accessibility audit...'}
             </p>
             <div className="max-w-xs mx-auto">
               <Progress value={progress} showLabel />
             </div>
             <p className="text-sm text-gray-500">
-              {state === 'auditing' 
-                ? 'Analyzing document structure and accessibility features' 
-                : 'Please wait while your file is being uploaded'}
+              {state === 'uploading' && 'Please wait while your file is being uploaded'}
+              {state === 'queued' && 'Your audit is in the queue and will start shortly'}
+              {state === 'processing' && 'Analyzing document structure and accessibility features'}
             </p>
           </div>
         )}
