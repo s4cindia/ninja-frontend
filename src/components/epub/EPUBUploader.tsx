@@ -113,9 +113,8 @@ export const EPUBUploader: React.FC<EPUBUploaderProps> = ({
       setProgress(85);
       setState('auditing');
 
-      const response = await api.post('/jobs', {
+      const response = await api.post('/epub/audit-file', {
         fileId,
-        type: 'EPUB_ACCESSIBILITY',
       });
 
       setProgress(100);
