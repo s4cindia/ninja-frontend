@@ -1,4 +1,5 @@
 import { api } from './api';
+import { AxiosError } from 'axios';
 
 interface PresignedUploadResponse {
   uploadUrl: string;
@@ -11,6 +12,18 @@ interface UploadProgress {
   loaded: number;
   total: number;
   percentage: number;
+}
+
+interface DirectUploadResponse {
+  jobId: string;
+  fileId?: string;
+}
+
+interface UploadResult {
+  fileId: string;
+  fileKey: string;
+  jobId?: string;
+  uploadMethod: 's3' | 'direct';
 }
 
 type ProgressCallback = (progress: UploadProgress) => void;
@@ -59,10 +72,6 @@ class UploadService {
         reject(new Error('Upload failed due to network error'));
       });
 
-      xhr.addEventListener('abort', () => {
-        reject(new Error('Upload was aborted'));
-      });
-
       xhr.open('PUT', presignedUrl);
       xhr.setRequestHeader('Content-Type', file.type || 'application/epub+zip');
       xhr.send(file);
@@ -73,23 +82,77 @@ class UploadService {
     await api.post(`/uploads/${fileId}/confirm`);
   }
 
+  async uploadDirect(
+    file: File,
+    onProgress?: ProgressCallback
+  ): Promise<DirectUploadResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await api.post('/epub/audit-upload', formData, {
+      headers: { 'Content-Type': undefined },
+      onUploadProgress: (event) => {
+        if (event.total && onProgress) {
+          onProgress({
+            loaded: event.loaded,
+            total: event.total,
+            percentage: Math.round((event.loaded / event.total) * 100),
+          });
+        }
+      },
+    });
+
+    return {
+      jobId: response.data.data?.jobId || response.data.jobId,
+      fileId: response.data.data?.fileId,
+    };
+  }
+
   async uploadFile(
     file: File,
     onProgress?: ProgressCallback
-  ): Promise<{ fileId: string; fileKey: string }> {
-    const presigned = await this.getPresignedUrl(
-      file.name,
-      file.size,
-      file.type || 'application/epub+zip'
-    );
+  ): Promise<UploadResult> {
+    let presigned: PresignedUploadResponse | null = null;
+
+    try {
+      presigned = await this.getPresignedUrl(
+        file.name,
+        file.size,
+        file.type || 'application/epub+zip'
+      );
+    } catch (error) {
+      const axiosError = error as AxiosError<{ error?: { code?: string; message?: string } }>;
+      const errorCode = axiosError.response?.data?.error?.code;
+      const errorMessage = axiosError.response?.data?.error?.message || '';
+
+      const isS3ConfigError =
+        axiosError.response?.status === 500 &&
+        (errorCode === 'S3_NOT_CONFIGURED' ||
+         errorMessage.includes('credentials') ||
+         errorMessage.includes('S3') ||
+         errorMessage.includes('presign'));
+
+      if (isS3ConfigError) {
+        console.warn('S3 not configured, using direct upload');
+        const result = await this.uploadDirect(file, onProgress);
+        return {
+          fileId: result.fileId || result.jobId,
+          fileKey: result.jobId,  // For direct upload, jobId serves as the file reference
+          jobId: result.jobId,
+          uploadMethod: 'direct' as const,
+        };
+      }
+
+      throw error;
+    }
 
     await this.uploadToS3(presigned.uploadUrl, file, onProgress);
-
     await this.confirmUpload(presigned.fileId);
 
     return {
       fileId: presigned.fileId,
       fileKey: presigned.fileKey,
+      uploadMethod: 's3' as const,
     };
   }
 
