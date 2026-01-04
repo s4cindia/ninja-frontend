@@ -89,6 +89,7 @@ class UploadService {
     formData.append('file', file);
 
     const response = await api.post('/epub/audit-upload', formData, {
+      headers: { 'Content-Type': undefined },
       onUploadProgress: (event) => {
         if (event.total && onProgress) {
           onProgress({
