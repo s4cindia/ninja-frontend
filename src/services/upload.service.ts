@@ -13,6 +13,11 @@ interface UploadProgress {
   percentage: number;
 }
 
+interface DirectUploadResponse {
+  jobId: string;
+  fileId?: string;
+}
+
 type ProgressCallback = (progress: UploadProgress) => void;
 
 class UploadService {
@@ -59,10 +64,6 @@ class UploadService {
         reject(new Error('Upload failed due to network error'));
       });
 
-      xhr.addEventListener('abort', () => {
-        reject(new Error('Upload was aborted'));
-      });
-
       xhr.open('PUT', presignedUrl);
       xhr.setRequestHeader('Content-Type', file.type || 'application/epub+zip');
       xhr.send(file);
@@ -73,24 +74,59 @@ class UploadService {
     await api.post(`/uploads/${fileId}/confirm`);
   }
 
+  async uploadDirect(
+    file: File,
+    onProgress?: ProgressCallback
+  ): Promise<DirectUploadResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await api.post('/epub/audit-buffer', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: (event) => {
+        if (event.total && onProgress) {
+          onProgress({
+            loaded: event.loaded,
+            total: event.total,
+            percentage: Math.round((event.loaded / event.total) * 100),
+          });
+        }
+      },
+    });
+
+    return {
+      jobId: response.data.data?.jobId || response.data.jobId,
+      fileId: response.data.data?.fileId,
+    };
+  }
+
   async uploadFile(
     file: File,
     onProgress?: ProgressCallback
   ): Promise<{ fileId: string; fileKey: string }> {
-    const presigned = await this.getPresignedUrl(
-      file.name,
-      file.size,
-      file.type || 'application/epub+zip'
-    );
+    try {
+      const presigned = await this.getPresignedUrl(
+        file.name,
+        file.size,
+        file.type || 'application/epub+zip'
+      );
 
-    await this.uploadToS3(presigned.uploadUrl, file, onProgress);
+      await this.uploadToS3(presigned.uploadUrl, file, onProgress);
+      await this.confirmUpload(presigned.fileId);
 
-    await this.confirmUpload(presigned.fileId);
+      return {
+        fileId: presigned.fileId,
+        fileKey: presigned.fileKey,
+      };
+    } catch (error) {
+      console.warn('S3 upload failed, falling back to direct upload:', error);
 
-    return {
-      fileId: presigned.fileId,
-      fileKey: presigned.fileKey,
-    };
+      const result = await this.uploadDirect(file, onProgress);
+      return {
+        fileId: result.fileId || result.jobId,
+        fileKey: result.jobId,
+      };
+    }
   }
 
   async getDownloadUrl(fileId: string): Promise<string> {
