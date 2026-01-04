@@ -153,19 +153,24 @@ export const EPUBUploader: React.FC<EPUBUploaderProps> = ({
     fileNameRef.current = selectedFile.name;
 
     try {
-      const { fileId } = await uploadService.uploadFile(selectedFile, (uploadProgress) => {
+      const uploadResult = await uploadService.uploadFile(selectedFile, (uploadProgress) => {
         setProgress(Math.round(uploadProgress.percentage * 0.8));
       });
 
       setProgress(85);
       setState('queued');
 
-      const response = await api.post('/epub/audit-file', {
-        fileId,
-      });
+      let jobId: string;
 
-      const responseData = response.data.data || response.data;
-      const jobId = responseData.jobId || responseData.id;
+      if (uploadResult.uploadMethod === 'direct' && uploadResult.jobId) {
+        jobId = uploadResult.jobId;
+      } else {
+        const response = await api.post('/epub/audit-file', {
+          fileId: uploadResult.fileId,
+        });
+        const responseData = response.data.data || response.data;
+        jobId = responseData.jobId || responseData.id;
+      }
 
       if (jobId) {
         startPolling(jobId);

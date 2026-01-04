@@ -18,6 +18,13 @@ interface DirectUploadResponse {
   fileId?: string;
 }
 
+interface UploadResult {
+  fileId: string;
+  fileKey: string;
+  jobId?: string;
+  uploadMethod: 's3' | 'direct';
+}
+
 type ProgressCallback = (progress: UploadProgress) => void;
 
 class UploadService {
@@ -82,7 +89,6 @@ class UploadService {
     formData.append('file', file);
 
     const response = await api.post('/epub/audit-buffer', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress: (event) => {
         if (event.total && onProgress) {
           onProgress({
@@ -100,10 +106,22 @@ class UploadService {
     };
   }
 
+  private isS3ConfigError(error: unknown): boolean {
+    const axiosError = error as { response?: { status?: number; data?: { message?: string } } };
+    const status = axiosError?.response?.status;
+    const message = axiosError?.response?.data?.message || '';
+
+    return status === 500 && (
+      message.includes('credentials') ||
+      message.includes('S3') ||
+      message.includes('presign')
+    );
+  }
+
   async uploadFile(
     file: File,
     onProgress?: ProgressCallback
-  ): Promise<{ fileId: string; fileKey: string }> {
+  ): Promise<UploadResult> {
     try {
       const presigned = await this.getPresignedUrl(
         file.name,
@@ -117,14 +135,21 @@ class UploadService {
       return {
         fileId: presigned.fileId,
         fileKey: presigned.fileKey,
+        uploadMethod: 's3',
       };
     } catch (error) {
-      console.warn('S3 upload failed, falling back to direct upload:', error);
+      if (!this.isS3ConfigError(error)) {
+        throw error;
+      }
+
+      console.warn('S3 not configured, using direct upload:', error);
 
       const result = await this.uploadDirect(file, onProgress);
       return {
         fileId: result.fileId || result.jobId,
         fileKey: result.jobId,
+        jobId: result.jobId,
+        uploadMethod: 'direct',
       };
     }
   }
