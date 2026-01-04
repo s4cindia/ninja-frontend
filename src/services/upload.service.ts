@@ -1,4 +1,5 @@
 import { api } from './api';
+import { AxiosError } from 'axios';
 
 interface PresignedUploadResponse {
   uploadUrl: string;
@@ -120,32 +121,39 @@ class UploadService {
         file.type || 'application/epub+zip'
       );
     } catch (error) {
-      const axiosError = error as { response?: { status?: number } };
-      if (axiosError?.response?.status === 500) {
-        console.warn('Presign failed (500), using direct upload');
+      const axiosError = error as AxiosError<{ error?: { code?: string; message?: string } }>;
+      const errorCode = axiosError.response?.data?.error?.code;
+      const errorMessage = axiosError.response?.data?.error?.message || '';
+
+      const isS3ConfigError =
+        axiosError.response?.status === 500 &&
+        (errorCode === 'S3_NOT_CONFIGURED' ||
+         errorMessage.includes('credentials') ||
+         errorMessage.includes('S3') ||
+         errorMessage.includes('presign'));
+
+      if (isS3ConfigError) {
+        console.warn('S3 not configured, using direct upload');
         const result = await this.uploadDirect(file, onProgress);
         return {
           fileId: result.fileId || result.jobId,
-          fileKey: result.jobId,
+          fileKey: result.jobId,  // For direct upload, jobId serves as the file reference
           jobId: result.jobId,
-          uploadMethod: 'direct',
+          uploadMethod: 'direct' as const,
         };
       }
+
       throw error;
     }
 
-    try {
-      await this.uploadToS3(presigned.uploadUrl, file, onProgress);
-      await this.confirmUpload(presigned.fileId);
+    await this.uploadToS3(presigned.uploadUrl, file, onProgress);
+    await this.confirmUpload(presigned.fileId);
 
-      return {
-        fileId: presigned.fileId,
-        fileKey: presigned.fileKey,
-        uploadMethod: 's3',
-      };
-    } catch (error) {
-      throw error;
-    }
+    return {
+      fileId: presigned.fileId,
+      fileKey: presigned.fileKey,
+      uploadMethod: 's3' as const,
+    };
   }
 
   async getDownloadUrl(fileId: string): Promise<string> {
