@@ -357,7 +357,7 @@ export const EPUBAccessibility: React.FC = () => {
         </Card>
       )}
 
-      {isJobProcessing && !auditResult && (
+      {isJobProcessing && !auditResult && jobIdParam && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-3" />
@@ -366,7 +366,7 @@ export const EPUBAccessibility: React.FC = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => loadJobAuditResult(jobIdParam!)}
+              onClick={() => loadJobAuditResult(jobIdParam)}
               className="mt-4"
             >
               Check Status
