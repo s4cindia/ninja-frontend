@@ -31,7 +31,8 @@ export interface FileStats {
 export const filesService = {
   async list(params?: { page?: number; limit?: number; status?: string }): Promise<FilesListResponse> {
     const response = await api.get<ApiResponse<FilesListResponse>>('/files', { params });
-    return response.data.data;
+    const { files, pagination } = response.data.data;
+    return { files, pagination };
   },
 
   async get(id: string): Promise<FileItem> {
@@ -42,11 +43,9 @@ export const filesService = {
   async upload(file: File): Promise<FileItem> {
     const formData = new FormData();
     formData.append('file', file);
-    
+
     const response = await api.post<ApiResponse<FileItem>>('/files/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+      headers: { 'Content-Type': undefined },
     });
     return response.data.data;
   },
