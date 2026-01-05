@@ -51,6 +51,8 @@ jobs:
       - name: Build production bundle
         run: npm run build
         env:
+          # TODO: Update with production CloudFront URL when available.
+          # Do NOT use ALB or API Gateway URLs directly - they cause CORS issues.
           VITE_API_URL: http://ninja-alb-prod-1427017841.ap-south-1.elb.amazonaws.com
           VITE_ENV: production
 
