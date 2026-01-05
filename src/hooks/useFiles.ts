@@ -46,3 +46,14 @@ export function useDeleteFile() {
     },
   });
 }
+
+export function useTriggerAudit() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (fileId: string) => filesService.triggerAudit(fileId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['files'] });
+    },
+  });
+}

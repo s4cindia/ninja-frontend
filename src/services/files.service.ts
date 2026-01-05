@@ -58,4 +58,9 @@ export const filesService = {
     const response = await api.get<ApiResponse<FileStats>>('/files/stats');
     return response.data.data;
   },
+
+  async triggerAudit(fileId: string): Promise<{ jobId: string; fileId: string; status: string }> {
+    const response = await api.post(`/files/${fileId}/audit`);
+    return response.data.data;
+  },
 };
