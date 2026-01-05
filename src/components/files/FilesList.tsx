@@ -1,6 +1,8 @@
 import { FileText, Trash2, Eye, Clock, CheckCircle, XCircle, Loader2, PlayCircle } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { isEpubFile } from '../../utils/fileUtils';
 import { Button } from '../ui/Button';
+import { Checkbox } from '../ui/Checkbox';
 import type { FileItem } from '../../services/files.service';
 
 type FileStatus = 'UPLOADED' | 'PROCESSING' | 'PROCESSED' | 'ERROR';
@@ -12,6 +14,9 @@ interface FilesListProps {
   onDelete?: (file: FileItem) => void;
   onAudit?: (file: FileItem) => void;
   emptyMessage?: string;
+  selectable?: boolean;
+  selectedIds?: string[];
+  onSelectionChange?: (selectedIds: string[]) => void;
 }
 
 const statusConfig: Record<FileStatus, { icon: React.ElementType; color: string; label: string }> = {
@@ -69,7 +74,29 @@ export function FilesList({
   onDelete,
   onAudit,
   emptyMessage = 'No files uploaded yet',
+  selectable = false,
+  selectedIds = [],
+  onSelectionChange,
 }: FilesListProps) {
+  const allSelected = files.length > 0 && selectedIds.length === files.length;
+  const someSelected = selectedIds.length > 0 && selectedIds.length < files.length;
+
+  const handleSelectAll = (checked: boolean) => {
+    if (onSelectionChange) {
+      onSelectionChange(checked ? files.map(f => f.id) : []);
+    }
+  };
+
+  const handleSelectOne = (fileId: string, checked: boolean) => {
+    if (onSelectionChange) {
+      if (checked) {
+        onSelectionChange([...selectedIds, fileId]);
+      } else {
+        onSelectionChange(selectedIds.filter(id => id !== fileId));
+      }
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -93,6 +120,16 @@ export function FilesList({
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
+            {selectable && (
+              <th scope="col" className="px-4 py-3 w-10">
+                <Checkbox
+                  checked={allSelected}
+                  indeterminate={someSelected}
+                  onChange={handleSelectAll}
+                  aria-label="Select all files"
+                />
+              </th>
+            )}
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               File
             </th>
@@ -115,7 +152,22 @@ export function FilesList({
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           {files.map((file) => (
-            <tr key={file.id} className="hover:bg-gray-50">
+            <tr
+              key={file.id}
+              className={cn(
+                'hover:bg-gray-50',
+                selectable && selectedIds.includes(file.id) && 'bg-primary-50'
+              )}
+            >
+              {selectable && (
+                <td className="px-4 py-4">
+                  <Checkbox
+                    checked={selectedIds.includes(file.id)}
+                    onChange={(checked) => handleSelectOne(file.id, checked)}
+                    aria-label={`Select ${file.originalName}`}
+                  />
+                </td>
+              )}
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="flex items-center">
                   <FileText className="h-5 w-5 text-gray-400 mr-3" aria-hidden="true" />
@@ -140,7 +192,7 @@ export function FilesList({
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <div className="flex items-center justify-end gap-2">
-                  {onAudit && file.status === 'UPLOADED' && file.mimeType.includes('epub') && (
+                  {onAudit && (file.status === 'UPLOADED' || file.status === 'PROCESSED') && isEpubFile(file) && (
                     <Button
                       variant="ghost"
                       size="sm"

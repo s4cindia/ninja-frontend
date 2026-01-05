@@ -9,6 +9,7 @@ export interface FileItem {
   status: 'UPLOADED' | 'PROCESSING' | 'PROCESSED' | 'ERROR';
   createdAt: string;
   updatedAt: string;
+  latestJobId?: string;
 }
 
 export interface FilesListResponse {
@@ -70,6 +71,21 @@ export const filesService = {
 
   async triggerAudit(fileId: string): Promise<{ jobId: string; fileId: string; status: string }> {
     const response = await api.post(`/files/${fileId}/audit`);
+    return response.data.data;
+  },
+
+  async bulkDelete(fileIds: string[]): Promise<{ deleted: number; failed: number; errors?: Array<{ fileId: string; error: string }> }> {
+    const response = await api.post('/files/bulk/delete', { fileIds });
+    return response.data.data;
+  },
+
+  async bulkAudit(fileIds: string[]): Promise<{ total: number; successful: number; failed: number; results: Array<{ fileId: string; jobId?: string; error?: string }> }> {
+    const response = await api.post('/files/bulk/audit', { fileIds });
+    return response.data.data;
+  },
+
+  async getFileArtifacts(fileId: string): Promise<Array<{ id: string; type: string; name: string; createdAt: string; data: unknown }>> {
+    const response = await api.get(`/files/${fileId}/artifacts`);
     return response.data.data;
   },
 };
