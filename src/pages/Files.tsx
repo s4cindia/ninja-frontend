@@ -44,7 +44,11 @@ export function Files() {
   };
 
   const handleView = (file: FileItem) => {
-    navigate(`/validation/${file.id}`);
+    if (file.latestJobId) {
+      navigate(`/epub?jobId=${file.latestJobId}`);
+    } else {
+      navigate(`/validation/${file.id}`);
+    }
   };
 
   const handleDelete = async (file: FileItem) => {

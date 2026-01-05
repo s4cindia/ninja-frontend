@@ -9,6 +9,7 @@ export interface FileItem {
   status: 'UPLOADED' | 'PROCESSING' | 'PROCESSED' | 'ERROR';
   createdAt: string;
   updatedAt: string;
+  latestJobId?: string;
 }
 
 export interface FilesListResponse {
