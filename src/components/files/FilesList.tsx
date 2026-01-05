@@ -13,6 +13,7 @@ interface FilesListProps {
   onView?: (file: FileItem) => void;
   onDelete?: (file: FileItem) => void;
   onAudit?: (file: FileItem) => void;
+  onRowClick?: (file: FileItem) => void;
   emptyMessage?: string;
   selectable?: boolean;
   selectedIds?: string[];
@@ -73,6 +74,7 @@ export function FilesList({
   onView,
   onDelete,
   onAudit,
+  onRowClick,
   emptyMessage = 'No files uploaded yet',
   selectable = false,
   selectedIds = [],
@@ -156,11 +158,13 @@ export function FilesList({
               key={file.id}
               className={cn(
                 'hover:bg-gray-50',
+                onRowClick && 'cursor-pointer',
                 selectable && selectedIds.includes(file.id) && 'bg-primary-50'
               )}
+              onClick={() => onRowClick?.(file)}
             >
               {selectable && (
-                <td className="px-4 py-4">
+                <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                   <Checkbox
                     checked={selectedIds.includes(file.id)}
                     onChange={(checked: boolean) => handleSelectOne(file.id, checked)}
@@ -191,7 +195,7 @@ export function FilesList({
                 {formatDate(file.createdAt)}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <div className="flex items-center justify-end gap-2">
+                <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                   {onAudit && (file.status === 'UPLOADED' || file.status === 'PROCESSED') && isEpubFile(file) && (
                     <Button
                       variant="ghost"
