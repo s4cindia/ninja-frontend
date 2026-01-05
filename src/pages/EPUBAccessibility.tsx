@@ -6,6 +6,7 @@ import { EPUBAuditResults, AuditResult, AuditIssue } from '@/components/epub/EPU
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { api } from '@/services/api';
 
@@ -89,19 +90,29 @@ export const EPUBAccessibility: React.FC = () => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
   const [isLoadingJob, setIsLoadingJob] = useState(false);
+  const [jobLoadError, setJobLoadError] = useState<string | null>(null);
+
+  const jobIdParam = searchParams.get('jobId');
 
   useEffect(() => {
-    const jobId = searchParams.get('jobId');
-    if (jobId && !auditResult) {
-      loadJobAuditResult(jobId);
+    if (jobIdParam && !auditResult) {
+      loadJobAuditResult(jobIdParam);
     }
-  }, [searchParams]);
+  }, [jobIdParam]);
 
   const loadJobAuditResult = async (jobId: string) => {
     setIsLoadingJob(true);
+    setJobLoadError(null);
+
     try {
       const response = await api.get(`/epub/job/${jobId}/audit/result`);
       const data = response.data.data || response.data;
+
+      if (data.status === 'PROCESSING') {
+        setJobLoadError('Audit is still processing. Please wait...');
+        setIsLoadingJob(false);
+        return;
+      }
 
       const apiIssues = data.combinedIssues || data.issues || [];
       const calculatedSummary = {
@@ -135,11 +146,12 @@ export const EPUBAccessibility: React.FC = () => {
       };
       setAuditResult(fullResult);
       setIsDemo(false);
-    } catch (error) {
-      console.error('[EPUBAccessibility] Failed to load job audit result:', error);
-      setUploadError('Failed to load audit results. Please try again.');
-    } finally {
       setIsLoadingJob(false);
+    } catch (error) {
+      setIsLoadingJob(false);
+      const message = error instanceof Error ? error.message : 'Failed to load audit results';
+      setJobLoadError(message);
+      console.error('[EPUBAccessibility] Failed to load job audit result:', error);
     }
   };
 
@@ -332,16 +344,36 @@ export const EPUBAccessibility: React.FC = () => {
         </Alert>
       )}
 
-      {isLoadingJob ? (
+      {isLoadingJob && (
         <Card>
           <CardContent className="py-12">
-            <div className="flex flex-col items-center justify-center gap-4">
+            <div className="flex items-center justify-center gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
-              <p className="text-gray-600">Loading audit results...</p>
+              <span className="text-gray-600">Loading audit results...</span>
             </div>
           </CardContent>
         </Card>
-      ) : !auditResult ? (
+      )}
+
+      {jobLoadError && !auditResult && (
+        <Alert variant="warning">
+          <div className="flex items-center justify-between">
+            <span>{jobLoadError}</span>
+            {jobLoadError.includes('processing') && jobIdParam && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => loadJobAuditResult(jobIdParam)}
+                className="ml-2"
+              >
+                Refresh
+              </Button>
+            )}
+          </div>
+        </Alert>
+      )}
+
+      {!auditResult && !isLoadingJob && !jobLoadError ? (
         <Card>
           <CardHeader>
             <CardTitle>Upload EPUB</CardTitle>
@@ -356,7 +388,7 @@ export const EPUBAccessibility: React.FC = () => {
             />
           </CardContent>
         </Card>
-      ) : (
+      ) : auditResult ? (
         <EPUBAuditResults
           result={auditResult}
           onCreateRemediationPlan={handleCreateRemediationPlan}
@@ -364,7 +396,7 @@ export const EPUBAccessibility: React.FC = () => {
           isCreatingPlan={isCreatingPlan}
           isDownloading={isDownloading}
         />
-      )}
+      ) : null}
     </div>
   );
 };
