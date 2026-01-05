@@ -121,23 +121,15 @@ class UploadService {
         file.type || 'application/epub+zip'
       );
     } catch (error) {
-      const axiosError = error as AxiosError<{ error?: { code?: string; message?: string } }>;
-      const errorCode = axiosError.response?.data?.error?.code;
-      const errorMessage = axiosError.response?.data?.error?.message || '';
+      const axiosError = error as AxiosError;
 
-      const isS3ConfigError =
-        axiosError.response?.status === 500 &&
-        (errorCode === 'S3_NOT_CONFIGURED' ||
-         errorMessage.includes('credentials') ||
-         errorMessage.includes('S3') ||
-         errorMessage.includes('presign'));
-
-      if (isS3ConfigError) {
-        console.warn('S3 not configured, using direct upload');
+      // Presign 500 = S3 not configured, fallback to direct upload
+      if (axiosError.response?.status === 500) {
+        console.warn('Presign failed (500), using direct upload');
         const result = await this.uploadDirect(file, onProgress);
         return {
           fileId: result.fileId || result.jobId,
-          fileKey: result.jobId,  // For direct upload, jobId serves as the file reference
+          fileKey: result.jobId,
           jobId: result.jobId,
           uploadMethod: 'direct' as const,
         };
