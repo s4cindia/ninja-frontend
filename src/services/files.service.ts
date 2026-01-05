@@ -30,17 +30,8 @@ export interface FileStats {
 
 export const filesService = {
   async list(params?: { page?: number; limit?: number; status?: string }): Promise<FilesListResponse> {
-    const response = await api.get('/files', { params });
-    const responseData = response.data;
-
-    const files = Array.isArray(responseData.data) ? responseData.data : responseData.data?.files || [];
-    const pagination = responseData.pagination || responseData.data?.pagination || {
-      page: 1,
-      limit: 20,
-      total: files.length,
-      pages: 1,
-    };
-
+    const response = await api.get<ApiResponse<FilesListResponse>>('/files', { params });
+    const { files, pagination } = response.data.data;
     return { files, pagination };
   },
 
