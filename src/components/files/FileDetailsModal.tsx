@@ -26,7 +26,7 @@ export function FileDetailsModal({ file, isOpen, onClose, onAudit, onView, onDel
   };
 
   const canAudit = (file.status === 'UPLOADED' || file.status === 'PROCESSED') && isEpubFile(file);
-  const canView = file.status === 'PROCESSED' && file.latestJobId;
+  const canView = file.status === 'PROCESSED';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
