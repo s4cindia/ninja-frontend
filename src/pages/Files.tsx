@@ -29,7 +29,7 @@ export function Files() {
     if (selectedFiles.length === 0) return false;
     const selectedFileObjects = filesData?.files.filter(f => selectedFiles.includes(f.id)) || [];
     return selectedFileObjects.every(f =>
-      f.status === 'UPLOADED' &&
+      (f.status === 'UPLOADED' || f.status === 'PROCESSED') &&
       (f.mimeType.includes('epub') || f.originalName.toLowerCase().endsWith('.epub'))
     );
   }, [selectedFiles, filesData?.files]);

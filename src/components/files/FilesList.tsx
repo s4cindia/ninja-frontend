@@ -191,7 +191,7 @@ export function FilesList({
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <div className="flex items-center justify-end gap-2">
-                  {onAudit && file.status === 'UPLOADED' && file.mimeType.includes('epub') && (
+                  {onAudit && (file.status === 'UPLOADED' || file.status === 'PROCESSED') && file.mimeType.includes('epub') && (
                     <Button
                       variant="ghost"
                       size="sm"
