@@ -1,5 +1,5 @@
 import { api } from './api';
-import { AxiosError } from 'axios';
+import { isAxiosError } from 'axios';
 
 interface PresignedUploadResponse {
   uploadUrl: string;
@@ -121,10 +121,8 @@ class UploadService {
         file.type || 'application/epub+zip'
       );
     } catch (error) {
-      const axiosError = error as AxiosError;
-
       // Presign 500 = S3 not configured, fallback to direct upload
-      if (axiosError.response?.status === 500) {
+      if (isAxiosError(error) && error.response?.status === 500) {
         console.warn('Presign failed (500), using direct upload');
         const result = await this.uploadDirect(file, onProgress);
         return {
