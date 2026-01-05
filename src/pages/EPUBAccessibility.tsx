@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { BookOpen } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { BookOpen, Loader2 } from 'lucide-react';
 import { EPUBUploader } from '@/components/epub/EPUBUploader';
 import { EPUBAuditResults, AuditResult, AuditIssue } from '@/components/epub/EPUBAuditResults';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
@@ -82,11 +82,66 @@ const generateDemoIssues = (summary: UploadSummary['issuesSummary']): AuditIssue
 
 export const EPUBAccessibility: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [auditResult, setAuditResult] = useState<AuditResult | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isCreatingPlan, setIsCreatingPlan] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
+  const [isLoadingJob, setIsLoadingJob] = useState(false);
+
+  useEffect(() => {
+    const jobId = searchParams.get('jobId');
+    if (jobId && !auditResult) {
+      loadJobAuditResult(jobId);
+    }
+  }, [searchParams]);
+
+  const loadJobAuditResult = async (jobId: string) => {
+    setIsLoadingJob(true);
+    try {
+      const response = await api.get(`/epub/job/${jobId}/audit/result`);
+      const data = response.data.data || response.data;
+
+      const apiIssues = data.combinedIssues || data.issues || [];
+      const calculatedSummary = {
+        total: apiIssues.length,
+        critical: apiIssues.filter((i: AuditIssue) => i.severity === 'critical').length,
+        serious: apiIssues.filter((i: AuditIssue) => i.severity === 'serious').length,
+        moderate: apiIssues.filter((i: AuditIssue) => i.severity === 'moderate').length,
+        minor: apiIssues.filter((i: AuditIssue) => i.severity === 'minor').length,
+      };
+
+      let fixTypeStats: { auto: number; quickfix: number; manual: number } | undefined;
+      try {
+        const remediationResponse = await api.get(`/epub/job/${jobId}/remediation`);
+        const remediationData = remediationResponse.data.data || remediationResponse.data;
+        if (remediationData.stats?.byFixType) {
+          fixTypeStats = remediationData.stats.byFixType;
+        }
+      } catch {
+        console.log('[EPUBAccessibility] Remediation stats not available yet');
+      }
+
+      const fullResult: AuditResult = {
+        jobId: data.jobId || jobId,
+        fileName: data.fileName || 'document.epub',
+        epubVersion: data.epubVersion || 'EPUB 3.0',
+        isValid: data.isValid ?? true,
+        accessibilityScore: data.accessibilityScore ?? 72,
+        issuesSummary: data.issuesSummary || calculatedSummary,
+        issues: apiIssues,
+        stats: fixTypeStats ? { byFixType: fixTypeStats } : undefined,
+      };
+      setAuditResult(fullResult);
+      setIsDemo(false);
+    } catch (error) {
+      console.error('[EPUBAccessibility] Failed to load job audit result:', error);
+      setUploadError('Failed to load audit results. Please try again.');
+    } finally {
+      setIsLoadingJob(false);
+    }
+  };
 
   const handleUploadComplete = async (summary: UploadSummary) => {
     const issuesSummary = summary.issuesSummary || {
@@ -277,7 +332,16 @@ export const EPUBAccessibility: React.FC = () => {
         </Alert>
       )}
 
-      {!auditResult ? (
+      {isLoadingJob ? (
+        <Card>
+          <CardContent className="py-12">
+            <div className="flex flex-col items-center justify-center gap-4">
+              <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+              <p className="text-gray-600">Loading audit results...</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : !auditResult ? (
         <Card>
           <CardHeader>
             <CardTitle>Upload EPUB</CardTitle>
