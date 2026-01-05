@@ -1,17 +1,19 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { Plus, PlayCircle, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { FileUploadZone } from '@/components/files/FileUploadZone';
 import { FilesList } from '@/components/files/FilesList';
-import { useFiles, useUploadFile, useDeleteFile, useTriggerAudit } from '@/hooks/useFiles';
+import { useFiles, useUploadFile, useDeleteFile, useTriggerAudit, useBulkDeleteFiles, useBulkAuditFiles } from '@/hooks/useFiles';
+import { cn } from '@/utils/cn';
 import type { FileItem } from '@/services/files.service';
 
 export function Files() {
   const navigate = useNavigate();
   const [showUpload, setShowUpload] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   
   const { data: filesData, isLoading, error } = useFiles(undefined, {
     autoRefreshWhileProcessing: true,
@@ -19,6 +21,17 @@ export function Files() {
   const uploadMutation = useUploadFile();
   const deleteMutation = useDeleteFile();
   const auditMutation = useTriggerAudit();
+  const bulkDeleteMutation = useBulkDeleteFiles();
+  const bulkAuditMutation = useBulkAuditFiles();
+
+  const canBulkAudit = useMemo(() => {
+    if (selectedFiles.length === 0) return false;
+    const selectedFileObjects = filesData?.files.filter(f => selectedFiles.includes(f.id)) || [];
+    return selectedFileObjects.every(f =>
+      f.status === 'UPLOADED' &&
+      (f.mimeType.includes('epub') || f.originalName.toLowerCase().endsWith('.epub'))
+    );
+  }, [selectedFiles, filesData?.files]);
 
   const handleUpload = async (file: File) => {
     try {
@@ -48,8 +61,36 @@ export function Files() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`Delete ${selectedFiles.length} file(s)? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const result = await bulkDeleteMutation.mutateAsync(selectedFiles);
+      console.log(`Deleted ${result.deleted} file(s)`);
+      setSelectedFiles([]);
+    } catch {
+      console.error('Bulk delete failed');
+    }
+  };
+
+  const handleBulkAudit = async () => {
+    try {
+      const result = await bulkAuditMutation.mutateAsync(selectedFiles);
+      console.log(`Started ${result.successful} audit(s)`);
+      setSelectedFiles([]);
+    } catch {
+      console.error('Bulk audit failed');
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedFiles([]);
+  };
+
   return (
-    <div className="space-y-6">
+    <div className={cn("space-y-6", selectedFiles.length > 0 && "pb-20")}>
       <Breadcrumbs items={[{ label: 'Files' }]} />
       <div className="flex items-center justify-between">
         <div>
@@ -98,8 +139,52 @@ export function Files() {
           onView={handleView}
           onDelete={handleDelete}
           onAudit={handleAudit}
+          selectable={true}
+          selectedIds={selectedFiles}
+          onSelectionChange={setSelectedFiles}
         />
       </div>
+
+      {selectedFiles.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-medium text-gray-700">
+                  {selectedFiles.length} file{selectedFiles.length !== 1 ? 's' : ''} selected
+                </span>
+                <button
+                  onClick={handleClearSelection}
+                  className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                >
+                  <X className="h-4 w-4" />
+                  Clear
+                </button>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleBulkAudit}
+                  disabled={bulkAuditMutation.isPending || !canBulkAudit}
+                >
+                  <PlayCircle className="h-4 w-4 mr-2" />
+                  Run Audit ({selectedFiles.length})
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleteMutation.isPending}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete ({selectedFiles.length})
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
