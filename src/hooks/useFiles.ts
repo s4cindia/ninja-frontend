@@ -66,3 +66,34 @@ export function useTriggerAudit() {
     },
   });
 }
+
+export function useBulkDeleteFiles() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (fileIds: string[]) => filesService.bulkDelete(fileIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['files'] });
+      queryClient.invalidateQueries({ queryKey: ['fileStats'] });
+    },
+  });
+}
+
+export function useBulkAuditFiles() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (fileIds: string[]) => filesService.bulkAudit(fileIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['files'] });
+    },
+  });
+}
+
+export function useFileArtifacts(fileId: string | null) {
+  return useQuery({
+    queryKey: ['fileArtifacts', fileId],
+    queryFn: () => filesService.getFileArtifacts(fileId!),
+    enabled: !!fileId,
+  });
+}
