@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { BookOpen } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { BookOpen, Loader2 } from 'lucide-react';
 import { EPUBUploader } from '@/components/epub/EPUBUploader';
 import { EPUBAuditResults, AuditResult, AuditIssue } from '@/components/epub/EPUBAuditResults';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { api } from '@/services/api';
 
@@ -82,11 +83,79 @@ const generateDemoIssues = (summary: UploadSummary['issuesSummary']): AuditIssue
 
 export const EPUBAccessibility: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [auditResult, setAuditResult] = useState<AuditResult | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isCreatingPlan, setIsCreatingPlan] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
+  const [isLoadingJob, setIsLoadingJob] = useState(false);
+  const [jobLoadError, setJobLoadError] = useState<string | null>(null);
+  const [isJobProcessing, setIsJobProcessing] = useState(false);
+
+  const jobIdParam = searchParams.get('jobId');
+
+  const loadJobAuditResult = useCallback(async (jobId: string) => {
+    setIsLoadingJob(true);
+    setJobLoadError(null);
+    setIsJobProcessing(false);
+
+    try {
+      const response = await api.get(`/epub/job/${jobId}/audit/result`);
+      const data = response.data.data || response.data;
+
+      if (data.status === 'PROCESSING') {
+        setIsJobProcessing(true);
+        setIsLoadingJob(false);
+        return;
+      }
+
+      const apiIssues = data.combinedIssues || data.issues || [];
+      const calculatedSummary = {
+        total: apiIssues.length,
+        critical: apiIssues.filter((i: AuditIssue) => i.severity === 'critical').length,
+        serious: apiIssues.filter((i: AuditIssue) => i.severity === 'serious').length,
+        moderate: apiIssues.filter((i: AuditIssue) => i.severity === 'moderate').length,
+        minor: apiIssues.filter((i: AuditIssue) => i.severity === 'minor').length,
+      };
+
+      let fixTypeStats: { auto: number; quickfix: number; manual: number } | undefined;
+      try {
+        const remediationResponse = await api.get(`/epub/job/${jobId}/remediation`);
+        const remediationData = remediationResponse.data.data || remediationResponse.data;
+        if (remediationData.stats?.byFixType) {
+          fixTypeStats = remediationData.stats.byFixType;
+        }
+      } catch {
+        console.log('[EPUBAccessibility] Remediation stats not available yet');
+      }
+
+      const fullResult: AuditResult = {
+        jobId: data.jobId || jobId,
+        fileName: data.fileName || 'document.epub',
+        epubVersion: data.epubVersion || 'EPUB 3.0',
+        isValid: data.isValid ?? true,
+        accessibilityScore: data.accessibilityScore ?? 72,
+        issuesSummary: data.issuesSummary || calculatedSummary,
+        issues: apiIssues,
+        stats: fixTypeStats ? { byFixType: fixTypeStats } : undefined,
+      };
+      setAuditResult(fullResult);
+      setIsDemo(false);
+      setIsLoadingJob(false);
+    } catch (error) {
+      setIsLoadingJob(false);
+      const message = error instanceof Error ? error.message : 'Failed to load audit results';
+      setJobLoadError(message);
+      console.error('[EPUBAccessibility] Failed to load job audit result:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (jobIdParam && !auditResult && !isLoadingJob) {
+      loadJobAuditResult(jobIdParam);
+    }
+  }, [jobIdParam, auditResult, isLoadingJob, loadJobAuditResult]);
 
   const handleUploadComplete = async (summary: UploadSummary) => {
     const issuesSummary = summary.issuesSummary || {
@@ -277,7 +346,42 @@ export const EPUBAccessibility: React.FC = () => {
         </Alert>
       )}
 
-      {!auditResult ? (
+      {isLoadingJob && (
+        <Card>
+          <CardContent className="py-12">
+            <div className="flex items-center justify-center gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+              <span className="text-gray-600">Loading audit results...</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {isJobProcessing && !auditResult && jobIdParam && (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-3" />
+            <p className="text-gray-700 font-medium">Audit in progress...</p>
+            <p className="text-gray-500 text-sm mt-1">This may take a few moments</p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => loadJobAuditResult(jobIdParam)}
+              className="mt-4"
+            >
+              Check Status
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {jobLoadError && !auditResult && (
+        <Alert variant="error">
+          {jobLoadError}
+        </Alert>
+      )}
+
+      {!auditResult && !isLoadingJob && !jobLoadError && !isJobProcessing ? (
         <Card>
           <CardHeader>
             <CardTitle>Upload EPUB</CardTitle>
@@ -292,7 +396,7 @@ export const EPUBAccessibility: React.FC = () => {
             />
           </CardContent>
         </Card>
-      ) : (
+      ) : auditResult ? (
         <EPUBAuditResults
           result={auditResult}
           onCreateRemediationPlan={handleCreateRemediationPlan}
@@ -300,7 +404,7 @@ export const EPUBAccessibility: React.FC = () => {
           isCreatingPlan={isCreatingPlan}
           isDownloading={isDownloading}
         />
-      )}
+      ) : null}
     </div>
   );
 };

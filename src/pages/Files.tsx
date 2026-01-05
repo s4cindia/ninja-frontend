@@ -6,16 +6,19 @@ import { Alert } from '@/components/ui/Alert';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { FileUploadZone } from '@/components/files/FileUploadZone';
 import { FilesList } from '@/components/files/FilesList';
-import { useFiles, useUploadFile, useDeleteFile } from '@/hooks/useFiles';
+import { useFiles, useUploadFile, useDeleteFile, useTriggerAudit } from '@/hooks/useFiles';
 import type { FileItem } from '@/services/files.service';
 
 export function Files() {
   const navigate = useNavigate();
   const [showUpload, setShowUpload] = useState(false);
   
-  const { data: filesData, isLoading, error } = useFiles();
+  const { data: filesData, isLoading, error } = useFiles(undefined, {
+    autoRefreshWhileProcessing: true,
+  });
   const uploadMutation = useUploadFile();
   const deleteMutation = useDeleteFile();
+  const auditMutation = useTriggerAudit();
 
   const handleUpload = async (file: File) => {
     try {
@@ -33,6 +36,15 @@ export function Files() {
   const handleDelete = async (file: FileItem) => {
     if (window.confirm(`Delete "${file.originalName}"?`)) {
       await deleteMutation.mutateAsync(file.id);
+    }
+  };
+
+  const handleAudit = async (file: FileItem) => {
+    try {
+      const result = await auditMutation.mutateAsync(file.id);
+      navigate(`/epub?jobId=${result.jobId}`);
+    } catch {
+      // Error handled by mutation
     }
   };
 
@@ -85,6 +97,7 @@ export function Files() {
           isLoading={isLoading}
           onView={handleView}
           onDelete={handleDelete}
+          onAudit={handleAudit}
         />
       </div>
     </div>

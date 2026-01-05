@@ -1,4 +1,4 @@
-import { FileText, Trash2, Eye, Clock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { FileText, Trash2, Eye, Clock, CheckCircle, XCircle, Loader2, PlayCircle } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { Button } from '../ui/Button';
 import type { FileItem } from '../../services/files.service';
@@ -10,6 +10,7 @@ interface FilesListProps {
   isLoading?: boolean;
   onView?: (file: FileItem) => void;
   onDelete?: (file: FileItem) => void;
+  onAudit?: (file: FileItem) => void;
   emptyMessage?: string;
 }
 
@@ -66,6 +67,7 @@ export function FilesList({
   isLoading = false,
   onView,
   onDelete,
+  onAudit,
   emptyMessage = 'No files uploaded yet',
 }: FilesListProps) {
   if (isLoading) {
@@ -138,6 +140,17 @@ export function FilesList({
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <div className="flex items-center justify-end gap-2">
+                  {onAudit && file.status === 'UPLOADED' && file.mimeType.includes('epub') && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onAudit(file)}
+                      aria-label={`Run audit on ${file.originalName}`}
+                      title="Run Accessibility Audit"
+                    >
+                      <PlayCircle className="h-4 w-4 text-green-600" aria-hidden="true" />
+                    </Button>
+                  )}
                   {onView && file.status === 'PROCESSED' && (
                     <Button 
                       variant="ghost" 
