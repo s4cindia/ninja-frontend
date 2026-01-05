@@ -53,7 +53,9 @@ export const filesService = {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await api.post<ApiResponse<FileItem>>('/files/upload', formData);
+    const response = await api.post<ApiResponse<FileItem>>('/files/upload', formData, {
+      headers: { 'Content-Type': undefined },
+    });
     return response.data.data;
   },
 
