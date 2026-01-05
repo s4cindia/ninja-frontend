@@ -8,6 +8,7 @@ import { FileUploadZone } from '@/components/files/FileUploadZone';
 import { FilesList } from '@/components/files/FilesList';
 import { useFiles, useUploadFile, useDeleteFile, useTriggerAudit, useBulkDeleteFiles, useBulkAuditFiles } from '@/hooks/useFiles';
 import { cn } from '@/utils/cn';
+import { isEpubFile } from '@/utils/fileUtils';
 import toast from 'react-hot-toast';
 import type { FileItem } from '@/services/files.service';
 
@@ -29,8 +30,7 @@ export function Files() {
     if (selectedFiles.length === 0) return false;
     const selectedFileObjects = filesData?.files.filter(f => selectedFiles.includes(f.id)) || [];
     return selectedFileObjects.every(f =>
-      (f.status === 'UPLOADED' || f.status === 'PROCESSED') &&
-      (f.mimeType.includes('epub') || f.originalName.toLowerCase().endsWith('.epub'))
+      (f.status === 'UPLOADED' || f.status === 'PROCESSED') && isEpubFile(f)
     );
   }, [selectedFiles, filesData?.files]);
 
