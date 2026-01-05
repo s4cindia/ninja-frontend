@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { BookOpen, Loader2 } from 'lucide-react';
 import { EPUBUploader } from '@/components/epub/EPUBUploader';
@@ -91,25 +91,21 @@ export const EPUBAccessibility: React.FC = () => {
   const [isDemo, setIsDemo] = useState(false);
   const [isLoadingJob, setIsLoadingJob] = useState(false);
   const [jobLoadError, setJobLoadError] = useState<string | null>(null);
+  const [isJobProcessing, setIsJobProcessing] = useState(false);
 
   const jobIdParam = searchParams.get('jobId');
 
-  useEffect(() => {
-    if (jobIdParam && !auditResult) {
-      loadJobAuditResult(jobIdParam);
-    }
-  }, [jobIdParam]);
-
-  const loadJobAuditResult = async (jobId: string) => {
+  const loadJobAuditResult = useCallback(async (jobId: string) => {
     setIsLoadingJob(true);
     setJobLoadError(null);
+    setIsJobProcessing(false);
 
     try {
       const response = await api.get(`/epub/job/${jobId}/audit/result`);
       const data = response.data.data || response.data;
 
       if (data.status === 'PROCESSING') {
-        setJobLoadError('Audit is still processing. Please wait...');
+        setIsJobProcessing(true);
         setIsLoadingJob(false);
         return;
       }
@@ -153,7 +149,13 @@ export const EPUBAccessibility: React.FC = () => {
       setJobLoadError(message);
       console.error('[EPUBAccessibility] Failed to load job audit result:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (jobIdParam && !auditResult && !isLoadingJob) {
+      loadJobAuditResult(jobIdParam);
+    }
+  }, [jobIdParam, auditResult, isLoadingJob, loadJobAuditResult]);
 
   const handleUploadComplete = async (summary: UploadSummary) => {
     const issuesSummary = summary.issuesSummary || {
@@ -355,25 +357,31 @@ export const EPUBAccessibility: React.FC = () => {
         </Card>
       )}
 
+      {isJobProcessing && !auditResult && (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-3" />
+            <p className="text-gray-700 font-medium">Audit in progress...</p>
+            <p className="text-gray-500 text-sm mt-1">This may take a few moments</p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => loadJobAuditResult(jobIdParam!)}
+              className="mt-4"
+            >
+              Check Status
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {jobLoadError && !auditResult && (
-        <Alert variant="warning">
-          <div className="flex items-center justify-between">
-            <span>{jobLoadError}</span>
-            {jobLoadError.includes('processing') && jobIdParam && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => loadJobAuditResult(jobIdParam)}
-                className="ml-2"
-              >
-                Refresh
-              </Button>
-            )}
-          </div>
+        <Alert variant="error">
+          {jobLoadError}
         </Alert>
       )}
 
-      {!auditResult && !isLoadingJob && !jobLoadError ? (
+      {!auditResult && !isLoadingJob && !jobLoadError && !isJobProcessing ? (
         <Card>
           <CardHeader>
             <CardTitle>Upload EPUB</CardTitle>
