@@ -163,7 +163,7 @@ export function FilesList({
                 <td className="px-4 py-4">
                   <Checkbox
                     checked={selectedIds.includes(file.id)}
-                    onChange={(checked) => handleSelectOne(file.id, checked)}
+                    onChange={(checked: boolean) => handleSelectOne(file.id, checked)}
                     aria-label={`Select ${file.originalName}`}
                   />
                 </td>
