@@ -40,7 +40,7 @@ export function Files() {
   const handleAudit = async (file: FileItem) => {
     try {
       const result = await auditMutation.mutateAsync(file.id);
-      navigate(`/epub-accessibility?jobId=${result.jobId}`);
+      navigate(`/epub?jobId=${result.jobId}`);
     } catch {
       // Error handled by mutation
     }
