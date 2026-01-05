@@ -13,7 +13,9 @@ export function Files() {
   const navigate = useNavigate();
   const [showUpload, setShowUpload] = useState(false);
   
-  const { data: filesData, isLoading, error } = useFiles();
+  const { data: filesData, isLoading, error } = useFiles(undefined, {
+    autoRefreshWhileProcessing: true,
+  });
   const uploadMutation = useUploadFile();
   const deleteMutation = useDeleteFile();
   const auditMutation = useTriggerAudit();

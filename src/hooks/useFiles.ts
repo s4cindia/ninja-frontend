@@ -1,10 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { filesService } from '@/services/files.service';
+import { filesService, FilesListResponse } from '@/services/files.service';
 
-export function useFiles(params?: { page?: number; limit?: number; status?: string }) {
+export function useFiles(
+  params?: { page?: number; limit?: number; status?: string },
+  options?: { autoRefreshWhileProcessing?: boolean }
+) {
   return useQuery({
     queryKey: ['files', params],
     queryFn: () => filesService.list(params),
+    refetchInterval: (query) => {
+      if (!options?.autoRefreshWhileProcessing) return false;
+      const data = query.state.data as FilesListResponse | undefined;
+      const hasProcessing = data?.files?.some((f) => f.status === 'PROCESSING') ?? false;
+      return hasProcessing ? 5000 : false;
+    },
   });
 }
 
