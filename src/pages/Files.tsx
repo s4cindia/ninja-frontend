@@ -8,6 +8,7 @@ import { FileUploadZone } from '@/components/files/FileUploadZone';
 import { FilesList } from '@/components/files/FilesList';
 import { useFiles, useUploadFile, useDeleteFile, useTriggerAudit, useBulkDeleteFiles, useBulkAuditFiles } from '@/hooks/useFiles';
 import { cn } from '@/utils/cn';
+import toast from 'react-hot-toast';
 import type { FileItem } from '@/services/files.service';
 
 export function Files() {
@@ -68,20 +69,26 @@ export function Files() {
 
     try {
       const result = await bulkDeleteMutation.mutateAsync(selectedFiles);
-      console.log(`Deleted ${result.deleted} file(s)`);
+      toast.success(`Deleted ${result.deleted} file(s)`);
+      if (result.failed > 0) {
+        toast.error(`Failed to delete ${result.failed} file(s)`);
+      }
       setSelectedFiles([]);
     } catch {
-      console.error('Bulk delete failed');
+      toast.error('Bulk delete failed');
     }
   };
 
   const handleBulkAudit = async () => {
     try {
       const result = await bulkAuditMutation.mutateAsync(selectedFiles);
-      console.log(`Started ${result.successful} audit(s)`);
+      toast.success(`Started ${result.successful} audit(s)`);
+      if (result.failed > 0) {
+        toast.error(`Failed to start ${result.failed} audit(s)`);
+      }
       setSelectedFiles([]);
     } catch {
-      console.error('Bulk audit failed');
+      toast.error('Bulk audit failed');
     }
   };
 
