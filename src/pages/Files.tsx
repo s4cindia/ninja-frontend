@@ -6,6 +6,7 @@ import { Alert } from '@/components/ui/Alert';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { FileUploadZone } from '@/components/files/FileUploadZone';
 import { FilesList } from '@/components/files/FilesList';
+import { FileDetailsModal } from '@/components/files/FileDetailsModal';
 import { useFiles, useUploadFile, useDeleteFile, useTriggerAudit, useBulkDeleteFiles, useBulkAuditFiles } from '@/hooks/useFiles';
 import { cn } from '@/utils/cn';
 import { isEpubFile } from '@/utils/fileUtils';
@@ -16,6 +17,7 @@ export function Files() {
   const navigate = useNavigate();
   const [showUpload, setShowUpload] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
+  const [detailFile, setDetailFile] = useState<FileItem | null>(null);
   
   const { data: filesData, isLoading, error } = useFiles(undefined, {
     autoRefreshWhileProcessing: true,
@@ -100,6 +102,10 @@ export function Files() {
     setSelectedFiles([]);
   };
 
+  const handleRowClick = (file: FileItem) => {
+    setDetailFile(file);
+  };
+
   return (
     <div className={cn("space-y-6", selectedFiles.length > 0 && "pb-20")}>
       <Breadcrumbs items={[{ label: 'Files' }]} />
@@ -150,6 +156,7 @@ export function Files() {
           onView={handleView}
           onDelete={handleDelete}
           onAudit={handleAudit}
+          onRowClick={handleRowClick}
           selectable={true}
           selectedIds={selectedFiles}
           onSelectionChange={setSelectedFiles}
@@ -196,6 +203,15 @@ export function Files() {
           </div>
         </div>
       )}
+
+      <FileDetailsModal
+        file={detailFile}
+        isOpen={!!detailFile}
+        onClose={() => setDetailFile(null)}
+        onAudit={handleAudit}
+        onView={handleView}
+        onDelete={handleDelete}
+      />
     </div>
   );
 }
