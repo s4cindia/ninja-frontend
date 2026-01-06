@@ -20,10 +20,10 @@ export function getJobTypeLabel(type: string): string {
   return JOB_TYPE_LABELS[type] || type.replace(/_/g, ' ');
 }
 
-export function extractFileNameFromJob(job: { input?: any; output?: any }): string {
-  if (job.output?.fileName) return job.output.fileName;
-  if (job.output?.originalName) return job.output.originalName;
-  if (job.input?.originalName) return job.input.originalName;
-  if (job.input?.fileName) return job.input.fileName;
+export function extractFileNameFromJob(job: { input?: Record<string, unknown>; output?: Record<string, unknown> }): string {
+  if (job.output?.fileName) return String(job.output.fileName);
+  if (job.output?.originalName) return String(job.output.originalName);
+  if (job.input?.originalName) return String(job.input.originalName);
+  if (job.input?.fileName) return String(job.input.fileName);
   return 'Unknown file';
 }
