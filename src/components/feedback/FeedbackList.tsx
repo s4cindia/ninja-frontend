@@ -21,11 +21,7 @@ export interface FeedbackItem {
   entityId?: string;
   createdAt: string;
   updatedAt?: string;
-  user?: {
-    id?: string;
-    name?: string;
-    email?: string;
-  };
+  userEmail?: string;
 }
 
 interface FeedbackListProps {
@@ -243,7 +239,7 @@ export const FeedbackList: React.FC<FeedbackListProps> = ({
                         {formatDate(item.createdAt)}
                       </td>
                       <td className="py-3 px-2 text-sm text-gray-600">
-                        {item.user?.name || item.user?.email || 'Anonymous'}
+                        {item.userEmail || 'Anonymous'}
                       </td>
                       <td className="py-3 px-2">
                         <Badge variant="default" size="sm">
