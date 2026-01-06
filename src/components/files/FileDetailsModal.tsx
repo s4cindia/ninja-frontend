@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { X, FileText, Calendar, HardDrive, Tag, CheckCircle, Clock, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import type { FileItem } from '@/services/files.service';
@@ -13,6 +14,22 @@ interface FileDetailsModalProps {
 }
 
 export function FileDetailsModal({ file, isOpen, onClose, onAudit, onView, onDelete }: FileDetailsModalProps) {
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen || !file) return null;
 
   const formatFileSize = (bytes: number) => {
