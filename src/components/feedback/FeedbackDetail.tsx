@@ -19,6 +19,11 @@ interface FeedbackItem {
   entityId?: string;
   createdAt: string;
   updatedAt?: string;
+  user?: {
+    id?: string;
+    name?: string;
+    email?: string;
+  };
 }
 
 interface FeedbackDetailProps {

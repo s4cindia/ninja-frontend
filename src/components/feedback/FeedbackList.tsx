@@ -21,6 +21,11 @@ export interface FeedbackItem {
   entityId?: string;
   createdAt: string;
   updatedAt?: string;
+  user?: {
+    id?: string;
+    name?: string;
+    email?: string;
+  };
 }
 
 interface FeedbackListProps {
@@ -211,6 +216,7 @@ export const FeedbackList: React.FC<FeedbackListProps> = ({
                 <thead>
                   <tr className="border-b border-gray-200">
                     <SortableHeader field="createdAt">Date</SortableHeader>
+                    <th className="text-left py-3 px-2 text-sm font-medium text-gray-600">Submitted By</th>
                     <SortableHeader field="type">Type</SortableHeader>
                     <SortableHeader field="status">Status</SortableHeader>
                     <th className="text-left py-3 px-2 text-sm font-medium text-gray-600">Rating</th>
@@ -235,6 +241,9 @@ export const FeedbackList: React.FC<FeedbackListProps> = ({
                     >
                       <td className="py-3 px-2 text-sm text-gray-600">
                         {formatDate(item.createdAt)}
+                      </td>
+                      <td className="py-3 px-2 text-sm text-gray-600">
+                        {item.user?.name || item.user?.email || 'Anonymous'}
                       </td>
                       <td className="py-3 px-2">
                         <Badge variant="default" size="sm">
