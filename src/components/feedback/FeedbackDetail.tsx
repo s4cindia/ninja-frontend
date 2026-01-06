@@ -19,6 +19,7 @@ interface FeedbackItem {
   entityId?: string;
   createdAt: string;
   updatedAt?: string;
+  userEmail?: string;
 }
 
 interface FeedbackDetailProps {
@@ -169,6 +170,11 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
                 <p className="text-sm text-gray-500">Created</p>
                 <p className="text-gray-900">{formatDate(item.createdAt)}</p>
               </div>
+            </div>
+
+            <div>
+              <p className="text-xs text-gray-500">Submitted By</p>
+              <p className="text-sm font-medium">{item.userEmail || 'Anonymous'}</p>
             </div>
 
             {item.isPositive !== null && item.isPositive !== undefined && (
