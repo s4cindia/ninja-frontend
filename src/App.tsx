@@ -10,6 +10,7 @@ import { Login } from '@/pages/Login';
 import { Register } from '@/pages/Register';
 import { Products } from '@/pages/Products';
 import { Jobs } from '@/pages/Jobs';
+import { JobDetails } from '@/pages/JobDetails';
 import { Files } from '@/pages/Files';
 import { NotFound } from '@/pages/NotFound';
 import { Unauthorized } from '@/pages/Unauthorized';
@@ -85,6 +86,7 @@ function AppRoutes() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/products" element={<Products />} />
           <Route path="/jobs" element={<Jobs />} />
+          <Route path="/jobs/:jobId" element={<JobDetails />} />
           <Route path="/files" element={<Files />} />
           <Route path="/validation/:fileId" element={<ValidationResults />} />
           <Route path="/compliance/section508/:fileId" element={<Section508Page />} />
