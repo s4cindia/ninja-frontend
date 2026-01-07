@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useId } from 'react';
 import { Upload, X, FileText, Image, File, Loader2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
@@ -39,6 +39,7 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
   maxSizeMB = 10,
   disabled = false,
 }) => {
+  const inputId = useId();
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,10 +133,10 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
           onChange={(e) => handleFileSelect(e.target.files)}
           disabled={disabled || isUploading}
           className="hidden"
-          id="attachment-input"
+          id={inputId}
         />
         <label
-          htmlFor="attachment-input"
+          htmlFor={inputId}
           className="cursor-pointer flex flex-col items-center gap-2"
         >
           <Upload className="h-8 w-8 text-gray-400" />
