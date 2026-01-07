@@ -1,26 +1,10 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { X, ThumbsUp, ThumbsDown, Calendar, Tag, Link2, Loader2 } from 'lucide-react';
+import { X, ThumbsUp, ThumbsDown, Calendar, Tag, Link2, Loader2, Paperclip, Download } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Alert } from '../ui/Alert';
 import { api } from '@/services/api';
-
-type FeedbackType = 'ACCESSIBILITY_ISSUE' | 'ALT_TEXT_QUALITY' | 'AUDIT_ACCURACY' | 'REMEDIATION_SUGGESTION' | 'GENERAL' | 'BUG_REPORT' | 'FEATURE_REQUEST';
-type FeedbackStatus = 'NEW' | 'REVIEWED' | 'IN_PROGRESS' | 'RESOLVED' | 'DISMISSED';
-
-interface FeedbackItem {
-  id: string;
-  type: FeedbackType;
-  status: FeedbackStatus;
-  comment: string;
-  context?: Record<string, unknown>;
-  isPositive?: boolean | null;
-  entityType?: string;
-  entityId?: string;
-  createdAt: string;
-  updatedAt?: string;
-  userEmail?: string;
-}
+import type { FeedbackItem, FeedbackStatus } from '@/types/feedback.types';
 
 interface FeedbackDetailProps {
   item: FeedbackItem;
@@ -28,6 +12,22 @@ interface FeedbackDetailProps {
   onClose: () => void;
   onStatusUpdate?: (id: string, newStatus: FeedbackStatus) => void;
 }
+
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+};
+
+const getFileIcon = (mimeType: string) => {
+  if (mimeType.startsWith('image/')) return '🖼️';
+  if (mimeType.startsWith('video/')) return '🎬';
+  if (mimeType.includes('pdf')) return '📄';
+  if (mimeType.includes('zip') || mimeType.includes('rar')) return '📦';
+  return '📎';
+};
 
 const STATUS_OPTIONS: { value: FeedbackStatus; label: string }[] = [
   { value: 'NEW', label: 'New' },
@@ -243,6 +243,48 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
                   <div key={key} className="flex gap-2 text-sm">
                     <span className="font-medium text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
                     <span className="text-gray-700">{String(value)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {item.attachments && item.attachments.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Paperclip className="h-4 w-4 text-gray-400" />
+                <p className="text-sm font-medium text-gray-700">
+                  Attachments ({item.attachments.length})
+                </p>
+              </div>
+              <div className="space-y-2">
+                {item.attachments.map((attachment) => (
+                  <div
+                    key={attachment.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-lg flex-shrink-0">{getFileIcon(attachment.mimeType)}</span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {attachment.originalName}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {formatFileSize(attachment.size)}
+                          {attachment.uploadedBy && (
+                            <span> • Uploaded by {attachment.uploadedBy.email}</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <a
+                      href={`/api/feedback/${item.id}/attachments/${attachment.id}/download`}
+                      download={attachment.originalName}
+                      className="flex-shrink-0 p-2 text-gray-500 hover:text-primary-600 hover:bg-white rounded-md transition-colors"
+                      aria-label={`Download ${attachment.originalName}`}
+                    >
+                      <Download className="h-4 w-4" />
+                    </a>
                   </div>
                 ))}
               </div>

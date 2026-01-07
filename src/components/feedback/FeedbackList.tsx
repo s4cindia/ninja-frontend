@@ -4,25 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Spinner } from '../ui/Spinner';
+import type { FeedbackItem, FeedbackType, FeedbackStatus } from '@/types/feedback.types';
 
-type FeedbackType = 'ACCESSIBILITY_ISSUE' | 'ALT_TEXT_QUALITY' | 'AUDIT_ACCURACY' | 'REMEDIATION_SUGGESTION' | 'GENERAL' | 'BUG_REPORT' | 'FEATURE_REQUEST';
-type FeedbackStatus = 'NEW' | 'REVIEWED' | 'IN_PROGRESS' | 'RESOLVED' | 'DISMISSED';
+export type { FeedbackItem };
+
 type SortField = 'createdAt' | 'type' | 'status';
 type SortDirection = 'asc' | 'desc';
-
-export interface FeedbackItem {
-  id: string;
-  type: FeedbackType;
-  status: FeedbackStatus;
-  comment: string;
-  context?: Record<string, unknown>;
-  isPositive?: boolean | null;
-  entityType?: string;
-  entityId?: string;
-  createdAt: string;
-  updatedAt?: string;
-  userEmail?: string;
-}
 
 interface FeedbackListProps {
   items: FeedbackItem[];
