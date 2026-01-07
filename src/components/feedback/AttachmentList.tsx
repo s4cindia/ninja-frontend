@@ -40,7 +40,7 @@ export const AttachmentList: React.FC<AttachmentListProps> = ({
       <div className="space-y-2">
         {attachments.map((attachment) => {
           const Icon = getFileIcon(attachment.mimeType);
-          const canDelete = onDelete && currentUserId === attachment.uploadedById;
+          const canDelete = onDelete && currentUserId && attachment.uploadedById && currentUserId === attachment.uploadedById;
 
           return (
             <div

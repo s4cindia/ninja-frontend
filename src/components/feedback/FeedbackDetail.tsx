@@ -68,13 +68,37 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
   }, [item.attachments]);
 
   const handleUpload = async (files: File[]) => {
-    const newAttachments = await feedbackAttachmentService.upload(item.id, files);
-    setAttachments(prev => [...newAttachments, ...prev]);
+    try {
+      const newAttachments = await feedbackAttachmentService.upload(item.id, files);
+      setAttachments(prev => [...newAttachments, ...prev]);
+    } catch (err) {
+      console.error('Failed to upload attachments:', err);
+      throw err;
+    }
   };
 
   const handleDownload = async (attachment: FeedbackAttachment) => {
-    const { url } = await feedbackAttachmentService.getDownloadUrl(attachment.id);
-    window.open(url, '_blank');
+    try {
+      const { url } = await feedbackAttachmentService.getDownloadUrl(attachment.id);
+
+      if (url.startsWith('/')) {
+        const response = await api.get(url, { responseType: 'blob' });
+        const blob = new Blob([response.data], { type: attachment.mimeType });
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = attachment.originalName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(downloadUrl);
+      } else {
+        window.open(url, '_blank');
+      }
+    } catch (err) {
+      console.error('Download failed:', err);
+      alert('Failed to download file. Please try again.');
+    }
   };
 
   const handleDeleteAttachment = async (attachment: FeedbackAttachment) => {
@@ -86,6 +110,7 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
       setAttachments(prev => prev.filter(a => a.id !== attachment.id));
     } catch (err) {
       console.error('Failed to delete attachment:', err);
+      alert('Failed to delete attachment. Please try again.');
     } finally {
       setIsDeleting(undefined);
     }

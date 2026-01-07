@@ -44,9 +44,9 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
 
-  const validateFiles = useCallback((files: File[]): string | null => {
-    if (files.length > maxFiles) {
-      return `Maximum ${maxFiles} files allowed`;
+  const validateFiles = useCallback((files: File[], existingCount: number = 0): string | null => {
+    if (files.length + existingCount > maxFiles) {
+      return `Maximum ${maxFiles} files allowed (${existingCount} already selected)`;
     }
 
     for (const file of files) {
@@ -65,7 +65,7 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
     if (!files) return;
 
     const fileArray = Array.from(files);
-    const validationError = validateFiles(fileArray);
+    const validationError = validateFiles(fileArray, selectedFiles.length);
 
     if (validationError) {
       setError(validationError);
@@ -73,8 +73,8 @@ export const AttachmentUploader: React.FC<AttachmentUploaderProps> = ({
     }
 
     setError(null);
-    setSelectedFiles(fileArray);
-  }, [validateFiles]);
+    setSelectedFiles(prev => [...prev, ...fileArray]);
+  }, [validateFiles, selectedFiles.length]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
