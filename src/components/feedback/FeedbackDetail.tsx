@@ -4,23 +4,11 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Alert } from '../ui/Alert';
 import { api } from '@/services/api';
-
-type FeedbackType = 'ACCESSIBILITY_ISSUE' | 'ALT_TEXT_QUALITY' | 'AUDIT_ACCURACY' | 'REMEDIATION_SUGGESTION' | 'GENERAL' | 'BUG_REPORT' | 'FEATURE_REQUEST';
-type FeedbackStatus = 'NEW' | 'REVIEWED' | 'IN_PROGRESS' | 'RESOLVED' | 'DISMISSED';
-
-interface FeedbackItem {
-  id: string;
-  type: FeedbackType;
-  status: FeedbackStatus;
-  comment: string;
-  context?: Record<string, unknown>;
-  isPositive?: boolean | null;
-  entityType?: string;
-  entityId?: string;
-  createdAt: string;
-  updatedAt?: string;
-  userEmail?: string;
-}
+import { AttachmentList } from './AttachmentList';
+import { AttachmentUploader } from './AttachmentUploader';
+import { feedbackAttachmentService } from '@/services/feedback-attachment.service';
+import { useAuthStore } from '@/stores/auth.store';
+import type { FeedbackItem, FeedbackStatus, FeedbackAttachment } from '@/types/feedback.types';
 
 interface FeedbackDetailProps {
   item: FeedbackItem;
@@ -65,12 +53,69 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [attachments, setAttachments] = useState<FeedbackAttachment[]>(item.attachments || []);
+  const [isDeleting, setIsDeleting] = useState<string | undefined>();
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const { user } = useAuthStore();
 
   useEffect(() => {
     setStatus(item.status);
   }, [item.status]);
+
+  useEffect(() => {
+    setAttachments(item.attachments || []);
+  }, [item.attachments]);
+
+  const handleUpload = async (files: File[]) => {
+    try {
+      const newAttachments = await feedbackAttachmentService.upload(item.id, files);
+      setAttachments(prev => [...newAttachments, ...prev]);
+    } catch (err) {
+      console.error('Failed to upload attachments:', err);
+      throw err;
+    }
+  };
+
+  const handleDownload = async (attachment: FeedbackAttachment) => {
+    try {
+      const { url } = await feedbackAttachmentService.getDownloadUrl(attachment.id);
+
+      if (url.startsWith('/')) {
+        const cleanUrl = url.replace(/^\/api\/v1/, '');
+        const response = await api.get(cleanUrl, { responseType: 'blob' });
+        const blob = new Blob([response.data], { type: attachment.mimeType });
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = attachment.originalName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(downloadUrl);
+      } else {
+        window.open(url, '_blank');
+      }
+    } catch (err) {
+      console.error('Download failed:', err);
+      alert('Failed to download file. Please try again.');
+    }
+  };
+
+  const handleDeleteAttachment = async (attachment: FeedbackAttachment) => {
+    if (!window.confirm(`Delete "${attachment.originalName}"?`)) return;
+
+    setIsDeleting(attachment.id);
+    try {
+      await feedbackAttachmentService.delete(attachment.id);
+      setAttachments(prev => prev.filter(a => a.id !== attachment.id));
+    } catch (err) {
+      console.error('Failed to delete attachment:', err);
+      alert('Failed to delete attachment. Please try again.');
+    } finally {
+      setIsDeleting(undefined);
+    }
+  };
 
   useEffect(() => {
     if (isOpen && closeButtonRef.current) {
@@ -248,6 +293,21 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
               </div>
             </div>
           )}
+
+          <div className="border-t pt-4 mt-4">
+            <AttachmentList
+              attachments={attachments}
+              onDownload={handleDownload}
+              onDelete={handleDeleteAttachment}
+              isDeleting={isDeleting}
+              currentUserId={user?.id}
+            />
+          </div>
+
+          <div className="border-t pt-4 mt-4">
+            <h4 className="text-sm font-medium text-gray-700 mb-2">Add Attachments</h4>
+            <AttachmentUploader onUpload={handleUpload} />
+          </div>
 
           <div className="pt-4 border-t">
             <Button variant="outline" onClick={onClose} className="w-full">
