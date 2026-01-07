@@ -8,3 +8,5 @@ export { FeedbackDetail } from './FeedbackDetail';
 export { FeedbackTrends } from './FeedbackTrends';
 export { RequiringAttention } from './RequiringAttention';
 export type { AttentionItem } from './RequiringAttention';
+export { AttachmentList } from './AttachmentList';
+export { AttachmentUploader } from './AttachmentUploader';
