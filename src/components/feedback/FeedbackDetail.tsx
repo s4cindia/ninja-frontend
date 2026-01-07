@@ -82,7 +82,8 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
       const { url } = await feedbackAttachmentService.getDownloadUrl(attachment.id);
 
       if (url.startsWith('/')) {
-        const response = await api.get(url, { responseType: 'blob' });
+        const cleanUrl = url.replace(/^\/api\/v1/, '');
+        const response = await api.get(cleanUrl, { responseType: 'blob' });
         const blob = new Blob([response.data], { type: attachment.mimeType });
         const downloadUrl = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
