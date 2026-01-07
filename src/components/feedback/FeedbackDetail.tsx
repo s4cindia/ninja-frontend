@@ -1,10 +1,14 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { X, ThumbsUp, ThumbsDown, Calendar, Tag, Link2, Loader2, Paperclip, Download } from 'lucide-react';
+import { X, ThumbsUp, ThumbsDown, Calendar, Tag, Link2, Loader2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Alert } from '../ui/Alert';
 import { api } from '@/services/api';
-import type { FeedbackItem, FeedbackStatus } from '@/types/feedback.types';
+import { AttachmentList } from './AttachmentList';
+import { AttachmentUploader } from './AttachmentUploader';
+import { feedbackAttachmentService } from '@/services/feedback-attachment.service';
+import { useAuthStore } from '@/stores/auth.store';
+import type { FeedbackItem, FeedbackStatus, FeedbackAttachment } from '@/types/feedback.types';
 
 interface FeedbackDetailProps {
   item: FeedbackItem;
@@ -12,22 +16,6 @@ interface FeedbackDetailProps {
   onClose: () => void;
   onStatusUpdate?: (id: string, newStatus: FeedbackStatus) => void;
 }
-
-const formatFileSize = (bytes: number): string => {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-};
-
-const getFileIcon = (mimeType: string) => {
-  if (mimeType.startsWith('image/')) return '🖼️';
-  if (mimeType.startsWith('video/')) return '🎬';
-  if (mimeType.includes('pdf')) return '📄';
-  if (mimeType.includes('zip') || mimeType.includes('rar')) return '📦';
-  return '📎';
-};
 
 const STATUS_OPTIONS: { value: FeedbackStatus; label: string }[] = [
   { value: 'NEW', label: 'New' },
@@ -65,12 +53,43 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [attachments, setAttachments] = useState<FeedbackAttachment[]>(item.attachments || []);
+  const [isDeleting, setIsDeleting] = useState<string | undefined>();
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const { user } = useAuthStore();
 
   useEffect(() => {
     setStatus(item.status);
   }, [item.status]);
+
+  useEffect(() => {
+    setAttachments(item.attachments || []);
+  }, [item.attachments]);
+
+  const handleUpload = async (files: File[]) => {
+    const newAttachments = await feedbackAttachmentService.upload(item.id, files);
+    setAttachments(prev => [...newAttachments, ...prev]);
+  };
+
+  const handleDownload = async (attachment: FeedbackAttachment) => {
+    const { url } = await feedbackAttachmentService.getDownloadUrl(attachment.id);
+    window.open(url, '_blank');
+  };
+
+  const handleDeleteAttachment = async (attachment: FeedbackAttachment) => {
+    if (!window.confirm(`Delete "${attachment.originalName}"?`)) return;
+
+    setIsDeleting(attachment.id);
+    try {
+      await feedbackAttachmentService.delete(attachment.id);
+      setAttachments(prev => prev.filter(a => a.id !== attachment.id));
+    } catch (err) {
+      console.error('Failed to delete attachment:', err);
+    } finally {
+      setIsDeleting(undefined);
+    }
+  };
 
   useEffect(() => {
     if (isOpen && closeButtonRef.current) {
@@ -249,47 +268,20 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
             </div>
           )}
 
-          {item.attachments && item.attachments.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Paperclip className="h-4 w-4 text-gray-400" />
-                <p className="text-sm font-medium text-gray-700">
-                  Attachments ({item.attachments.length})
-                </p>
-              </div>
-              <div className="space-y-2">
-                {item.attachments.map((attachment) => (
-                  <div
-                    key={attachment.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-lg flex-shrink-0">{getFileIcon(attachment.mimeType)}</span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {attachment.originalName}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {formatFileSize(attachment.size)}
-                          {attachment.uploadedBy && (
-                            <span> • Uploaded by {attachment.uploadedBy.email}</span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                    <a
-                      href={`/api/feedback/${item.id}/attachments/${attachment.id}/download`}
-                      download={attachment.originalName}
-                      className="flex-shrink-0 p-2 text-gray-500 hover:text-primary-600 hover:bg-white rounded-md transition-colors"
-                      aria-label={`Download ${attachment.originalName}`}
-                    >
-                      <Download className="h-4 w-4" />
-                    </a>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <div className="border-t pt-4 mt-4">
+            <AttachmentList
+              attachments={attachments}
+              onDownload={handleDownload}
+              onDelete={handleDeleteAttachment}
+              isDeleting={isDeleting}
+              currentUserId={user?.id}
+            />
+          </div>
+
+          <div className="border-t pt-4 mt-4">
+            <h4 className="text-sm font-medium text-gray-700 mb-2">Add Attachments</h4>
+            <AttachmentUploader onUpload={handleUpload} />
+          </div>
 
           <div className="pt-4 border-t">
             <Button variant="outline" onClick={onClose} className="w-full">
