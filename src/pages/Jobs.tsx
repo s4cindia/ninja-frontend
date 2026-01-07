@@ -14,8 +14,10 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  RefreshCw
+  RefreshCw,
+  Eye
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 const STATUS_OPTIONS = [
@@ -129,7 +131,7 @@ export function Jobs() {
         <div className="bg-white rounded-lg shadow p-4">
           <div className="text-sm text-gray-500">Total</div>
           <div className="text-2xl font-bold text-gray-900">
-            {stats?.total ?? '-'}
+            {stats?.total ?? pagination.total ?? '-'}
           </div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
@@ -306,16 +308,24 @@ export function Jobs() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        {(job.status === 'QUEUED' || job.status === 'PROCESSING') && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCancel(job.id)}
-                            disabled={cancelJob.isPending}
-                          >
-                            Cancel
-                          </Button>
-                        )}
+                        <div className="flex items-center justify-end gap-2">
+                          <Link to={`/jobs/${job.id}`}>
+                            <Button variant="ghost" size="sm">
+                              <Eye className="w-4 h-4 mr-1" />
+                              View
+                            </Button>
+                          </Link>
+                          {(job.status === 'QUEUED' || job.status === 'PROCESSING') && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleCancel(job.id)}
+                              disabled={cancelJob.isPending}
+                            >
+                              Cancel
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
