@@ -72,10 +72,13 @@ const SourceCard: React.FC<SourceCardProps> = ({
         
         <div className="mt-4 text-center">
           <span className={cn('text-3xl font-bold', theme.accent)}>
-            {data.fixable !== undefined ? data.fixable : (data.autoFixable !== undefined ? data.autoFixable : data.total)}
+            {data.total}
           </span>
           <p className="text-xs text-gray-500 mt-1">
-            {(data.fixable !== undefined || data.autoFixable !== undefined) ? 'fixable' : 'issues'}
+            {data.total === 1 ? 'issue' : 'issues'}
+            {data.autoFixable !== undefined && data.autoFixable > 0 && (
+              <span className="ml-1 text-green-600">({data.autoFixable} fixable)</span>
+            )}
           </p>
         </div>
         
