@@ -143,19 +143,16 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
             <FileText className="h-8 w-8 text-gray-400" />
             <div>
               <p className="font-medium text-gray-900">{plan.epubFileName}</p>
-              <p className="text-sm text-gray-500">{totalTasks} issues to address</p>
+              <p className="text-sm text-gray-500">
+                {totalTasks} issues to address
+                {excludedIssues > 0 && (
+                  <span className="text-amber-600 ml-1">
+                    ({excludedIssues} issue{excludedIssues !== 1 ? 's' : ''} ha{excludedIssues !== 1 ? 've' : 's'} no automated fix)
+                  </span>
+                )}
+              </p>
             </div>
           </div>
-
-          {excludedIssues > 0 && (
-            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
-              <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-              <div className="text-amber-800">
-                <span className="font-medium">{excludedIssues} issue{excludedIssues !== 1 ? 's' : ''}</span>
-                {' '}from the audit {excludedIssues !== 1 ? 'have' : 'has'} no available automated fix and must be addressed manually outside this tool.
-              </div>
-            </div>
-          )}
 
           <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
             <div className="flex items-center gap-2">
