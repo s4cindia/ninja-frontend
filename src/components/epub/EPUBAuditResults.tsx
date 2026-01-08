@@ -255,16 +255,8 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
     for (const source of sources) {
       const sourceIssues = issues.filter(i => i.source === source);
       if (sourceIssues.length > 0 || source === 'js-auditor') {
-        // Use API stats.byFixType if available for JS Auditor
-        const apiStats = result?.stats?.byFixType;
-        const autoFixable = source === 'js-auditor' 
-          ? (apiStats?.auto ?? sourceIssues.filter(isAutoFixable).length)
-          : sourceIssues.filter(isAutoFixable).length;
-        const quickFixable = source === 'js-auditor' ? (apiStats?.quickfix ?? 0) : 0;
-        // Combined fixable = auto + quickfix (excludes manual)
-        const fixable = source === 'js-auditor' 
-          ? (apiStats ? (apiStats.auto + apiStats.quickfix) : autoFixable)
-          : undefined;
+        // Compute autoFixable per-source (not global stats)
+        const autoFixable = sourceIssues.filter(isAutoFixable).length;
         
         summary[source] = {
           critical: sourceIssues.filter(i => i.severity === 'critical').length,
@@ -272,12 +264,12 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
           moderate: sourceIssues.filter(i => i.severity === 'moderate').length,
           minor: sourceIssues.filter(i => i.severity === 'minor').length,
           total: sourceIssues.length,
-          ...(source === 'js-auditor' ? { autoFixable, quickFixable, fixable } : {}),
+          ...(source === 'js-auditor' ? { autoFixable } : {}),
         };
       }
     }
     return summary;
-  }, [result?.summaryBySource, result?.stats?.byFixType, issues]);
+  }, [result?.summaryBySource, issues]);
 
   const [sourceFilter, setSourceFilter] = useState<'epubcheck' | 'ace' | 'js-auditor' | null>(null);
 
