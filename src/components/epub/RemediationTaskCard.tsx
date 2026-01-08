@@ -21,6 +21,7 @@ import DOMPurify from "dompurify";
 import { hasQuickFixTemplate } from "@/data/quickFixTemplates";
 import { QuickFixPanel } from "@/components/quickfix/QuickFixPanel";
 import { FixTypeBadge } from "@/components/remediation/FixTypeBadge";
+import { getWcagUrl } from "@/utils/wcag";
 import type { QuickFix } from "@/types/quickfix.types";
 
 function escapeHtml(text: string): string {
@@ -152,7 +153,7 @@ const sourceConfig: Record<string, { bgColor: string; textColor: string }> = {
 };
 
 const WcagBadge: React.FC<{ criterion: string }> = ({ criterion }) => {
-  const wcagUrl = `https://www.w3.org/WAI/WCAG21/Understanding/${criterion.toLowerCase().replace(".", "")}`;
+  const wcagUrl = getWcagUrl(criterion);
 
   return (
     <a

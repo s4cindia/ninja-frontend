@@ -12,6 +12,7 @@ import {
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { getWcagUrl } from '@/utils/wcag';
 import type { AccessibilityIssue, IssueSeverity, IssueStatus } from '@/services/accessibility.service';
 
 interface IssueTableProps {
@@ -208,7 +209,7 @@ function IssueRow({
                   {issue.wcagCriteria.map((criteria) => (
                     <a
                       key={criteria}
-                      href={`https://www.w3.org/WAI/WCAG21/Understanding/${criteria.toLowerCase().replace(/\./g, '')}`}
+                      href={getWcagUrl(criteria)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700"

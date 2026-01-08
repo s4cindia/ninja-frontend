@@ -13,6 +13,7 @@ import { QuickRating } from '../feedback';
 import { SourceBadge, SummaryBySource, ViewInContextButton, RemediationGuidance, ScoreTooltip, calculateScoreBreakdown } from '../audit';
 import type { SummaryBySourceData } from '../audit';
 import { cn } from '@/utils/cn';
+import { getWcagUrl } from '@/utils/wcag';
 
 type Severity = 'critical' | 'serious' | 'moderate' | 'minor';
 type IssueSource = 'js-auditor' | 'ace' | 'epubcheck' | 'manual';
@@ -526,7 +527,7 @@ const IssueCard: React.FC<{ issue: AuditIssue; jobId: string }> = ({ issue, jobI
             )}
             {issue.wcagCriteria && typeof issue.wcagCriteria === 'string' && (
               <a
-                href={`https://www.w3.org/WAI/WCAG21/Understanding/${issue.wcagCriteria.toLowerCase().replace(/\./g, '')}`}
+                href={getWcagUrl(issue.wcagCriteria)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-block"
