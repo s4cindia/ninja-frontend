@@ -35,6 +35,59 @@ Ninja is an EPUB/PDF Accessibility Platform that provides accessibility auditing
 - **CI/CD:** GitHub Actions
 - **Database:** Neon PostgreSQL (serverless)
 
+---
+
+## Visual Comparison Feature (Active Development)
+
+### Feature Overview
+Side-by-side visual comparison of remediation changes with:
+- XML diff view with syntax highlighting
+- Issue navigation (prev/next)
+- Filtering by type, severity, status
+- PDF export for compliance documentation (Phase 2)
+
+### Implementation Status
+- [ ] B1: Database schema
+- [ ] B2: Comparison service
+- [ ] B3: Controller & routes
+- [ ] B4: Remediation service integration
+- [ ] F1: Types & API service
+- [ ] F2: React Query hooks
+- [ ] F3: UI components
+- [ ] F4: Page & route integration
+
+### New Models
+- `RemediationChange` - Individual change records
+- `ComparisonReport` - Generated reports with PDF URLs
+- `ChangeReview` - Review/approval records (Phase 3)
+
+### New Files
+**Backend:**
+- `src/services/comparison/comparison.service.ts`
+- `src/controllers/comparison.controller.ts`
+- `src/routes/comparison.routes.ts`
+- `src/types/comparison.types.ts`
+
+**Frontend:**
+- `src/pages/ComparisonPage.tsx`
+- `src/components/comparison/*`
+- `src/services/comparison.service.ts`
+- `src/hooks/useComparison.ts`
+
+### API Endpoints
+- `GET /api/v1/jobs/:jobId/comparison` - Get comparison data
+- `GET /api/v1/jobs/:jobId/comparison/changes/:changeId` - Single change
+- `GET /api/v1/jobs/:jobId/comparison/filter` - Filtered results
+- `POST /api/v1/jobs/:jobId/comparison/export-pdf` - Export PDF (Phase 2)
+
+### Session Checkpoint
+**Updated:** [DATE TIME]  
+**Last completed:** [Step name]  
+**Next step:** [Step name]  
+**Blockers:** [None / Description]
+
+---
+
 ## Key Directories
 
 ### Backend (`ninja-backend`)
@@ -43,9 +96,14 @@ Ninja is an EPUB/PDF Accessibility Platform that provides accessibility auditing
 src/
 ├── controllers/     # Route handlers
 ├── services/        # Business logic
+│   ├── comparison/  # NEW: Visual Comparison service
+│   └── ...
 ├── routes/          # Express route definitions
 ├── middleware/      # Auth, validation, error handling
 ├── schemas/         # Zod validation schemas
+├── types/           # TypeScript types
+│   ├── comparison.types.ts  # NEW
+│   └── ...
 ├── utils/           # Helpers and utilities
 prisma/
 ├── schema.prisma    # Database schema
@@ -62,15 +120,26 @@ src/
 │   ├── ui/          # Base components (Button, Card, etc.)
 │   ├── files/       # Files-related components
 │   ├── epub/        # EPUB audit/remediation components
+│   ├── comparison/  # NEW: Visual Comparison components
 │   └── acr/         # ACR workflow components
 ├── pages/           # Route pages
+│   ├── ComparisonPage.tsx  # NEW
+│   └── ...
 ├── services/        # API service functions
+│   ├── comparison.service.ts  # NEW
+│   └── ...
 ├── hooks/           # React Query hooks
-├── utils/           # Helper functions
+│   ├── useComparison.ts  # NEW
+│   └── ...
 ├── types/           # TypeScript types
+│   ├── comparison.ts  # NEW
+│   └── ...
+├── utils/           # Helper functions
 .github/
 └── workflows/       # CI/CD pipelines
 ```
+
+---
 
 ## Development Workflow
 
@@ -108,10 +177,35 @@ src/
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
-Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 ```
 
 Types: `feat`, `fix`, `chore`, `ci`, `refactor`, `docs`, `test`
+
+### Multi-Session Workflow
+
+When resuming work after a break:
+
+1. **Pull latest changes:**
+   ```bash
+   git pull origin feature/visual-comparison
+   ```
+
+2. **Check checkpoint** in this file (Session Checkpoint section)
+
+3. **Review pending items:**
+   - CodeRabbit comments on open PR
+   - CI/CD test results
+   - Any blockers noted
+
+4. **Continue from checkpoint** with context prompt:
+   ```
+   Continuing Visual Comparison implementation.
+   Status: [from checkpoint]
+   Next: [from checkpoint]
+   ```
+
+---
 
 ## Database
 
@@ -134,11 +228,144 @@ DATABASE_URL="..." npx prisma migrate resolve --applied migration_name
 npx prisma studio
 ```
 
+### New Models (Visual Comparison)
+
+```prisma
+model RemediationChange {
+  id              String       @id @default(uuid())
+  jobId           String
+  job             Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  changeNumber    Int
+  filePath        String
+  changeType      String
+  description     String
+  beforeContent   String?      @db.Text
+  afterContent    String?      @db.Text
+  severity        String?
+  wcagCriteria    String?
+  status          ChangeStatus @default(APPLIED)
+  appliedAt       DateTime     @default(now())
+
+  @@index([jobId])
+  @@index([status])
+}
+
+enum ChangeStatus {
+  APPLIED
+  REJECTED
+  REVERTED
+  FAILED
+  SKIPPED
+}
+
+model ComparisonReport {
+  id              String   @id @default(uuid())
+  jobId           String   @unique
+  job             Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  totalChanges    Int
+  appliedCount    Int
+  rejectedCount   Int
+  reportData      Json?
+  pdfUrl          String?
+  generatedAt     DateTime @default(now())
+}
+```
+
 ### Staging Database
 
 - **Host:** `ep-falling-hall-a16iblwt-pooler.ap-southeast-1.aws.neon.tech`
 - **Database:** `neondb`
 - **Credentials:** Stored in Bitwarden and AWS Secrets Manager
+
+---
+
+## Testing Patterns
+
+### Backend (Jest)
+
+```typescript
+// Service test pattern
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { mockDeep, mockReset, DeepMockProxy } from 'jest-mock-extended';
+import { PrismaClient } from '@prisma/client';
+
+describe('ServiceName', () => {
+  let prisma: DeepMockProxy<PrismaClient>;
+  let service: ServiceClass;
+
+  beforeEach(() => {
+    prisma = mockDeep<PrismaClient>();
+    service = new ServiceClass(prisma as unknown as PrismaClient);
+  });
+
+  afterEach(() => {
+    mockReset(prisma);
+  });
+
+  it('should do something', async () => {
+    prisma.model.findMany.mockResolvedValue([...]);
+    const result = await service.method();
+    expect(result).toEqual(...);
+  });
+});
+```
+
+### Frontend (Vitest + React Testing Library)
+
+```typescript
+// Component test pattern
+import { describe, it, expect, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { server } from '../mocks/server';
+import { rest } from 'msw';
+
+describe('ComponentName', () => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } }
+  });
+
+  beforeEach(() => {
+    server.use(
+      rest.get('/api/endpoint', (req, res, ctx) => 
+        res(ctx.json({ success: true, data: mockData }))
+      )
+    );
+  });
+
+  it('should render correctly', async () => {
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Component />
+      </QueryClientProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Expected Text')).toBeInTheDocument();
+    });
+  });
+});
+```
+
+### Running Tests
+
+```bash
+# Backend
+npm test                    # Run all tests
+npm test -- --watch         # Watch mode
+npm test -- --coverage      # With coverage
+
+# Frontend
+npm test                    # Run all tests
+npm test -- --watch         # Watch mode
+npm run test:coverage       # With coverage
+
+# E2E (Playwright)
+npx playwright test
+npx playwright test --headed  # See browser
+```
+
+---
 
 ## AWS Infrastructure
 
@@ -168,6 +395,8 @@ Required permissions for CI/CD:
 - `ecr:*` (push images)
 - `ecs:*` (deploy services, run tasks)
 - `iam:PassRole` (for ECS task roles)
+
+---
 
 ## Key Patterns
 
@@ -226,12 +455,20 @@ router.post('/bulk/delete', ...);
 router.get('/:id', ...);  // Parameterized route last
 ```
 
+---
+
 ## Common Issues & Solutions
 
 ### CORS Errors on Staging
 
 - Check CloudFront Origin Request Policy is set to `CORS-S3Origin`
 - Verify `corsOrigins` in backend config includes frontend domain
+
+### WAF Blocking File Uploads
+
+- **Symptom:** `403 Forbidden` with `x-cache: Error from cloudfront` on multipart uploads
+- **Cause:** CloudFront WAF "Core protections" blocks multipart/form-data
+- **Solution:** Use presigned S3 URLs for direct uploads (see PRESIGNED_S3_UPLOAD_DESIGN.md)
 
 ### Prisma Migration Issues
 
@@ -244,6 +481,8 @@ router.get('/:id', ...);  // Parameterized route last
 - Check CloudWatch logs: `/ecs/ninja-backend-task`
 - Verify IAM permissions for the task execution role
 - Check security group allows outbound traffic
+
+---
 
 ## File-Specific Notes
 
@@ -262,8 +501,11 @@ router.get('/:id', ...);  // Parameterized route last
 3. View audit results with issues
 4. Create remediation plan
 5. Apply fixes (auto/manual)
-6. Re-audit to verify fixes
-7. Export remediated EPUB
+6. **NEW: Review changes (Visual Comparison)**
+7. Re-audit to verify fixes
+8. Export remediated EPUB
+
+---
 
 ## Useful Commands
 
@@ -296,6 +538,17 @@ gh run rerun --failed
 gh variable set VAR_NAME --body "value"
 ```
 
+---
+
 ## Related Documentation
 
-- [Workflow Lineage Design](./WORKFLOW_LINEAGE_DESIGN.md) - Design for tracking document audit/remediation cycles
+- [Visual Comparison Design](./VISUAL_COMPARISON_DESIGN.md) - Feature design
+- [Visual Comparison Prompts](./VISUAL_COMPARISON_IMPLEMENTATION_PROMPTS.md) - Implementation prompts
+- [Visual Comparison Tests](./VISUAL_COMPARISON_TESTS.md) - Test specifications
+- [Workflow Lineage Design](./WORKFLOW_LINEAGE_DESIGN.md) - Workflow tracking
+- [Feedback Enhancement Design](./FEEDBACK_ENHANCEMENT_DESIGN.md) - Feedback features
+- [EPUB User Guide](./EPUB_AUDIT_REMEDIATION_USER_GUIDE.md) - User documentation
+
+---
+
+*Last updated: January 8, 2026*
