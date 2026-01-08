@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Download, Package, FileText, FileJson, Loader2, CheckCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Download, Package, FileText, FileJson, Loader2, CheckCircle, Eye } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
@@ -691,6 +692,16 @@ ${modifications.map(mod => {
                   </>
                 )}
               </Button>
+
+              {fixedCount > 0 && (
+                <Link
+                  to={`/remediation/${jobId}/comparison`}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  <Eye className="h-4 w-4" />
+                  Review Changes
+                </Link>
+              )}
             </div>
           </div>
         </div>
