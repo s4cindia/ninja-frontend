@@ -13,7 +13,7 @@ import { QuickRating } from '../feedback';
 import { SourceBadge, SummaryBySource, ViewInContextButton, RemediationGuidance, ScoreTooltip, calculateScoreBreakdown } from '../audit';
 import type { SummaryBySourceData } from '../audit';
 import { cn } from '@/utils/cn';
-import { getWcagUrl } from '@/utils/wcag';
+import { getWcagUrl, getWcagTooltip, formatWcagLabel } from '@/utils/wcag';
 
 type Severity = 'critical' | 'serious' | 'moderate' | 'minor';
 type IssueSource = 'js-auditor' | 'ace' | 'epubcheck' | 'manual';
@@ -530,11 +530,12 @@ const IssueCard: React.FC<{ issue: AuditIssue; jobId: string }> = ({ issue, jobI
                 href={getWcagUrl(issue.wcagCriteria)}
                 target="_blank"
                 rel="noopener noreferrer"
+                title={getWcagTooltip(issue.wcagCriteria)}
                 className="inline-block"
               >
                 <Badge variant="info" size="sm" className="hover:bg-blue-200 cursor-pointer transition-colors">
                   <ExternalLink className="h-3 w-3 mr-1" />
-                  {issue.wcagCriteria}
+                  {formatWcagLabel(issue.wcagCriteria)}
                 </Badge>
               </a>
             )}

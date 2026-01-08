@@ -21,7 +21,7 @@ import DOMPurify from "dompurify";
 import { hasQuickFixTemplate } from "@/data/quickFixTemplates";
 import { QuickFixPanel } from "@/components/quickfix/QuickFixPanel";
 import { FixTypeBadge } from "@/components/remediation/FixTypeBadge";
-import { getWcagUrl } from "@/utils/wcag";
+import { getWcagUrl, getWcagTooltip, formatWcagLabel } from "@/utils/wcag";
 import type { QuickFix } from "@/types/quickfix.types";
 
 function escapeHtml(text: string): string {
@@ -154,16 +154,19 @@ const sourceConfig: Record<string, { bgColor: string; textColor: string }> = {
 
 const WcagBadge: React.FC<{ criterion: string }> = ({ criterion }) => {
   const wcagUrl = getWcagUrl(criterion);
+  const tooltip = getWcagTooltip(criterion);
+  const label = formatWcagLabel(criterion);
 
   return (
     <a
       href={wcagUrl}
       target="_blank"
       rel="noopener noreferrer"
+      title={tooltip}
       className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
       onClick={(e) => e.stopPropagation()}
     >
-      WCAG {criterion}
+      {label}
       <ExternalLink className="h-3 w-3" />
     </a>
   );

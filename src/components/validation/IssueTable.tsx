@@ -12,7 +12,7 @@ import {
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { getWcagUrl } from '@/utils/wcag';
+import { getWcagUrl, getWcagTooltip, formatWcagLabel } from '@/utils/wcag';
 import type { AccessibilityIssue, IssueSeverity, IssueStatus } from '@/services/accessibility.service';
 
 interface IssueTableProps {
@@ -112,9 +112,10 @@ function IssueRow({
             {issue.wcagCriteria.slice(0, 2).map((criteria) => (
               <span 
                 key={criteria}
+                title={getWcagTooltip(criteria)}
                 className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700"
               >
-                {criteria}
+                {formatWcagLabel(criteria)}
               </span>
             ))}
             {issue.wcagCriteria.length > 2 && (
@@ -212,9 +213,10 @@ function IssueRow({
                       href={getWcagUrl(criteria)}
                       target="_blank"
                       rel="noopener noreferrer"
+                      title={getWcagTooltip(criteria)}
                       className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700"
                     >
-                      {criteria}
+                      {formatWcagLabel(criteria)}
                       <ExternalLink className="h-3 w-3" aria-hidden="true" />
                     </a>
                   ))}
