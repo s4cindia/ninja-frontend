@@ -926,9 +926,10 @@ export const EPUBRemediation: React.FC = () => {
         const auditData = auditResponse.data?.data || auditResponse.data;
         
         // Set total audit issues count
-        const issuesCount = auditData?.issuesSummary?.total 
-          ?? auditData?.issues?.length 
-          ?? auditData?.totalIssues;
+        const issuesCount = auditData?.summary?.total 
+          ?? auditData?.combinedIssues?.length 
+          ?? auditData?.issuesSummary?.total
+          ?? auditData?.issues?.length;
         if (issuesCount !== undefined) {
           setTotalAuditIssues(issuesCount);
         }
