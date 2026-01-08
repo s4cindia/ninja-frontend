@@ -24,6 +24,7 @@ interface RemediationPlanViewProps {
   isRunningRemediation: boolean;
   currentTask: string | null;
   completedFixes: FixResult[];
+  totalAuditIssues?: number;
   onRunAutoRemediation: () => void;
   onCancelRemediation?: () => void;
   onMarkTaskFixed?: (taskId: string, notes?: string) => Promise<void>;
@@ -36,6 +37,7 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
   isRunningRemediation,
   currentTask,
   completedFixes,
+  totalAuditIssues,
   onRunAutoRemediation,
   onCancelRemediation,
   onMarkTaskFixed,
@@ -106,6 +108,9 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
   const failedTasks = plan.tasks.filter(t => t.status === 'failed');
   const pendingAutoTasks = autoTasks.filter(t => t.status === 'pending');
   const pendingQuickFixTasks = quickFixTasks.filter(t => t.status === 'pending');
+  const excludedIssues = totalAuditIssues !== undefined && totalAuditIssues > totalTasks 
+    ? totalAuditIssues - totalTasks 
+    : 0;
 
   const completionPercent = totalTasks > 0 
     ? Math.round((completedTasks.length / totalTasks) * 100) 
@@ -138,7 +143,14 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
             <FileText className="h-8 w-8 text-gray-400" />
             <div>
               <p className="font-medium text-gray-900">{plan.epubFileName}</p>
-              <p className="text-sm text-gray-500">{totalTasks} issues to address</p>
+              <p className="text-sm text-gray-500">
+                {totalTasks} issues to address
+                {excludedIssues > 0 && (
+                  <span className="text-amber-600 ml-1">
+                    ({excludedIssues} issue{excludedIssues !== 1 ? 's' : ''} ha{excludedIssues !== 1 ? 've' : 's'} no automated fix)
+                  </span>
+                )}
+              </p>
             </div>
           </div>
 
