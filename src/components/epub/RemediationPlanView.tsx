@@ -24,6 +24,7 @@ interface RemediationPlanViewProps {
   isRunningRemediation: boolean;
   currentTask: string | null;
   completedFixes: FixResult[];
+  totalAuditIssues?: number;
   onRunAutoRemediation: () => void;
   onCancelRemediation?: () => void;
   onMarkTaskFixed?: (taskId: string, notes?: string) => Promise<void>;
@@ -36,6 +37,7 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
   isRunningRemediation,
   currentTask,
   completedFixes,
+  totalAuditIssues,
   onRunAutoRemediation,
   onCancelRemediation,
   onMarkTaskFixed,
@@ -106,6 +108,9 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
   const failedTasks = plan.tasks.filter(t => t.status === 'failed');
   const pendingAutoTasks = autoTasks.filter(t => t.status === 'pending');
   const pendingQuickFixTasks = quickFixTasks.filter(t => t.status === 'pending');
+  const excludedIssues = totalAuditIssues !== undefined && totalAuditIssues > totalTasks 
+    ? totalAuditIssues - totalTasks 
+    : 0;
 
   const completionPercent = totalTasks > 0 
     ? Math.round((completedTasks.length / totalTasks) * 100) 
@@ -141,6 +146,16 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
               <p className="text-sm text-gray-500">{totalTasks} issues to address</p>
             </div>
           </div>
+
+          {excludedIssues > 0 && (
+            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+              <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div className="text-amber-800">
+                <span className="font-medium">{excludedIssues} issue{excludedIssues !== 1 ? 's' : ''}</span>
+                {' '}from the audit {excludedIssues !== 1 ? 'have' : 'has'} no available automated fix and must be addressed manually outside this tool.
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
             <div className="flex items-center gap-2">

@@ -904,6 +904,8 @@ export const EPUBRemediation: React.FC = () => {
   const [apiStats, setApiStats] = useState<{
     byFixType?: { auto: number; quickfix: number; manual: number };
   } | null>(null);
+  // Track total audit issues to show excluded count
+  const [totalAuditIssues, setTotalAuditIssues] = useState<number | undefined>(undefined);
 
   // Persist filename to localStorage when it changes
   useEffect(() => {
@@ -912,22 +914,35 @@ export const EPUBRemediation: React.FC = () => {
     }
   }, [fileName, jobId]);
 
-  // Fetch filename from API if not available
+  // Fetch filename and total audit issues from API
   useEffect(() => {
-    const fetchFileName = async () => {
-      if (fileName === "Loading..." && jobId) {
-        try {
-          const auditResponse = await api.get(
-            `/epub/job/${jobId}/audit/result`,
-          );
-          const auditData = auditResponse.data?.data || auditResponse.data;
-          if (auditData?.fileName) {
-            setFileName(auditData.fileName);
-            return;
-          }
-        } catch {
-          // Try job endpoint
+    const fetchAuditInfo = async () => {
+      if (!jobId) return;
+      
+      try {
+        const auditResponse = await api.get(
+          `/epub/job/${jobId}/audit/result`,
+        );
+        const auditData = auditResponse.data?.data || auditResponse.data;
+        
+        // Set total audit issues count
+        const issuesCount = auditData?.issuesSummary?.total 
+          ?? auditData?.issues?.length 
+          ?? auditData?.totalIssues;
+        if (issuesCount !== undefined) {
+          setTotalAuditIssues(issuesCount);
         }
+        
+        // Set filename if still loading
+        if (fileName === "Loading..." && auditData?.fileName) {
+          setFileName(auditData.fileName);
+          return;
+        }
+      } catch {
+        // Try job endpoint for filename
+      }
+      
+      if (fileName === "Loading...") {
         try {
           const jobResponse = await api.get(`/jobs/${jobId}`);
           const jobData = jobResponse.data?.data || jobResponse.data;
@@ -942,7 +957,7 @@ export const EPUBRemediation: React.FC = () => {
         setFileName("document.epub");
       }
     };
-    fetchFileName();
+    fetchAuditInfo();
   }, [jobId, fileName]);
 
   // Load comparison summary when returning with status=completed
@@ -1694,6 +1709,7 @@ export const EPUBRemediation: React.FC = () => {
         isRunningRemediation={pageState === "running"}
         currentTask={currentTask}
         completedFixes={completedFixes}
+        totalAuditIssues={totalAuditIssues}
         onRunAutoRemediation={handleRunAutoRemediation}
         onCancelRemediation={handleCancelRemediation}
         onMarkTaskFixed={handleMarkTaskFixed}
