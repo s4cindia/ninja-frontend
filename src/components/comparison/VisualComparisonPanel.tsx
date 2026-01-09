@@ -36,7 +36,7 @@ export function VisualComparisonPanel({ jobId, changeId }: VisualComparisonPanel
     );
   }
 
-  if (!visualData) {
+  if (!visualData || !visualData.beforeContent || !visualData.afterContent) {
     return (
       <div className="flex items-center justify-center h-96">
         <p className="text-gray-500 italic">No visual preview available</p>
