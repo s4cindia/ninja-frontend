@@ -45,13 +45,36 @@ export const jobsService = {
     const response = await api.get('/jobs', { params: filters });
     const responseData = response.data;
 
-    const jobs = Array.isArray(responseData.data) ? responseData.data : responseData.data?.jobs || [];
-    const pagination = responseData.pagination || responseData.data?.pagination || {
-      page: filters?.page || 1,
-      limit: filters?.limit || 20,
-      total: jobs.length,
-      pages: 1,
-    };
+    let jobs: Job[];
+    let pagination: JobsListResponse['pagination'];
+
+    // Expected backend response: { data: { jobs: [...], pagination: { total, page, limit, pages } } }
+    if (Array.isArray(responseData.data)) {
+      console.warn('[jobs.service] Non-standard response: responseData.data is an array, expected { jobs, pagination }', { responseData });
+      jobs = responseData.data;
+    } else if (responseData.data?.jobs) {
+      jobs = responseData.data.jobs;
+    } else {
+      console.warn('[jobs.service] Non-standard response: responseData.data.jobs is absent', { responseData });
+      jobs = [];
+    }
+
+    if (responseData.data?.pagination) {
+      pagination = responseData.data.pagination;
+    } else if (responseData.pagination) {
+      console.warn('[jobs.service] Non-standard response: using responseData.pagination instead of responseData.data.pagination', { responseData });
+      pagination = responseData.pagination;
+    } else {
+      console.warn('[jobs.service] Non-standard response: pagination is absent, using fallback', { responseData });
+      const total = responseData.total ?? responseData.data?.total;
+      const limit = filters?.limit || 20;
+      pagination = {
+        page: filters?.page || 1,
+        limit,
+        total: total ?? 0,
+        pages: (total !== undefined && limit) ? Math.ceil(total / limit) : 1,
+      };
+    }
 
     return { jobs, pagination };
   },
