@@ -378,7 +378,7 @@ export const RemediationWorkflow: React.FC<RemediationWorkflowProps> = ({
           </div>
         );
 
-      case 'review':
+      case 'review': {
         const handleViewFullComparison = () => {
           const typeParam = `?type=${contentType}`;
           navigate(`/remediation/${jobId}/comparison${typeParam}`);
@@ -417,6 +417,7 @@ export const RemediationWorkflow: React.FC<RemediationWorkflowProps> = ({
             )}
           </div>
         );
+      }
 
       case 'export':
         return (

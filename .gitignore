@@ -140,3 +140,4 @@ vite.config.ts.timestamp-*
 
 # Attached assets (Replit uploads)
 attached_assets/
+.replit

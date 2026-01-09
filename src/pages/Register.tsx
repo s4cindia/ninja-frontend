@@ -29,6 +29,7 @@ export function Register() {
       lastName: formData.lastName,
       email: formData.email,
       password: formData.password,
+      tenantId: import.meta.env.VITE_DEFAULT_TENANT_ID || undefined,
     });
   };
 

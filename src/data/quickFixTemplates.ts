@@ -873,7 +873,7 @@ const colorContrastTemplate: QuickFixTemplate = {
     },
   ],
   generateFix: (inputs, context): QuickFix => {
-    let foreground = (inputs.foregroundColor as string) || '#767676';
+    const foreground = (inputs.foregroundColor as string) || '#767676';
     const background = (inputs.backgroundColor as string) || '#ffffff';
     const targetLevel = (inputs.targetLevel as string) || 'aa-normal';
     const fixMethod = (inputs.fixMethod as string) || 'use-suggested';
