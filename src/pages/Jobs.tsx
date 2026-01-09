@@ -5,17 +5,15 @@ import { Spinner } from '@/components/ui/Spinner';
 import { useJobs, useJobStats, useCancelJob } from '@/hooks/useJobs';
 import { Job } from '@/services/jobs.service';
 import { getJobTypeLabel, extractFileNameFromJob, JOB_TYPE_LABELS } from '@/utils/jobTypes';
+import { getStatusIcon, getStatusBadgeClass, formatRelativeTime } from '@/utils/jobHelpers';
 import { 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  Loader2, 
   AlertCircle,
   ChevronLeft,
   ChevronRight,
   X,
   RefreshCw,
-  Eye
+  Eye,
+  Clock
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -33,56 +31,6 @@ const TYPE_OPTIONS = [
   { value: '', label: 'All Types' },
   ...Object.entries(JOB_TYPE_LABELS).map(([value, label]) => ({ value, label })),
 ];
-
-function getStatusIcon(status: string) {
-  switch (status) {
-    case 'QUEUED':
-      return <Clock className="w-4 h-4" />;
-    case 'PROCESSING':
-      return <Loader2 className="w-4 h-4 animate-spin" />;
-    case 'COMPLETED':
-      return <CheckCircle className="w-4 h-4" />;
-    case 'FAILED':
-      return <XCircle className="w-4 h-4" />;
-    case 'CANCELLED':
-      return <AlertCircle className="w-4 h-4" />;
-    default:
-      return null;
-  }
-}
-
-function getStatusBadgeClass(status: string) {
-  switch (status) {
-    case 'QUEUED':
-      return 'bg-gray-100 text-gray-800';
-    case 'PROCESSING':
-      return 'bg-blue-100 text-blue-800';
-    case 'COMPLETED':
-      return 'bg-green-100 text-green-800';
-    case 'FAILED':
-      return 'bg-red-100 text-red-800';
-    case 'CANCELLED':
-      return 'bg-yellow-100 text-yellow-800';
-    default:
-      return 'bg-gray-100 text-gray-800';
-  }
-}
-
-function formatRelativeTime(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSecs = Math.floor(diffMs / 1000);
-  const diffMins = Math.floor(diffSecs / 60);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffSecs < 60) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
-}
 
 export function Jobs() {
   const [page, setPage] = useState(1);
@@ -113,8 +61,10 @@ export function Jobs() {
     try {
       await cancelJob.mutateAsync(jobId);
       toast.success('Job cancelled successfully');
-    } catch {
-      toast.error('Failed to cancel job');
+    } catch (error) {
+      console.error('Failed to cancel job:', error);
+      const message = error instanceof Error ? error.message : 'Failed to cancel job';
+      toast.error(message);
     }
   };
 

@@ -5,72 +5,18 @@ import { Spinner } from '@/components/ui/Spinner';
 import { useJob, useCancelJob } from '@/hooks/useJobs';
 import { getJobTypeLabel, extractFileNameFromJob } from '@/utils/jobTypes';
 import { 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  Loader2, 
+  getStatusIcon, 
+  getStatusBadgeClass, 
+  formatDateTime, 
+  formatDuration 
+} from '@/utils/jobHelpers';
+import { 
   AlertCircle,
   ArrowLeft,
   Download,
   RefreshCw
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-
-function getStatusIcon(status: string) {
-  switch (status) {
-    case 'QUEUED':
-      return <Clock className="w-5 h-5" />;
-    case 'PROCESSING':
-      return <Loader2 className="w-5 h-5 animate-spin" />;
-    case 'COMPLETED':
-      return <CheckCircle className="w-5 h-5" />;
-    case 'FAILED':
-      return <XCircle className="w-5 h-5" />;
-    case 'CANCELLED':
-      return <AlertCircle className="w-5 h-5" />;
-    default:
-      return null;
-  }
-}
-
-function getStatusBadgeClass(status: string) {
-  switch (status) {
-    case 'QUEUED':
-      return 'bg-gray-100 text-gray-800';
-    case 'PROCESSING':
-      return 'bg-blue-100 text-blue-800';
-    case 'COMPLETED':
-      return 'bg-green-100 text-green-800';
-    case 'FAILED':
-      return 'bg-red-100 text-red-800';
-    case 'CANCELLED':
-      return 'bg-yellow-100 text-yellow-800';
-    default:
-      return 'bg-gray-100 text-gray-800';
-  }
-}
-
-function formatDateTime(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleString();
-}
-
-function formatDuration(startDate: string, endDate?: string): string {
-  const start = new Date(startDate);
-  const end = endDate ? new Date(endDate) : new Date();
-  const diffMs = end.getTime() - start.getTime();
-  const diffSecs = Math.floor(diffMs / 1000);
-  const diffMins = Math.floor(diffSecs / 60);
-  const diffHours = Math.floor(diffMins / 60);
-
-  if (diffHours > 0) {
-    return `${diffHours}h ${diffMins % 60}m`;
-  }
-  if (diffMins > 0) {
-    return `${diffMins}m ${diffSecs % 60}s`;
-  }
-  return `${diffSecs}s`;
-}
 
 export function JobDetails() {
   const { jobId } = useParams<{ jobId: string }>();
@@ -82,8 +28,10 @@ export function JobDetails() {
     try {
       await cancelJob.mutateAsync(jobId);
       toast.success('Job cancelled successfully');
-    } catch {
-      toast.error('Failed to cancel job');
+    } catch (error) {
+      console.error('Failed to cancel job:', error);
+      const message = error instanceof Error ? error.message : 'Failed to cancel job';
+      toast.error(message);
     }
   };
 
@@ -168,7 +116,7 @@ export function JobDetails() {
               <dt className="text-sm text-gray-500">Status</dt>
               <dd>
                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-sm font-medium ${getStatusBadgeClass(job.status)}`}>
-                  {getStatusIcon(job.status)}
+                  {getStatusIcon(job.status, 'md')}
                   {job.status}
                 </span>
               </dd>

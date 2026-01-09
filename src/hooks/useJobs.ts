@@ -34,6 +34,7 @@ export function useJobStats() {
   return useQuery({
     queryKey: ['jobStats'],
     queryFn: () => jobsService.getJobStats(),
+    staleTime: 30000,
     refetchInterval: 30000,
   });
 }
