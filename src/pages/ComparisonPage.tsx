@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Eye, Code } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { Alert } from '@/components/ui/Alert';
@@ -11,6 +11,7 @@ import {
   IssueNavigator,
   ComparisonPanel,
 } from '@/components/comparison';
+import { VisualComparisonPanel } from '@/components/comparison/VisualComparisonPanel';
 import { useFilteredComparison } from '@/hooks/useComparison';
 import type { ComparisonFilters } from '@/types/comparison';
 
@@ -19,6 +20,7 @@ export const ComparisonPage: React.FC = () => {
   const navigate = useNavigate();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [filters, setFilters] = useState<ComparisonFilters>({});
+  const [viewType, setViewType] = useState<'visual' | 'code'>('visual');
 
   const { data, isLoading, error } = useFilteredComparison(jobId || '', filters);
 
@@ -136,7 +138,43 @@ export const ComparisonPage: React.FC = () => {
             onNext={handleNext}
           />
 
-          {currentChange && <ComparisonPanel change={currentChange} />}
+          {currentChange && (
+            <>
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => setViewType('visual')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
+                    viewType === 'visual'
+                      ? 'bg-blue-500 text-white border-blue-500'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <Eye size={16} />
+                  Visual
+                </button>
+                <button
+                  onClick={() => setViewType('code')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
+                    viewType === 'code'
+                      ? 'bg-blue-500 text-white border-blue-500'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <Code size={16} />
+                  Code
+                </button>
+              </div>
+
+              {viewType === 'visual' ? (
+                <VisualComparisonPanel
+                  jobId={jobId}
+                  changeId={currentChange.id}
+                />
+              ) : (
+                <ComparisonPanel change={currentChange} />
+              )}
+            </>
+          )}
         </>
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
