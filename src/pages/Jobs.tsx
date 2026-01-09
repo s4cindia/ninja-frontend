@@ -335,11 +335,15 @@ export function Jobs() {
 
             {/* Pagination */}
             <div className="bg-gray-50 px-6 py-3 flex items-center justify-between border-t border-gray-200">
-              <div className="text-sm text-gray-500">
-                Showing {(pagination.page - 1) * pagination.limit + 1} to{' '}
-                {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
-                {pagination.total} jobs
-              </div>
+              {(() => {
+                const start = pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1;
+                const end = pagination.total === 0 ? 0 : Math.min(pagination.page * pagination.limit, pagination.total);
+                return (
+                  <div className="text-sm text-gray-500">
+                    Showing {start} to {end} of {pagination.total} jobs
+                  </div>
+                );
+              })()}
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
