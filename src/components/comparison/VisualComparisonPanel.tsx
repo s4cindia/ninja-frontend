@@ -46,6 +46,28 @@ export function VisualComparisonPanel({ jobId, changeId }: VisualComparisonPanel
 
   return (
     <div className="visual-comparison-panel h-full flex flex-col">
+      <div className="bg-blue-50 border-b border-blue-200 p-4">
+        <h3 className="font-semibold text-lg text-blue-900">
+          {visualData.change?.description || 'Visual Change'}
+        </h3>
+        <div className="flex gap-4 mt-2 text-sm text-gray-600">
+          {visualData.change?.changeType && (
+            <span>Type: <strong>{visualData.change.changeType}</strong></span>
+          )}
+          {visualData.spineItem?.href && (
+            <span>File: <strong>{visualData.spineItem.href}</strong></span>
+          )}
+          {visualData.change?.severity && (
+            <span>Severity: <strong>{visualData.change.severity}</strong></span>
+          )}
+        </div>
+        {visualData.highlightData?.xpath && (
+          <div className="mt-1 text-xs text-gray-500">
+            Location: {visualData.highlightData.xpath}
+          </div>
+        )}
+      </div>
+
       <div className="flex items-center gap-4 p-4 bg-gray-50 border-b">
         <div className="flex items-center gap-2">
           <button
