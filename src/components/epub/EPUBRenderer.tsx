@@ -45,7 +45,7 @@ function applyHighlights(
 ) {
   if (!highlights || highlights.length === 0) return;
 
-  highlights.forEach(highlight => {
+  highlights.forEach((highlight, highlightIndex) => {
     let elements: Element[] = [];
 
     if (highlight.cssSelector) {
@@ -60,7 +60,7 @@ function applyHighlights(
       elements = findByXPath(doc, highlight.xpath);
     }
 
-    elements.forEach(el => {
+    elements.forEach((el, elementIndex) => {
       el.classList.add(`change-highlight-${version}`);
 
       const tooltip = doc.createElement('div');
@@ -87,6 +87,19 @@ function applyHighlights(
       el.addEventListener('mouseleave', () => {
         tooltip.style.display = 'none';
       });
+
+      if (highlightIndex === 0 && elementIndex === 0) {
+        setTimeout(() => {
+          el.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+            inline: 'nearest'
+          });
+
+          el.classList.add('flash-highlight');
+          setTimeout(() => el.classList.remove('flash-highlight'), 2000);
+        }, 500);
+      }
     });
   });
 }
