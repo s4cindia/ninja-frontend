@@ -89,10 +89,35 @@ function applyHighlights(
         pointer-events: none;
         z-index: 1000;
         display: none;
+        top: -30px;
+        left: 0;
       `;
 
-      (el as HTMLElement).style.position = 'relative';
+      const badge = doc.createElement('div');
+      badge.className = 'change-badge';
+      badge.textContent = version === 'before' ? '❌ BEFORE' : '✓ AFTER';
+      badge.style.cssText = `
+        position: absolute;
+        top: -12px;
+        right: -12px;
+        background: ${version === 'before' ? '#ef4444' : '#22c55e'};
+        color: white;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 10px;
+        font-weight: bold;
+        z-index: 1001;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        pointer-events: none;
+      `;
+
+      const computedStyle = window.getComputedStyle(el as HTMLElement);
+      if (computedStyle.position === 'static') {
+        (el as HTMLElement).style.position = 'relative';
+      }
+      
       el.appendChild(tooltip);
+      el.appendChild(badge);
 
       el.addEventListener('mouseenter', () => {
         tooltip.style.display = 'block';
