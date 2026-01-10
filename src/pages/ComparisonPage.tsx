@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Eye, Code } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
@@ -13,6 +14,7 @@ import {
 } from '@/components/comparison';
 import { VisualComparisonPanel } from '@/components/comparison/VisualComparisonPanel';
 import { useFilteredComparison } from '@/hooks/useComparison';
+import { getVisualComparison } from '@/services/comparison.service';
 import type { ComparisonFilters } from '@/types/comparison';
 
 export const ComparisonPage: React.FC = () => {
@@ -23,6 +25,29 @@ export const ComparisonPage: React.FC = () => {
   const [viewType, setViewType] = useState<'visual' | 'code'>('visual');
 
   const { data, isLoading, error } = useFilteredComparison(jobId || '', filters);
+
+  const currentChange = data?.changes[currentIndex];
+
+  const { data: isVisualAvailable } = useQuery({
+    queryKey: ['visual-available', currentChange?.jobId, currentChange?.id],
+    queryFn: async () => {
+      try {
+        await getVisualComparison(currentChange!.jobId, currentChange!.id);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    enabled: !!currentChange?.jobId && !!currentChange?.id,
+    retry: false,
+    staleTime: 5 * 60 * 1000
+  });
+
+  useEffect(() => {
+    if (isVisualAvailable === false && viewType === 'visual') {
+      setViewType('code');
+    }
+  }, [isVisualAvailable, viewType]);
 
   const changeTypes = useMemo(() => {
     if (!data?.byType) return [];
@@ -103,8 +128,6 @@ export const ComparisonPage: React.FC = () => {
     );
   }
 
-  const currentChange = data.changes[currentIndex];
-
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-4">
       <Breadcrumbs
@@ -143,14 +166,19 @@ export const ComparisonPage: React.FC = () => {
               <div className="flex gap-2 mb-4">
                 <button
                   onClick={() => setViewType('visual')}
+                  disabled={!isVisualAvailable}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
                     viewType === 'visual'
                       ? 'bg-blue-500 text-white border-blue-500'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      : isVisualAvailable
+                        ? 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                        : 'bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed'
                   }`}
+                  title={!isVisualAvailable ? 'Visual comparison not available for metadata changes' : ''}
                 >
                   <Eye size={16} />
                   Visual
+                  {!isVisualAvailable && <span className="text-xs ml-1">(N/A)</span>}
                 </button>
                 <button
                   onClick={() => setViewType('code')}
