@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getVisualComparison } from '@/services/comparison.service';
 import { EPUBRenderer } from '../epub/EPUBRenderer';
-import { Loader2, ZoomIn, ZoomOut, Info, Code, AlertTriangle } from 'lucide-react';
+import { Loader2, ZoomIn, ZoomOut, Info, Code, AlertTriangle, Columns, Rows } from 'lucide-react';
 
 interface ChangeExplanation {
   title: string;
@@ -101,6 +101,7 @@ export function VisualComparisonPanel({
   const [zoom, setZoom] = useState(100);
   const [syncScroll, setSyncScroll] = useState(true);
   const [showCode, setShowCode] = useState(false);
+  const [layout, setLayout] = useState<'side-by-side' | 'stacked'>('side-by-side');
 
   const { data: visualData, isLoading, error } = useQuery({
     queryKey: ['visual-comparison', jobId, changeId],
@@ -333,16 +334,43 @@ export function VisualComparisonPanel({
           />
           <label htmlFor="sync-scroll" className="text-sm">Sync Scroll</label>
         </div>
+
+        <div className="flex items-center gap-2 ml-4 border-l border-gray-300 pl-4">
+          <button
+            onClick={() => setLayout('side-by-side')}
+            className={`p-2 border rounded ${
+              layout === 'side-by-side'
+                ? 'bg-blue-500 text-white border-blue-500'
+                : 'border-gray-300 hover:bg-gray-100'
+            }`}
+            title="Side by side"
+            aria-label="Side by side layout"
+          >
+            <Columns size={16} />
+          </button>
+          <button
+            onClick={() => setLayout('stacked')}
+            className={`p-2 border rounded ${
+              layout === 'stacked'
+                ? 'bg-blue-500 text-white border-blue-500'
+                : 'border-gray-300 hover:bg-gray-100'
+            }`}
+            title="Stacked"
+            aria-label="Stacked layout"
+          >
+            <Rows size={16} />
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-0 flex-1 overflow-hidden">
+      <div className={layout === 'side-by-side' ? 'grid grid-cols-2 gap-0 flex-1 overflow-hidden' : 'flex flex-col flex-1 overflow-hidden'}>
         <div
-          className="overflow-auto border-r border-gray-200"
+          className={`overflow-auto ${layout === 'side-by-side' ? 'border-r border-gray-200' : 'flex-1 border-b border-gray-200'}`}
           style={{
             transform: `scale(${zoom / 100})`,
             transformOrigin: 'top left',
             width: `${100 / (zoom / 100)}%`,
-            height: `${100 / (zoom / 100)}%`
+            height: layout === 'side-by-side' ? `${100 / (zoom / 100)}%` : `${50 / (zoom / 100)}%`
           }}
         >
           <div className="bg-red-50 px-4 py-2 sticky top-0 z-10 border-b border-red-200">
@@ -360,12 +388,12 @@ export function VisualComparisonPanel({
         </div>
 
         <div
-          className="overflow-auto"
+          className={`overflow-auto ${layout === 'stacked' ? 'flex-1' : ''}`}
           style={{
             transform: `scale(${zoom / 100})`,
             transformOrigin: 'top left',
             width: `${100 / (zoom / 100)}%`,
-            height: `${100 / (zoom / 100)}%`
+            height: layout === 'side-by-side' ? `${100 / (zoom / 100)}%` : `${50 / (zoom / 100)}%`
           }}
         >
           <div className="bg-green-50 px-4 py-2 sticky top-0 z-10 border-b border-green-200">
