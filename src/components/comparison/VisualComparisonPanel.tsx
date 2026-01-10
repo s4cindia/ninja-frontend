@@ -47,6 +47,26 @@ export function VisualComparisonPanel({
     retry: 1
   });
 
+  const effectiveHighlights = useMemo(() => {
+    const actualType = changeType || visualData?.change?.changeType;
+    const baseHighlight = visualData?.highlightData;
+    
+    if (baseHighlight?.xpath || baseHighlight?.cssSelector) {
+      return [baseHighlight];
+    }
+    
+    const fallbackSelector = getFallbackSelector(actualType);
+    if (fallbackSelector) {
+      return [{
+        xpath: '',
+        cssSelector: fallbackSelector,
+        description: changeDescription || visualData?.change?.description || 'Changed element'
+      }];
+    }
+    
+    return undefined;
+  }, [visualData, changeType, changeDescription]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96 bg-white rounded-lg border border-gray-200">
@@ -67,26 +87,6 @@ export function VisualComparisonPanel({
       </div>
     );
   }
-
-  const effectiveHighlights = useMemo(() => {
-    const actualType = changeType || visualData?.change?.changeType;
-    const baseHighlight = visualData?.highlightData;
-    
-    if (baseHighlight?.xpath || baseHighlight?.cssSelector) {
-      return [baseHighlight];
-    }
-    
-    const fallbackSelector = getFallbackSelector(actualType);
-    if (fallbackSelector) {
-      return [{
-        xpath: '',
-        cssSelector: fallbackSelector,
-        description: changeDescription || visualData?.change?.description || 'Changed element'
-      }];
-    }
-    
-    return undefined;
-  }, [visualData, changeType, changeDescription]);
 
   if (!visualData || !visualData.beforeContent || !visualData.afterContent) {
     return (
