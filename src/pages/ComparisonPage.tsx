@@ -28,13 +28,28 @@ export const ComparisonPage: React.FC = () => {
 
   const currentChange = data?.changes[currentIndex];
 
-  const { data: isVisualAvailable } = useQuery({
+  const { data: isVisualAvailable, isLoading: isCheckingVisual } = useQuery({
     queryKey: ['visual-available', currentChange?.jobId, currentChange?.id],
     queryFn: async () => {
+      const metadataFiles = ['content.opf', 'toc.ncx', 'nav.xhtml', '.opf'];
+      const isMetadataChange = metadataFiles.some(file =>
+        currentChange?.filePath?.toLowerCase().includes(file)
+      );
+
+      if (isMetadataChange) {
+        return false;
+      }
+
       try {
         await getVisualComparison(currentChange!.jobId, currentChange!.id);
         return true;
-      } catch {
+      } catch (error: unknown) {
+        const err = error as { response?: { status?: number }; message?: string };
+        if (err?.response?.status === 500 ||
+            err?.message?.includes('Spine item not found')) {
+          return false;
+        }
+        console.warn('Visual comparison check failed:', error);
         return false;
       }
     },
@@ -166,19 +181,26 @@ export const ComparisonPage: React.FC = () => {
               <div className="flex gap-2 mb-4">
                 <button
                   onClick={() => setViewType('visual')}
-                  disabled={!isVisualAvailable}
+                  disabled={!isVisualAvailable || isCheckingVisual}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
                     viewType === 'visual'
                       ? 'bg-blue-500 text-white border-blue-500'
-                      : isVisualAvailable
+                      : isVisualAvailable && !isCheckingVisual
                         ? 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                         : 'bg-gray-100 text-gray-400 border-gray-300 cursor-not-allowed'
                   }`}
-                  title={!isVisualAvailable ? 'Visual comparison not available for metadata changes' : ''}
+                  title={
+                    isCheckingVisual
+                      ? 'Checking availability...'
+                      : !isVisualAvailable
+                        ? 'Visual comparison not available for this change'
+                        : ''
+                  }
                 >
                   <Eye size={16} />
                   Visual
-                  {!isVisualAvailable && <span className="text-xs ml-1">(N/A)</span>}
+                  {isCheckingVisual && <span className="text-xs ml-1">(Checking...)</span>}
+                  {!isCheckingVisual && !isVisualAvailable && <span className="text-xs ml-1">(N/A)</span>}
                 </button>
                 <button
                   onClick={() => setViewType('code')}
