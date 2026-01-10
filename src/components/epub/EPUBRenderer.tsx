@@ -43,7 +43,12 @@ function applyHighlights(
   highlights: ChangeHighlight[] | undefined,
   version: 'before' | 'after'
 ) {
-  if (!highlights || highlights.length === 0) return;
+  if (!highlights || highlights.length === 0) {
+    console.log('[EPUBRenderer] No highlights to apply');
+    return;
+  }
+
+  console.log('[EPUBRenderer] Applying highlights:', highlights, 'version:', version);
 
   highlights.forEach((highlight, highlightIndex) => {
     let elements: Element[] = [];
@@ -51,16 +56,24 @@ function applyHighlights(
     if (highlight.cssSelector) {
       try {
         elements = Array.from(doc.querySelectorAll(highlight.cssSelector));
+        console.log(`[EPUBRenderer] CSS selector "${highlight.cssSelector}" found ${elements.length} elements`);
       } catch (error) {
-        console.warn('CSS selector failed:', error);
+        console.warn('[EPUBRenderer] CSS selector failed:', error);
       }
     }
 
     if (elements.length === 0 && highlight.xpath) {
       elements = findByXPath(doc, highlight.xpath);
+      console.log(`[EPUBRenderer] XPath "${highlight.xpath}" found ${elements.length} elements`);
+    }
+
+    if (elements.length === 0) {
+      console.warn('[EPUBRenderer] No elements found for highlight:', highlight);
+      return;
     }
 
     elements.forEach((el, elementIndex) => {
+      console.log(`[EPUBRenderer] Applying highlight to element ${elementIndex}:`, el.tagName, el);
       el.classList.add(`change-highlight-${version}`);
 
       const tooltip = doc.createElement('div');
@@ -123,6 +136,11 @@ export function EPUBRenderer({
     const doc = iframe.contentDocument || iframe.contentWindow?.document;
     if (!doc) return;
 
+    console.log('[EPUBRenderer] Rendering EPUB content, version:', version);
+    console.log('[EPUBRenderer] CSS files:', css.length);
+    console.log('[EPUBRenderer] BaseURL:', baseUrl);
+    console.log('[EPUBRenderer] Highlights:', highlights);
+
     const fullHtml = `
       <!DOCTYPE html>
       <html>
@@ -167,7 +185,9 @@ export function EPUBRenderer({
     doc.close();
 
     const handleLoad = () => {
+      console.log('[EPUBRenderer] Content loaded in iframe');
       applyHighlights(doc, highlights, version);
+      console.log('[EPUBRenderer] Highlights applied successfully');
       setIsLoaded(true);
       onLoad?.();
     };
