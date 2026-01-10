@@ -2,7 +2,68 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getVisualComparison } from '@/services/comparison.service';
 import { EPUBRenderer } from '../epub/EPUBRenderer';
-import { Loader2, ZoomIn, ZoomOut, Info } from 'lucide-react';
+import { Loader2, ZoomIn, ZoomOut, Info, Code, AlertTriangle } from 'lucide-react';
+
+interface ChangeExplanation {
+  title: string;
+  what: string;
+  why: string;
+  visual: string;
+  codeExample: boolean;
+}
+
+function getChangeExplanation(changeType?: string, changeDescription?: string): ChangeExplanation {
+  const desc = changeDescription?.toLowerCase() || '';
+  const type = changeType?.toLowerCase() || '';
+  
+  if (desc.includes('header') && desc.includes('table')) {
+    return {
+      title: "Table Header Accessibility Fix",
+      what: "Added semantic HTML table header elements (<thead> and <th> tags) to identify header rows.",
+      why: "Screen readers can now properly announce these rows as headers and allow users to navigate by table structure.",
+      visual: "The tables look identical visually, but the underlying HTML structure is now accessible.",
+      codeExample: true
+    };
+  }
+
+  if (type.includes('aria')) {
+    return {
+      title: "ARIA Attribute Enhancement",
+      what: "Added or updated ARIA (Accessible Rich Internet Applications) attributes.",
+      why: "ARIA attributes provide additional context to assistive technologies about the purpose and state of elements.",
+      visual: "No visual change - ARIA attributes are invisible but essential for screen readers.",
+      codeExample: false
+    };
+  }
+
+  if (desc.includes('alt')) {
+    return {
+      title: "Image Alt Text Addition",
+      what: "Added or improved alternative text descriptions for images.",
+      why: "Screen readers read alt text aloud, allowing blind users to understand image content.",
+      visual: "Alt text is not visible on screen but appears in the HTML code.",
+      codeExample: false
+    };
+  }
+
+  if (type.includes('struct')) {
+    return {
+      title: "Structural Accessibility Fix",
+      what: "Improved the semantic HTML structure for better accessibility.",
+      why: "Proper semantic structure helps assistive technologies understand and navigate content.",
+      visual: "Changes may not be visually obvious but improve the experience for users with disabilities.",
+      codeExample: false
+    };
+  }
+
+  return {
+    title: "Accessibility Enhancement",
+    what: "Made structural improvements to improve accessibility compliance.",
+    why: "These changes help assistive technologies better understand and navigate the content.",
+    visual: "Changes may not be visually obvious but improve the experience for users with disabilities.",
+    codeExample: false
+  };
+}
 
 function getFallbackSelector(changeType?: string): string | undefined {
   const normalizedType = changeType?.toLowerCase().replace(/[-_]/g, '');
@@ -39,6 +100,7 @@ export function VisualComparisonPanel({
 }: VisualComparisonPanelProps) {
   const [zoom, setZoom] = useState(100);
   const [syncScroll, setSyncScroll] = useState(true);
+  const [showCode, setShowCode] = useState(false);
 
   const { data: visualData, isLoading, error } = useQuery({
     queryKey: ['visual-comparison', jobId, changeId],
@@ -128,6 +190,86 @@ export function VisualComparisonPanel({
           </div>
         )}
       </div>
+
+      {(() => {
+        const explanation = getChangeExplanation(
+          changeType || visualData.change?.changeType,
+          changeDescription || visualData.change?.description
+        );
+        return (
+          <>
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+              <div className="flex items-start">
+                <AlertTriangle className="h-5 w-5 text-yellow-400 flex-shrink-0" />
+                <div className="ml-3 flex-1">
+                  <h3 className="text-sm font-medium text-yellow-800">
+                    {explanation.title}
+                  </h3>
+                  <div className="mt-2 text-sm text-yellow-700 space-y-2">
+                    <div className="bg-yellow-100 bg-opacity-50 p-2 rounded text-xs space-y-1">
+                      <p><strong>What changed:</strong> {explanation.what}</p>
+                      <p><strong>Why it matters:</strong> {explanation.why}</p>
+                      <p><strong>Visual impact:</strong> {explanation.visual}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {explanation.codeExample && (
+              <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
+                <button
+                  onClick={() => setShowCode(!showCode)}
+                  className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1 font-medium"
+                >
+                  <Code size={14} />
+                  {showCode ? 'Hide' : 'Show'} HTML code changes
+                </button>
+
+                {showCode && (
+                  <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
+                    <div className="bg-red-50 border border-red-200 rounded overflow-hidden">
+                      <div className="bg-red-100 px-3 py-1 text-red-800 font-semibold border-b border-red-200">
+                        Before (regular cells)
+                      </div>
+                      <pre className="text-red-900 p-3 overflow-x-auto whitespace-pre-wrap">
+{`<table>
+  <tr>
+    <td>Header Cell</td>
+  </tr>
+  <tr>
+    <td>Data</td>
+  </tr>
+</table>`}
+                      </pre>
+                    </div>
+
+                    <div className="bg-green-50 border border-green-200 rounded overflow-hidden">
+                      <div className="bg-green-100 px-3 py-1 text-green-800 font-semibold border-b border-green-200">
+                        After (with semantic headers)
+                      </div>
+                      <pre className="text-green-900 p-3 overflow-x-auto whitespace-pre-wrap">
+{`<table>
+  <thead>
+    <tr>
+      <th>Header Cell</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Data</td>
+    </tr>
+  </tbody>
+</table>`}
+                      </pre>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       <div className="flex items-center gap-4 p-4 bg-gray-50 border-b border-gray-200">
         <div className="flex items-center gap-2">
