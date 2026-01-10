@@ -129,6 +129,15 @@ export function VisualComparisonPanel({
     return undefined;
   }, [visualData, changeType, changeDescription]);
 
+  const isStructuralChange = useMemo(() => {
+    const type = changeType || visualData?.change?.changeType || '';
+    const desc = changeDescription || visualData?.change?.description || '';
+    return type.toLowerCase().includes('struct') ||
+           desc.toLowerCase().includes('header') ||
+           desc.toLowerCase().includes('semantic') ||
+           desc.toLowerCase().includes('aria');
+  }, [changeType, changeDescription, visualData]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96 bg-white rounded-lg border border-gray-200">
@@ -191,7 +200,7 @@ export function VisualComparisonPanel({
         )}
       </div>
 
-      {(() => {
+      {isStructuralChange && (() => {
         const explanation = getChangeExplanation(
           changeType || visualData.change?.changeType,
           changeDescription || visualData.change?.description
