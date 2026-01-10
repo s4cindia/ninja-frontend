@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getVisualComparison } from '@/services/comparison.service';
 import { EPUBRenderer } from '../epub/EPUBRenderer';
-import { Loader2, ZoomIn, ZoomOut, Info, Code, AlertTriangle, Columns, Rows } from 'lucide-react';
+import { Loader2, ZoomIn, ZoomOut, Info, Code, AlertTriangle, Columns, Rows, Maximize2, X } from 'lucide-react';
 
 interface ChangeExplanation {
   title: string;
@@ -102,6 +102,8 @@ export function VisualComparisonPanel({
   const [syncScroll, setSyncScroll] = useState(true);
   const [showCode, setShowCode] = useState(false);
   const [layout, setLayout] = useState<'side-by-side' | 'stacked'>('side-by-side');
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fullscreenTab, setFullscreenTab] = useState<'before' | 'after'>('before');
 
   const { data: visualData, isLoading, error } = useQuery({
     queryKey: ['visual-comparison', jobId, changeId],
@@ -154,6 +156,23 @@ export function VisualComparisonPanel({
       });
     }
   }, [visualData]);
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsFullscreen(false);
+      } else if (e.key === '1') {
+        setFullscreenTab('before');
+      } else if (e.key === '2') {
+        setFullscreenTab('after');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
 
   if (isLoading) {
     return (
@@ -361,6 +380,15 @@ export function VisualComparisonPanel({
             <Rows size={16} />
           </button>
         </div>
+
+        <button
+          onClick={() => setIsFullscreen(true)}
+          className="flex items-center gap-1 px-3 py-2 border border-gray-300 rounded hover:bg-gray-100 text-sm font-medium ml-4"
+          aria-label="Open fullscreen view"
+        >
+          <Maximize2 size={16} />
+          Fullscreen
+        </button>
       </div>
 
       <div className={layout === 'side-by-side' ? 'grid grid-cols-2 gap-0 flex-1 overflow-hidden' : 'flex flex-col flex-1 overflow-hidden'}>
@@ -410,6 +438,78 @@ export function VisualComparisonPanel({
           ), [visualData.afterContent, effectiveHighlights])}
         </div>
       </div>
+
+      {isFullscreen && (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <div className="flex items-center gap-4">
+              <h3 className="text-lg font-semibold">
+                {changeDescription || visualData.change?.description || 'Visual Change'}
+              </h3>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setFullscreenTab('before')}
+                  className={`px-4 py-2 rounded-lg font-medium ${
+                    fullscreenTab === 'before'
+                      ? 'bg-red-500 text-white'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  BEFORE
+                </button>
+                <button
+                  onClick={() => setFullscreenTab('after')}
+                  className={`px-4 py-2 rounded-lg font-medium ${
+                    fullscreenTab === 'after'
+                      ? 'bg-green-500 text-white'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  AFTER
+                </button>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setIsFullscreen(false)}
+              className="p-2 hover:bg-gray-200 rounded-lg"
+              title="Close (ESC)"
+              aria-label="Close fullscreen"
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-auto">
+            {fullscreenTab === 'before' ? (
+              <EPUBRenderer
+                html={visualData.beforeContent.html}
+                css={visualData.beforeContent.css}
+                baseUrl={visualData.beforeContent.baseHref}
+                highlights={effectiveHighlights}
+                version="before"
+                className="h-full"
+              />
+            ) : (
+              <EPUBRenderer
+                html={visualData.afterContent.html}
+                css={visualData.afterContent.css}
+                baseUrl={visualData.afterContent.baseHref}
+                highlights={effectiveHighlights}
+                version="after"
+                className="h-full"
+              />
+            )}
+          </div>
+
+          <div className="px-6 py-2 bg-gray-100 border-t border-gray-200 text-xs text-gray-600 flex gap-4">
+            <span><kbd className="px-2 py-1 bg-white border border-gray-300 rounded">ESC</kbd> Close</span>
+            <span><kbd className="px-2 py-1 bg-white border border-gray-300 rounded">1</kbd> Before</span>
+            <span><kbd className="px-2 py-1 bg-white border border-gray-300 rounded">2</kbd> After</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
