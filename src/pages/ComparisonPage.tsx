@@ -219,6 +219,10 @@ export const ComparisonPage: React.FC = () => {
                 <VisualComparisonPanel
                   jobId={jobId}
                   changeId={currentChange.id}
+                  changeDescription={currentChange.description}
+                  changeType={currentChange.changeType}
+                  filePath={currentChange.filePath}
+                  severity={currentChange.severity || undefined}
                 />
               ) : (
                 <ComparisonPanel change={currentChange} />
