@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getVisualComparison } from '@/services/comparison.service';
 import { EPUBRenderer } from '../epub/EPUBRenderer';
@@ -106,8 +106,14 @@ export function VisualComparisonPanel({
     queryKey: ['visual-comparison', jobId, changeId],
     queryFn: () => getVisualComparison(jobId, changeId),
     enabled: !!jobId && !!changeId,
-    retry: 1
+    retry: 1,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000
   });
+
+  const handleZoomOut = useCallback(() => setZoom(prev => Math.max(50, prev - 10)), []);
+  const handleZoomIn = useCallback(() => setZoom(prev => Math.min(200, prev + 10)), []);
+  const handleZoomReset = useCallback(() => setZoom(100), []);
 
   const effectiveHighlights = useMemo(() => {
     const actualType = changeType || visualData?.change?.changeType;
@@ -283,7 +289,7 @@ export function VisualComparisonPanel({
       <div className="flex items-center gap-4 p-4 bg-gray-50 border-b border-gray-200">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setZoom(Math.max(50, zoom - 10))}
+            onClick={handleZoomOut}
             className="p-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
             disabled={zoom <= 50}
             aria-label="Zoom out"
@@ -292,7 +298,7 @@ export function VisualComparisonPanel({
           </button>
           <span className="text-sm font-medium w-16 text-center">{zoom}%</span>
           <button
-            onClick={() => setZoom(Math.min(200, zoom + 10))}
+            onClick={handleZoomIn}
             className="p-2 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50"
             disabled={zoom >= 200}
             aria-label="Zoom in"
@@ -300,7 +306,7 @@ export function VisualComparisonPanel({
             <ZoomIn size={16} />
           </button>
           <button
-            onClick={() => setZoom(100)}
+            onClick={handleZoomReset}
             className="px-3 py-2 border border-gray-300 rounded hover:bg-gray-100 text-sm"
           >
             Reset
@@ -332,13 +338,15 @@ export function VisualComparisonPanel({
           <div className="bg-red-50 px-4 py-2 sticky top-0 z-10 border-b border-red-200">
             <span className="font-semibold text-red-700">BEFORE</span>
           </div>
-          <EPUBRenderer
-            html={visualData.beforeContent.html}
-            css={visualData.beforeContent.css}
-            baseUrl={visualData.beforeContent.baseHref}
-            highlights={effectiveHighlights}
-            version="before"
-          />
+          {useMemo(() => (
+            <EPUBRenderer
+              html={visualData.beforeContent.html}
+              css={visualData.beforeContent.css}
+              baseUrl={visualData.beforeContent.baseHref}
+              highlights={effectiveHighlights}
+              version="before"
+            />
+          ), [visualData.beforeContent, effectiveHighlights])}
         </div>
 
         <div
@@ -353,13 +361,15 @@ export function VisualComparisonPanel({
           <div className="bg-green-50 px-4 py-2 sticky top-0 z-10 border-b border-green-200">
             <span className="font-semibold text-green-700">AFTER</span>
           </div>
-          <EPUBRenderer
-            html={visualData.afterContent.html}
-            css={visualData.afterContent.css}
-            baseUrl={visualData.afterContent.baseHref}
-            highlights={effectiveHighlights}
-            version="after"
-          />
+          {useMemo(() => (
+            <EPUBRenderer
+              html={visualData.afterContent.html}
+              css={visualData.afterContent.css}
+              baseUrl={visualData.afterContent.baseHref}
+              highlights={effectiveHighlights}
+              version="after"
+            />
+          ), [visualData.afterContent, effectiveHighlights])}
         </div>
       </div>
     </div>
