@@ -1,8 +1,24 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getVisualComparison } from '@/services/comparison.service';
 import { EPUBRenderer } from '../epub/EPUBRenderer';
 import { Loader2, ZoomIn, ZoomOut, Info } from 'lucide-react';
+
+function getFallbackSelector(changeType?: string): string | undefined {
+  const normalizedType = changeType?.toLowerCase().replace(/[-_]/g, '');
+  
+  switch (normalizedType) {
+    case 'epubstruct002':
+      return 'table';
+    case 'epubimg001':
+    case 'epubimg002':
+      return 'img';
+    case 'epublang001':
+      return 'html';
+    default:
+      return undefined;
+  }
+}
 
 interface VisualComparisonPanelProps {
   jobId: string;
@@ -51,6 +67,26 @@ export function VisualComparisonPanel({
       </div>
     );
   }
+
+  const effectiveHighlights = useMemo(() => {
+    const actualType = changeType || visualData?.change?.changeType;
+    const baseHighlight = visualData?.highlightData;
+    
+    if (baseHighlight?.xpath || baseHighlight?.cssSelector) {
+      return [baseHighlight];
+    }
+    
+    const fallbackSelector = getFallbackSelector(actualType);
+    if (fallbackSelector) {
+      return [{
+        xpath: '',
+        cssSelector: fallbackSelector,
+        description: changeDescription || visualData?.change?.description || 'Changed element'
+      }];
+    }
+    
+    return undefined;
+  }, [visualData, changeType, changeDescription]);
 
   if (!visualData || !visualData.beforeContent || !visualData.afterContent) {
     return (
@@ -149,7 +185,7 @@ export function VisualComparisonPanel({
             html={visualData.beforeContent.html}
             css={visualData.beforeContent.css}
             baseUrl={visualData.beforeContent.baseHref}
-            highlights={[visualData.highlightData]}
+            highlights={effectiveHighlights}
             version="before"
           />
         </div>
@@ -170,7 +206,7 @@ export function VisualComparisonPanel({
             html={visualData.afterContent.html}
             css={visualData.afterContent.css}
             baseUrl={visualData.afterContent.baseHref}
-            highlights={[visualData.highlightData]}
+            highlights={effectiveHighlights}
             version="after"
           />
         </div>
