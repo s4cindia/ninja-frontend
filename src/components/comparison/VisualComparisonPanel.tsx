@@ -47,22 +47,37 @@ export function VisualComparisonPanel({ jobId, changeId }: VisualComparisonPanel
   return (
     <div className="visual-comparison-panel h-full flex flex-col">
       <div className="bg-blue-50 border-b border-blue-200 p-4">
-        <h3 className="font-semibold text-lg text-blue-900">
+        <h3 className="font-semibold text-lg text-blue-900 mb-2">
           {visualData.change?.description || 'Visual Change'}
         </h3>
-        <div className="flex gap-4 mt-2 text-sm text-gray-600">
+        <div className="flex flex-wrap gap-4 text-sm">
           {visualData.change?.changeType && (
-            <span>Type: <strong>{visualData.change.changeType}</strong></span>
+            <div className="flex items-center gap-1">
+              <span className="text-gray-600">Type:</span>
+              <span className="font-medium text-gray-900">{visualData.change.changeType}</span>
+            </div>
           )}
           {visualData.spineItem?.href && (
-            <span>File: <strong>{visualData.spineItem.href}</strong></span>
+            <div className="flex items-center gap-1">
+              <span className="text-gray-600">File:</span>
+              <span className="font-medium text-gray-900">{visualData.spineItem.href}</span>
+            </div>
           )}
           {visualData.change?.severity && (
-            <span>Severity: <strong>{visualData.change.severity}</strong></span>
+            <div className="flex items-center gap-1">
+              <span className="text-gray-600">Severity:</span>
+              <span className={`font-medium ${
+                visualData.change.severity === 'MAJOR' ? 'text-red-600' :
+                visualData.change.severity === 'MINOR' ? 'text-yellow-600' :
+                'text-blue-600'
+              }`}>
+                {visualData.change.severity}
+              </span>
+            </div>
           )}
         </div>
         {visualData.highlightData?.xpath && (
-          <div className="mt-1 text-xs text-gray-500">
+          <div className="mt-2 text-xs text-gray-500">
             Location: {visualData.highlightData.xpath}
           </div>
         )}
