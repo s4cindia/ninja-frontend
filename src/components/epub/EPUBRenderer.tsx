@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useMemo, useCallback } from 'react';
 
 interface ChangeHighlight {
   xpath: string;
@@ -33,7 +33,9 @@ function findByXPath(doc: Document, xpath: string): Element[] {
       }
     }
   } catch (error) {
-    console.warn('XPath evaluation failed:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[EPUBRenderer] XPath evaluation failed:', error);
+    }
   }
   return result;
 }
@@ -44,36 +46,29 @@ function applyHighlights(
   version: 'before' | 'after'
 ) {
   if (!highlights || highlights.length === 0) {
-    console.log('[EPUBRenderer] No highlights to apply');
     return;
   }
 
-  console.log('[EPUBRenderer] Applying highlights:', highlights, 'version:', version);
-
-  highlights.forEach((highlight, highlightIndex) => {
+  highlights.forEach((highlight, index) => {
     let elements: Element[] = [];
 
     if (highlight.cssSelector) {
       try {
         elements = Array.from(doc.querySelectorAll(highlight.cssSelector));
-        console.log(`[EPUBRenderer] CSS selector "${highlight.cssSelector}" found ${elements.length} elements`);
       } catch (error) {
-        console.warn('[EPUBRenderer] CSS selector failed:', error);
+        // Silent fail, try XPath
       }
     }
 
     if (elements.length === 0 && highlight.xpath) {
       elements = findByXPath(doc, highlight.xpath);
-      console.log(`[EPUBRenderer] XPath "${highlight.xpath}" found ${elements.length} elements`);
     }
 
     if (elements.length === 0) {
-      console.warn('[EPUBRenderer] No elements found for highlight:', highlight);
       return;
     }
 
-    elements.forEach((el, elementIndex) => {
-      console.log(`[EPUBRenderer] Applying highlight to element ${elementIndex}:`, el.tagName, el);
+    elements.forEach((el, elIndex) => {
       el.classList.add(`change-highlight-${version}`);
 
       const tooltip = doc.createElement('div');
@@ -115,34 +110,32 @@ function applyHighlights(
       if (computedStyle.position === 'static') {
         (el as HTMLElement).style.position = 'relative';
       }
-      
+
       el.appendChild(tooltip);
       el.appendChild(badge);
 
       el.addEventListener('mouseenter', () => {
         tooltip.style.display = 'block';
-      });
+      }, { passive: true });
+
       el.addEventListener('mouseleave', () => {
         tooltip.style.display = 'none';
-      });
+      }, { passive: true });
 
-      if (highlightIndex === 0 && elementIndex === 0) {
-        setTimeout(() => {
-          el.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center',
-            inline: 'nearest'
-          });
-
-          el.classList.add('flash-highlight');
-          setTimeout(() => el.classList.remove('flash-highlight'), 2000);
-        }, 500);
+      if (index === 0 && elIndex === 0) {
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.classList.add('flash-highlight');
+            setTimeout(() => el.classList.remove('flash-highlight'), 1000);
+          }, 300);
+        });
       }
     });
   });
 }
 
-export function EPUBRenderer({
+export const EPUBRenderer = React.memo(function EPUBRenderer({
   html,
   css,
   baseUrl,
@@ -152,77 +145,89 @@ export function EPUBRenderer({
   className = ''
 }: EPUBRendererProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const contentHashRef = useRef<string>('');
+
+  const combinedCSS = useMemo(() => {
+    return css.map(styles => `<style>${styles}</style>`).join('\n');
+  }, [css]);
+
+  const fullHtml = useMemo(() => {
+    return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <base href="${baseUrl}/">
+    ${combinedCSS}
+    <style>
+      body {
+        margin: 20px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+      .change-highlight-before {
+        outline: 3px solid #ef4444 !important;
+        outline-offset: 2px;
+        background-color: rgba(239, 68, 68, 0.1) !important;
+      }
+      .change-highlight-after {
+        outline: 3px solid #22c55e !important;
+        outline-offset: 2px;
+        background-color: rgba(34, 197, 94, 0.1) !important;
+      }
+      @keyframes flash {
+        0%, 100% { background-color: transparent; }
+        50% { background-color: rgba(59, 130, 246, 0.3); }
+      }
+      .flash-highlight {
+        animation: flash 1s ease-in-out;
+      }
+    </style>
+  </head>
+  <body>${html}</body>
+</html>`;
+  }, [html, baseUrl, combinedCSS]);
+
+  const contentHash = useMemo(() => {
+    return `${html.length}-${css.length}-${baseUrl}-${version}`;
+  }, [html, css.length, baseUrl, version]);
+
+  const handleLoadCallback = useCallback(() => {
+    onLoad?.();
+  }, [onLoad]);
 
   useEffect(() => {
+    if (contentHash === contentHashRef.current) {
+      if (iframeRef.current) {
+        const doc = iframeRef.current.contentDocument;
+        if (doc) {
+          applyHighlights(doc, highlights, version);
+        }
+      }
+      return;
+    }
+
+    contentHashRef.current = contentHash;
+
     if (!iframeRef.current) return;
 
     const iframe = iframeRef.current;
     const doc = iframe.contentDocument || iframe.contentWindow?.document;
     if (!doc) return;
 
-    console.log('[EPUBRenderer] Rendering EPUB content, version:', version);
-    console.log('[EPUBRenderer] CSS files:', css.length);
-    console.log('[EPUBRenderer] BaseURL:', baseUrl);
-    console.log('[EPUBRenderer] Highlights:', highlights);
-
-    const fullHtml = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <base href="${baseUrl}/">
-          ${css.map(styles => `<style>${styles}</style>`).join('\n')}
-          <style>
-            body {
-              margin: 20px;
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            }
-
-            .change-highlight-before {
-              outline: 3px solid #ef4444 !important;
-              outline-offset: 2px;
-              background-color: rgba(239, 68, 68, 0.1) !important;
-            }
-            .change-highlight-after {
-              outline: 3px solid #22c55e !important;
-              outline-offset: 2px;
-              background-color: rgba(34, 197, 94, 0.1) !important;
-            }
-
-            @keyframes flash {
-              0%, 100% { background-color: transparent; }
-              50% { background-color: rgba(59, 130, 246, 0.3); }
-            }
-            .flash-highlight {
-              animation: flash 1s ease-in-out;
-            }
-          </style>
-        </head>
-        <body>
-          ${html}
-        </body>
-      </html>
-    `;
-
     doc.open();
     doc.write(fullHtml);
     doc.close();
 
     const handleLoad = () => {
-      console.log('[EPUBRenderer] Content loaded in iframe');
       applyHighlights(doc, highlights, version);
-      console.log('[EPUBRenderer] Highlights applied successfully');
-      setIsLoaded(true);
-      onLoad?.();
+      handleLoadCallback();
     };
 
-    iframe.addEventListener('load', handleLoad);
+    iframe.addEventListener('load', handleLoad, { once: true });
 
     return () => {
       iframe.removeEventListener('load', handleLoad);
     };
-  }, [html, css, baseUrl, highlights, version, onLoad]);
+  }, [contentHash, fullHtml, highlights, version, handleLoadCallback]);
 
   return (
     <div className={`epub-renderer ${className}`}>
@@ -232,11 +237,15 @@ export function EPUBRenderer({
         className="w-full h-full border-0"
         title={`EPUB ${version}`}
       />
-      {!isLoaded && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
-        </div>
-      )}
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.html === nextProps.html &&
+    prevProps.css === nextProps.css &&
+    prevProps.baseUrl === nextProps.baseUrl &&
+    prevProps.version === nextProps.version &&
+    prevProps.highlights === nextProps.highlights &&
+    prevProps.className === nextProps.className
+  );
+});
