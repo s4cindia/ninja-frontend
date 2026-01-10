@@ -147,6 +147,16 @@ export const EPUBRenderer = React.memo(function EPUBRenderer({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const contentHashRef = useRef<string>('');
 
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      const startTime = performance.now();
+      return () => {
+        const endTime = performance.now();
+        console.log(`[EPUBRenderer] Render time: ${(endTime - startTime).toFixed(2)}ms`);
+      };
+    }
+  }, [html, css, baseUrl, highlights, version]);
+
   const combinedCSS = useMemo(() => {
     return css.map(styles => `<style>${styles}</style>`).join('\n');
   }, [css]);

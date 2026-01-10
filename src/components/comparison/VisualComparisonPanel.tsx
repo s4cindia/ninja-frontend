@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getVisualComparison } from '@/services/comparison.service';
 import { EPUBRenderer } from '../epub/EPUBRenderer';
@@ -143,6 +143,16 @@ export function VisualComparisonPanel({
            desc.toLowerCase().includes('semantic') ||
            desc.toLowerCase().includes('aria');
   }, [changeType, changeDescription, visualData]);
+
+  useEffect(() => {
+    if (import.meta.env.DEV && visualData) {
+      console.log('[VisualComparisonPanel] Data loaded:', {
+        htmlSize: visualData.beforeContent.html.length + visualData.afterContent.html.length,
+        cssFiles: visualData.beforeContent.css.length + visualData.afterContent.css.length,
+        hasHighlights: !!visualData.highlightData
+      });
+    }
+  }, [visualData]);
 
   if (isLoading) {
     return (
