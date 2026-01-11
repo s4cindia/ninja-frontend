@@ -1,4 +1,7 @@
-import React, { useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useEffect, useRef, useMemo, useCallback, useState } from 'react';
+
+const requestIdleCallback = window.requestIdleCallback || ((cb: IdleRequestCallback) => setTimeout(() => cb({ didTimeout: false, timeRemaining: () => 50 } as IdleDeadline), 1));
+const cancelIdleCallback = window.cancelIdleCallback || clearTimeout;
 
 interface ChangeHighlight {
   xpath: string;
@@ -167,6 +170,15 @@ export const EPUBRenderer = React.memo(function EPUBRenderer({
   className = ''
 }: EPUBRendererProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [shouldRender, setShouldRender] = useState(false);
+
+  useEffect(() => {
+    const timer = requestIdleCallback(() => {
+      setShouldRender(true);
+    }, { timeout: 100 });
+
+    return () => cancelIdleCallback(timer);
+  }, []);
 
   useEffect(() => {
     if (import.meta.env.DEV) {
@@ -222,7 +234,7 @@ export const EPUBRenderer = React.memo(function EPUBRenderer({
   }, [onLoad]);
 
   useEffect(() => {
-    if (!iframeRef.current) return;
+    if (!shouldRender || !iframeRef.current) return;
 
     const iframe = iframeRef.current;
     const doc = iframe.contentDocument || iframe.contentWindow?.document;
@@ -255,7 +267,15 @@ export const EPUBRenderer = React.memo(function EPUBRenderer({
     return () => {
       iframe.removeEventListener('load', handleLoad);
     };
-  }, [fullHtml, highlights, version, handleLoadCallback]);
+  }, [shouldRender, fullHtml, highlights, version, handleLoadCallback]);
+
+  if (!shouldRender) {
+    return (
+      <div className={`epub-renderer ${className} flex items-center justify-center`}>
+        <div className="text-sm text-gray-500">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className={`epub-renderer ${className}`}>
