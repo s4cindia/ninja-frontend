@@ -70,7 +70,17 @@ export async function getVisualComparison(
   changeId: string
 ): Promise<SpineItemWithChange> {
   const response = await api.get(`/jobs/${jobId}/comparison/changes/${changeId}/visual`);
-  return response.data;
+  const data = response.data.data || response.data;
+  
+  if (import.meta.env.DEV) {
+    console.log('[comparison.service] getVisualComparison response:', {
+      hasHighlightData: !!data?.highlightData,
+      highlightData: data?.highlightData,
+      changeType: data?.change?.changeType
+    });
+  }
+  
+  return data;
 }
 
 export async function getSpineItemContent(

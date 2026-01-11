@@ -66,8 +66,9 @@ function getChangeExplanation(changeType?: string, changeDescription?: string): 
 }
 
 function getFallbackSelector(changeType?: string): string | undefined {
-  const normalizedType = changeType?.toLowerCase().replace(/[-_]/g, '');
+  const normalizedType = changeType?.toLowerCase().replace(/[-_]/g, '') || '';
   
+  // Direct code matches
   switch (normalizedType) {
     case 'epubstruct002':
       return 'table';
@@ -76,9 +77,29 @@ function getFallbackSelector(changeType?: string): string | undefined {
       return 'img';
     case 'epublang001':
       return 'html';
-    default:
-      return undefined;
   }
+  
+  // Pattern-based fallbacks
+  if (normalizedType.includes('table') || normalizedType.includes('header')) {
+    return 'table';
+  }
+  if (normalizedType.includes('img') || normalizedType.includes('alt')) {
+    return 'img';
+  }
+  if (normalizedType.includes('lang')) {
+    return 'html';
+  }
+  if (normalizedType.includes('link') || normalizedType.includes('href')) {
+    return 'a';
+  }
+  if (normalizedType.includes('list')) {
+    return 'ul, ol';
+  }
+  if (normalizedType.includes('heading')) {
+    return 'h1, h2, h3, h4, h5, h6';
+  }
+  
+  return undefined;
 }
 
 interface VisualComparisonPanelProps {
@@ -293,10 +314,12 @@ export function VisualComparisonPanel({
       console.log('[VisualComparisonPanel] Data loaded:', {
         htmlSize: displayData.beforeContent.html.length + displayData.afterContent.html.length,
         cssFiles: displayData.beforeContent.css.length + displayData.afterContent.css.length,
-        hasHighlights: !!displayData.highlightData
+        hasHighlights: !!displayData.highlightData,
+        highlightData: displayData.highlightData,
+        effectiveHighlights: effectiveHighlights
       });
     }
-  }, [displayData]);
+  }, [displayData, effectiveHighlights]);
 
   useEffect(() => {
     if (!isFullscreen) return;
