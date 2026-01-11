@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef, useTransition } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getVisualComparison } from '@/services/comparison.service';
 import { EPUBRenderer } from '../epub/EPUBRenderer';
@@ -117,6 +117,7 @@ export function VisualComparisonPanel({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fullscreenMode, setFullscreenMode] = useState<'before' | 'after' | 'compare'>('compare');
   const [showCodeChanges, setShowCodeChanges] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const beforeScrollRef = useRef<HTMLDivElement>(null);
   const afterScrollRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
@@ -167,9 +168,23 @@ export function VisualComparisonPanel({
     refetchOnReconnect: false
   });
 
-  const handleZoomOut = useCallback(() => setZoom(prev => Math.max(50, prev - 10)), []);
-  const handleZoomIn = useCallback(() => setZoom(prev => Math.min(200, prev + 10)), []);
-  const handleZoomReset = useCallback(() => setZoom(100), []);
+  const handleZoomOut = useCallback(() => {
+    startTransition(() => {
+      setZoom(prev => Math.max(50, prev - 10));
+    });
+  }, [startTransition]);
+
+  const handleZoomIn = useCallback(() => {
+    startTransition(() => {
+      setZoom(prev => Math.min(200, prev + 10));
+    });
+  }, [startTransition]);
+
+  const handleZoomReset = useCallback(() => {
+    startTransition(() => {
+      setZoom(100);
+    });
+  }, [startTransition]);
 
   const effectiveHighlights = useMemo(() => {
     const actualType = changeType || visualData?.change?.changeType;
@@ -248,12 +263,16 @@ export function VisualComparisonPanel({
   }, [rendererProps, changeId]);
 
   const toggleLayout = useCallback((newLayout: 'side-by-side' | 'stacked') => {
-    setLayout(newLayout);
-  }, []);
+    startTransition(() => {
+      setLayout(newLayout);
+    });
+  }, [startTransition]);
 
   const toggleSyncScroll = useCallback(() => {
-    setSyncScroll(prev => !prev);
-  }, []);
+    startTransition(() => {
+      setSyncScroll(prev => !prev);
+    });
+  }, [startTransition]);
 
   useEffect(() => {
     if (import.meta.env.DEV && visualData) {
@@ -336,7 +355,12 @@ export function VisualComparisonPanel({
   }
 
   return (
-    <div className="visual-comparison-panel h-full flex flex-col bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div className="visual-comparison-panel h-full flex flex-col bg-white rounded-lg border border-gray-200 overflow-hidden relative">
+      {isPending && (
+        <div className="absolute top-2 right-2 bg-blue-500 text-white px-2 py-1 rounded text-xs z-50">
+          Updating...
+        </div>
+      )}
       <div className="bg-blue-50 border-b border-blue-200 p-4">
         <h3 className="text-base font-semibold text-gray-900 mb-1">
           {changeDescription || visualData.change?.description || 'Visual Change'}
