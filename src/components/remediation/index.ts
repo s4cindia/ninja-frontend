@@ -14,3 +14,4 @@ export { BatchResultsSummary } from './BatchResultsSummary';
 export { CodePreview } from './CodePreview';
 export { RemediationTaskCard } from './RemediationTaskCard';
 export { RemediationSessionView } from './RemediationSessionView';
+export { BatchQuickFixPanel } from './BatchQuickFixPanel';
