@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useEffect, useCallback, useTransition } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useTransition, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Eye, Code } from 'lucide-react';
+import { ArrowLeft, Eye, Code, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { Alert } from '@/components/ui/Alert';
@@ -12,7 +12,12 @@ import {
   IssueNavigator,
   ComparisonPanel,
 } from '@/components/comparison';
-import { VisualComparisonPanel } from '@/components/comparison/VisualComparisonPanel';
+
+const VisualComparisonPanel = lazy(() =>
+  import('@/components/comparison/VisualComparisonPanel').then(module => ({
+    default: module.VisualComparisonPanel
+  }))
+);
 import { useFilteredComparison } from '@/hooks/useComparison';
 import { getVisualComparison } from '@/services/comparison.service';
 import type { ComparisonFilters } from '@/types/comparison';
@@ -229,14 +234,21 @@ export const ComparisonPage: React.FC = () => {
               </div>
 
               {viewType === 'visual' ? (
-                <VisualComparisonPanel
-                  jobId={jobId}
-                  changeId={currentChange.id}
-                  changeDescription={currentChange.description}
-                  changeType={currentChange.changeType}
-                  filePath={currentChange.filePath}
-                  severity={currentChange.severity || undefined}
-                />
+                <Suspense fallback={
+                  <div className="flex items-center justify-center h-96 bg-white rounded-lg border border-gray-200">
+                    <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                    <span className="ml-2 text-gray-600">Loading visual comparison...</span>
+                  </div>
+                }>
+                  <VisualComparisonPanel
+                    jobId={jobId}
+                    changeId={currentChange.id}
+                    changeDescription={currentChange.description}
+                    changeType={currentChange.changeType}
+                    filePath={currentChange.filePath}
+                    severity={currentChange.severity || undefined}
+                  />
+                </Suspense>
               ) : (
                 <ComparisonPanel change={currentChange} />
               )}
