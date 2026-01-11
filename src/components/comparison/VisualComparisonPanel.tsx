@@ -121,6 +121,18 @@ export function VisualComparisonPanel({
   const afterScrollRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
 
+  useEffect(() => {
+    return () => {
+      if (import.meta.env.DEV) {
+        console.log('[VisualComparisonPanel] Unmounting, cleaning up resources');
+      }
+
+      if ((window as unknown as { gc?: () => void }).gc) {
+        (window as unknown as { gc: () => void }).gc();
+      }
+    };
+  }, []);
+
   const { data: visualData, isLoading, error } = useQuery({
     queryKey: ['visual-comparison', jobId, changeId],
     queryFn: () => getVisualComparison(jobId, changeId),
