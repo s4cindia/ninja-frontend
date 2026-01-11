@@ -162,10 +162,11 @@ export function VisualComparisonPanel({
     enabled: !!jobId && !!changeId,
     retry: 1,
     staleTime: Infinity,
-    gcTime: 30 * 60 * 1000,
+    gcTime: 60000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
-    refetchOnReconnect: false
+    refetchOnReconnect: false,
+    notifyOnChangeProps: ['data', 'error']
   });
 
   const handleZoomOut = useCallback(() => {
