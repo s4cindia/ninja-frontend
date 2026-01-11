@@ -18,22 +18,47 @@ interface EPUBRendererProps {
 
 class IframeRegistry {
   private iframes: Map<string, HTMLIFrameElement> = new Map();
-  private maxIframes = 2;
+  private maxIframes = 4; // Allow 2 before + 2 after for smoother navigation
+  private reuseCount = 0;
+  private createCount = 0;
+
+  get(version: string): HTMLIFrameElement | undefined {
+    return this.iframes.get(version);
+  }
 
   register(version: string, iframe: HTMLIFrameElement) {
-    this.destroy(version);
+    const existing = this.iframes.get(version);
+    
+    // If same iframe is being re-registered, just track it
+    if (existing === iframe) {
+      if (import.meta.env.DEV) {
+        this.reuseCount++;
+        console.log(`[IframeRegistry] Reusing same ${version} iframe (reuse: ${this.reuseCount}, create: ${this.createCount})`);
+      }
+      return;
+    }
 
+    // If there's an existing different iframe for this version, destroy it first
+    if (existing && existing !== iframe) {
+      this.destroy(version);
+    }
+
+    // Enforce pool size limit - remove oldest if at capacity
     if (this.iframes.size >= this.maxIframes) {
       const oldestKey = this.iframes.keys().next().value;
-      if (oldestKey) {
-        console.log(`[IframeRegistry] At capacity, destroying oldest: ${oldestKey}`);
+      if (oldestKey && oldestKey !== version) {
+        console.log(`[IframeRegistry] At capacity (${this.maxIframes}), destroying oldest: ${oldestKey}`);
         this.destroy(oldestKey);
       }
     }
 
     this.iframes.set(version, iframe);
-    console.log(`[IframeRegistry] Registered ${version} iframe. Total: ${this.iframes.size}`);
-    this.logDOMState();
+    this.createCount++;
+    
+    if (import.meta.env.DEV) {
+      console.log(`[IframeRegistry] Registered ${version} iframe. Total: ${this.iframes.size} (reuse: ${this.reuseCount}, create: ${this.createCount})`);
+      this.logDOMState();
+    }
   }
 
   destroy(version: string) {
@@ -52,8 +77,9 @@ class IframeRegistry {
         }
 
         this.iframes.delete(version);
-        console.log(`[IframeRegistry] Destroyed ${version} iframe. Total: ${this.iframes.size}`);
-        this.logDOMState();
+        if (import.meta.env.DEV) {
+          console.log(`[IframeRegistry] Destroyed ${version} iframe. Total: ${this.iframes.size}`);
+        }
       } catch (error) {
         console.error(`[IframeRegistry] Error destroying ${version} iframe:`, error);
       }
@@ -70,6 +96,10 @@ class IframeRegistry {
     return this.iframes.size;
   }
 
+  getStats() {
+    return { reuse: this.reuseCount, create: this.createCount, active: this.iframes.size };
+  }
+
   private logDOMState() {
     setTimeout(() => {
       const actualIframes = document.querySelectorAll('iframe').length;
@@ -77,8 +107,6 @@ class IframeRegistry {
 
       if (Math.abs(actualIframes - registryCount) > 1) {
         console.warn(`[IframeRegistry] MISMATCH! Registry: ${registryCount}, DOM: ${actualIframes}`);
-      } else if (actualIframes === registryCount) {
-        console.log(`[IframeRegistry] DOM count verified: ${actualIframes} iframes`);
       }
     }, 100);
   }
@@ -172,11 +200,29 @@ const EPUBRendererComponent = function EPUBRenderer({
     if (isInitialized.current) return;
     isInitialized.current = true;
 
-    console.log(`[EPUBRenderer] Initializing ${version} renderer`);
-
     if (!containerRef.current) {
-      console.warn(`[EPUBRenderer] No container ref for ${version}`);
+      if (import.meta.env.DEV) {
+        console.warn(`[EPUBRenderer] No container ref for ${version}`);
+      }
       return;
+    }
+
+    // Try to reuse existing iframe from pool
+    const existingIframe = iframeRegistry.get(version);
+    if (existingIframe && existingIframe.parentNode) {
+      // Iframe exists and is in DOM - just update our ref
+      if (import.meta.env.DEV) {
+        console.log(`[EPUBRenderer] Reusing pooled ${version} iframe`);
+      }
+      iframeRef.current = existingIframe;
+      // Re-register to update pool stats
+      iframeRegistry.register(version, existingIframe);
+      return;
+    }
+
+    // Create new iframe only if pool doesn't have one
+    if (import.meta.env.DEV) {
+      console.log(`[EPUBRenderer] Creating new ${version} iframe`);
     }
 
     const iframe = document.createElement('iframe');
@@ -189,23 +235,29 @@ const EPUBRendererComponent = function EPUBRenderer({
 
     containerRef.current.appendChild(iframe);
 
-    console.log(`[EPUBRenderer] Created ${version} iframe`);
-
+    // Don't destroy on unmount - let the pool manage lifecycle
     return () => {
-      console.log(`[EPUBRenderer] Cleanup triggered for ${version}`);
-      iframeRegistry.destroy(version);
+      if (import.meta.env.DEV) {
+        console.log(`[EPUBRenderer] Unmount triggered for ${version} (keeping in pool)`);
+      }
+      // Don't destroy - keep iframe in pool for reuse
+      // Only clear local ref
       iframeRef.current = null;
       isInitialized.current = false;
     };
-  }, []);
+  }, [version]);
 
   useEffect(() => {
     if (!iframeRef.current) {
-      console.warn(`[EPUBRenderer] No iframe ref for ${version}, skipping render`);
+      if (import.meta.env.DEV) {
+        console.warn(`[EPUBRenderer] No iframe ref for ${version}, skipping render`);
+      }
       return;
     }
 
-    console.log(`[EPUBRenderer] Rendering content for ${version}`);
+    if (import.meta.env.DEV) {
+      console.log(`[EPUBRenderer] Updating ${version} content (${html.length} chars)`);
+    }
 
     const fullHtml = `
       <!DOCTYPE html>
@@ -249,7 +301,9 @@ const EPUBRendererComponent = function EPUBRenderer({
     iframeRef.current.srcdoc = fullHtml;
 
     const handleLoad = () => {
-      console.log(`[EPUBRenderer] Content loaded in ${version} iframe`);
+      if (import.meta.env.DEV) {
+        console.log(`[EPUBRenderer] ${version} content loaded`);
+      }
       const doc = iframeRef.current?.contentDocument;
       if (doc) {
         applyHighlights(doc, highlights, version);
