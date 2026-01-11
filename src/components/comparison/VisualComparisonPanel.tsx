@@ -113,8 +113,11 @@ export function VisualComparisonPanel({
     queryFn: () => getVisualComparison(jobId, changeId),
     enabled: !!jobId && !!changeId,
     retry: 1,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000
+    staleTime: Infinity,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false
   });
 
   const handleZoomOut = useCallback(() => setZoom(prev => Math.max(50, prev - 10)), []);
