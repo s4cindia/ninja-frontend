@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useTransition } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Eye, Code } from 'lucide-react';
@@ -22,7 +22,9 @@ export const ComparisonPage: React.FC = () => {
   const navigate = useNavigate();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [filters, setFilters] = useState<ComparisonFilters>({});
-  const [viewType, setViewType] = useState<'visual' | 'code'>('visual');
+  const [viewType, setViewType] = useState<'visual' | 'code'>('code'); // Default to code for performance
+  const [isPending, startTransition] = useTransition();
+  const [isNavigating, setIsNavigating] = useState(false);
 
   const { data, isLoading, error } = useFilteredComparison(jobId || '', filters);
 
@@ -74,15 +76,25 @@ export const ComparisonPage: React.FC = () => {
     setCurrentIndex(0);
   };
 
-  const handlePrevious = () => {
-    setCurrentIndex((prev) => Math.max(0, prev - 1));
-  };
+  const handlePrevious = useCallback(() => {
+    if (isNavigating) return; // Prevent rapid clicks
 
-  const handleNext = () => {
-    if (data?.changes) {
+    setIsNavigating(true);
+    startTransition(() => {
+      setCurrentIndex((prev) => Math.max(0, prev - 1));
+      setTimeout(() => setIsNavigating(false), 500);
+    });
+  }, [isNavigating]);
+
+  const handleNext = useCallback(() => {
+    if (isNavigating || !data?.changes) return; // Prevent rapid clicks
+
+    setIsNavigating(true);
+    startTransition(() => {
       setCurrentIndex((prev) => Math.min(data.changes.length - 1, prev + 1));
-    }
-  };
+      setTimeout(() => setIsNavigating(false), 500);
+    });
+  }, [isNavigating, data?.changes]);
 
   const handleBack = () => {
     navigate(`/remediation/${jobId}`);
@@ -174,6 +186,7 @@ export const ComparisonPage: React.FC = () => {
             totalCount={data.changes.length}
             onPrevious={handlePrevious}
             onNext={handleNext}
+            disabled={isNavigating || isPending}
           />
 
           {currentChange && (
