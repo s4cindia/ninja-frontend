@@ -3,6 +3,8 @@ import React, { useEffect, useRef, useMemo, useCallback, useState } from 'react'
 const requestIdleCallback = window.requestIdleCallback || ((cb: IdleRequestCallback) => setTimeout(() => cb({ didTimeout: false, timeRemaining: () => 50 } as IdleDeadline), 1));
 const cancelIdleCallback = window.cancelIdleCallback || clearTimeout;
 
+let instanceCounter = 0;
+
 interface ChangeHighlight {
   xpath: string;
   cssSelector?: string;
@@ -171,6 +173,34 @@ export const EPUBRenderer = React.memo(function EPUBRenderer({
 }: EPUBRendererProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [shouldRender, setShouldRender] = useState(false);
+  const instanceId = useRef(`${version}-${++instanceCounter}`);
+
+  useEffect(() => {
+    console.log(
+      `%c[EPUBRenderer] Created`,
+      'background: #9C27B0; color: white; padding: 2px 5px;',
+      { instanceId: instanceId.current, version }
+    );
+
+    return () => {
+      console.log(
+        `%c[EPUBRenderer] Destroyed`,
+        'background: #E91E63; color: white; padding: 2px 5px;',
+        { instanceId: instanceId.current, version }
+      );
+
+      setTimeout(() => {
+        const remainingIframes = document.querySelectorAll('iframe').length;
+        if (remainingIframes > 2) {
+          console.error(
+            `%c[IFRAME LEAK]`,
+            'background: #f44336; color: white; padding: 5px; font-weight: bold;',
+            `${remainingIframes} iframes still in DOM after cleanup!`
+          );
+        }
+      }, 100);
+    };
+  }, [version]);
 
   useEffect(() => {
     const timer = requestIdleCallback(() => {

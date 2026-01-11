@@ -120,18 +120,40 @@ export function VisualComparisonPanel({
   const beforeScrollRef = useRef<HTMLDivElement>(null);
   const afterScrollRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
+  const mountTime = useRef(Date.now());
+  const renderCount = useRef(0);
+  renderCount.current++;
 
   useEffect(() => {
+    console.log(
+      `%c[VisualComparisonPanel] MOUNTED`,
+      'background: #4CAF50; color: white; padding: 2px 5px;',
+      { changeId }
+    );
+
     return () => {
-      if (import.meta.env.DEV) {
-        console.log('[VisualComparisonPanel] Unmounting, cleaning up resources');
-      }
+      const lifetime = Date.now() - mountTime.current;
+      console.log(
+        `%c[VisualComparisonPanel] UNMOUNTED`,
+        'background: #f44336; color: white; padding: 2px 5px;',
+        { changeId, lifetime: `${lifetime}ms`, renders: renderCount.current }
+      );
 
       if ((window as unknown as { gc?: () => void }).gc) {
         (window as unknown as { gc: () => void }).gc();
       }
     };
-  }, []);
+  }, [changeId]);
+
+  useEffect(() => {
+    if (renderCount.current > 1) {
+      console.warn(
+        `%c[VisualComparisonPanel] RE-RENDER #${renderCount.current}`,
+        'background: #ff9800; color: white; padding: 2px 5px;',
+        { changeId }
+      );
+    }
+  });
 
   const { data: visualData, isLoading, error } = useQuery({
     queryKey: ['visual-comparison', jobId, changeId],

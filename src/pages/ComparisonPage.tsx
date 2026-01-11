@@ -21,6 +21,7 @@ const VisualComparisonPanel = lazy(() =>
 import { useFilteredComparison } from '@/hooks/useComparison';
 import { getVisualComparison } from '@/services/comparison.service';
 import type { ComparisonFilters } from '@/types/comparison';
+import { useMemoryMonitor, memoryMonitor } from '@/utils/MemoryProfiler';
 
 export const ComparisonPage: React.FC = () => {
   const { jobId } = useParams<{ jobId: string }>();
@@ -33,6 +34,13 @@ export const ComparisonPage: React.FC = () => {
   const [isNavigating, setIsNavigating] = useState(false);
 
   const { data, isLoading, error } = useFilteredComparison(jobId || '', filters);
+
+  useMemoryMonitor(currentIndex);
+
+  useEffect(() => {
+    (window as any).printMemorySummary = () => memoryMonitor.printSummary();
+    console.log('💡 Tip: Run printMemorySummary() in console to see memory usage table');
+  }, []);
 
   const currentChange = data?.changes[currentIndex];
 
