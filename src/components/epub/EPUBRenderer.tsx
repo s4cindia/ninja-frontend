@@ -210,33 +210,58 @@ export const EPUBRenderer = React.memo(function EPUBRenderer({
   }, [onLoad]);
 
   useEffect(() => {
-    if (contentHash === contentHashRef.current) {
-      if (iframeRef.current) {
-        const doc = iframeRef.current.contentDocument;
-        if (doc) {
-          applyHighlights(doc, highlights, version);
-        }
-      }
-      return;
-    }
-
-    contentHashRef.current = contentHash;
-
     if (!iframeRef.current) return;
 
     const iframe = iframeRef.current;
     const doc = iframe.contentDocument || iframe.contentWindow?.document;
     if (!doc) return;
 
-    doc.open();
-    doc.write(fullHtml);
-    doc.close();
+    // Check if we need to rewrite the iframe
+    const needsRewrite = contentHash !== contentHashRef.current;
 
-    // Apply highlights immediately after doc.close() since load event may not fire reliably
-    requestAnimationFrame(() => {
-      applyHighlights(doc, highlights, version);
-      handleLoadCallback();
-    });
+    if (needsRewrite) {
+      // Content changed - rewrite iframe
+      contentHashRef.current = contentHash;
+
+      // Write to iframe
+      doc.open();
+      doc.write(fullHtml);
+      doc.close();
+
+      // Apply highlights after content loads
+      const handleLoad = () => {
+        const loadedDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (loadedDoc) {
+          if (import.meta.env.DEV) {
+            console.log('[EPUBRenderer] Content loaded, applying highlights');
+          }
+          applyHighlights(loadedDoc, highlights, version);
+          handleLoadCallback();
+        }
+      };
+
+      iframe.addEventListener('load', handleLoad, { once: true });
+
+      // Also apply immediately via requestAnimationFrame as fallback
+      requestAnimationFrame(() => {
+        if (doc.body && doc.body.children.length > 0) {
+          applyHighlights(doc, highlights, version);
+        }
+      });
+
+      return () => {
+        iframe.removeEventListener('load', handleLoad);
+      };
+    } else {
+      // Content hasn't changed, but highlights might have - reapply them
+      if (import.meta.env.DEV) {
+        console.log('[EPUBRenderer] Content unchanged, checking highlights');
+      }
+      if (doc.body && doc.body.children.length > 0) {
+        // Document already loaded, apply highlights immediately
+        applyHighlights(doc, highlights, version);
+      }
+    }
   }, [contentHash, fullHtml, highlights, version, handleLoadCallback]);
 
   return (
