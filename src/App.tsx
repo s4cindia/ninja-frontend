@@ -44,18 +44,23 @@ import Settings from '@/pages/Settings';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 0,
-      gcTime: 30000,
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
-      refetchOnReconnect: false,
-      retry: 1,
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      refetchOnWindowFocus: true,
+      refetchOnMount: true,
+      refetchOnReconnect: true,
+      retry: 3,
     },
   },
 });
 
 queryClient.setQueryDefaults(['visual-comparison'], {
+  staleTime: 0,
   gcTime: 30000,
+  refetchOnWindowFocus: false,
+  refetchOnMount: false,
+  refetchOnReconnect: false,
+  retry: 1,
 });
 
 function VisualQueryCacheCleaner() {

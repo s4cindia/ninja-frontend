@@ -115,7 +115,6 @@ export function VisualComparisonPanel({
   onToggleFullscreen
 }: VisualComparisonPanelProps) {
   const [zoom, setZoom] = useState(100);
-  const [syncScroll, setSyncScroll] = useState(true);
   const [showCode, setShowCode] = useState(false);
   const [layout, setLayout] = useState<'side-by-side' | 'stacked'>('side-by-side');
   const [internalFullscreen, setInternalFullscreen] = useState(false);
@@ -179,12 +178,6 @@ export function VisualComparisonPanel({
     queryKey: ['visual-comparison', jobId, changeId],
     queryFn: () => getVisualComparison(jobId, changeId),
     enabled: !!jobId && !!changeId,
-    retry: 1,
-    staleTime: Infinity,
-    gcTime: 60000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    refetchOnReconnect: false,
     notifyOnChangeProps: ['data', 'error', 'isFetching'],
     placeholderData: keepPreviousData
   });
@@ -292,12 +285,6 @@ export function VisualComparisonPanel({
   const toggleLayout = useCallback((newLayout: 'side-by-side' | 'stacked') => {
     startTransition(() => {
       setLayout(newLayout);
-    });
-  }, [startTransition]);
-
-  const toggleSyncScroll = useCallback(() => {
-    startTransition(() => {
-      setSyncScroll(prev => !prev);
     });
   }, [startTransition]);
 
@@ -527,16 +514,7 @@ export function VisualComparisonPanel({
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="sync-scroll"
-            checked={syncScroll}
-            onChange={toggleSyncScroll}
-            className="rounded"
-          />
-          <label htmlFor="sync-scroll" className="text-sm">Sync Scroll</label>
-        </div>
+        {/* Sync scroll is only functional in fullscreen compare mode */}
 
         <div className="flex items-center gap-2 ml-4 border-l border-gray-300 pl-4">
           <button
@@ -748,8 +726,14 @@ export function VisualComparisonPanel({
                     <div className="bg-red-100 px-3 py-1 text-red-800 font-semibold border-b border-red-200">
                       Before
                     </div>
-                    <pre className="text-red-900 p-3 overflow-x-auto max-h-48 text-xs">
-{displayData.beforeContent?.html?.slice(0, 500) || 'No content available'}
+                    <pre className="text-red-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all">
+{(() => {
+  const html = displayData.beforeContent?.html || '';
+  if (!html) return 'No content available';
+  const truncated = html.slice(0, 1000);
+  const lastClosingTag = truncated.lastIndexOf('>');
+  return lastClosingTag > 0 ? truncated.slice(0, lastClosingTag + 1) + (html.length > 1000 ? '...' : '') : truncated;
+})()}
                     </pre>
                   </div>
 
@@ -757,8 +741,14 @@ export function VisualComparisonPanel({
                     <div className="bg-green-100 px-3 py-1 text-green-800 font-semibold border-b border-green-200">
                       After
                     </div>
-                    <pre className="text-green-900 p-3 overflow-x-auto max-h-48 text-xs">
-{displayData.afterContent?.html?.slice(0, 500) || 'No content available'}
+                    <pre className="text-green-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all">
+{(() => {
+  const html = displayData.afterContent?.html || '';
+  if (!html) return 'No content available';
+  const truncated = html.slice(0, 1000);
+  const lastClosingTag = truncated.lastIndexOf('>');
+  return lastClosingTag > 0 ? truncated.slice(0, lastClosingTag + 1) + (html.length > 1000 ? '...' : '') : truncated;
+})()}
                     </pre>
                   </div>
                 </div>

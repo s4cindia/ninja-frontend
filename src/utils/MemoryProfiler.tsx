@@ -15,20 +15,33 @@ class MemoryMonitor {
   private maxMetrics = 20;
 
   logMetrics(changeIndex: number) {
-    const memory = (performance as any).memory;
+    let jsHeapSize = 0;
+    let jsHeapSizeLimit = 0;
+    
+    if (typeof performance !== 'undefined' && 'memory' in performance) {
+      const memory = (performance as any).memory;
+      jsHeapSize = memory?.usedJSHeapSize || 0;
+      jsHeapSizeLimit = memory?.jsHeapSizeLimit || 0;
+    }
 
     const iframeCount = document.querySelectorAll('iframe').length;
-    const queryCache = (window as any).__REACT_QUERY_DEVTOOLS_GLOBAL_HOOK__?.queryClient?.getQueryCache();
-    const queryCount = queryCache?.getAll()?.length || 0;
+    
+    let queryCount = 0;
+    try {
+      const queryCache = (window as any).__REACT_QUERY_DEVTOOLS_GLOBAL_HOOK__?.queryClient?.getQueryCache?.();
+      queryCount = queryCache?.getAll?.()?.length || 0;
+    } catch {
+      queryCount = 0;
+    }
 
     const metrics: MemoryMetrics = {
       timestamp: Date.now(),
       changeIndex,
-      jsHeapSize: memory?.usedJSHeapSize || 0,
-      jsHeapSizeLimit: memory?.jsHeapSizeLimit || 0,
+      jsHeapSize,
+      jsHeapSizeLimit,
       iframeCount,
       queryCount,
-      eventListenerCount: this.estimateEventListeners()
+      eventListenerCount: this.countInlineEventHandlers()
     };
 
     this.metrics.push(metrics);
@@ -40,7 +53,7 @@ class MemoryMonitor {
     this.checkForLeaks();
   }
 
-  private estimateEventListeners(): number {
+  private countInlineEventHandlers(): number {
     return document.querySelectorAll('[onclick], [onload], [onscroll]').length;
   }
 
@@ -55,7 +68,7 @@ class MemoryMonitor {
       `\n  Heap: ${mbUsed} MB / ${mbLimit} MB (${usagePercent}%)`,
       `\n  iframes: ${metrics.iframeCount}`,
       `\n  Queries: ${metrics.queryCount}`,
-      `\n  Event Listeners: ~${metrics.eventListenerCount}`
+      `\n  Inline Handlers: ~${metrics.eventListenerCount} (estimate, excludes addEventListener)`
     );
   }
 
