@@ -205,13 +205,6 @@ const EPUBRendererComponent = function EPUBRenderer({
       return;
     }
 
-    const iframe = iframeRef.current;
-    const doc = iframe.contentDocument || iframe.contentWindow?.document;
-    if (!doc) {
-      console.warn(`[EPUBRenderer] No document for ${version}`);
-      return;
-    }
-
     console.log(`[EPUBRenderer] Rendering content for ${version}`);
 
     const fullHtml = `
@@ -253,16 +246,18 @@ const EPUBRendererComponent = function EPUBRenderer({
       </html>
     `;
 
-    doc.open();
-    doc.write(fullHtml);
-    doc.close();
+    iframeRef.current.srcdoc = fullHtml;
 
     const handleLoad = () => {
       console.log(`[EPUBRenderer] Content loaded in ${version} iframe`);
-      applyHighlights(doc, highlights, version);
+      const doc = iframeRef.current?.contentDocument;
+      if (doc) {
+        applyHighlights(doc, highlights, version);
+      }
       onLoad?.();
     };
 
+    const iframe = iframeRef.current;
     iframe.addEventListener('load', handleLoad);
 
     return () => {
