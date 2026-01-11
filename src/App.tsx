@@ -44,11 +44,36 @@ import Settings from '@/pages/Settings';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000,
+      gcTime: 2 * 60 * 1000,
+      staleTime: Infinity,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      refetchOnReconnect: false,
       retry: 1,
     },
   },
 });
+
+queryClient.setQueryDefaults(['visual-comparison'], {
+  gcTime: 1 * 60 * 1000,
+});
+
+setInterval(() => {
+  const cache = queryClient.getQueryCache();
+  const queries = cache.getAll();
+
+  const visualQueries = queries
+    .filter(q => q.queryKey[0] === 'visual-comparison')
+    .sort((a, b) => (b.state.dataUpdatedAt || 0) - (a.state.dataUpdatedAt || 0));
+
+  visualQueries.slice(5).forEach(query => {
+    queryClient.removeQueries({ queryKey: query.queryKey });
+  });
+
+  if (import.meta.env.DEV) {
+    console.log(`[Cache Cleanup] Total queries: ${queries.length}, Visual queries: ${visualQueries.length}`);
+  }
+}, 30000);
 
 function SessionExpiryHandler() {
   const navigate = useNavigate();
