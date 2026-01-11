@@ -103,10 +103,10 @@ export function VisualComparisonPanel({
   const [showCode, setShowCode] = useState(false);
   const [layout, setLayout] = useState<'side-by-side' | 'stacked'>('side-by-side');
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [fullscreenMode, setFullscreenMode] = useState<'before' | 'after' | 'slider'>('before');
-  const [sliderPosition, setSliderPosition] = useState(50);
-  const sliderContainerRef = useRef<HTMLDivElement>(null);
-  const isDraggingRef = useRef(false);
+  const [fullscreenMode, setFullscreenMode] = useState<'before' | 'after' | 'compare'>('compare');
+  const beforeScrollRef = useRef<HTMLDivElement>(null);
+  const afterScrollRef = useRef<HTMLDivElement>(null);
+  const isScrollingRef = useRef(false);
 
   const { data: visualData, isLoading, error } = useQuery({
     queryKey: ['visual-comparison', jobId, changeId],
@@ -174,7 +174,7 @@ export function VisualComparisonPanel({
       } else if (e.key === '2') {
         setFullscreenMode('after');
       } else if (e.key === '3') {
-        setFullscreenMode('slider');
+        setFullscreenMode('compare');
       }
     };
 
@@ -182,29 +182,22 @@ export function VisualComparisonPanel({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isFullscreen]);
 
-  const handleSliderMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isDraggingRef.current = true;
-  }, []);
+  const handleSyncScroll = useCallback((source: 'before' | 'after') => (e: React.UIEvent<HTMLDivElement>) => {
+    if (isScrollingRef.current) return;
 
-  const handleSliderMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDraggingRef.current || !sliderContainerRef.current) return;
-    const rect = sliderContainerRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
-    setSliderPosition(percentage);
-  }, []);
+    const sourceEl = e.currentTarget;
+    const targetEl = source === 'before' ? afterScrollRef.current : beforeScrollRef.current;
 
-  const handleSliderMouseUp = useCallback(() => {
-    isDraggingRef.current = false;
-  }, []);
+    if (!targetEl) return;
 
-  const handleSliderTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!isDraggingRef.current || !sliderContainerRef.current) return;
-    const rect = sliderContainerRef.current.getBoundingClientRect();
-    const x = e.touches[0].clientX - rect.left;
-    const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
-    setSliderPosition(percentage);
+    isScrollingRef.current = true;
+
+    const scrollPercentage = sourceEl.scrollTop / (sourceEl.scrollHeight - sourceEl.clientHeight || 1);
+    targetEl.scrollTop = scrollPercentage * (targetEl.scrollHeight - targetEl.clientHeight);
+
+    requestAnimationFrame(() => {
+      isScrollingRef.current = false;
+    });
   }, []);
 
   if (isLoading) {
@@ -520,9 +513,9 @@ export function VisualComparisonPanel({
                   AFTER
                 </button>
                 <button
-                  onClick={() => setFullscreenMode('slider')}
+                  onClick={() => setFullscreenMode('compare')}
                   className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${
-                    fullscreenMode === 'slider'
+                    fullscreenMode === 'compare'
                       ? 'bg-blue-500 text-white'
                       : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                   }`}
@@ -568,38 +561,16 @@ export function VisualComparisonPanel({
                 />
               </div>
             )}
-            {fullscreenMode === 'slider' && (
-              <div
-                ref={sliderContainerRef}
-                className="relative h-full w-full cursor-ew-resize select-none"
-                onMouseMove={handleSliderMouseMove}
-                onMouseUp={handleSliderMouseUp}
-                onMouseLeave={handleSliderMouseUp}
-                onTouchMove={handleSliderTouchMove}
-                onTouchEnd={handleSliderMouseUp}
-              >
-                {/* AFTER layer (full width, behind) */}
-                <div className="absolute inset-0 overflow-hidden">
-                  <div className="absolute top-2 right-2 z-20 px-2 py-1 bg-green-500 text-white text-xs font-semibold rounded">
-                    AFTER
-                  </div>
-                  <EPUBRenderer
-                    html={visualData.afterContent.html}
-                    css={visualData.afterContent.css}
-                    baseUrl={visualData.afterContent.baseHref}
-                    highlights={effectiveHighlights}
-                    version="after"
-                    className="h-full"
-                  />
-                </div>
-
-                {/* BEFORE layer (clipped by slider position) */}
+            {fullscreenMode === 'compare' && (
+              <div className="grid grid-cols-2 gap-0 h-full">
+                {/* BEFORE Panel */}
                 <div
-                  className="absolute inset-0 overflow-hidden"
-                  style={{ clipPath: `inset(0 ${100 - sliderPosition}% 0 0)` }}
+                  ref={beforeScrollRef}
+                  onScroll={handleSyncScroll('before')}
+                  className="h-full overflow-auto border-r-2 border-gray-300"
                 >
-                  <div className="absolute top-2 left-2 z-20 px-2 py-1 bg-red-500 text-white text-xs font-semibold rounded">
-                    BEFORE
+                  <div className="bg-red-50 px-4 py-2 sticky top-0 z-10 border-b border-red-200">
+                    <span className="font-semibold text-red-700">BEFORE</span>
                   </div>
                   <EPUBRenderer
                     html={visualData.beforeContent.html}
@@ -611,19 +582,23 @@ export function VisualComparisonPanel({
                   />
                 </div>
 
-                {/* Slider handle */}
+                {/* AFTER Panel */}
                 <div
-                  className="absolute top-0 bottom-0 w-1 bg-blue-500 cursor-ew-resize z-30"
-                  style={{ left: `${sliderPosition}%`, transform: 'translateX(-50%)' }}
-                  onMouseDown={handleSliderMouseDown}
-                  onTouchStart={() => { isDraggingRef.current = true; }}
+                  ref={afterScrollRef}
+                  onScroll={handleSyncScroll('after')}
+                  className="h-full overflow-auto"
                 >
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center shadow-lg">
-                    <div className="flex gap-0.5">
-                      <div className="w-0.5 h-4 bg-white rounded" />
-                      <div className="w-0.5 h-4 bg-white rounded" />
-                    </div>
+                  <div className="bg-green-50 px-4 py-2 sticky top-0 z-10 border-b border-green-200">
+                    <span className="font-semibold text-green-700">AFTER</span>
                   </div>
+                  <EPUBRenderer
+                    html={visualData.afterContent.html}
+                    css={visualData.afterContent.css}
+                    baseUrl={visualData.afterContent.baseHref}
+                    highlights={effectiveHighlights}
+                    version="after"
+                    className="h-full"
+                  />
                 </div>
               </div>
             )}
