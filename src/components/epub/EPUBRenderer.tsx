@@ -16,6 +16,70 @@ interface EPUBRendererProps {
   className?: string;
 }
 
+class IframeRegistry {
+  private iframes: Map<string, HTMLIFrameElement> = new Map();
+  private maxIframes = 2;
+
+  register(version: string, iframe: HTMLIFrameElement) {
+    this.destroy(version);
+
+    if (this.iframes.size >= this.maxIframes) {
+      const oldestKey = this.iframes.keys().next().value;
+      if (oldestKey) {
+        console.log(`[IframeRegistry] At capacity, destroying oldest: ${oldestKey}`);
+        this.destroy(oldestKey);
+      }
+    }
+
+    this.iframes.set(version, iframe);
+    console.log(`[IframeRegistry] Registered ${version} iframe. Total: ${this.iframes.size}`);
+    this.logDOMState();
+  }
+
+  destroy(version: string) {
+    const iframe = this.iframes.get(version);
+    if (iframe) {
+      try {
+        iframe.contentWindow?.stop();
+
+        const doc = iframe.contentDocument;
+        if (doc?.body) {
+          doc.body.innerHTML = '';
+        }
+
+        if (iframe.parentNode) {
+          iframe.parentNode.removeChild(iframe);
+        }
+
+        this.iframes.delete(version);
+        console.log(`[IframeRegistry] Destroyed ${version} iframe. Total: ${this.iframes.size}`);
+        this.logDOMState();
+      } catch (error) {
+        console.error(`[IframeRegistry] Error destroying ${version} iframe:`, error);
+      }
+    }
+  }
+
+  destroyAll() {
+    const versions = Array.from(this.iframes.keys());
+    versions.forEach(version => this.destroy(version));
+    console.log('[IframeRegistry] Destroyed all iframes');
+  }
+
+  getCount(): number {
+    return this.iframes.size;
+  }
+
+  private logDOMState() {
+    const actualIframes = document.querySelectorAll('iframe').length;
+    if (actualIframes !== this.iframes.size) {
+      console.warn(`[IframeRegistry] MISMATCH! Registry: ${this.iframes.size}, DOM: ${actualIframes}`);
+    }
+  }
+}
+
+const iframeRegistry = new IframeRegistry();
+
 function findByXPath(doc: Document, xpath: string): Element[] {
   const result: Element[] = [];
   try {
@@ -85,130 +149,122 @@ function applyHighlights(doc: Document, highlights: ChangeHighlight[] | undefine
   });
 }
 
-export function EPUBRenderer({ html, css, baseUrl, highlights, version, onLoad, className = '' }: EPUBRendererProps) {
+export function EPUBRenderer({
+  html,
+  css,
+  baseUrl,
+  highlights,
+  version,
+  onLoad,
+  className = ''
+}: EPUBRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const instanceId = useRef(`${version}-${Math.random().toString(36).substr(2, 9)}`);
+  const isInitialized = useRef(false);
 
   useEffect(() => {
-    console.log(`[EPUBRenderer] Created ${instanceId.current}`);
+    if (isInitialized.current) return;
+    isInitialized.current = true;
+
+    console.log(`[EPUBRenderer] Initializing ${version} renderer`);
+
+    if (!containerRef.current) {
+      console.warn(`[EPUBRenderer] No container ref for ${version}`);
+      return;
+    }
 
     const iframe = document.createElement('iframe');
     iframe.sandbox.add('allow-same-origin');
     iframe.className = 'w-full h-full border-0';
     iframe.title = `EPUB ${version}`;
-    iframe.style.cssText = 'width: 100%; height: 100%; border: 0;';
 
+    iframeRegistry.register(version, iframe);
     iframeRef.current = iframe;
 
-    if (containerRef.current) {
-      containerRef.current.appendChild(iframe);
-    }
+    containerRef.current.appendChild(iframe);
 
-    const fullHtml = `<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8">
-    <base href="${baseUrl}/">
-    ${css.map(styles => `<style>${styles}</style>`).join('\n')}
-    <style>
-      body { margin: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-      .change-highlight-before { outline: 3px solid #ef4444 !important; outline-offset: 2px; background-color: rgba(239, 68, 68, 0.1) !important; }
-      .change-highlight-after { outline: 3px solid #22c55e !important; outline-offset: 2px; background-color: rgba(34, 197, 94, 0.1) !important; }
-      @keyframes flash { 0%, 100% { background-color: transparent; } 50% { background-color: rgba(59, 130, 246, 0.3); } }
-      .flash-highlight { animation: flash 1s ease-in-out; }
-    </style>
-  </head>
-  <body>${html}</body>
-</html>`;
-
-    const doc = iframe.contentDocument || iframe.contentWindow?.document;
-    if (doc) {
-      doc.open();
-      doc.write(fullHtml);
-      doc.close();
-
-      const handleLoad = () => {
-        const loadedDoc = iframe.contentDocument || iframe.contentWindow?.document;
-        if (loadedDoc) {
-          applyHighlights(loadedDoc, highlights, version);
-          onLoad?.();
-        }
-      };
-
-      iframe.addEventListener('load', handleLoad, { once: true });
-    }
+    console.log(`[EPUBRenderer] Created ${version} iframe`);
 
     return () => {
-      console.log(`[EPUBRenderer] Destroying ${instanceId.current}`);
-
-      if (iframeRef.current) {
-        if (iframeRef.current.contentWindow) {
-          try {
-            iframeRef.current.contentWindow.stop();
-          } catch (e) { /* ignore */ }
-        }
-
-        if (iframeRef.current.contentDocument) {
-          const doc = iframeRef.current.contentDocument;
-          if (doc.body) doc.body.innerHTML = '';
-          doc.open();
-          doc.write('');
-          doc.close();
-        }
-
-        if (iframeRef.current.parentNode) {
-          iframeRef.current.parentNode.removeChild(iframeRef.current);
-        }
-
-        iframeRef.current = null;
-      }
-
-      setTimeout(() => {
-        const remainingIframes = document.querySelectorAll('iframe').length;
-        console.log(`[EPUBRenderer] Cleanup verified: ${remainingIframes} iframes remaining`);
-        if (remainingIframes > 2) {
-          console.error(`[IFRAME LEAK] ${remainingIframes} iframes still in DOM!`);
-        }
-      }, 100);
+      console.log(`[EPUBRenderer] Cleanup triggered for ${version}`);
+      iframeRegistry.destroy(version);
+      iframeRef.current = null;
+      isInitialized.current = false;
     };
   }, []);
 
   useEffect(() => {
-    if (!iframeRef.current) return;
+    if (!iframeRef.current) {
+      console.warn(`[EPUBRenderer] No iframe ref for ${version}, skipping render`);
+      return;
+    }
 
-    const doc = iframeRef.current.contentDocument;
-    if (!doc) return;
+    const iframe = iframeRef.current;
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!doc) {
+      console.warn(`[EPUBRenderer] No document for ${version}`);
+      return;
+    }
 
-    const fullHtml = `<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8">
-    <base href="${baseUrl}/">
-    ${css.map(styles => `<style>${styles}</style>`).join('\n')}
-    <style>
-      body { margin: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-      .change-highlight-before { outline: 3px solid #ef4444 !important; outline-offset: 2px; background-color: rgba(239, 68, 68, 0.1) !important; }
-      .change-highlight-after { outline: 3px solid #22c55e !important; outline-offset: 2px; background-color: rgba(34, 197, 94, 0.1) !important; }
-      @keyframes flash { 0%, 100% { background-color: transparent; } 50% { background-color: rgba(59, 130, 246, 0.3); } }
-      .flash-highlight { animation: flash 1s ease-in-out; }
-    </style>
-  </head>
-  <body>${html}</body>
-</html>`;
+    console.log(`[EPUBRenderer] Rendering content for ${version}`);
+
+    const fullHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <base href="${baseUrl}/">
+          ${css.map(styles => `<style>${styles}</style>`).join('\n')}
+          <style>
+            body {
+              margin: 20px;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            }
+
+            .change-highlight-before {
+              outline: 3px solid #ef4444 !important;
+              outline-offset: 2px;
+              background-color: rgba(239, 68, 68, 0.1) !important;
+            }
+            .change-highlight-after {
+              outline: 3px solid #22c55e !important;
+              outline-offset: 2px;
+              background-color: rgba(34, 197, 94, 0.1) !important;
+            }
+
+            @keyframes flash {
+              0%, 100% { background-color: transparent; }
+              50% { background-color: rgba(59, 130, 246, 0.3); }
+            }
+            .flash-highlight {
+              animation: flash 1s ease-in-out;
+            }
+          </style>
+        </head>
+        <body>
+          ${html}
+        </body>
+      </html>
+    `;
 
     doc.open();
     doc.write(fullHtml);
     doc.close();
 
-    applyHighlights(doc, highlights, version);
-  }, [html, css, baseUrl, highlights, version]);
+    const handleLoad = () => {
+      console.log(`[EPUBRenderer] Content loaded in ${version} iframe`);
+      applyHighlights(doc, highlights, version);
+      onLoad?.();
+    };
+
+    iframe.addEventListener('load', handleLoad);
+
+    return () => {
+      iframe.removeEventListener('load', handleLoad);
+    };
+  }, [html, css, baseUrl, highlights, version, onLoad]);
 
   return (
-    <div
-      ref={containerRef}
-      className={`epub-renderer ${className}`}
-      style={{ width: '100%', height: '100%' }}
-    />
+    <div ref={containerRef} className={`epub-renderer ${className}`} />
   );
 }
