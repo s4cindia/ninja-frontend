@@ -925,12 +925,55 @@ export const EPUBRemediation: React.FC = () => {
   } | null>(null);
   const queryClient = useQueryClient();
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const batchModalRef = useRef<HTMLDivElement>(null);
+
+  const handleBatchFixCancel = useCallback(() => {
+    setShowBatchPanel(false);
+    setSelectedBatch(null);
+    const elementToFocus = previousFocusRef.current;
+    previousFocusRef.current = null;
+    if (elementToFocus?.isConnected) {
+      elementToFocus.focus();
+    }
+  }, []);
+
+  // Keyboard handling for batch modal (Escape to close, Tab focus trap)
+  const handleBatchModalKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      handleBatchFixCancel();
+    }
+
+    if (e.key === 'Tab' && batchModalRef.current) {
+      const focusableElements = batchModalRef.current.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+
+      if (e.shiftKey && document.activeElement === firstElement) {
+        e.preventDefault();
+        lastElement?.focus();
+      } else if (!e.shiftKey && document.activeElement === lastElement) {
+        e.preventDefault();
+        firstElement?.focus();
+      }
+    }
+  }, []);
 
   useEffect(() => {
-    if (showBatchPanel && !previousFocusRef.current) {
-      previousFocusRef.current = document.activeElement as HTMLElement;
+    if (showBatchPanel) {
+      if (!previousFocusRef.current) {
+        previousFocusRef.current = document.activeElement as HTMLElement;
+      }
+      document.addEventListener('keydown', handleBatchModalKeyDown);
+      document.body.style.overflow = 'hidden';
+
+      return () => {
+        document.removeEventListener('keydown', handleBatchModalKeyDown);
+        document.body.style.overflow = '';
+      };
     }
-  }, [showBatchPanel]);
+  }, [showBatchPanel, handleBatchModalKeyDown]);
 
   const handleBatchFixComplete = useCallback(async () => {
     if (import.meta.env.DEV) {
@@ -948,16 +991,6 @@ export const EPUBRemediation: React.FC = () => {
       queryClient.refetchQueries({ queryKey: ['similar-issues', jobId] })
     ]);
   }, [queryClient, jobId]);
-
-  const handleBatchFixCancel = useCallback(() => {
-    setShowBatchPanel(false);
-    setSelectedBatch(null);
-    const elementToFocus = previousFocusRef.current;
-    previousFocusRef.current = null;
-    if (elementToFocus?.isConnected) {
-      elementToFocus.focus();
-    }
-  }, []);
 
   // Fetch similar issues grouping for batch quick fixes
   const { data: similarIssuesFromApi } = useQuery({
@@ -1906,19 +1939,15 @@ export const EPUBRemediation: React.FC = () => {
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
           onClick={handleBatchFixCancel}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              handleBatchFixCancel();
-            }
-          }}
-          role="presentation"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="batch-fix-title"
+          tabIndex={-1}
         >
           <div 
+            ref={batchModalRef}
             className="max-w-2xl w-full"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="batch-fix-title"
-            aria-describedby="batch-fix-description"
+            role="document"
             onClick={(e) => e.stopPropagation()}
           >
             <BatchQuickFixPanel
