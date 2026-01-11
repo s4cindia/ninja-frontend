@@ -5,7 +5,8 @@ import {
   useLocation,
   useSearchParams,
 } from "react-router-dom";
-import { BookOpen, ArrowLeft, Eye, RotateCcw } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { BookOpen, ArrowLeft, Eye, RotateCcw, Zap } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Alert } from "@/components/ui/Alert";
@@ -30,6 +31,7 @@ import { TransferToAcrButton } from "@/components/epub/TransferToAcrButton";
 import { QuickRating } from "@/components/feedback";
 import { api } from "@/services/api";
 import { IssueTallyTracker, TallyData, CompletionStats } from "@/components/remediation/IssueTallyTracker";
+import { BatchQuickFixPanel } from "@/components/remediation/BatchQuickFixPanel";
 import { hasQuickFixTemplate } from "@/data/quickFixTemplates";
 
 type PageState = "loading" | "ready" | "running" | "complete" | "error";
@@ -907,6 +909,32 @@ export const EPUBRemediation: React.FC = () => {
   // Track total audit issues to show excluded count
   const [totalAuditIssues, setTotalAuditIssues] = useState<number | undefined>(undefined);
 
+  // Batch quick fix state
+  const [showBatchPanel, setShowBatchPanel] = useState(false);
+  const [selectedBatch, setSelectedBatch] = useState<{
+    fixType: string;
+    fixName: string;
+    count: number;
+    issues: Array<{
+      id: string;
+      code: string;
+      message: string;
+      filePath: string;
+      location?: string;
+    }>;
+  } | null>(null);
+  const queryClient = useQueryClient();
+
+  // Fetch similar issues grouping for batch quick fixes
+  const { data: similarIssues } = useQuery({
+    queryKey: ['similar-issues', jobId],
+    queryFn: async () => {
+      const response = await api.get(`/jobs/${jobId}/remediation/similar-issues`);
+      return response.data;
+    },
+    enabled: !!jobId && pageState === 'ready'
+  });
+
   // Persist filename to localStorage when it changes
   useEffect(() => {
     if (fileName && fileName !== "Loading..." && jobId) {
@@ -1705,6 +1733,58 @@ export const EPUBRemediation: React.FC = () => {
         completionStats={completionStats}
       />
 
+      {/* Batch Quick Fix Section */}
+      {similarIssues?.hasBatchableIssues && pageState === 'ready' && (
+        <Card className="mb-4 border-green-200 bg-green-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-green-800">
+              <Zap size={20} />
+              Batch Quick Fixes Available
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-green-700 mb-4">
+              You have multiple similar issues that can be fixed together:
+            </p>
+
+            <div className="space-y-2">
+              {similarIssues.batchableGroups.map((group: {
+                fixType: string;
+                fixName: string;
+                count: number;
+                issues: Array<{
+                  id: string;
+                  code: string;
+                  message: string;
+                  filePath: string;
+                  location?: string;
+                }>;
+              }) => (
+                <button
+                  key={group.fixType}
+                  onClick={() => {
+                    setSelectedBatch(group);
+                    setShowBatchPanel(true);
+                  }}
+                  className="w-full flex items-center justify-between p-3 bg-white border border-green-300 rounded hover:bg-green-50 text-left"
+                >
+                  <div>
+                    <div className="font-medium text-gray-900">{group.fixName}</div>
+                    <div className="text-sm text-gray-600">
+                      {group.count} similar {group.count === 1 ? 'issue' : 'issues'}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-green-600">
+                    <Zap size={16} />
+                    <span className="text-sm font-medium">Apply All</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <RemediationPlanView
         plan={plan}
         isRunningRemediation={pageState === "running"}
@@ -1733,6 +1813,30 @@ export const EPUBRemediation: React.FC = () => {
             isDemo={isDemo}
           />
         </>
+      )}
+
+      {/* Batch Quick Fix Modal */}
+      {showBatchPanel && selectedBatch && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="max-w-2xl w-full">
+            <BatchQuickFixPanel
+              jobId={jobId || ''}
+              fixType={selectedBatch.fixType}
+              fixName={selectedBatch.fixName}
+              issues={selectedBatch.issues}
+              onComplete={() => {
+                setShowBatchPanel(false);
+                setSelectedBatch(null);
+                queryClient.invalidateQueries({ queryKey: ['remediation-plan', jobId] });
+                queryClient.invalidateQueries({ queryKey: ['similar-issues', jobId] });
+              }}
+              onCancel={() => {
+                setShowBatchPanel(false);
+                setSelectedBatch(null);
+              }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
