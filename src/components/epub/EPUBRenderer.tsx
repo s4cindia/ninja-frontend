@@ -45,7 +45,14 @@ function applyHighlights(
   highlights: ChangeHighlight[] | undefined,
   version: 'before' | 'after'
 ) {
+  if (import.meta.env.DEV) {
+    console.log('[applyHighlights] Called with:', { highlights, version });
+  }
+
   if (!highlights || highlights.length === 0) {
+    if (import.meta.env.DEV) {
+      console.log('[applyHighlights] No highlights to apply');
+    }
     return;
   }
 
@@ -55,17 +62,32 @@ function applyHighlights(
     if (highlight.cssSelector) {
       try {
         elements = Array.from(doc.querySelectorAll(highlight.cssSelector));
+        if (import.meta.env.DEV) {
+          console.log(`[applyHighlights] CSS selector "${highlight.cssSelector}" found ${elements.length} elements`);
+        }
       } catch (error) {
-        // Silent fail, try XPath
+        if (import.meta.env.DEV) {
+          console.warn('[applyHighlights] CSS selector failed:', error);
+        }
       }
     }
 
     if (elements.length === 0 && highlight.xpath) {
       elements = findByXPath(doc, highlight.xpath);
+      if (import.meta.env.DEV) {
+        console.log(`[applyHighlights] XPath "${highlight.xpath}" found ${elements.length} elements`);
+      }
     }
 
     if (elements.length === 0) {
+      if (import.meta.env.DEV) {
+        console.warn('[applyHighlights] No elements found for highlight:', highlight);
+      }
       return;
+    }
+
+    if (import.meta.env.DEV) {
+      console.log(`[applyHighlights] Applying ${version} highlights to ${elements.length} elements`);
     }
 
     elements.forEach((el, elIndex) => {
@@ -145,7 +167,6 @@ export const EPUBRenderer = React.memo(function EPUBRenderer({
   className = ''
 }: EPUBRendererProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const contentHashRef = useRef<string>('');
 
   useEffect(() => {
     if (import.meta.env.DEV) {
@@ -196,15 +217,6 @@ export const EPUBRenderer = React.memo(function EPUBRenderer({
 </html>`;
   }, [html, baseUrl, combinedCSS]);
 
-  const highlightsKey = useMemo(() => {
-    if (!highlights || highlights.length === 0) return '';
-    return highlights.map(h => `${h.xpath || ''}-${h.cssSelector || ''}`).join('|');
-  }, [highlights]);
-
-  const contentHash = useMemo(() => {
-    return `${html.length}-${css.length}-${baseUrl}-${version}-${highlightsKey}`;
-  }, [html, css.length, baseUrl, version, highlightsKey]);
-
   const handleLoadCallback = useCallback(() => {
     onLoad?.();
   }, [onLoad]);
@@ -216,53 +228,34 @@ export const EPUBRenderer = React.memo(function EPUBRenderer({
     const doc = iframe.contentDocument || iframe.contentWindow?.document;
     if (!doc) return;
 
-    // Check if we need to rewrite the iframe
-    const needsRewrite = contentHash !== contentHashRef.current;
-
-    if (needsRewrite) {
-      // Content changed - rewrite iframe
-      contentHashRef.current = contentHash;
-
-      // Write to iframe
-      doc.open();
-      doc.write(fullHtml);
-      doc.close();
-
-      // Apply highlights after content loads
-      const handleLoad = () => {
-        const loadedDoc = iframe.contentDocument || iframe.contentWindow?.document;
-        if (loadedDoc) {
-          if (import.meta.env.DEV) {
-            console.log('[EPUBRenderer] Content loaded, applying highlights');
-          }
-          applyHighlights(loadedDoc, highlights, version);
-          handleLoadCallback();
-        }
-      };
-
-      iframe.addEventListener('load', handleLoad, { once: true });
-
-      // Also apply immediately via requestAnimationFrame as fallback
-      requestAnimationFrame(() => {
-        if (doc.body && doc.body.children.length > 0) {
-          applyHighlights(doc, highlights, version);
-        }
-      });
-
-      return () => {
-        iframe.removeEventListener('load', handleLoad);
-      };
-    } else {
-      // Content hasn't changed, but highlights might have - reapply them
-      if (import.meta.env.DEV) {
-        console.log('[EPUBRenderer] Content unchanged, checking highlights');
-      }
-      if (doc.body && doc.body.children.length > 0) {
-        // Document already loaded, apply highlights immediately
-        applyHighlights(doc, highlights, version);
-      }
+    if (import.meta.env.DEV) {
+      console.log('[EPUBRenderer] Rendering EPUB, version:', version);
+      console.log('[EPUBRenderer] Highlights:', highlights);
     }
-  }, [contentHash, fullHtml, highlights, version, handleLoadCallback]);
+
+    // Always rewrite iframe on render
+    doc.open();
+    doc.write(fullHtml);
+    doc.close();
+
+    // Apply highlights after load
+    const handleLoad = () => {
+      const loadedDoc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (loadedDoc) {
+        if (import.meta.env.DEV) {
+          console.log('[EPUBRenderer] Applying highlights to loaded content');
+        }
+        applyHighlights(loadedDoc, highlights, version);
+        handleLoadCallback();
+      }
+    };
+
+    iframe.addEventListener('load', handleLoad, { once: true });
+
+    return () => {
+      iframe.removeEventListener('load', handleLoad);
+    };
+  }, [fullHtml, highlights, version, handleLoadCallback]);
 
   return (
     <div className={`epub-renderer ${className}`}>
