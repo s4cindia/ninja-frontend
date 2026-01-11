@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getVisualComparison } from '@/services/comparison.service';
 import { EPUBRenderer } from '../epub/EPUBRenderer';
-import { Loader2, ZoomIn, ZoomOut, Info, Code, AlertTriangle, Columns, Rows, Maximize2, X, SplitSquareHorizontal } from 'lucide-react';
+import { Loader2, ZoomIn, ZoomOut, Info, Code, AlertTriangle, Columns, Rows, Maximize2, X } from 'lucide-react';
 
 interface ChangeExplanation {
   title: string;
@@ -88,6 +88,12 @@ interface VisualComparisonPanelProps {
   changeType?: string;
   filePath?: string;
   severity?: string;
+  currentIndex?: number;
+  totalChanges?: number;
+  onNavigatePrevious?: () => void;
+  onNavigateNext?: () => void;
+  canNavigatePrevious?: boolean;
+  canNavigateNext?: boolean;
 }
 
 export function VisualComparisonPanel({
@@ -96,7 +102,13 @@ export function VisualComparisonPanel({
   changeDescription,
   changeType,
   filePath,
-  severity
+  severity,
+  currentIndex,
+  totalChanges,
+  onNavigatePrevious,
+  onNavigateNext,
+  canNavigatePrevious,
+  canNavigateNext
 }: VisualComparisonPanelProps) {
   const [zoom, setZoom] = useState(100);
   const [syncScroll, setSyncScroll] = useState(true);
@@ -104,6 +116,7 @@ export function VisualComparisonPanel({
   const [layout, setLayout] = useState<'side-by-side' | 'stacked'>('side-by-side');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fullscreenMode, setFullscreenMode] = useState<'before' | 'after' | 'compare'>('compare');
+  const [showCodeChanges, setShowCodeChanges] = useState(false);
   const beforeScrollRef = useRef<HTMLDivElement>(null);
   const afterScrollRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
@@ -175,12 +188,16 @@ export function VisualComparisonPanel({
         setFullscreenMode('after');
       } else if (e.key === '3') {
         setFullscreenMode('compare');
+      } else if (e.key === 'ArrowLeft' && canNavigatePrevious && onNavigatePrevious) {
+        onNavigatePrevious();
+      } else if (e.key === 'ArrowRight' && canNavigateNext && onNavigateNext) {
+        onNavigateNext();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFullscreen]);
+  }, [isFullscreen, canNavigatePrevious, canNavigateNext, onNavigatePrevious, onNavigateNext]);
 
   const handleSyncScroll = useCallback((source: 'before' | 'after') => (e: React.UIEvent<HTMLDivElement>) => {
     if (isScrollingRef.current) return;
@@ -485,16 +502,76 @@ export function VisualComparisonPanel({
 
       {isFullscreen && (
         <div className="fixed inset-0 z-50 bg-white flex flex-col">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
-            <div className="flex items-center gap-4">
-              <h3 className="text-lg font-semibold">
+          <div className="border-b border-gray-200 bg-gray-50">
+            {/* Top Row: Title and Close */}
+            <div className="flex items-center justify-between px-6 py-3">
+              <h3 className="text-lg font-semibold text-gray-900">
                 {changeDescription || visualData.change?.description || 'Visual Change'}
               </h3>
 
+              <button
+                onClick={() => setIsFullscreen(false)}
+                className="p-2 hover:bg-gray-200 rounded-lg"
+                title="Close (ESC)"
+                aria-label="Close fullscreen"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Middle Row: Change Info */}
+            <div className="px-6 py-2 bg-blue-50 border-y border-blue-200">
+              <div className="flex flex-wrap gap-3 text-xs text-gray-700">
+                <span>
+                  <strong>Type:</strong> {changeType || visualData.change?.changeType || 'Unknown'}
+                </span>
+                <span>
+                  <strong>File:</strong> {filePath || visualData.spineItem?.href || 'Unknown'}
+                </span>
+                {(severity || visualData.change?.severity) && (
+                  <span>
+                    <strong>Severity:</strong> {severity || visualData.change?.severity}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Bottom Row: Navigation and Controls */}
+            <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200">
+              {/* Left: Change Navigation */}
+              <div className="flex items-center gap-3">
+                {currentIndex !== undefined && totalChanges !== undefined ? (
+                  <>
+                    <button
+                      onClick={onNavigatePrevious}
+                      disabled={!canNavigatePrevious}
+                      className="px-3 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    >
+                      ← Previous
+                    </button>
+
+                    <span className="text-sm font-medium text-gray-700">
+                      Change {currentIndex + 1} of {totalChanges}
+                    </span>
+
+                    <button
+                      onClick={onNavigateNext}
+                      disabled={!canNavigateNext}
+                      className="px-3 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    >
+                      Next →
+                    </button>
+                  </>
+                ) : (
+                  <div className="text-sm text-gray-500">Fullscreen View</div>
+                )}
+              </div>
+
+              {/* Center: View Tabs */}
               <div className="flex gap-2">
                 <button
                   onClick={() => setFullscreenMode('before')}
-                  className={`px-4 py-2 rounded-lg font-medium ${
+                  className={`px-4 py-2 rounded-lg font-medium text-sm ${
                     fullscreenMode === 'before'
                       ? 'bg-red-500 text-white'
                       : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
@@ -504,7 +581,7 @@ export function VisualComparisonPanel({
                 </button>
                 <button
                   onClick={() => setFullscreenMode('after')}
-                  className={`px-4 py-2 rounded-lg font-medium ${
+                  className={`px-4 py-2 rounded-lg font-medium text-sm ${
                     fullscreenMode === 'after'
                       ? 'bg-green-500 text-white'
                       : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
@@ -514,26 +591,50 @@ export function VisualComparisonPanel({
                 </button>
                 <button
                   onClick={() => setFullscreenMode('compare')}
-                  className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${
+                  className={`px-4 py-2 rounded-lg font-medium text-sm ${
                     fullscreenMode === 'compare'
                       ? 'bg-blue-500 text-white'
                       : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                   }`}
                 >
-                  <SplitSquareHorizontal size={16} />
                   COMPARE
                 </button>
               </div>
+
+              {/* Right: HTML Code Toggle */}
+              <button
+                onClick={() => setShowCodeChanges(!showCodeChanges)}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
+              >
+                <Code size={16} />
+                {showCodeChanges ? 'Hide' : 'Show'} HTML code
+              </button>
             </div>
 
-            <button
-              onClick={() => setIsFullscreen(false)}
-              className="p-2 hover:bg-gray-200 rounded-lg"
-              title="Close (ESC)"
-              aria-label="Close fullscreen"
-            >
-              <X size={24} />
-            </button>
+            {/* HTML Code Changes Section (Collapsible) */}
+            {showCodeChanges && isStructuralChange && (
+              <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="bg-red-50 border border-red-200 rounded overflow-hidden">
+                    <div className="bg-red-100 px-3 py-1 text-red-800 font-semibold border-b border-red-200">
+                      Before
+                    </div>
+                    <pre className="text-red-900 p-3 overflow-x-auto max-h-48 text-xs">
+{visualData.beforeContent?.html?.slice(0, 500) || 'No content available'}
+                    </pre>
+                  </div>
+
+                  <div className="bg-green-50 border border-green-200 rounded overflow-hidden">
+                    <div className="bg-green-100 px-3 py-1 text-green-800 font-semibold border-b border-green-200">
+                      After
+                    </div>
+                    <pre className="text-green-900 p-3 overflow-x-auto max-h-48 text-xs">
+{visualData.afterContent?.html?.slice(0, 500) || 'No content available'}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex-1 overflow-hidden">
@@ -604,11 +705,13 @@ export function VisualComparisonPanel({
             )}
           </div>
 
-          <div className="px-6 py-2 bg-gray-100 border-t border-gray-200 text-xs text-gray-600 flex gap-4">
+          <div className="px-6 py-2 bg-gray-100 border-t border-gray-200 text-xs text-gray-600 flex flex-wrap gap-4">
             <span><kbd className="px-2 py-1 bg-white border border-gray-300 rounded">ESC</kbd> Close</span>
             <span><kbd className="px-2 py-1 bg-white border border-gray-300 rounded">1</kbd> Before</span>
             <span><kbd className="px-2 py-1 bg-white border border-gray-300 rounded">2</kbd> After</span>
             <span><kbd className="px-2 py-1 bg-white border border-gray-300 rounded">3</kbd> Compare</span>
+            {canNavigatePrevious && <span><kbd className="px-2 py-1 bg-white border border-gray-300 rounded">←</kbd> Previous</span>}
+            {canNavigateNext && <span><kbd className="px-2 py-1 bg-white border border-gray-300 rounded">→</kbd> Next</span>}
           </div>
         </div>
       )}

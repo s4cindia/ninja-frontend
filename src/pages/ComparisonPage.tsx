@@ -270,6 +270,12 @@ export const ComparisonPage: React.FC = () => {
                     changeType={currentChange.changeType}
                     filePath={currentChange.filePath}
                     severity={currentChange.severity || undefined}
+                    currentIndex={currentIndex}
+                    totalChanges={data?.changes.length}
+                    onNavigatePrevious={handlePrevious}
+                    onNavigateNext={handleNext}
+                    canNavigatePrevious={currentIndex > 0}
+                    canNavigateNext={currentIndex < (data?.changes.length ?? 0) - 1}
                   />
                 </Suspense>
               ) : (
