@@ -459,6 +459,7 @@ export function VisualComparisonPanel({
             </button>
           </div>
           <EPUBRenderer
+            key={`before-${changeId}`}
             html={visualData.beforeContent.html}
             css={visualData.beforeContent.css}
             baseUrl={visualData.beforeContent.baseHref}
@@ -491,6 +492,7 @@ export function VisualComparisonPanel({
             </button>
           </div>
           <EPUBRenderer
+            key={`after-${changeId}`}
             html={visualData.afterContent.html}
             css={visualData.afterContent.css}
             baseUrl={visualData.afterContent.baseHref}
@@ -641,6 +643,7 @@ export function VisualComparisonPanel({
             {fullscreenMode === 'before' && (
               <div className="h-full overflow-auto">
                 <EPUBRenderer
+                  key={`fullscreen-before-${changeId}`}
                   html={visualData.beforeContent.html}
                   css={visualData.beforeContent.css}
                   baseUrl={visualData.beforeContent.baseHref}
@@ -653,6 +656,7 @@ export function VisualComparisonPanel({
             {fullscreenMode === 'after' && (
               <div className="h-full overflow-auto">
                 <EPUBRenderer
+                  key={`fullscreen-after-${changeId}`}
                   html={visualData.afterContent.html}
                   css={visualData.afterContent.css}
                   baseUrl={visualData.afterContent.baseHref}
@@ -674,6 +678,7 @@ export function VisualComparisonPanel({
                     <span className="font-semibold text-red-700">BEFORE</span>
                   </div>
                   <EPUBRenderer
+                    key={`compare-before-${changeId}`}
                     html={visualData.beforeContent.html}
                     css={visualData.beforeContent.css}
                     baseUrl={visualData.beforeContent.baseHref}
@@ -693,6 +698,7 @@ export function VisualComparisonPanel({
                     <span className="font-semibold text-green-700">AFTER</span>
                   </div>
                   <EPUBRenderer
+                    key={`compare-after-${changeId}`}
                     html={visualData.afterContent.html}
                     css={visualData.afterContent.css}
                     baseUrl={visualData.afterContent.baseHref}
