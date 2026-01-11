@@ -149,30 +149,85 @@ export const RemediationWorkflow: React.FC<RemediationWorkflowProps> = ({
   useEffect(() => {
     const fetchInitialData = async () => {
       setIsLoading(true);
-      try {
-        const auditResponse = await api.get(`${apiPrefix}/job/${jobId}/audit/result`);
-        const auditRaw = auditResponse.data.data || auditResponse.data;
-        setAuditData(mapAuditData(auditRaw));
-        setCompletedSteps(['audit']);
+      setError(null);
 
-        try {
-          const planResponse = await api.get(`${apiPrefix}/job/${jobId}/remediation`);
-          const planRaw = planResponse.data.data || planResponse.data;
-          if (planRaw) {
-            setPlanData(mapPlanData(planRaw));
-            setCompletedSteps(prev => [...prev, 'plan']);
-            setCurrentStep('plan');
-          }
-        } catch {
-          // Plan not created yet - that's okay
-        }
-      } catch (err) {
-        console.error('[RemediationWorkflow] Failed to fetch initial data:', err);
-        setAuditData(generateDemoAudit());
-        setCompletedSteps(['audit']);
-      } finally {
-        setIsLoading(false);
+      // Fetch all data in parallel to determine job stage
+      const [auditResult, planResult, comparisonResult] = await Promise.allSettled([
+        api.get(`${apiPrefix}/job/${jobId}/audit/result`),
+        api.get(`${apiPrefix}/job/${jobId}/remediation`),
+        api.get(`${apiPrefix}/job/${jobId}/comparison/summary`),
+      ]);
+
+      console.log('[RemediationWorkflow] Parallel fetch results:', {
+        audit: auditResult.status,
+        plan: planResult.status,
+        comparison: comparisonResult.status,
+      });
+
+      // Extract data from successful responses
+      const auditRaw = auditResult.status === 'fulfilled' 
+        ? (auditResult.value.data.data || auditResult.value.data) 
+        : null;
+      const planRaw = planResult.status === 'fulfilled' 
+        ? (planResult.value.data.data || planResult.value.data) 
+        : null;
+      const comparisonRaw = comparisonResult.status === 'fulfilled' 
+        ? (comparisonResult.value.data.data || comparisonResult.value.data) 
+        : null;
+
+      // Check for workflow status in plan response (backend may include it)
+      const workflowStatus = planRaw?.status || planRaw?.workflowStatus || planRaw?.stage;
+
+      // Determine job stage based on available data (priority: most advanced stage first)
+      let determinedStep: RemediationStep = 'audit';
+      let determinedCompleted: RemediationStep[] = [];
+
+      if (comparisonRaw && (comparisonRaw.fixedIssues > 0 || comparisonRaw.fixedCount > 0 || comparisonRaw.fixed_count > 0)) {
+        // Job has comparison data - remediation is complete, go to review
+        console.log('[RemediationWorkflow] Job has comparison data - starting at review step');
+        determinedStep = 'review';
+        determinedCompleted = ['audit', 'plan', 'remediate', 'review'];
+        setComparisonData(mapComparisonData(comparisonRaw));
+      } else if (workflowStatus === 'remediated' || workflowStatus === 'completed') {
+        // Backend reports job is remediated
+        console.log('[RemediationWorkflow] Backend reports job is remediated - starting at review step');
+        determinedStep = 'review';
+        determinedCompleted = ['audit', 'plan', 'remediate'];
+      } else if (workflowStatus === 'remediating' || workflowStatus === 'in_progress') {
+        // Job is currently being remediated
+        console.log('[RemediationWorkflow] Job is being remediated - starting at remediate step');
+        determinedStep = 'remediate';
+        determinedCompleted = ['audit', 'plan'];
+        setIsRemediating(true);
+      } else if (planRaw && (planRaw.tasks?.length > 0 || planRaw.issues?.length > 0 || planRaw.totalTasks > 0)) {
+        // Job has a plan - start at plan step
+        console.log('[RemediationWorkflow] Job has plan data - starting at plan step');
+        determinedStep = 'plan';
+        determinedCompleted = ['audit', 'plan'];
+        setPlanData(mapPlanData(planRaw));
+      } else {
+        // Default to audit step
+        console.log('[RemediationWorkflow] Starting at audit step');
+        determinedStep = 'audit';
+        determinedCompleted = ['audit'];
       }
+
+      // Set audit data (use demo as fallback)
+      if (auditRaw) {
+        setAuditData(mapAuditData(auditRaw));
+      } else {
+        console.log('[RemediationWorkflow] No audit data, using demo');
+        setAuditData(generateDemoAudit());
+      }
+
+      // Set plan data if available and not already set
+      if (planRaw && !planData) {
+        setPlanData(mapPlanData(planRaw));
+      }
+
+      setCurrentStep(determinedStep);
+      setCompletedSteps(determinedCompleted);
+      setIsLoading(false);
     };
 
     fetchInitialData();
