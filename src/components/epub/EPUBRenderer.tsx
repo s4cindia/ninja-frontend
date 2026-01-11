@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 interface ChangeHighlight {
   xpath: string;
@@ -155,7 +155,7 @@ function applyHighlights(doc: Document, highlights: ChangeHighlight[] | undefine
   });
 }
 
-export function EPUBRenderer({
+const EPUBRendererComponent = function EPUBRenderer({
   html,
   css,
   baseUrl,
@@ -273,4 +273,16 @@ export function EPUBRenderer({
   return (
     <div ref={containerRef} className={`epub-renderer ${className}`} />
   );
-}
+};
+
+export const EPUBRenderer = React.memo(EPUBRendererComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.html === nextProps.html &&
+    prevProps.version === nextProps.version &&
+    prevProps.baseUrl === nextProps.baseUrl &&
+    JSON.stringify(prevProps.css) === JSON.stringify(nextProps.css) &&
+    JSON.stringify(prevProps.highlights) === JSON.stringify(nextProps.highlights)
+  );
+});
+
+EPUBRenderer.displayName = 'EPUBRenderer';
