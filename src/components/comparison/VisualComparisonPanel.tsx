@@ -445,15 +445,13 @@ export function VisualComparisonPanel({
               <Maximize2 size={16} className="text-red-700" />
             </button>
           </div>
-          {useMemo(() => (
-            <EPUBRenderer
-              html={visualData.beforeContent.html}
-              css={visualData.beforeContent.css}
-              baseUrl={visualData.beforeContent.baseHref}
-              highlights={effectiveHighlights}
-              version="before"
-            />
-          ), [visualData.beforeContent, effectiveHighlights])}
+          <EPUBRenderer
+            html={visualData.beforeContent.html}
+            css={visualData.beforeContent.css}
+            baseUrl={visualData.beforeContent.baseHref}
+            highlights={effectiveHighlights}
+            version="before"
+          />
         </div>
 
         <div
@@ -479,15 +477,13 @@ export function VisualComparisonPanel({
               <Maximize2 size={16} className="text-green-700" />
             </button>
           </div>
-          {useMemo(() => (
-            <EPUBRenderer
-              html={visualData.afterContent.html}
-              css={visualData.afterContent.css}
-              baseUrl={visualData.afterContent.baseHref}
-              highlights={effectiveHighlights}
-              version="after"
-            />
-          ), [visualData.afterContent, effectiveHighlights])}
+          <EPUBRenderer
+            html={visualData.afterContent.html}
+            css={visualData.afterContent.css}
+            baseUrl={visualData.afterContent.baseHref}
+            highlights={effectiveHighlights}
+            version="after"
+          />
         </div>
       </div>
 
