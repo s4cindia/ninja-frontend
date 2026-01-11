@@ -42,17 +42,6 @@ export const ComparisonPage: React.FC = () => {
     console.log('💡 Tip: Run printMemorySummary() in console to see memory usage table');
   }, []);
 
-  useEffect(() => {
-    return () => {
-      const iframes = document.querySelectorAll('iframe');
-      iframes.forEach(iframe => {
-        if (iframe.parentNode) {
-          iframe.parentNode.removeChild(iframe);
-        }
-      });
-      console.log('[ComparisonPage] Cleaned up all iframes on unmount');
-    };
-  }, []);
 
   useEffect(() => {
     console.log(`[ComparisonPage] Navigated to change ${currentIndex}/${data?.changes.length || 0}`);
