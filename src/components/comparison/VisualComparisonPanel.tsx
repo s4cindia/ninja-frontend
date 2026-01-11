@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef, useTransition } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { getVisualComparison } from '@/services/comparison.service';
 import { EPUBRenderer } from '../epub/EPUBRenderer';
 import { Loader2, ZoomIn, ZoomOut, Info, Code, AlertTriangle, Columns, Rows, Maximize2, X } from 'lucide-react';
@@ -175,7 +175,7 @@ export function VisualComparisonPanel({
     }
   });
 
-  const { data: visualData, isLoading, error } = useQuery({
+  const { data: visualData, isLoading, error, isFetching } = useQuery({
     queryKey: ['visual-comparison', jobId, changeId],
     queryFn: () => getVisualComparison(jobId, changeId),
     enabled: !!jobId && !!changeId,
@@ -185,7 +185,8 @@ export function VisualComparisonPanel({
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: false,
-    notifyOnChangeProps: ['data', 'error']
+    notifyOnChangeProps: ['data', 'error', 'isFetching'],
+    placeholderData: keepPreviousData
   });
 
   const handleZoomOut = useCallback(() => {
@@ -345,7 +346,7 @@ export function VisualComparisonPanel({
     });
   }, []);
 
-  if (isLoading) {
+  if (isLoading && !visualData) {
     return (
       <div className="flex items-center justify-center h-96 bg-white rounded-lg border border-gray-200">
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
@@ -376,9 +377,10 @@ export function VisualComparisonPanel({
 
   return (
     <div className="visual-comparison-panel h-full flex flex-col bg-white rounded-lg border border-gray-200 overflow-hidden relative">
-      {isPending && (
-        <div className="absolute top-2 right-2 bg-blue-500 text-white px-2 py-1 rounded text-xs z-50">
-          Updating...
+      {(isPending || isFetching) && (
+        <div className="absolute top-2 right-2 bg-blue-500 text-white px-2 py-1 rounded text-xs z-50 flex items-center gap-1">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Loading...
         </div>
       )}
       <div className="bg-blue-50 border-b border-blue-200 p-4">
