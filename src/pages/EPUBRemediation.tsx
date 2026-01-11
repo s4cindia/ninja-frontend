@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   useParams,
   useNavigate,
@@ -924,6 +924,24 @@ export const EPUBRemediation: React.FC = () => {
     }>;
   } | null>(null);
   const queryClient = useQueryClient();
+
+  const handleBatchFixComplete = useCallback(() => {
+    if (import.meta.env.DEV) {
+      console.log('[Remediation Page] Batch fix completed, refreshing data');
+    }
+    setShowBatchPanel(false);
+    setSelectedBatch(null);
+    queryClient.invalidateQueries({ queryKey: ['remediation-plan', jobId] });
+    queryClient.invalidateQueries({ queryKey: ['similar-issues', jobId] });
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);
+  }, [queryClient, jobId]);
+
+  const handleBatchFixCancel = useCallback(() => {
+    setShowBatchPanel(false);
+    setSelectedBatch(null);
+  }, []);
 
   // Fetch similar issues grouping for batch quick fixes
   const { data: similarIssuesFromApi } = useQuery({
@@ -1871,20 +1889,8 @@ export const EPUBRemediation: React.FC = () => {
               fixType={selectedBatch.fixType}
               fixName={selectedBatch.fixName}
               issues={selectedBatch.issues}
-              onComplete={() => {
-                console.log('[Remediation Page] Batch fix completed, refreshing data');
-                setShowBatchPanel(false);
-                setSelectedBatch(null);
-                queryClient.invalidateQueries({ queryKey: ['remediation-plan'] });
-                queryClient.invalidateQueries({ queryKey: ['similar-issues'] });
-                setTimeout(() => {
-                  window.location.reload();
-                }, 500);
-              }}
-              onCancel={() => {
-                setShowBatchPanel(false);
-                setSelectedBatch(null);
-              }}
+              onComplete={handleBatchFixComplete}
+              onCancel={handleBatchFixCancel}
             />
           </div>
         </div>

@@ -152,3 +152,51 @@ export async function applyQuickFix(
     throw new Error('Failed to apply quick fix');
   }
 }
+
+export interface BatchQuickFixResult {
+  successful: number;
+  failed: Array<{ issueId: string; error: string }>;
+  totalAttempted: number;
+}
+
+interface RawBatchResponse {
+  successful?: number | Array<{ issueId: string }>;
+  failed?: Array<{ issueId: string; error: string }>;
+  totalAttempted?: number;
+}
+
+export async function applyBatchQuickFix(
+  jobId: string,
+  issueIds: string[],
+  fixType: string
+): Promise<BatchQuickFixResult> {
+  const response = await api.post(
+    `/epub/job/${jobId}/remediation/quick-fix/batch`,
+    { issueIds, fixType }
+  );
+  
+  // Handle various API response shapes:
+  // - { data: { results: { successful, failed, totalAttempted } } }
+  // - { data: { successful, failed, totalAttempted } }
+  // - { results: { successful, failed, totalAttempted } }
+  // - { successful, failed, totalAttempted }
+  const responseData = response.data;
+  const rawData: RawBatchResponse = 
+    responseData?.data?.results || 
+    responseData?.results || 
+    responseData?.data || 
+    responseData || {};
+  
+  const successfulValue = rawData?.successful;
+  const failedValue = rawData?.failed;
+  
+  return {
+    successful: typeof successfulValue === 'number' 
+      ? successfulValue 
+      : (Array.isArray(successfulValue) ? successfulValue.length : 0),
+    failed: Array.isArray(failedValue) ? failedValue : [],
+    totalAttempted: typeof rawData?.totalAttempted === 'number' 
+      ? rawData.totalAttempted 
+      : issueIds.length
+  };
+}

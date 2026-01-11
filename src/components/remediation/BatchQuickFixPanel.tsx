@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Zap, CheckCircle, XCircle, Loader2 } from 'lucide-react';
-import { api } from '@/services/api';
+import { applyBatchQuickFix, BatchQuickFixResult } from '@/services/quickfix.service';
 
-interface BatchFixResults {
-  successful: Array<{ issueId: string }> | number;
-  failed: Array<{ issueId: string; error: string }> | number;
-  totalAttempted: number;
+interface BatchFixResults extends BatchQuickFixResult {
+  errorMessage?: string;
 }
 
 interface BatchQuickFixPanelProps {
@@ -33,13 +31,9 @@ function ResultsDisplay({
   issuesCount: number;
   onComplete: () => void;
 }) {
-  const successCount = typeof results.successful === 'number' 
-    ? results.successful 
-    : (Array.isArray(results.successful) ? results.successful.length : 0);
-  const failedCount = typeof results.failed === 'number' 
-    ? results.failed 
-    : (Array.isArray(results.failed) ? results.failed.length : 0);
-  const failedItems = Array.isArray(results.failed) ? results.failed : [];
+  const successCount = results.successful;
+  const failedCount = results.failed.length;
+  const failedItems = results.failed;
 
   const initialCountdown = failedCount > 0 ? 10 : 3;
   const [countdown, setCountdown] = useState(initialCountdown);
@@ -100,14 +94,19 @@ function ResultsDisplay({
           </div>
         )}
 
-        {failedCount > 0 && (
+        {(failedCount > 0 || results.errorMessage) && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-3">
               <XCircle size={20} className="text-red-600" />
               <span className="font-semibold text-red-800">
-                {failedCount} fixes failed
+                {results.errorMessage 
+                  ? 'Batch fix failed' 
+                  : `${failedCount} fixes failed`}
               </span>
             </div>
+            {results.errorMessage && (
+              <p className="text-sm text-red-700 mb-2">{results.errorMessage}</p>
+            )}
             {failedItems.length > 0 && (
               <ul className="text-sm text-red-700 space-y-2 ml-7">
                 {failedItems.map((fail, idx) => (
@@ -159,36 +158,26 @@ export function BatchQuickFixPanel({
 
   const applyBatchMutation = useMutation({
     mutationFn: async () => {
-      console.log('[Batch Quick Fix] Applying fixes:', {
-        jobId,
-        issueIds: issues.map(i => i.id),
-        fixType
-      });
-
-      const response = await api.post(
-        `/epub/job/${jobId}/remediation/quick-fix/batch`,
-        {
+      if (import.meta.env.DEV) {
+        console.log('[Batch Quick Fix] Applying fixes:', {
+          jobId,
           issueIds: issues.map(i => i.id),
           fixType
-        }
-      );
+        });
+      }
 
-      console.log('[Batch Quick Fix] Full response:', response);
-      console.log('[Batch Quick Fix] Response data:', response.data);
+      const result = await applyBatchQuickFix(jobId, issues.map(i => i.id), fixType);
 
-      const rawData = response.data?.data?.results || response.data?.results || response.data;
+      if (import.meta.env.DEV) {
+        console.log('[Batch Quick Fix] Result:', result);
+      }
       
-      const extractedResults: BatchFixResults = {
-        successful: rawData?.successful ?? 0,
-        failed: rawData?.failed ?? [],
-        totalAttempted: typeof rawData?.totalAttempted === 'number' ? rawData.totalAttempted : issues.length
-      };
-
-      console.log('[Batch Quick Fix] Extracted results:', extractedResults);
-      return extractedResults;
+      return result;
     },
     onSuccess: (data) => {
-      console.log('[Batch Quick Fix] Success! Setting results:', data);
+      if (import.meta.env.DEV) {
+        console.log('[Batch Quick Fix] Success! Setting results:', data);
+      }
       setResults(data);
 
       queryClient.invalidateQueries({ queryKey: ['remediation-plan', jobId] });
@@ -200,11 +189,13 @@ export function BatchQuickFixPanel({
       queryClient.refetchQueries({ queryKey: ['similar-issues', jobId] });
     },
     onError: (error: unknown) => {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('[Batch Quick Fix] Error:', error);
       setResults({
         successful: 0,
-        failed: issues.length,
-        totalAttempted: issues.length
+        failed: [],
+        totalAttempted: issues.length,
+        errorMessage
       });
     }
   });
