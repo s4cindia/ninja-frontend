@@ -237,35 +237,59 @@ export const EPUBRenderer = React.memo(function EPUBRenderer({
     if (!shouldRender || !iframeRef.current) return;
 
     const iframe = iframeRef.current;
-    const doc = iframe.contentDocument || iframe.contentWindow?.document;
-    if (!doc) return;
+    let isCleanedUp = false;
 
     if (import.meta.env.DEV) {
-      console.log('[EPUBRenderer] Rendering EPUB, version:', version);
-      console.log('[EPUBRenderer] Highlights:', highlights);
+      console.log('[EPUBRenderer] Mounting, version:', version);
     }
 
-    // Always rewrite iframe on render
-    doc.open();
-    doc.write(fullHtml);
-    doc.close();
+    const initializeIframe = () => {
+      if (isCleanedUp) return;
 
-    // Apply highlights after load
-    const handleLoad = () => {
-      const loadedDoc = iframe.contentDocument || iframe.contentWindow?.document;
-      if (loadedDoc) {
-        if (import.meta.env.DEV) {
-          console.log('[EPUBRenderer] Applying highlights to loaded content');
+      const doc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!doc) return;
+
+      doc.open();
+      doc.write(fullHtml);
+      doc.close();
+
+      const handleLoad = () => {
+        if (isCleanedUp) return;
+
+        const loadedDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (loadedDoc) {
+          if (import.meta.env.DEV) {
+            console.log('[EPUBRenderer] Content loaded, applying highlights');
+          }
+          applyHighlights(loadedDoc, highlights, version);
+          handleLoadCallback();
         }
-        applyHighlights(loadedDoc, highlights, version);
-        handleLoadCallback();
-      }
+      };
+
+      iframe.addEventListener('load', handleLoad, { once: true });
     };
 
-    iframe.addEventListener('load', handleLoad, { once: true });
+    initializeIframe();
 
     return () => {
-      iframe.removeEventListener('load', handleLoad);
+      if (import.meta.env.DEV) {
+        console.log('[EPUBRenderer] Unmounting, cleaning up version:', version);
+      }
+      isCleanedUp = true;
+
+      if (iframe.contentDocument) {
+        const doc = iframe.contentDocument;
+
+        if (doc.body) {
+          doc.body.innerHTML = '';
+        }
+
+        doc.open();
+        doc.write('');
+        doc.close();
+      }
+
+      iframe.src = 'about:blank';
     };
   }, [shouldRender, fullHtml, highlights, version, handleLoadCallback]);
 
@@ -281,6 +305,7 @@ export const EPUBRenderer = React.memo(function EPUBRenderer({
     <div className={`epub-renderer ${className}`}>
       <iframe
         ref={iframeRef}
+        key={`${version}-${html.substring(0, 50)}`}
         sandbox="allow-same-origin"
         className="w-full h-full border-0"
         title={`EPUB ${version}`}
