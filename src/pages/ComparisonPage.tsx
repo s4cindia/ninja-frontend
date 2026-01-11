@@ -50,6 +50,15 @@ export const ComparisonPage: React.FC = () => {
 
   const currentChange = data?.changes[currentIndex];
 
+  // Debug logging for navigation issue
+  useEffect(() => {
+    console.log('🔍 [ComparisonPage] Component mounted/updated');
+    console.log('  - URL jobId:', jobId);
+    console.log('  - Current URL:', window.location.pathname);
+    console.log('  - Current change:', currentChange?.id);
+    console.log('  - Current change jobId:', currentChange?.jobId);
+  }, [jobId, currentChange]);
+
   const { data: isVisualAvailable, isLoading: isCheckingVisual } = useQuery({
     queryKey: ['visual-available', currentChange?.jobId, currentChange?.id],
     queryFn: async () => {
@@ -139,6 +148,8 @@ export const ComparisonPage: React.FC = () => {
   }, [isNavigating, data?.changes]);
 
   const handleBack = () => {
+    console.log('🔙 [ComparisonPage] Back button clicked');
+    console.log('  - Navigating to: /remediation/' + jobId);
     navigate(`/remediation/${jobId}`);
   };
 
