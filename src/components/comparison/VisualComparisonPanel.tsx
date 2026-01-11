@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getVisualComparison } from '@/services/comparison.service';
 import { EPUBRenderer } from '../epub/EPUBRenderer';
@@ -218,6 +218,34 @@ export function VisualComparisonPanel({
       }
     };
   }, [visualData, effectiveHighlights]);
+
+  const beforeRenderer = useMemo(() => {
+    if (!rendererProps) return null;
+    return (
+      <EPUBRenderer
+        key={`before-${changeId}`}
+        html={rendererProps.before.html}
+        css={rendererProps.before.css}
+        baseUrl={rendererProps.before.baseUrl}
+        highlights={rendererProps.before.highlights}
+        version="before"
+      />
+    );
+  }, [rendererProps, changeId]);
+
+  const afterRenderer = useMemo(() => {
+    if (!rendererProps) return null;
+    return (
+      <EPUBRenderer
+        key={`after-${changeId}`}
+        html={rendererProps.after.html}
+        css={rendererProps.after.css}
+        baseUrl={rendererProps.after.baseUrl}
+        highlights={rendererProps.after.highlights}
+        version="after"
+      />
+    );
+  }, [rendererProps, changeId]);
 
   const toggleLayout = useCallback((newLayout: 'side-by-side' | 'stacked') => {
     setLayout(newLayout);
@@ -519,16 +547,7 @@ export function VisualComparisonPanel({
               <Maximize2 size={16} className="text-red-700" />
             </button>
           </div>
-          {rendererProps && (
-            <EPUBRenderer
-              key={`before-${changeId}`}
-              html={rendererProps.before.html}
-              css={rendererProps.before.css}
-              baseUrl={rendererProps.before.baseUrl}
-              highlights={rendererProps.before.highlights}
-              version="before"
-            />
-          )}
+          {beforeRenderer}
         </div>
 
         <div
@@ -554,16 +573,7 @@ export function VisualComparisonPanel({
               <Maximize2 size={16} className="text-green-700" />
             </button>
           </div>
-          {rendererProps && (
-            <EPUBRenderer
-              key={`after-${changeId}`}
-              html={rendererProps.after.html}
-              css={rendererProps.after.css}
-              baseUrl={rendererProps.after.baseUrl}
-              highlights={rendererProps.after.highlights}
-              version="after"
-            />
-          )}
+          {afterRenderer}
         </div>
       </div>
 

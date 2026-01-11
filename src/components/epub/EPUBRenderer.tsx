@@ -71,10 +71,16 @@ class IframeRegistry {
   }
 
   private logDOMState() {
-    const actualIframes = document.querySelectorAll('iframe').length;
-    if (actualIframes !== this.iframes.size) {
-      console.warn(`[IframeRegistry] MISMATCH! Registry: ${this.iframes.size}, DOM: ${actualIframes}`);
-    }
+    setTimeout(() => {
+      const actualIframes = document.querySelectorAll('iframe').length;
+      const registryCount = this.iframes.size;
+
+      if (Math.abs(actualIframes - registryCount) > 1) {
+        console.warn(`[IframeRegistry] MISMATCH! Registry: ${registryCount}, DOM: ${actualIframes}`);
+      } else if (actualIframes === registryCount) {
+        console.log(`[IframeRegistry] DOM count verified: ${actualIframes} iframes`);
+      }
+    }, 100);
   }
 }
 
