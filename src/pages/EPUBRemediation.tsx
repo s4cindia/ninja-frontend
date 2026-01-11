@@ -1872,10 +1872,14 @@ export const EPUBRemediation: React.FC = () => {
               fixName={selectedBatch.fixName}
               issues={selectedBatch.issues}
               onComplete={() => {
+                console.log('[Remediation Page] Batch fix completed, refreshing data');
                 setShowBatchPanel(false);
                 setSelectedBatch(null);
-                queryClient.invalidateQueries({ queryKey: ['remediation-plan', jobId] });
-                queryClient.invalidateQueries({ queryKey: ['similar-issues', jobId] });
+                queryClient.invalidateQueries({ queryKey: ['remediation-plan'] });
+                queryClient.invalidateQueries({ queryKey: ['similar-issues'] });
+                setTimeout(() => {
+                  window.location.reload();
+                }, 500);
               }}
               onCancel={() => {
                 setShowBatchPanel(false);
