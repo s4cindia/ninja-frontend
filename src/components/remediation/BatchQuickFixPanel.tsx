@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Zap, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { api } from '@/services/api';
@@ -29,6 +29,10 @@ export function BatchQuickFixPanel({
   const [results, setResults] = useState<any>(null);
   const queryClient = useQueryClient();
 
+  useEffect(() => {
+    console.log('[BatchQuickFixPanel] Current results state:', results);
+  }, [results]);
+
   const applyBatchMutation = useMutation({
     mutationFn: async () => {
       console.log('[Batch Quick Fix] Applying fixes:', {
@@ -45,48 +49,66 @@ export function BatchQuickFixPanel({
         }
       );
 
-      console.log('[Batch Quick Fix] Response:', response.data);
-      return response.data;
+      console.log('[Batch Quick Fix] Full response:', response);
+      console.log('[Batch Quick Fix] Response data:', response.data);
+
+      const extractedResults = response.data.results || response.data.data?.results || response.data;
+
+      console.log('[Batch Quick Fix] Extracted results:', extractedResults);
+      return extractedResults;
     },
     onSuccess: (data) => {
-      setResults(data.results);
+      console.log('[Batch Quick Fix] Success! Setting results:', data);
+      setResults(data);
+
       queryClient.invalidateQueries({ queryKey: ['remediation-plan', jobId] });
       queryClient.invalidateQueries({ queryKey: ['issues', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['similar-issues', jobId] });
     },
-    onError: (error: unknown) => {
+    onError: (error: any) => {
       console.error('[Batch Quick Fix] Error:', error);
+      alert(`Failed to apply batch fixes: ${error.message || 'Unknown error'}`);
     }
   });
 
   if (results) {
+    console.log('[BatchQuickFixPanel] Results object:', results);
+    console.log('[BatchQuickFixPanel] Successful:', results.successful);
+    console.log('[BatchQuickFixPanel] Failed:', results.failed);
+    console.log('[BatchQuickFixPanel] Total attempted:', results.totalAttempted);
+
     return (
       <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold mb-4">Batch Fix Results</h3>
+        <h3 className="text-xl font-bold mb-4">Batch Fix Results</h3>
 
         <div className="space-y-4 mb-6">
-          <div className="flex items-center gap-2 text-green-700">
-            <CheckCircle size={20} />
-            <span className="font-medium">
-              {results.successful.length} of {results.totalAttempted} fixes applied successfully
-            </span>
-          </div>
-
-          {results.failed.length > 0 && (
-            <div className="flex items-center gap-2 text-red-700">
-              <XCircle size={20} />
-              <span className="font-medium">
-                {results.failed.length} fixes failed
-              </span>
+          {results.successful && results.successful.length > 0 && (
+            <div className="flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <CheckCircle size={24} className="text-green-600" />
+              <div>
+                <div className="font-semibold text-green-800">
+                  Successfully applied {results.successful.length} of {results.totalAttempted || issues.length} fixes
+                </div>
+                <div className="text-sm text-green-700 mt-1">
+                  The EPUB has been updated with all fixes
+                </div>
+              </div>
             </div>
           )}
 
-          {results.failed.length > 0 && (
-            <div className="mt-4 bg-red-50 border border-red-200 rounded p-3">
-              <p className="text-sm font-medium text-red-800 mb-2">Failed Issues:</p>
-              <ul className="text-xs text-red-700 space-y-1">
+          {results.failed && results.failed.length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <XCircle size={20} className="text-red-600" />
+                <span className="font-semibold text-red-800">
+                  {results.failed.length} fixes failed
+                </span>
+              </div>
+              <ul className="text-sm text-red-700 space-y-2 ml-7">
                 {results.failed.map((fail: any, idx: number) => (
-                  <li key={idx}>
-                    Issue {fail.issueId}: {fail.error}
+                  <li key={idx} className="border-l-2 border-red-300 pl-3">
+                    <div className="font-medium">Issue {fail.issueId?.substring(0, 8)}...</div>
+                    <div className="text-xs text-red-600">{fail.error}</div>
                   </li>
                 ))}
               </ul>
@@ -95,10 +117,13 @@ export function BatchQuickFixPanel({
         </div>
 
         <button
-          onClick={onComplete}
-          className="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          onClick={() => {
+            setResults(null);
+            onComplete();
+          }}
+          className="w-full px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold"
         >
-          Done
+          Done - Close and Refresh
         </button>
       </div>
     );
@@ -146,16 +171,16 @@ export function BatchQuickFixPanel({
         <button
           onClick={() => applyBatchMutation.mutate()}
           disabled={applyBatchMutation.isPending}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
         >
           {applyBatchMutation.isPending ? (
             <>
-              <Loader2 className="animate-spin" size={16} />
-              Applying...
+              <Loader2 className="animate-spin" size={20} />
+              Applying {issues.length} fixes...
             </>
           ) : (
             <>
-              <Zap size={16} />
+              <Zap size={20} />
               Apply All ({issues.length})
             </>
           )}
@@ -164,7 +189,7 @@ export function BatchQuickFixPanel({
         <button
           onClick={onCancel}
           disabled={applyBatchMutation.isPending}
-          className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
         >
           Cancel
         </button>
