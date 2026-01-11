@@ -32,6 +32,7 @@ export const ComparisonPage: React.FC = () => {
   const [viewType, setViewType] = useState<'visual' | 'code'>('code'); // Default to code for performance
   const [isPending, startTransition] = useTransition();
   const [isNavigating, setIsNavigating] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const { data, isLoading, error } = useFilteredComparison(jobId || '', filters);
 
@@ -277,7 +278,6 @@ export const ComparisonPage: React.FC = () => {
                   </div>
                 }>
                   <VisualComparisonPanel
-                    key={`visual-panel-${currentChange.id}`}
                     jobId={jobId}
                     changeId={currentChange.id}
                     changeDescription={currentChange.description}
@@ -290,6 +290,8 @@ export const ComparisonPage: React.FC = () => {
                     onNavigateNext={handleNext}
                     canNavigatePrevious={currentIndex > 0}
                     canNavigateNext={currentIndex < (data?.changes.length ?? 0) - 1}
+                    isFullscreen={isFullscreen}
+                    onToggleFullscreen={() => setIsFullscreen(prev => !prev)}
                   />
                 </Suspense>
               ) : (

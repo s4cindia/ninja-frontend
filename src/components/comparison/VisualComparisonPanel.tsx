@@ -94,6 +94,8 @@ interface VisualComparisonPanelProps {
   onNavigateNext?: () => void;
   canNavigatePrevious?: boolean;
   canNavigateNext?: boolean;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
 }
 
 export function VisualComparisonPanel({
@@ -108,13 +110,30 @@ export function VisualComparisonPanel({
   onNavigatePrevious,
   onNavigateNext,
   canNavigatePrevious,
-  canNavigateNext
+  canNavigateNext,
+  isFullscreen: externalFullscreen,
+  onToggleFullscreen
 }: VisualComparisonPanelProps) {
   const [zoom, setZoom] = useState(100);
   const [syncScroll, setSyncScroll] = useState(true);
   const [showCode, setShowCode] = useState(false);
   const [layout, setLayout] = useState<'side-by-side' | 'stacked'>('side-by-side');
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [internalFullscreen, setInternalFullscreen] = useState(false);
+  const isFullscreen = externalFullscreen ?? internalFullscreen;
+  const handleOpenFullscreen = useCallback(() => {
+    if (onToggleFullscreen) {
+      if (!isFullscreen) onToggleFullscreen();
+    } else {
+      setInternalFullscreen(true);
+    }
+  }, [onToggleFullscreen, isFullscreen]);
+  const handleCloseFullscreen = useCallback(() => {
+    if (onToggleFullscreen) {
+      if (isFullscreen) onToggleFullscreen();
+    } else {
+      setInternalFullscreen(false);
+    }
+  }, [onToggleFullscreen, isFullscreen]);
   const [fullscreenMode, setFullscreenMode] = useState<'before' | 'after' | 'compare'>('compare');
   const [showCodeChanges, setShowCodeChanges] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -144,7 +163,7 @@ export function VisualComparisonPanel({
         (window as unknown as { gc: () => void }).gc();
       }
     };
-  }, [changeId]);
+  }, []);
 
   useEffect(() => {
     if (renderCount.current > 1) {
@@ -239,7 +258,7 @@ export function VisualComparisonPanel({
     if (!rendererProps) return null;
     return (
       <EPUBRenderer
-        key={`before-${changeId}`}
+        key="before-stable"
         html={rendererProps.before.html}
         css={rendererProps.before.css}
         baseUrl={rendererProps.before.baseUrl}
@@ -247,13 +266,13 @@ export function VisualComparisonPanel({
         version="before"
       />
     );
-  }, [rendererProps, changeId]);
+  }, [rendererProps]);
 
   const afterRenderer = useMemo(() => {
     if (!rendererProps) return null;
     return (
       <EPUBRenderer
-        key={`after-${changeId}`}
+        key="after-stable"
         html={rendererProps.after.html}
         css={rendererProps.after.css}
         baseUrl={rendererProps.after.baseUrl}
@@ -261,7 +280,7 @@ export function VisualComparisonPanel({
         version="after"
       />
     );
-  }, [rendererProps, changeId]);
+  }, [rendererProps]);
 
   const toggleLayout = useCallback((newLayout: 'side-by-side' | 'stacked') => {
     startTransition(() => {
@@ -290,7 +309,7 @@ export function VisualComparisonPanel({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setIsFullscreen(false);
+        handleCloseFullscreen();
       } else if (e.key === '1') {
         setFullscreenMode('before');
       } else if (e.key === '2') {
@@ -539,7 +558,7 @@ export function VisualComparisonPanel({
         </div>
 
         <button
-          onClick={() => setIsFullscreen(true)}
+          onClick={() => handleOpenFullscreen()}
           className="flex items-center gap-1 px-3 py-2 border border-gray-300 rounded hover:bg-gray-100 text-sm font-medium ml-4"
           aria-label="Open fullscreen view"
         >
@@ -563,7 +582,7 @@ export function VisualComparisonPanel({
             <button
               onClick={() => {
                 setFullscreenMode('before');
-                setIsFullscreen(true);
+                handleOpenFullscreen();
               }}
               className="p-1 hover:bg-red-100 rounded"
               title="Expand BEFORE to fullscreen"
@@ -589,7 +608,7 @@ export function VisualComparisonPanel({
             <button
               onClick={() => {
                 setFullscreenMode('after');
-                setIsFullscreen(true);
+                handleOpenFullscreen();
               }}
               className="p-1 hover:bg-green-100 rounded"
               title="Expand AFTER to fullscreen"
@@ -612,7 +631,7 @@ export function VisualComparisonPanel({
               </h3>
 
               <button
-                onClick={() => setIsFullscreen(false)}
+                onClick={() => handleCloseFullscreen()}
                 className="p-2 hover:bg-gray-200 rounded-lg"
                 title="Close (ESC)"
                 aria-label="Close fullscreen"
