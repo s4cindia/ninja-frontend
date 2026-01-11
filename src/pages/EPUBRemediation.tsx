@@ -929,7 +929,9 @@ export const EPUBRemediation: React.FC = () => {
   const { data: similarIssuesFromApi } = useQuery({
     queryKey: ['similar-issues', jobId],
     queryFn: async () => {
-      const response = await api.get(`/jobs/${jobId}/remediation/similar-issues`);
+      console.log('[Similar Issues] Fetching for job:', jobId);
+      const response = await api.get(`/epub/job/${jobId}/remediation/similar-issues`);
+      console.log('[Similar Issues] Response:', response.data);
       return response.data;
     },
     enabled: !!jobId && pageState === 'ready',

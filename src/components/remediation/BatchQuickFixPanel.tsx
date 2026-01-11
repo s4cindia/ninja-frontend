@@ -31,19 +31,30 @@ export function BatchQuickFixPanel({
 
   const applyBatchMutation = useMutation({
     mutationFn: async () => {
+      console.log('[Batch Quick Fix] Applying fixes:', {
+        jobId,
+        issueIds: issues.map(i => i.id),
+        fixType
+      });
+
       const response = await api.post(
-        `/jobs/${jobId}/remediation/quick-fix/batch`,
+        `/epub/job/${jobId}/remediation/quick-fix/batch`,
         {
           issueIds: issues.map(i => i.id),
           fixType
         }
       );
+
+      console.log('[Batch Quick Fix] Response:', response.data);
       return response.data;
     },
     onSuccess: (data) => {
       setResults(data.results);
       queryClient.invalidateQueries({ queryKey: ['remediation-plan', jobId] });
       queryClient.invalidateQueries({ queryKey: ['issues', jobId] });
+    },
+    onError: (error: unknown) => {
+      console.error('[Batch Quick Fix] Error:', error);
     }
   });
 
