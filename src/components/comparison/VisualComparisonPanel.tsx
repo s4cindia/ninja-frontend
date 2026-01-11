@@ -200,6 +200,33 @@ export function VisualComparisonPanel({
            desc.toLowerCase().includes('aria');
   }, [changeType, changeDescription, visualData]);
 
+  const rendererProps = useMemo(() => {
+    if (!visualData) return null;
+
+    return {
+      before: {
+        html: visualData.beforeContent.html,
+        css: visualData.beforeContent.css,
+        baseUrl: visualData.beforeContent.baseHref,
+        highlights: effectiveHighlights
+      },
+      after: {
+        html: visualData.afterContent.html,
+        css: visualData.afterContent.css,
+        baseUrl: visualData.afterContent.baseHref,
+        highlights: effectiveHighlights
+      }
+    };
+  }, [visualData, effectiveHighlights]);
+
+  const toggleLayout = useCallback((newLayout: 'side-by-side' | 'stacked') => {
+    setLayout(newLayout);
+  }, []);
+
+  const toggleSyncScroll = useCallback(() => {
+    setSyncScroll(prev => !prev);
+  }, []);
+
   useEffect(() => {
     if (import.meta.env.DEV && visualData) {
       console.log('[VisualComparisonPanel] Data loaded:', {
@@ -425,7 +452,7 @@ export function VisualComparisonPanel({
             type="checkbox"
             id="sync-scroll"
             checked={syncScroll}
-            onChange={(e) => setSyncScroll(e.target.checked)}
+            onChange={toggleSyncScroll}
             className="rounded"
           />
           <label htmlFor="sync-scroll" className="text-sm">Sync Scroll</label>
@@ -433,7 +460,7 @@ export function VisualComparisonPanel({
 
         <div className="flex items-center gap-2 ml-4 border-l border-gray-300 pl-4">
           <button
-            onClick={() => setLayout('side-by-side')}
+            onClick={() => toggleLayout('side-by-side')}
             className={`p-2 border rounded ${
               layout === 'side-by-side'
                 ? 'bg-blue-500 text-white border-blue-500'
@@ -445,7 +472,7 @@ export function VisualComparisonPanel({
             <Columns size={16} />
           </button>
           <button
-            onClick={() => setLayout('stacked')}
+            onClick={() => toggleLayout('stacked')}
             className={`p-2 border rounded ${
               layout === 'stacked'
                 ? 'bg-blue-500 text-white border-blue-500'
@@ -492,14 +519,16 @@ export function VisualComparisonPanel({
               <Maximize2 size={16} className="text-red-700" />
             </button>
           </div>
-          <EPUBRenderer
-            key={`before-${changeId}`}
-            html={visualData.beforeContent.html}
-            css={visualData.beforeContent.css}
-            baseUrl={visualData.beforeContent.baseHref}
-            highlights={effectiveHighlights}
-            version="before"
-          />
+          {rendererProps && (
+            <EPUBRenderer
+              key={`before-${changeId}`}
+              html={rendererProps.before.html}
+              css={rendererProps.before.css}
+              baseUrl={rendererProps.before.baseUrl}
+              highlights={rendererProps.before.highlights}
+              version="before"
+            />
+          )}
         </div>
 
         <div
@@ -525,14 +554,16 @@ export function VisualComparisonPanel({
               <Maximize2 size={16} className="text-green-700" />
             </button>
           </div>
-          <EPUBRenderer
-            key={`after-${changeId}`}
-            html={visualData.afterContent.html}
-            css={visualData.afterContent.css}
-            baseUrl={visualData.afterContent.baseHref}
-            highlights={effectiveHighlights}
-            version="after"
-          />
+          {rendererProps && (
+            <EPUBRenderer
+              key={`after-${changeId}`}
+              html={rendererProps.after.html}
+              css={rendererProps.after.css}
+              baseUrl={rendererProps.after.baseUrl}
+              highlights={rendererProps.after.highlights}
+              version="after"
+            />
+          )}
         </div>
       </div>
 
