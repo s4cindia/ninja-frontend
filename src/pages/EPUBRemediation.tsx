@@ -924,23 +924,39 @@ export const EPUBRemediation: React.FC = () => {
     }>;
   } | null>(null);
   const queryClient = useQueryClient();
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
-  const handleBatchFixComplete = useCallback(() => {
+  useEffect(() => {
+    if (showBatchPanel && !previousFocusRef.current) {
+      previousFocusRef.current = document.activeElement as HTMLElement;
+    }
+  }, [showBatchPanel]);
+
+  const handleBatchFixComplete = useCallback(async () => {
     if (import.meta.env.DEV) {
       console.log('[Remediation Page] Batch fix completed, refreshing data');
     }
     setShowBatchPanel(false);
     setSelectedBatch(null);
-    queryClient.invalidateQueries({ queryKey: ['remediation-plan', jobId] });
-    queryClient.invalidateQueries({ queryKey: ['similar-issues', jobId] });
-    setTimeout(() => {
-      window.location.reload();
-    }, 500);
+    const elementToFocus = previousFocusRef.current;
+    previousFocusRef.current = null;
+    if (elementToFocus?.isConnected) {
+      elementToFocus.focus();
+    }
+    await Promise.all([
+      queryClient.refetchQueries({ queryKey: ['remediation-plan', jobId] }),
+      queryClient.refetchQueries({ queryKey: ['similar-issues', jobId] })
+    ]);
   }, [queryClient, jobId]);
 
   const handleBatchFixCancel = useCallback(() => {
     setShowBatchPanel(false);
     setSelectedBatch(null);
+    const elementToFocus = previousFocusRef.current;
+    previousFocusRef.current = null;
+    if (elementToFocus?.isConnected) {
+      elementToFocus.focus();
+    }
   }, []);
 
   // Fetch similar issues grouping for batch quick fixes
@@ -964,8 +980,12 @@ export const EPUBRemediation: React.FC = () => {
 
     if (!plan?.tasks) return null;
 
+    // Use same logic as getEffectiveFixType to detect quickfix tasks
+    const getEffectiveFixTypeLocal = (t: PlanViewPlan['tasks'][0]) =>
+      t.fixType || (t.type === 'auto' ? 'auto' : hasQuickFixTemplate(t.code) ? 'quickfix' : 'manual');
+
     const quickfixTasks = plan.tasks.filter(
-      t => t.fixType === 'quickfix' && t.status === 'pending'
+      t => getEffectiveFixTypeLocal(t) === 'quickfix' && t.status === 'pending'
     );
 
     const groupedByCode: Record<string, typeof quickfixTasks> = {};
@@ -1827,7 +1847,8 @@ export const EPUBRemediation: React.FC = () => {
               }) => (
                 <button
                   key={group.fixType}
-                  onClick={() => {
+                  onClick={(e) => {
+                    previousFocusRef.current = e.currentTarget;
                     setSelectedBatch(group);
                     setShowBatchPanel(true);
                   }}
@@ -1882,8 +1903,24 @@ export const EPUBRemediation: React.FC = () => {
 
       {/* Batch Quick Fix Modal */}
       {showBatchPanel && selectedBatch && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="max-w-2xl w-full">
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={handleBatchFixCancel}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              handleBatchFixCancel();
+            }
+          }}
+          role="presentation"
+        >
+          <div 
+            className="max-w-2xl w-full"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="batch-fix-title"
+            aria-describedby="batch-fix-description"
+            onClick={(e) => e.stopPropagation()}
+          >
             <BatchQuickFixPanel
               jobId={jobId || ''}
               fixType={selectedBatch.fixType}

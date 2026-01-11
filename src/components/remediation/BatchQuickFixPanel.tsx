@@ -151,9 +151,19 @@ export function BatchQuickFixPanel({
 }: BatchQuickFixPanelProps) {
   const [results, setResults] = useState<BatchFixResults | null>(null);
   const queryClient = useQueryClient();
+  const panelRef = useRef<HTMLDivElement>(null);
+  const applyButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    console.log('[BatchQuickFixPanel] Current results state:', results);
+    if (import.meta.env.DEV) {
+      console.log('[BatchQuickFixPanel] Current results state:', results);
+    }
+  }, [results]);
+
+  useEffect(() => {
+    if (!results) {
+      applyButtonRef.current?.focus();
+    }
   }, [results]);
 
   const applyBatchMutation = useMutation({
@@ -205,14 +215,14 @@ export function BatchQuickFixPanel({
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6">
+    <div ref={panelRef} className="bg-white rounded-lg border border-gray-200 p-6">
       <div className="flex items-center gap-3 mb-4">
         <div className="p-2 bg-green-100 rounded">
-          <Zap className="text-green-600" size={24} />
+          <Zap className="text-green-600" size={24} aria-hidden="true" />
         </div>
         <div>
-          <h3 className="text-lg font-semibold">{fixName}</h3>
-          <p className="text-sm text-gray-600">
+          <h3 id="batch-fix-title" className="text-lg font-semibold">{fixName}</h3>
+          <p id="batch-fix-description" className="text-sm text-gray-600">
             Apply to {issues.length} similar {issues.length === 1 ? 'issue' : 'issues'}
           </p>
         </div>
@@ -244,18 +254,19 @@ export function BatchQuickFixPanel({
 
       <div className="flex gap-3">
         <button
+          ref={applyButtonRef}
           onClick={() => applyBatchMutation.mutate()}
           disabled={applyBatchMutation.isPending}
           className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
         >
           {applyBatchMutation.isPending ? (
             <>
-              <Loader2 className="animate-spin" size={20} />
+              <Loader2 className="animate-spin" size={20} aria-hidden="true" />
               Applying {issues.length} fixes...
             </>
           ) : (
             <>
-              <Zap size={20} />
+              <Zap size={20} aria-hidden="true" />
               Apply All ({issues.length})
             </>
           )}
