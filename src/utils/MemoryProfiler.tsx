@@ -59,8 +59,12 @@ class MemoryMonitor {
 
   private logToConsole(metrics: MemoryMetrics) {
     const mbUsed = (metrics.jsHeapSize / 1024 / 1024).toFixed(2);
-    const mbLimit = (metrics.jsHeapSizeLimit / 1024 / 1024).toFixed(2);
-    const usagePercent = ((metrics.jsHeapSize / metrics.jsHeapSizeLimit) * 100).toFixed(1);
+    const mbLimit = metrics.jsHeapSizeLimit > 0 
+      ? (metrics.jsHeapSizeLimit / 1024 / 1024).toFixed(2) 
+      : 'N/A';
+    const usagePercent = metrics.jsHeapSizeLimit > 0 
+      ? ((metrics.jsHeapSize / metrics.jsHeapSizeLimit) * 100).toFixed(1) 
+      : 'N/A';
 
     console.log(
       `%c[MEMORY] Change ${metrics.changeIndex}`,

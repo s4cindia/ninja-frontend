@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Zap, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { api } from '@/services/api';
@@ -33,13 +33,26 @@ function ResultsDisplay({
   issuesCount: number;
   onComplete: () => void;
 }) {
-  const [countdown, setCountdown] = useState(3);
+  const successCount = typeof results.successful === 'number' 
+    ? results.successful 
+    : (Array.isArray(results.successful) ? results.successful.length : 0);
+  const failedCount = typeof results.failed === 'number' 
+    ? results.failed 
+    : (Array.isArray(results.failed) ? results.failed.length : 0);
+  const failedItems = Array.isArray(results.failed) ? results.failed : [];
+
+  const initialCountdown = failedCount > 0 ? 10 : 3;
+  const [countdown, setCountdown] = useState(initialCountdown);
+  const [isPaused, setIsPaused] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    const timer = setInterval(() => {
+    if (isPaused) return;
+
+    timerRef.current = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) {
-          clearInterval(timer);
+          if (timerRef.current) clearInterval(timerRef.current);
           console.log('[Batch Quick Fix] Auto-closing panel');
           onComplete();
           return 0;
@@ -48,21 +61,23 @@ function ResultsDisplay({
       });
     }, 1000);
 
-    return () => clearInterval(timer);
-  }, [onComplete]);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [onComplete, isPaused]);
+
+  const handlePauseTimer = () => {
+    setIsPaused(true);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
 
   console.log('[BatchQuickFixPanel] Results object:', results);
   console.log('[BatchQuickFixPanel] Successful:', results.successful);
   console.log('[BatchQuickFixPanel] Failed:', results.failed);
   console.log('[BatchQuickFixPanel] Total attempted:', results.totalAttempted);
-
-  const successCount = typeof results.successful === 'number' 
-    ? results.successful 
-    : (Array.isArray(results.successful) ? results.successful.length : 0);
-  const failedCount = typeof results.failed === 'number' 
-    ? results.failed 
-    : (Array.isArray(results.failed) ? results.failed.length : 0);
-  const failedItems = Array.isArray(results.failed) ? results.failed : [];
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -76,9 +91,11 @@ function ResultsDisplay({
               <div className="font-semibold text-green-800">
                 Successfully applied {successCount} of {results.totalAttempted || issuesCount} fixes
               </div>
-              <div className="text-sm text-green-700 mt-1">
-                Closing in {countdown} second{countdown !== 1 ? 's' : ''}...
-              </div>
+              {!isPaused && (
+                <div className="text-sm text-green-700 mt-1">
+                  Closing in {countdown} second{countdown !== 1 ? 's' : ''}...
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -105,12 +122,22 @@ function ResultsDisplay({
         )}
       </div>
 
-      <button
-        onClick={onComplete}
-        className="w-full px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold"
-      >
-        Done
-      </button>
+      <div className="flex gap-2">
+        {!isPaused && (
+          <button
+            onClick={handlePauseTimer}
+            className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+          >
+            Cancel Auto-close
+          </button>
+        )}
+        <button
+          onClick={onComplete}
+          className={`${isPaused ? 'w-full' : 'flex-1'} px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold`}
+        >
+          Done
+        </button>
+      </div>
     </div>
   );
 }
@@ -164,17 +191,21 @@ export function BatchQuickFixPanel({
       console.log('[Batch Quick Fix] Success! Setting results:', data);
       setResults(data);
 
-      queryClient.invalidateQueries({ queryKey: ['remediation-plan'] });
-      queryClient.invalidateQueries({ queryKey: ['similar-issues'] });
-      queryClient.invalidateQueries({ queryKey: ['issues'] });
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['remediation-plan', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['similar-issues', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['issues', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', jobId] });
 
       queryClient.refetchQueries({ queryKey: ['remediation-plan', jobId] });
       queryClient.refetchQueries({ queryKey: ['similar-issues', jobId] });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('[Batch Quick Fix] Error:', error);
-      alert(`Failed to apply batch fixes: ${error.message || 'Unknown error'}`);
+      setResults({
+        successful: 0,
+        failed: issues.length,
+        totalAttempted: issues.length
+      });
     }
   });
 

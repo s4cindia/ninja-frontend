@@ -331,8 +331,12 @@ export function VisualComparisonPanel({
 
     isScrollingRef.current = true;
 
-    const scrollPercentage = sourceEl.scrollTop / (sourceEl.scrollHeight - sourceEl.clientHeight || 1);
-    targetEl.scrollTop = scrollPercentage * (targetEl.scrollHeight - targetEl.clientHeight);
+    const sourceScrollableHeight = sourceEl.scrollHeight - sourceEl.clientHeight;
+    const scrollPercentage = sourceScrollableHeight > 0 
+      ? sourceEl.scrollTop / sourceScrollableHeight 
+      : 0;
+    const targetScrollableHeight = targetEl.scrollHeight - targetEl.clientHeight;
+    targetEl.scrollTop = scrollPercentage * targetScrollableHeight;
 
     requestAnimationFrame(() => {
       isScrollingRef.current = false;

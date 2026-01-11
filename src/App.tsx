@@ -80,17 +80,20 @@ function VisualQueryCacheCleaner() {
       const queriesToRemove = sortedQueries.slice(2);
 
       if (queriesToRemove.length > 0) {
-        console.log(`[Cache Cleanup] Removing ${queriesToRemove.length} old visual queries`);
+        if (import.meta.env.DEV) {
+          console.log(`[Cache Cleanup] Removing ${queriesToRemove.length} old visual queries`);
+        }
         queriesToRemove.forEach(query => {
           queryClient.removeQueries({ queryKey: query.queryKey, exact: true });
         });
       }
 
-      const remainingVisualQueries = queryCache.getAll().filter(q =>
-        Array.isArray(q.queryKey) && q.queryKey[0] === 'visual-comparison'
-      ).length;
-
-      console.log(`[Cache Cleanup] Visual queries remaining: ${remainingVisualQueries}`);
+      if (import.meta.env.DEV) {
+        const remainingVisualQueries = queryCache.getAll().filter(q =>
+          Array.isArray(q.queryKey) && q.queryKey[0] === 'visual-comparison'
+        ).length;
+        console.log(`[Cache Cleanup] Visual queries remaining: ${remainingVisualQueries}`);
+      }
     }, 5000);
 
     return () => clearInterval(intervalId);
