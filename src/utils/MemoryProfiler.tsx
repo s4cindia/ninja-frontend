@@ -63,11 +63,13 @@ class MemoryMonitor {
     if (this.metrics.length < 3) return;
 
     const recent = this.metrics.slice(-3);
-    const heapGrowth = recent.map((m, i) =>
-      i === 0 ? 0 : m.jsHeapSize - recent[i - 1].jsHeapSize
+    const heapGrowth = recent.slice(1).map((m, i) =>
+      m.jsHeapSize - recent[i].jsHeapSize
     );
 
-    const avgGrowth = heapGrowth.reduce((a, b) => a + b, 0) / heapGrowth.length;
+    const avgGrowth = heapGrowth.length > 0 
+      ? heapGrowth.reduce((a, b) => a + b, 0) / heapGrowth.length 
+      : 0;
 
     if (avgGrowth > 5 * 1024 * 1024) {
       console.error(
@@ -110,12 +112,12 @@ class MemoryMonitor {
 export const memoryMonitor = new MemoryMonitor();
 
 export function useMemoryMonitor(changeIndex: number) {
-  const hasLogged = useRef(false);
+  const lastLoggedIndex = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!hasLogged.current) {
+    if (lastLoggedIndex.current !== changeIndex) {
       memoryMonitor.logMetrics(changeIndex);
-      hasLogged.current = true;
+      lastLoggedIndex.current = changeIndex;
     }
   }, [changeIndex]);
 }

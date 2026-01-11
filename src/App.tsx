@@ -58,33 +58,41 @@ queryClient.setQueryDefaults(['visual-comparison'], {
   gcTime: 30000,
 });
 
-setInterval(() => {
-  const queryCache = queryClient.getQueryCache();
-  const allQueries = queryCache.getAll();
+function VisualQueryCacheCleaner() {
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      const queryCache = queryClient.getQueryCache();
+      const allQueries = queryCache.getAll();
 
-  const visualQueries = allQueries.filter(q =>
-    Array.isArray(q.queryKey) && q.queryKey[0] === 'visual-comparison'
-  );
+      const visualQueries = allQueries.filter(q =>
+        Array.isArray(q.queryKey) && q.queryKey[0] === 'visual-comparison'
+      );
 
-  const sortedQueries = visualQueries.sort((a, b) =>
-    (b.state.dataUpdatedAt || 0) - (a.state.dataUpdatedAt || 0)
-  );
+      const sortedQueries = visualQueries.sort((a, b) =>
+        (b.state.dataUpdatedAt || 0) - (a.state.dataUpdatedAt || 0)
+      );
 
-  const queriesToRemove = sortedQueries.slice(2);
+      const queriesToRemove = sortedQueries.slice(2);
 
-  if (queriesToRemove.length > 0) {
-    console.log(`[Cache Cleanup] Removing ${queriesToRemove.length} old visual queries`);
-    queriesToRemove.forEach(query => {
-      queryClient.removeQueries({ queryKey: query.queryKey, exact: true });
-    });
-  }
+      if (queriesToRemove.length > 0) {
+        console.log(`[Cache Cleanup] Removing ${queriesToRemove.length} old visual queries`);
+        queriesToRemove.forEach(query => {
+          queryClient.removeQueries({ queryKey: query.queryKey, exact: true });
+        });
+      }
 
-  const remainingVisualQueries = queryCache.getAll().filter(q =>
-    Array.isArray(q.queryKey) && q.queryKey[0] === 'visual-comparison'
-  ).length;
+      const remainingVisualQueries = queryCache.getAll().filter(q =>
+        Array.isArray(q.queryKey) && q.queryKey[0] === 'visual-comparison'
+      ).length;
 
-  console.log(`[Cache Cleanup] Visual queries remaining: ${remainingVisualQueries}`);
-}, 5000);
+      console.log(`[Cache Cleanup] Visual queries remaining: ${remainingVisualQueries}`);
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  return null;
+}
 
 function SessionExpiryHandler() {
   const navigate = useNavigate();
@@ -167,6 +175,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <VisualQueryCacheCleaner />
         <AppRoutes />
         <Toaster position="top-right" />
       </BrowserRouter>

@@ -145,28 +145,28 @@ export function VisualComparisonPanel({
   renderCount.current++;
 
   useEffect(() => {
-    console.log(
-      `%c[VisualComparisonPanel] MOUNTED`,
-      'background: #4CAF50; color: white; padding: 2px 5px;',
-      { changeId }
-    );
+    if (import.meta.env.DEV) {
+      console.log(
+        `%c[VisualComparisonPanel] MOUNTED`,
+        'background: #4CAF50; color: white; padding: 2px 5px;',
+        { changeId }
+      );
+    }
 
     return () => {
-      const lifetime = Date.now() - mountTime.current;
-      console.log(
-        `%c[VisualComparisonPanel] UNMOUNTED`,
-        'background: #f44336; color: white; padding: 2px 5px;',
-        { changeId, lifetime: `${lifetime}ms`, renders: renderCount.current }
-      );
-
-      if ((window as unknown as { gc?: () => void }).gc) {
-        (window as unknown as { gc: () => void }).gc();
+      if (import.meta.env.DEV) {
+        const lifetime = Date.now() - mountTime.current;
+        console.log(
+          `%c[VisualComparisonPanel] UNMOUNTED`,
+          'background: #f44336; color: white; padding: 2px 5px;',
+          { changeId, lifetime: `${lifetime}ms`, renders: renderCount.current }
+        );
       }
     };
-  }, []);
+  }, [changeId]);
 
   useEffect(() => {
-    if (renderCount.current > 1) {
+    if (import.meta.env.DEV && renderCount.current > 1) {
       console.warn(
         `%c[VisualComparisonPanel] RE-RENDER #${renderCount.current}`,
         'background: #ff9800; color: white; padding: 2px 5px;',

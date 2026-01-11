@@ -9,7 +9,7 @@ interface FilterBarProps {
 }
 
 const SEVERITY_OPTIONS = ['All', 'CRITICAL', 'MAJOR', 'MINOR'];
-const STATUS_OPTIONS = ['All', 'APPLIED', 'REJECTED', 'SKIPPED', 'FAILED'];
+const STATUS_OPTIONS = ['All', 'APPLIED', 'REJECTED', 'REVERTED', 'SKIPPED', 'FAILED'];
 
 export const FilterBar: React.FC<FilterBarProps> = ({
   filters,

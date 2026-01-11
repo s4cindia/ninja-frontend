@@ -102,10 +102,9 @@ export function BatchQuickFixPanel({
   fixType,
   fixName,
   issues,
-  onComplete: _onComplete,
+  onComplete,
   onCancel
 }: BatchQuickFixPanelProps) {
-  void _onComplete;
   const [results, setResults] = useState<any>(null);
   const queryClient = useQueryClient();
 
@@ -148,6 +147,8 @@ export function BatchQuickFixPanel({
 
       queryClient.refetchQueries({ queryKey: ['remediation-plan', jobId] });
       queryClient.refetchQueries({ queryKey: ['similar-issues', jobId] });
+
+      onComplete?.();
     },
     onError: (error: any) => {
       console.error('[Batch Quick Fix] Error:', error);

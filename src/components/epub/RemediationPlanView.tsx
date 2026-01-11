@@ -244,33 +244,31 @@ export const RemediationPlanView: React.FC<RemediationPlanViewProps> = ({
                 ({quickFixCompleted}/{quickFixTasks.length} complete)
               </p>
             </div>
-            <div className={`text-center p-3 rounded-lg border ${
-              getCompletionStatus(manualCompleted, pureManualTasks.length) === 'complete' 
-                ? 'bg-green-100 border-green-300' 
-                : getCompletionStatus(manualCompleted, pureManualTasks.length) === 'partial'
-                  ? 'bg-yellow-50 border-yellow-200'
-                  : 'bg-yellow-50 border-yellow-200'
-            }`}>
-              <div className="flex items-center justify-center gap-1 mb-1">
-                {getCompletionIcon(getCompletionStatus(manualCompleted, pureManualTasks.length))}
-                <p className={`text-2xl font-bold ${
-                  getCompletionStatus(manualCompleted, pureManualTasks.length) === 'complete'
-                    ? 'text-green-700'
-                    : 'text-yellow-700'
-                }`}>{pureManualTasks.length}</p>
-              </div>
-              <p className={`text-xs flex items-center justify-center gap-1 ${
-                getCompletionStatus(manualCompleted, pureManualTasks.length) === 'complete'
-                  ? 'text-green-600'
-                  : 'text-yellow-600'
-              }`}>
-                <FileEdit className="h-3 w-3" />
-                Manual
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                ({manualCompleted}/{pureManualTasks.length} complete)
-              </p>
-            </div>
+            {(() => {
+              const manualStatus = getCompletionStatus(manualCompleted, pureManualTasks.length);
+              const isComplete = manualStatus === 'complete';
+              return (
+                <div className={`text-center p-3 rounded-lg border ${
+                  isComplete ? 'bg-green-100 border-green-300' : 'bg-yellow-50 border-yellow-200'
+                }`}>
+                  <div className="flex items-center justify-center gap-1 mb-1">
+                    {getCompletionIcon(manualStatus)}
+                    <p className={`text-2xl font-bold ${isComplete ? 'text-green-700' : 'text-yellow-700'}`}>
+                      {pureManualTasks.length}
+                    </p>
+                  </div>
+                  <p className={`text-xs flex items-center justify-center gap-1 ${
+                    isComplete ? 'text-green-600' : 'text-yellow-600'
+                  }`}>
+                    <FileEdit className="h-3 w-3" />
+                    Manual
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    ({manualCompleted}/{pureManualTasks.length} complete)
+                  </p>
+                </div>
+              );
+            })()}
             <div className="text-center p-3 bg-purple-50 rounded-lg border border-purple-200">
               <p className="text-2xl font-bold text-purple-700">{completionPercent}%</p>
               <p className="text-xs text-purple-600 flex items-center justify-center gap-1">
