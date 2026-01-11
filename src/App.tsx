@@ -46,10 +46,62 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000,
-      retry: 1,
+      gcTime: 10 * 60 * 1000,
+      refetchOnWindowFocus: true,
+      refetchOnMount: true,
+      refetchOnReconnect: true,
+      retry: 3,
     },
   },
 });
+
+queryClient.setQueryDefaults(['visual-comparison'], {
+  staleTime: 0,
+  gcTime: 30000,
+  refetchOnWindowFocus: false,
+  refetchOnMount: false,
+  refetchOnReconnect: false,
+  retry: 1,
+});
+
+function VisualQueryCacheCleaner() {
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      const queryCache = queryClient.getQueryCache();
+      const allQueries = queryCache.getAll();
+
+      const visualQueries = allQueries.filter(q =>
+        Array.isArray(q.queryKey) && q.queryKey[0] === 'visual-comparison'
+      );
+
+      const sortedQueries = visualQueries.sort((a, b) =>
+        (b.state.dataUpdatedAt || 0) - (a.state.dataUpdatedAt || 0)
+      );
+
+      const queriesToRemove = sortedQueries.slice(2);
+
+      if (queriesToRemove.length > 0) {
+        if (import.meta.env.DEV) {
+          console.log(`[Cache Cleanup] Removing ${queriesToRemove.length} old visual queries`);
+        }
+        queriesToRemove.forEach(query => {
+          queryClient.removeQueries({ queryKey: query.queryKey, exact: true });
+        });
+      }
+
+      if (import.meta.env.DEV) {
+        const remainingVisualQueries = queryCache.getAll().filter(q =>
+          Array.isArray(q.queryKey) && q.queryKey[0] === 'visual-comparison'
+        ).length;
+        console.log(`[Cache Cleanup] Visual queries remaining: ${remainingVisualQueries}`);
+      }
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  return null;
+}
 
 function SessionExpiryHandler() {
   const navigate = useNavigate();
@@ -133,6 +185,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <VisualQueryCacheCleaner />
         <AppRoutes />
         <Toaster position="top-right" />
       </BrowserRouter>

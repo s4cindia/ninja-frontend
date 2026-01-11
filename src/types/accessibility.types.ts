@@ -13,6 +13,8 @@ export type IssueCategory =
   | 'multimedia'
   | 'other';
 
+export type FixTypeLabel = 'autofix' | 'quickfix' | 'manual';
+
 export interface AccessibilityIssue {
   id: string;
   code: string;
@@ -29,6 +31,9 @@ export interface AccessibilityIssue {
   wcagCriteria?: string[];
   remediation?: string;
   helpUrl?: string;
+  confidence?: number;
+  fixType?: FixTypeLabel;
+  status?: string;
 }
 
 export interface AccessibilityAuditResult {

@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   useParams,
   useNavigate,
   useLocation,
   useSearchParams,
 } from "react-router-dom";
-import { BookOpen, ArrowLeft, Eye, RotateCcw } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { BookOpen, ArrowLeft, Eye, RotateCcw, Zap } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Alert } from "@/components/ui/Alert";
@@ -30,6 +31,7 @@ import { TransferToAcrButton } from "@/components/epub/TransferToAcrButton";
 import { QuickRating } from "@/components/feedback";
 import { api } from "@/services/api";
 import { IssueTallyTracker, TallyData, CompletionStats } from "@/components/remediation/IssueTallyTracker";
+import { BatchQuickFixPanel } from "@/components/remediation/BatchQuickFixPanel";
 import { hasQuickFixTemplate } from "@/data/quickFixTemplates";
 
 type PageState = "loading" | "ready" | "running" | "complete" | "error";
@@ -907,6 +909,150 @@ export const EPUBRemediation: React.FC = () => {
   // Track total audit issues to show excluded count
   const [totalAuditIssues, setTotalAuditIssues] = useState<number | undefined>(undefined);
 
+  // Batch quick fix state
+  const [showBatchPanel, setShowBatchPanel] = useState(false);
+  const [selectedBatch, setSelectedBatch] = useState<{
+    fixType: string;
+    fixName: string;
+    count: number;
+    issues: Array<{
+      id: string;
+      code: string;
+      message: string;
+      filePath: string;
+      location?: string;
+    }>;
+  } | null>(null);
+  const queryClient = useQueryClient();
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const batchModalRef = useRef<HTMLDivElement>(null);
+
+  const handleBatchFixCancel = useCallback(() => {
+    setShowBatchPanel(false);
+    setSelectedBatch(null);
+    const elementToFocus = previousFocusRef.current;
+    previousFocusRef.current = null;
+    if (elementToFocus?.isConnected) {
+      elementToFocus.focus();
+    }
+  }, []);
+
+  // Keyboard handling for batch modal (Escape to close, Tab focus trap)
+  const handleBatchModalKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      handleBatchFixCancel();
+    }
+
+    if (e.key === 'Tab' && batchModalRef.current) {
+      const focusableElements = batchModalRef.current.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+
+      if (e.shiftKey && document.activeElement === firstElement) {
+        e.preventDefault();
+        lastElement?.focus();
+      } else if (!e.shiftKey && document.activeElement === lastElement) {
+        e.preventDefault();
+        firstElement?.focus();
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showBatchPanel) {
+      if (!previousFocusRef.current) {
+        previousFocusRef.current = document.activeElement as HTMLElement;
+      }
+      document.addEventListener('keydown', handleBatchModalKeyDown);
+      document.body.style.overflow = 'hidden';
+
+      return () => {
+        document.removeEventListener('keydown', handleBatchModalKeyDown);
+        document.body.style.overflow = '';
+      };
+    }
+  }, [showBatchPanel, handleBatchModalKeyDown]);
+
+  const handleBatchFixComplete = useCallback(async () => {
+    if (import.meta.env.DEV) {
+      console.log('[Remediation Page] Batch fix completed, refreshing data');
+    }
+    setShowBatchPanel(false);
+    setSelectedBatch(null);
+    const elementToFocus = previousFocusRef.current;
+    previousFocusRef.current = null;
+    if (elementToFocus?.isConnected) {
+      elementToFocus.focus();
+    }
+    await Promise.all([
+      queryClient.refetchQueries({ queryKey: ['remediation-plan', jobId] }),
+      queryClient.refetchQueries({ queryKey: ['similar-issues', jobId] })
+    ]);
+  }, [queryClient, jobId]);
+
+  // Fetch similar issues grouping for batch quick fixes
+  const { data: similarIssuesFromApi } = useQuery({
+    queryKey: ['similar-issues', jobId],
+    queryFn: async () => {
+      console.log('[Similar Issues] Fetching for job:', jobId);
+      const response = await api.get(`/epub/job/${jobId}/remediation/similar-issues`);
+      console.log('[Similar Issues] Response:', response.data);
+      return response.data;
+    },
+    enabled: !!jobId && pageState === 'ready',
+    retry: 1
+  });
+
+  // Client-side fallback: group issues by code when API doesn't return data
+  const similarIssues = useMemo(() => {
+    if (similarIssuesFromApi?.hasBatchableIssues) {
+      return similarIssuesFromApi;
+    }
+
+    if (!plan?.tasks) return null;
+
+    // Use same logic as getEffectiveFixType to detect quickfix tasks
+    const getEffectiveFixTypeLocal = (t: PlanViewPlan['tasks'][0]) =>
+      t.fixType || (t.type === 'auto' ? 'auto' : hasQuickFixTemplate(t.code) ? 'quickfix' : 'manual');
+
+    const quickfixTasks = plan.tasks.filter(
+      t => getEffectiveFixTypeLocal(t) === 'quickfix' && t.status === 'pending'
+    );
+
+    const groupedByCode: Record<string, typeof quickfixTasks> = {};
+    quickfixTasks.forEach(task => {
+      const code = task.code || 'unknown';
+      if (!groupedByCode[code]) {
+        groupedByCode[code] = [];
+      }
+      groupedByCode[code].push(task);
+    });
+
+    const batchableGroups = Object.entries(groupedByCode)
+      .filter(([, tasks]) => tasks.length >= 2)
+      .map(([code, tasks]) => ({
+        fixType: code,
+        fixName: tasks[0]?.message || `Fix ${code}`,
+        count: tasks.length,
+        issues: tasks.map(t => ({
+          id: t.id,
+          code: t.code || code,
+          message: t.message,
+          filePath: t.filePath || '',
+          location: t.location
+        }))
+      }));
+
+    if (batchableGroups.length === 0) return null;
+
+    return {
+      hasBatchableIssues: true,
+      batchableGroups
+    };
+  }, [similarIssuesFromApi, plan?.tasks]);
+
   // Persist filename to localStorage when it changes
   useEffect(() => {
     if (fileName && fileName !== "Loading..." && jobId) {
@@ -1705,6 +1851,59 @@ export const EPUBRemediation: React.FC = () => {
         completionStats={completionStats}
       />
 
+      {/* Batch Quick Fix Section */}
+      {similarIssues?.hasBatchableIssues && pageState === 'ready' && (
+        <Card className="mb-4 border-green-200 bg-green-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-green-800">
+              <Zap size={20} />
+              Batch Quick Fixes Available
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-green-700 mb-4">
+              You have multiple similar issues that can be fixed together:
+            </p>
+
+            <div className="space-y-2">
+              {similarIssues.batchableGroups.map((group: {
+                fixType: string;
+                fixName: string;
+                count: number;
+                issues: Array<{
+                  id: string;
+                  code: string;
+                  message: string;
+                  filePath: string;
+                  location?: string;
+                }>;
+              }) => (
+                <button
+                  key={group.fixType}
+                  onClick={(e) => {
+                    previousFocusRef.current = e.currentTarget;
+                    setSelectedBatch(group);
+                    setShowBatchPanel(true);
+                  }}
+                  className="w-full flex items-center justify-between p-3 bg-white border border-green-300 rounded hover:bg-green-50 text-left"
+                >
+                  <div>
+                    <div className="font-medium text-gray-900">{group.fixName}</div>
+                    <div className="text-sm text-gray-600">
+                      {group.count} similar {group.count === 1 ? 'issue' : 'issues'}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-green-600">
+                    <Zap size={16} />
+                    <span className="text-sm font-medium">Apply All</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <RemediationPlanView
         plan={plan}
         isRunningRemediation={pageState === "running"}
@@ -1733,6 +1932,34 @@ export const EPUBRemediation: React.FC = () => {
             isDemo={isDemo}
           />
         </>
+      )}
+
+      {/* Batch Quick Fix Modal */}
+      {showBatchPanel && selectedBatch && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={handleBatchFixCancel}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="batch-fix-title"
+          tabIndex={-1}
+        >
+          <div 
+            ref={batchModalRef}
+            className="max-w-2xl w-full"
+            role="document"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <BatchQuickFixPanel
+              jobId={jobId || ''}
+              fixType={selectedBatch.fixType}
+              fixName={selectedBatch.fixName}
+              issues={selectedBatch.issues}
+              onComplete={handleBatchFixComplete}
+              onCancel={handleBatchFixCancel}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

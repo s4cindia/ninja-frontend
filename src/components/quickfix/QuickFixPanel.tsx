@@ -339,6 +339,7 @@ export function QuickFixPanel({
       await api.post(`/epub/job/${jobId}/apply-fix`, { 
         fixCode: normalizedCode,
         taskId: issue.id,
+        targetFile: issue.filePath || issue.location || undefined,
       });
       
       setToast({ type: 'success', message: 'Fix applied successfully!' });

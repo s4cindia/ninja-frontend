@@ -10,7 +10,8 @@ import {
   Code,
   Eye,
   SkipForward,
-  FileCode
+  FileCode,
+  Zap
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { QuickFixPanel } from '@/components/quickfix/QuickFixPanel';
@@ -150,6 +151,24 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
               <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700">
                 <Wrench className="h-3 w-3" />
                 Quick Fix Available
+              </span>
+            )}
+            {status === 'fixed' && task.fixedBy === 'auto' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                <Zap className="h-3 w-3" />
+                Auto-Fixed
+              </span>
+            )}
+            {issue.confidence !== undefined && issue.confidence > 0 && (
+              <span className={cn(
+                'inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full',
+                issue.confidence >= 0.95 ? 'bg-green-100 text-green-800' :
+                issue.confidence >= 0.70 ? 'bg-yellow-100 text-yellow-800' :
+                'bg-gray-100 text-gray-700'
+              )}>
+                {issue.confidence >= 0.95 ? <CheckCircle className="h-3 w-3" /> :
+                 issue.confidence >= 0.70 ? <AlertTriangle className="h-3 w-3" /> : null}
+                {Math.round(issue.confidence * 100)}%
               </span>
             )}
           </div>
