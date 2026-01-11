@@ -20,10 +20,12 @@ interface BatchQuickFixPanelProps {
 
 function ResultsDisplay({ 
   results, 
-  issuesCount 
+  issuesCount,
+  onComplete
 }: { 
   results: any; 
   issuesCount: number;
+  onComplete: () => void;
 }) {
   const [countdown, setCountdown] = useState(3);
 
@@ -32,8 +34,8 @@ function ResultsDisplay({
       setCountdown(prev => {
         if (prev <= 1) {
           clearInterval(timer);
-          console.log('[Batch Quick Fix] Auto-reloading page');
-          window.location.reload();
+          console.log('[Batch Quick Fix] Auto-closing panel');
+          onComplete();
           return 0;
         }
         return prev - 1;
@@ -41,7 +43,7 @@ function ResultsDisplay({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [onComplete]);
 
   console.log('[BatchQuickFixPanel] Results object:', results);
   console.log('[BatchQuickFixPanel] Successful:', results.successful);
@@ -61,7 +63,7 @@ function ResultsDisplay({
                 Successfully applied {results.successful.length} of {results.totalAttempted || issuesCount} fixes
               </div>
               <div className="text-sm text-green-700 mt-1">
-                Page will refresh in {countdown} second{countdown !== 1 ? 's' : ''}...
+                Closing in {countdown} second{countdown !== 1 ? 's' : ''}...
               </div>
             </div>
           </div>
@@ -88,10 +90,10 @@ function ResultsDisplay({
       </div>
 
       <button
-        onClick={() => window.location.reload()}
+        onClick={onComplete}
         className="w-full px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-semibold"
       >
-        Refresh Now
+        Done
       </button>
     </div>
   );
@@ -157,7 +159,7 @@ export function BatchQuickFixPanel({
   });
 
   if (results) {
-    return <ResultsDisplay results={results} issuesCount={issues.length} />;
+    return <ResultsDisplay results={results} issuesCount={issues.length} onComplete={onComplete} />;
   }
 
   return (
