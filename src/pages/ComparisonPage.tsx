@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback, useTransition, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Eye, Code, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
@@ -25,6 +25,7 @@ import type { ComparisonFilters } from '@/types/comparison';
 export const ComparisonPage: React.FC = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [filters, setFilters] = useState<ComparisonFilters>({});
   const [viewType, setViewType] = useState<'visual' | 'code'>('code'); // Default to code for performance
@@ -70,6 +71,28 @@ export const ComparisonPage: React.FC = () => {
       setViewType('code');
     }
   }, [isVisualAvailable, viewType]);
+
+  useEffect(() => {
+    if (!data?.changes || viewType !== 'visual') return;
+
+    const prefetchChange = (index: number) => {
+      if (index < 0 || index >= data.changes.length) return;
+
+      const change = data.changes[index];
+      queryClient.prefetchQuery({
+        queryKey: ['visual-comparison', change.jobId, change.id],
+        queryFn: () => getVisualComparison(change.jobId, change.id),
+        staleTime: Infinity,
+      });
+    };
+
+    const timer = setTimeout(() => {
+      prefetchChange(currentIndex + 1);
+      prefetchChange(currentIndex - 1);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [currentIndex, data?.changes, viewType, queryClient]);
 
   const changeTypes = useMemo(() => {
     if (!data?.byType) return [];
