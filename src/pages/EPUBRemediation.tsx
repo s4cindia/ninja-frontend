@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   useParams,
   useNavigate,
@@ -926,14 +926,59 @@ export const EPUBRemediation: React.FC = () => {
   const queryClient = useQueryClient();
 
   // Fetch similar issues grouping for batch quick fixes
-  const { data: similarIssues } = useQuery({
+  const { data: similarIssuesFromApi } = useQuery({
     queryKey: ['similar-issues', jobId],
     queryFn: async () => {
       const response = await api.get(`/jobs/${jobId}/remediation/similar-issues`);
       return response.data;
     },
-    enabled: !!jobId && pageState === 'ready'
+    enabled: !!jobId && pageState === 'ready',
+    retry: 1
   });
+
+  // Client-side fallback: group issues by code when API doesn't return data
+  const similarIssues = useMemo(() => {
+    if (similarIssuesFromApi?.hasBatchableIssues) {
+      return similarIssuesFromApi;
+    }
+
+    if (!plan?.tasks) return null;
+
+    const quickfixTasks = plan.tasks.filter(
+      t => t.fixType === 'quickfix' && t.status === 'pending'
+    );
+
+    const groupedByCode: Record<string, typeof quickfixTasks> = {};
+    quickfixTasks.forEach(task => {
+      const code = task.code || 'unknown';
+      if (!groupedByCode[code]) {
+        groupedByCode[code] = [];
+      }
+      groupedByCode[code].push(task);
+    });
+
+    const batchableGroups = Object.entries(groupedByCode)
+      .filter(([, tasks]) => tasks.length >= 2)
+      .map(([code, tasks]) => ({
+        fixType: code,
+        fixName: tasks[0]?.message || `Fix ${code}`,
+        count: tasks.length,
+        issues: tasks.map(t => ({
+          id: t.id,
+          code: t.code || code,
+          message: t.message,
+          filePath: t.filePath || '',
+          location: t.location
+        }))
+      }));
+
+    if (batchableGroups.length === 0) return null;
+
+    return {
+      hasBatchableIssues: true,
+      batchableGroups
+    };
+  }, [similarIssuesFromApi, plan?.tasks]);
 
   // Persist filename to localStorage when it changes
   useEffect(() => {
