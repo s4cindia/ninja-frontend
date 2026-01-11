@@ -1,9 +1,4 @@
-import React, { useEffect, useRef, useMemo, useCallback, useState } from 'react';
-
-const requestIdleCallback = window.requestIdleCallback || ((cb: IdleRequestCallback) => setTimeout(() => cb({ didTimeout: false, timeRemaining: () => 50 } as IdleDeadline), 1));
-const cancelIdleCallback = window.cancelIdleCallback || clearTimeout;
-
-let instanceCounter = 0;
+import { useEffect, useRef } from 'react';
 
 interface ChangeHighlight {
   xpath: string;
@@ -24,42 +19,19 @@ interface EPUBRendererProps {
 function findByXPath(doc: Document, xpath: string): Element[] {
   const result: Element[] = [];
   try {
-    const xpathResult = doc.evaluate(
-      xpath,
-      doc,
-      null,
-      XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
-      null
-    );
+    const xpathResult = doc.evaluate(xpath, doc, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
     for (let i = 0; i < xpathResult.snapshotLength; i++) {
       const node = xpathResult.snapshotItem(i);
-      if (node instanceof Element) {
-        result.push(node);
-      }
+      if (node instanceof Element) result.push(node);
     }
   } catch (error) {
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('[EPUBRenderer] XPath evaluation failed:', error);
-    }
+    console.warn('[EPUBRenderer] XPath failed:', error);
   }
   return result;
 }
 
-function applyHighlights(
-  doc: Document,
-  highlights: ChangeHighlight[] | undefined,
-  version: 'before' | 'after'
-) {
-  if (import.meta.env.DEV) {
-    console.log('[applyHighlights] Called with:', { highlights, version });
-  }
-
-  if (!highlights || highlights.length === 0) {
-    if (import.meta.env.DEV) {
-      console.log('[applyHighlights] No highlights to apply');
-    }
-    return;
-  }
+function applyHighlights(doc: Document, highlights: ChangeHighlight[] | undefined, version: 'before' | 'after') {
+  if (!highlights || highlights.length === 0) return;
 
   highlights.forEach((highlight, index) => {
     let elements: Element[] = [];
@@ -67,33 +39,14 @@ function applyHighlights(
     if (highlight.cssSelector) {
       try {
         elements = Array.from(doc.querySelectorAll(highlight.cssSelector));
-        if (import.meta.env.DEV) {
-          console.log(`[applyHighlights] CSS selector "${highlight.cssSelector}" found ${elements.length} elements`);
-        }
-      } catch (error) {
-        if (import.meta.env.DEV) {
-          console.warn('[applyHighlights] CSS selector failed:', error);
-        }
-      }
+      } catch (error) { /* silent fail */ }
     }
 
     if (elements.length === 0 && highlight.xpath) {
       elements = findByXPath(doc, highlight.xpath);
-      if (import.meta.env.DEV) {
-        console.log(`[applyHighlights] XPath "${highlight.xpath}" found ${elements.length} elements`);
-      }
     }
 
-    if (elements.length === 0) {
-      if (import.meta.env.DEV) {
-        console.warn('[applyHighlights] No elements found for highlight:', highlight);
-      }
-      return;
-    }
-
-    if (import.meta.env.DEV) {
-      console.log(`[applyHighlights] Applying ${version} highlights to ${elements.length} elements`);
-    }
+    if (elements.length === 0) return;
 
     elements.forEach((el, elIndex) => {
       el.classList.add(`change-highlight-${version}`);
@@ -101,39 +54,14 @@ function applyHighlights(
       const tooltip = doc.createElement('div');
       tooltip.className = 'change-tooltip';
       tooltip.textContent = highlight.description || 'Changed';
-      tooltip.style.cssText = `
-        position: absolute;
-        background: rgba(0, 0, 0, 0.8);
-        color: white;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 12px;
-        pointer-events: none;
-        z-index: 1000;
-        display: none;
-        top: -30px;
-        left: 0;
-      `;
+      tooltip.style.cssText = `position:absolute;background:rgba(0,0,0,0.8);color:white;padding:4px 8px;border-radius:4px;font-size:12px;pointer-events:none;z-index:1000;display:none;top:-30px;left:0;`;
 
       const badge = doc.createElement('div');
       badge.className = 'change-badge';
       badge.textContent = version === 'before' ? '❌ BEFORE' : '✓ AFTER';
-      badge.style.cssText = `
-        position: absolute;
-        top: -12px;
-        right: -12px;
-        background: ${version === 'before' ? '#ef4444' : '#22c55e'};
-        color: white;
-        padding: 2px 8px;
-        border-radius: 12px;
-        font-size: 10px;
-        font-weight: bold;
-        z-index: 1001;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        pointer-events: none;
-      `;
+      badge.style.cssText = `position:absolute;top:-12px;right:-12px;background:${version === 'before' ? '#ef4444' : '#22c55e'};color:white;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:bold;z-index:1001;box-shadow:0 2px 4px rgba(0,0,0,0.2);pointer-events:none;`;
 
-      const computedStyle = window.getComputedStyle(el as HTMLElement);
+      const computedStyle = window.getComputedStyle(el);
       if (computedStyle.position === 'static') {
         (el as HTMLElement).style.position = 'relative';
       }
@@ -141,13 +69,8 @@ function applyHighlights(
       el.appendChild(tooltip);
       el.appendChild(badge);
 
-      el.addEventListener('mouseenter', () => {
-        tooltip.style.display = 'block';
-      }, { passive: true });
-
-      el.addEventListener('mouseleave', () => {
-        tooltip.style.display = 'none';
-      }, { passive: true });
+      el.addEventListener('mouseenter', () => tooltip.style.display = 'block', { passive: true });
+      el.addEventListener('mouseleave', () => tooltip.style.display = 'none', { passive: true });
 
       if (index === 0 && elIndex === 0) {
         requestAnimationFrame(() => {
@@ -162,193 +85,130 @@ function applyHighlights(
   });
 }
 
-export const EPUBRenderer = React.memo(function EPUBRenderer({
-  html,
-  css,
-  baseUrl,
-  highlights,
-  version,
-  onLoad,
-  className = ''
-}: EPUBRendererProps) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [shouldRender, setShouldRender] = useState(false);
-  const instanceId = useRef(`${version}-${++instanceCounter}`);
+export function EPUBRenderer({ html, css, baseUrl, highlights, version, onLoad, className = '' }: EPUBRendererProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const instanceId = useRef(`${version}-${Math.random().toString(36).substr(2, 9)}`);
 
   useEffect(() => {
-    console.log(
-      `%c[EPUBRenderer] Created`,
-      'background: #9C27B0; color: white; padding: 2px 5px;',
-      { instanceId: instanceId.current, version }
-    );
+    console.log(`[EPUBRenderer] Created ${instanceId.current}`);
 
-    return () => {
-      console.log(
-        `%c[EPUBRenderer] Destroyed`,
-        'background: #E91E63; color: white; padding: 2px 5px;',
-        { instanceId: instanceId.current, version }
-      );
+    const iframe = document.createElement('iframe');
+    iframe.sandbox.add('allow-same-origin');
+    iframe.className = 'w-full h-full border-0';
+    iframe.title = `EPUB ${version}`;
+    iframe.style.cssText = 'width: 100%; height: 100%; border: 0;';
 
-      setTimeout(() => {
-        const remainingIframes = document.querySelectorAll('iframe').length;
-        if (remainingIframes > 2) {
-          console.error(
-            `%c[IFRAME LEAK]`,
-            'background: #f44336; color: white; padding: 5px; font-weight: bold;',
-            `${remainingIframes} iframes still in DOM after cleanup!`
-          );
-        }
-      }, 100);
-    };
-  }, [version]);
+    iframeRef.current = iframe;
 
-  useEffect(() => {
-    const timer = requestIdleCallback(() => {
-      setShouldRender(true);
-    }, { timeout: 100 });
-
-    return () => cancelIdleCallback(timer);
-  }, []);
-
-  useEffect(() => {
-    if (import.meta.env.DEV) {
-      const startTime = performance.now();
-      return () => {
-        const endTime = performance.now();
-        console.log(`[EPUBRenderer] Render time: ${(endTime - startTime).toFixed(2)}ms`);
-      };
+    if (containerRef.current) {
+      containerRef.current.appendChild(iframe);
     }
-  }, [html, css, baseUrl, highlights, version]);
 
-  const combinedCSS = useMemo(() => {
-    return css.map(styles => `<style>${styles}</style>`).join('\n');
-  }, [css]);
-
-  const fullHtml = useMemo(() => {
-    return `<!DOCTYPE html>
+    const fullHtml = `<!DOCTYPE html>
 <html>
   <head>
     <meta charset="UTF-8">
     <base href="${baseUrl}/">
-    ${combinedCSS}
+    ${css.map(styles => `<style>${styles}</style>`).join('\n')}
     <style>
-      body {
-        margin: 20px;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      }
-      .change-highlight-before {
-        outline: 3px solid #ef4444 !important;
-        outline-offset: 2px;
-        background-color: rgba(239, 68, 68, 0.1) !important;
-      }
-      .change-highlight-after {
-        outline: 3px solid #22c55e !important;
-        outline-offset: 2px;
-        background-color: rgba(34, 197, 94, 0.1) !important;
-      }
-      @keyframes flash {
-        0%, 100% { background-color: transparent; }
-        50% { background-color: rgba(59, 130, 246, 0.3); }
-      }
-      .flash-highlight {
-        animation: flash 1s ease-in-out;
-      }
+      body { margin: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+      .change-highlight-before { outline: 3px solid #ef4444 !important; outline-offset: 2px; background-color: rgba(239, 68, 68, 0.1) !important; }
+      .change-highlight-after { outline: 3px solid #22c55e !important; outline-offset: 2px; background-color: rgba(34, 197, 94, 0.1) !important; }
+      @keyframes flash { 0%, 100% { background-color: transparent; } 50% { background-color: rgba(59, 130, 246, 0.3); } }
+      .flash-highlight { animation: flash 1s ease-in-out; }
     </style>
   </head>
   <body>${html}</body>
 </html>`;
-  }, [html, baseUrl, combinedCSS]);
 
-  const handleLoadCallback = useCallback(() => {
-    onLoad?.();
-  }, [onLoad]);
-
-  useEffect(() => {
-    if (!shouldRender || !iframeRef.current) return;
-
-    const iframe = iframeRef.current;
-    let isCleanedUp = false;
-
-    if (import.meta.env.DEV) {
-      console.log('[EPUBRenderer] Mounting, version:', version);
-    }
-
-    const initializeIframe = () => {
-      if (isCleanedUp) return;
-
-      const doc = iframe.contentDocument || iframe.contentWindow?.document;
-      if (!doc) return;
-
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (doc) {
       doc.open();
       doc.write(fullHtml);
       doc.close();
 
       const handleLoad = () => {
-        if (isCleanedUp) return;
-
         const loadedDoc = iframe.contentDocument || iframe.contentWindow?.document;
         if (loadedDoc) {
-          if (import.meta.env.DEV) {
-            console.log('[EPUBRenderer] Content loaded, applying highlights');
-          }
           applyHighlights(loadedDoc, highlights, version);
-          handleLoadCallback();
+          onLoad?.();
         }
       };
 
       iframe.addEventListener('load', handleLoad, { once: true });
-    };
-
-    initializeIframe();
+    }
 
     return () => {
-      if (import.meta.env.DEV) {
-        console.log('[EPUBRenderer] Unmounting, cleaning up version:', version);
-      }
-      isCleanedUp = true;
+      console.log(`[EPUBRenderer] Destroying ${instanceId.current}`);
 
-      if (iframe.contentDocument) {
-        const doc = iframe.contentDocument;
-
-        if (doc.body) {
-          doc.body.innerHTML = '';
+      if (iframeRef.current) {
+        if (iframeRef.current.contentWindow) {
+          try {
+            iframeRef.current.contentWindow.stop();
+          } catch (e) { /* ignore */ }
         }
 
-        doc.open();
-        doc.write('');
-        doc.close();
+        if (iframeRef.current.contentDocument) {
+          const doc = iframeRef.current.contentDocument;
+          if (doc.body) doc.body.innerHTML = '';
+          doc.open();
+          doc.write('');
+          doc.close();
+        }
+
+        if (iframeRef.current.parentNode) {
+          iframeRef.current.parentNode.removeChild(iframeRef.current);
+        }
+
+        iframeRef.current = null;
       }
 
-      iframe.src = 'about:blank';
+      setTimeout(() => {
+        const remainingIframes = document.querySelectorAll('iframe').length;
+        console.log(`[EPUBRenderer] Cleanup verified: ${remainingIframes} iframes remaining`);
+        if (remainingIframes > 2) {
+          console.error(`[IFRAME LEAK] ${remainingIframes} iframes still in DOM!`);
+        }
+      }, 100);
     };
-  }, [shouldRender, fullHtml, highlights, version, handleLoadCallback]);
+  }, []);
 
-  if (!shouldRender) {
-    return (
-      <div className={`epub-renderer ${className} flex items-center justify-center`}>
-        <div className="text-sm text-gray-500">Loading...</div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!iframeRef.current) return;
+
+    const doc = iframeRef.current.contentDocument;
+    if (!doc) return;
+
+    const fullHtml = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <base href="${baseUrl}/">
+    ${css.map(styles => `<style>${styles}</style>`).join('\n')}
+    <style>
+      body { margin: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+      .change-highlight-before { outline: 3px solid #ef4444 !important; outline-offset: 2px; background-color: rgba(239, 68, 68, 0.1) !important; }
+      .change-highlight-after { outline: 3px solid #22c55e !important; outline-offset: 2px; background-color: rgba(34, 197, 94, 0.1) !important; }
+      @keyframes flash { 0%, 100% { background-color: transparent; } 50% { background-color: rgba(59, 130, 246, 0.3); } }
+      .flash-highlight { animation: flash 1s ease-in-out; }
+    </style>
+  </head>
+  <body>${html}</body>
+</html>`;
+
+    doc.open();
+    doc.write(fullHtml);
+    doc.close();
+
+    applyHighlights(doc, highlights, version);
+  }, [html, css, baseUrl, highlights, version]);
 
   return (
-    <div className={`epub-renderer ${className}`}>
-      <iframe
-        ref={iframeRef}
-        key={`${version}-${html.substring(0, 50)}`}
-        sandbox="allow-same-origin"
-        className="w-full h-full border-0"
-        title={`EPUB ${version}`}
-      />
-    </div>
+    <div
+      ref={containerRef}
+      className={`epub-renderer ${className}`}
+      style={{ width: '100%', height: '100%' }}
+    />
   );
-}, (prevProps, nextProps) => {
-  return (
-    prevProps.html === nextProps.html &&
-    prevProps.css === nextProps.css &&
-    prevProps.baseUrl === nextProps.baseUrl &&
-    prevProps.version === nextProps.version &&
-    prevProps.highlights === nextProps.highlights &&
-    prevProps.className === nextProps.className
-  );
-});
+}

@@ -66,14 +66,14 @@ setInterval(() => {
     .filter(q => q.queryKey[0] === 'visual-comparison')
     .sort((a, b) => (b.state.dataUpdatedAt || 0) - (a.state.dataUpdatedAt || 0));
 
-  visualQueries.slice(5).forEach(query => {
+  visualQueries.slice(3).forEach(query => {
     queryClient.removeQueries({ queryKey: query.queryKey });
   });
 
   if (import.meta.env.DEV) {
     console.log(`[Cache Cleanup] Total queries: ${queries.length}, Visual queries: ${visualQueries.length}`);
   }
-}, 30000);
+}, 10000);
 
 function SessionExpiryHandler() {
   const navigate = useNavigate();
