@@ -401,8 +401,19 @@ export function VisualComparisonPanel({
             height: layout === 'side-by-side' ? `${100 / (zoom / 100)}%` : `${50 / (zoom / 100)}%`
           }}
         >
-          <div className="bg-red-50 px-4 py-2 sticky top-0 z-10 border-b border-red-200">
+          <div className="bg-red-50 px-4 py-2 sticky top-0 z-10 border-b border-red-200 flex items-center justify-between">
             <span className="font-semibold text-red-700">BEFORE</span>
+            <button
+              onClick={() => {
+                setFullscreenTab('before');
+                setIsFullscreen(true);
+              }}
+              className="p-1 hover:bg-red-100 rounded"
+              title="Expand BEFORE to fullscreen"
+              aria-label="Expand BEFORE panel to fullscreen"
+            >
+              <Maximize2 size={16} className="text-red-700" />
+            </button>
           </div>
           {useMemo(() => (
             <EPUBRenderer
@@ -424,8 +435,19 @@ export function VisualComparisonPanel({
             height: layout === 'side-by-side' ? `${100 / (zoom / 100)}%` : `${50 / (zoom / 100)}%`
           }}
         >
-          <div className="bg-green-50 px-4 py-2 sticky top-0 z-10 border-b border-green-200">
+          <div className="bg-green-50 px-4 py-2 sticky top-0 z-10 border-b border-green-200 flex items-center justify-between">
             <span className="font-semibold text-green-700">AFTER</span>
+            <button
+              onClick={() => {
+                setFullscreenTab('after');
+                setIsFullscreen(true);
+              }}
+              className="p-1 hover:bg-green-100 rounded"
+              title="Expand AFTER to fullscreen"
+              aria-label="Expand AFTER panel to fullscreen"
+            >
+              <Maximize2 size={16} className="text-green-700" />
+            </button>
           </div>
           {useMemo(() => (
             <EPUBRenderer
