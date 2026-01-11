@@ -280,6 +280,7 @@ export function VisualComparisonPanel({
     return (
       <EPUBRenderer
         key="before-stable"
+        poolKey="inline-before"
         html={rendererProps.before.html}
         css={rendererProps.before.css}
         baseUrl={rendererProps.before.baseUrl}
@@ -294,6 +295,7 @@ export function VisualComparisonPanel({
     return (
       <EPUBRenderer
         key="after-stable"
+        poolKey="inline-after"
         html={rendererProps.after.html}
         css={rendererProps.after.css}
         baseUrl={rendererProps.after.baseUrl}
@@ -788,6 +790,7 @@ export function VisualComparisonPanel({
               <div className="h-full overflow-auto">
                 <EPUBRenderer
                   key={`fullscreen-before-${changeId}`}
+                  poolKey={`fullscreen-before`}
                   html={displayData.beforeContent.html}
                   css={displayData.beforeContent.css}
                   baseUrl={displayData.beforeContent.baseHref}
@@ -801,6 +804,7 @@ export function VisualComparisonPanel({
               <div className="h-full overflow-auto">
                 <EPUBRenderer
                   key={`fullscreen-after-${changeId}`}
+                  poolKey={`fullscreen-after`}
                   html={displayData.afterContent.html}
                   css={displayData.afterContent.css}
                   baseUrl={displayData.afterContent.baseHref}
@@ -823,6 +827,7 @@ export function VisualComparisonPanel({
                   </div>
                   <EPUBRenderer
                     key={`compare-before-${changeId}`}
+                    poolKey={`fullscreen-before`}
                     html={displayData.beforeContent.html}
                     css={displayData.beforeContent.css}
                     baseUrl={displayData.beforeContent.baseHref}
@@ -843,6 +848,7 @@ export function VisualComparisonPanel({
                   </div>
                   <EPUBRenderer
                     key={`compare-after-${changeId}`}
+                    poolKey={`fullscreen-after`}
                     html={displayData.afterContent.html}
                     css={displayData.afterContent.css}
                     baseUrl={displayData.afterContent.baseHref}

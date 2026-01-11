@@ -14,11 +14,12 @@ interface EPUBRendererProps {
   version: 'before' | 'after';
   onLoad?: () => void;
   className?: string;
+  poolKey?: string; // Unique identifier for iframe pooling (use different keys for fullscreen vs inline)
 }
 
 class IframeRegistry {
   private iframes: Map<string, HTMLIFrameElement> = new Map();
-  private maxIframes = 4; // Allow 2 before + 2 after for smoother navigation
+  private maxIframes = 6; // Allow inline-before/after + fullscreen-before/after + 2 spare
   private reuseCount = 0;
   private createCount = 0;
 
@@ -190,11 +191,15 @@ const EPUBRendererComponent = function EPUBRenderer({
   highlights,
   version,
   onLoad,
-  className = ''
+  className = '',
+  poolKey
 }: EPUBRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const isInitialized = useRef(false);
+  
+  // Use poolKey if provided, otherwise default to version
+  const iframeKey = poolKey || version;
 
   useEffect(() => {
     if (isInitialized.current) return;
@@ -202,27 +207,34 @@ const EPUBRendererComponent = function EPUBRenderer({
 
     if (!containerRef.current) {
       if (import.meta.env.DEV) {
-        console.warn(`[EPUBRenderer] No container ref for ${version}`);
+        console.warn(`[EPUBRenderer] No container ref for ${iframeKey}`);
       }
       return;
     }
 
     // Try to reuse existing iframe from pool
-    const existingIframe = iframeRegistry.get(version);
-    if (existingIframe && existingIframe.parentNode) {
-      // Iframe exists and is in DOM - just update our ref
-      if (import.meta.env.DEV) {
-        console.log(`[EPUBRenderer] Reusing pooled ${version} iframe`);
+    const existingIframe = iframeRegistry.get(iframeKey);
+    if (existingIframe) {
+      // Check if iframe is in our container or needs to be moved
+      if (existingIframe.parentNode === containerRef.current) {
+        // Already in our container - just reuse
+        if (import.meta.env.DEV) {
+          console.log(`[EPUBRenderer] Reusing ${iframeKey} iframe (same container)`);
+        }
+        iframeRef.current = existingIframe;
+        iframeRegistry.register(iframeKey, existingIframe);
+        return;
+      } else if (existingIframe.parentNode) {
+        // Iframe is in a different container - can't reuse, create new
+        if (import.meta.env.DEV) {
+          console.log(`[EPUBRenderer] ${iframeKey} iframe exists but in different container, creating new`);
+        }
       }
-      iframeRef.current = existingIframe;
-      // Re-register to update pool stats
-      iframeRegistry.register(version, existingIframe);
-      return;
     }
 
-    // Create new iframe only if pool doesn't have one
+    // Create new iframe
     if (import.meta.env.DEV) {
-      console.log(`[EPUBRenderer] Creating new ${version} iframe`);
+      console.log(`[EPUBRenderer] Creating new ${iframeKey} iframe`);
     }
 
     const iframe = document.createElement('iframe');
@@ -230,7 +242,7 @@ const EPUBRendererComponent = function EPUBRenderer({
     iframe.className = 'w-full h-full border-0';
     iframe.title = `EPUB ${version}`;
 
-    iframeRegistry.register(version, iframe);
+    iframeRegistry.register(iframeKey, iframe);
     iframeRef.current = iframe;
 
     containerRef.current.appendChild(iframe);
@@ -238,14 +250,14 @@ const EPUBRendererComponent = function EPUBRenderer({
     // Don't destroy on unmount - let the pool manage lifecycle
     return () => {
       if (import.meta.env.DEV) {
-        console.log(`[EPUBRenderer] Unmount triggered for ${version} (keeping in pool)`);
+        console.log(`[EPUBRenderer] Unmount triggered for ${iframeKey} (keeping in pool)`);
       }
       // Don't destroy - keep iframe in pool for reuse
       // Only clear local ref
       iframeRef.current = null;
       isInitialized.current = false;
     };
-  }, [version]);
+  }, [iframeKey, version]);
 
   useEffect(() => {
     if (!iframeRef.current) {
@@ -329,6 +341,7 @@ export const EPUBRenderer = React.memo(EPUBRendererComponent, (prevProps, nextPr
     prevProps.html === nextProps.html &&
     prevProps.version === nextProps.version &&
     prevProps.baseUrl === nextProps.baseUrl &&
+    prevProps.poolKey === nextProps.poolKey &&
     JSON.stringify(prevProps.css) === JSON.stringify(nextProps.css) &&
     JSON.stringify(prevProps.highlights) === JSON.stringify(nextProps.highlights)
   );
