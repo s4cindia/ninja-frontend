@@ -196,9 +196,14 @@ export const EPUBRenderer = React.memo(function EPUBRenderer({
 </html>`;
   }, [html, baseUrl, combinedCSS]);
 
+  const highlightsKey = useMemo(() => {
+    if (!highlights || highlights.length === 0) return '';
+    return highlights.map(h => `${h.xpath || ''}-${h.cssSelector || ''}`).join('|');
+  }, [highlights]);
+
   const contentHash = useMemo(() => {
-    return `${html.length}-${css.length}-${baseUrl}-${version}`;
-  }, [html, css.length, baseUrl, version]);
+    return `${html.length}-${css.length}-${baseUrl}-${version}-${highlightsKey}`;
+  }, [html, css.length, baseUrl, version, highlightsKey]);
 
   const handleLoadCallback = useCallback(() => {
     onLoad?.();
@@ -227,16 +232,11 @@ export const EPUBRenderer = React.memo(function EPUBRenderer({
     doc.write(fullHtml);
     doc.close();
 
-    const handleLoad = () => {
+    // Apply highlights immediately after doc.close() since load event may not fire reliably
+    requestAnimationFrame(() => {
       applyHighlights(doc, highlights, version);
       handleLoadCallback();
-    };
-
-    iframe.addEventListener('load', handleLoad, { once: true });
-
-    return () => {
-      iframe.removeEventListener('load', handleLoad);
-    };
+    });
   }, [contentHash, fullHtml, highlights, version, handleLoadCallback]);
 
   return (
