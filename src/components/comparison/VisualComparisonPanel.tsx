@@ -175,7 +175,7 @@ export function VisualComparisonPanel({
     }
   });
 
-  const { data: visualData, isLoading, error, isFetching } = useQuery({
+  const { data: queryData, isLoading, error, isFetching } = useQuery({
     queryKey: ['visual-comparison', jobId, changeId],
     queryFn: () => getVisualComparison(jobId, changeId),
     enabled: !!jobId && !!changeId,
@@ -188,6 +188,12 @@ export function VisualComparisonPanel({
     notifyOnChangeProps: ['data', 'error', 'isFetching'],
     placeholderData: keepPreviousData
   });
+
+  const cachedDataRef = useRef(queryData);
+  if (queryData?.beforeContent && queryData?.afterContent) {
+    cachedDataRef.current = queryData;
+  }
+  const displayData = queryData || cachedDataRef.current;
 
   const handleZoomOut = useCallback(() => {
     startTransition(() => {
@@ -208,8 +214,8 @@ export function VisualComparisonPanel({
   }, [startTransition]);
 
   const effectiveHighlights = useMemo(() => {
-    const actualType = changeType || visualData?.change?.changeType;
-    const baseHighlight = visualData?.highlightData;
+    const actualType = changeType || displayData?.change?.changeType;
+    const baseHighlight = displayData?.highlightData;
     
     if (baseHighlight?.xpath || baseHighlight?.cssSelector) {
       return [baseHighlight];
@@ -220,40 +226,40 @@ export function VisualComparisonPanel({
       return [{
         xpath: '',
         cssSelector: fallbackSelector,
-        description: changeDescription || visualData?.change?.description || 'Changed element'
+        description: changeDescription || displayData?.change?.description || 'Changed element'
       }];
     }
     
     return undefined;
-  }, [visualData, changeType, changeDescription]);
+  }, [displayData, changeType, changeDescription]);
 
   const isStructuralChange = useMemo(() => {
-    const type = changeType || visualData?.change?.changeType || '';
-    const desc = changeDescription || visualData?.change?.description || '';
+    const type = changeType || displayData?.change?.changeType || '';
+    const desc = changeDescription || displayData?.change?.description || '';
     return type.toLowerCase().includes('struct') ||
            desc.toLowerCase().includes('header') ||
            desc.toLowerCase().includes('semantic') ||
            desc.toLowerCase().includes('aria');
-  }, [changeType, changeDescription, visualData]);
+  }, [changeType, changeDescription, displayData]);
 
   const rendererProps = useMemo(() => {
-    if (!visualData) return null;
+    if (!displayData) return null;
 
     return {
       before: {
-        html: visualData.beforeContent.html,
-        css: visualData.beforeContent.css,
-        baseUrl: visualData.beforeContent.baseHref,
+        html: displayData.beforeContent.html,
+        css: displayData.beforeContent.css,
+        baseUrl: displayData.beforeContent.baseHref,
         highlights: effectiveHighlights
       },
       after: {
-        html: visualData.afterContent.html,
-        css: visualData.afterContent.css,
-        baseUrl: visualData.afterContent.baseHref,
+        html: displayData.afterContent.html,
+        css: displayData.afterContent.css,
+        baseUrl: displayData.afterContent.baseHref,
         highlights: effectiveHighlights
       }
     };
-  }, [visualData, effectiveHighlights]);
+  }, [displayData, effectiveHighlights]);
 
   const beforeRenderer = useMemo(() => {
     if (!rendererProps) return null;
@@ -296,14 +302,14 @@ export function VisualComparisonPanel({
   }, [startTransition]);
 
   useEffect(() => {
-    if (import.meta.env.DEV && visualData) {
+    if (import.meta.env.DEV && displayData) {
       console.log('[VisualComparisonPanel] Data loaded:', {
-        htmlSize: visualData.beforeContent.html.length + visualData.afterContent.html.length,
-        cssFiles: visualData.beforeContent.css.length + visualData.afterContent.css.length,
-        hasHighlights: !!visualData.highlightData
+        htmlSize: displayData.beforeContent.html.length + displayData.afterContent.html.length,
+        cssFiles: displayData.beforeContent.css.length + displayData.afterContent.css.length,
+        hasHighlights: !!displayData.highlightData
       });
     }
-  }, [visualData]);
+  }, [displayData]);
 
   useEffect(() => {
     if (!isFullscreen) return;
@@ -346,7 +352,7 @@ export function VisualComparisonPanel({
     });
   }, []);
 
-  if (isLoading && !visualData) {
+  if (isLoading && !displayData) {
     return (
       <div className="flex items-center justify-center h-96 bg-white rounded-lg border border-gray-200">
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
@@ -355,7 +361,7 @@ export function VisualComparisonPanel({
     );
   }
 
-  if (error) {
+  if (error && !displayData) {
     return (
       <div className="flex items-center justify-center h-96 bg-white rounded-lg border border-gray-200">
         <div className="text-center">
@@ -367,7 +373,7 @@ export function VisualComparisonPanel({
     );
   }
 
-  if (!visualData || !visualData.beforeContent || !visualData.afterContent) {
+  if (!displayData || !displayData.beforeContent || !displayData.afterContent) {
     return (
       <div className="flex items-center justify-center h-96 bg-white rounded-lg border border-gray-200">
         <p className="text-gray-500 italic">No visual preview available</p>
@@ -385,39 +391,39 @@ export function VisualComparisonPanel({
       )}
       <div className="bg-blue-50 border-b border-blue-200 p-4">
         <h3 className="text-base font-semibold text-gray-900 mb-1">
-          {changeDescription || visualData.change?.description || 'Visual Change'}
+          {changeDescription || displayData.change?.description || 'Visual Change'}
         </h3>
         <div className="flex flex-wrap gap-3 text-xs text-gray-600">
           <span>
-            <strong>Type:</strong> {changeType || visualData.change?.changeType}
+            <strong>Type:</strong> {changeType || displayData.change?.changeType}
           </span>
           <span>
-            <strong>File:</strong> {filePath || visualData.spineItem?.href}
+            <strong>File:</strong> {filePath || displayData.spineItem?.href}
           </span>
-          {(severity || visualData.change?.severity) && (
+          {(severity || displayData.change?.severity) && (
             <span>
               <strong>Severity:</strong>{' '}
               <span className={`font-medium ${
-                (severity || visualData.change?.severity) === 'MAJOR' ? 'text-red-600' :
-                (severity || visualData.change?.severity) === 'MINOR' ? 'text-yellow-600' :
+                (severity || displayData.change?.severity) === 'MAJOR' ? 'text-red-600' :
+                (severity || displayData.change?.severity) === 'MINOR' ? 'text-yellow-600' :
                 'text-blue-600'
               }`}>
-                {severity || visualData.change?.severity}
+                {severity || displayData.change?.severity}
               </span>
             </span>
           )}
         </div>
-        {visualData.highlightData?.xpath && (
+        {displayData.highlightData?.xpath && (
           <div className="mt-2 text-xs text-gray-500">
-            Location: {visualData.highlightData.xpath}
+            Location: {displayData.highlightData.xpath}
           </div>
         )}
       </div>
 
       {isStructuralChange && (() => {
         const explanation = getChangeExplanation(
-          changeType || visualData.change?.changeType,
-          changeDescription || visualData.change?.description
+          changeType || displayData.change?.changeType,
+          changeDescription || displayData.change?.description
         );
         return (
           <>
@@ -629,7 +635,7 @@ export function VisualComparisonPanel({
             {/* Top Row: Title and Close */}
             <div className="flex items-center justify-between px-6 py-3">
               <h3 className="text-lg font-semibold text-gray-900">
-                {changeDescription || visualData.change?.description || 'Visual Change'}
+                {changeDescription || displayData.change?.description || 'Visual Change'}
               </h3>
 
               <button
@@ -646,14 +652,14 @@ export function VisualComparisonPanel({
             <div className="px-6 py-2 bg-blue-50 border-y border-blue-200">
               <div className="flex flex-wrap gap-3 text-xs text-gray-700">
                 <span>
-                  <strong>Type:</strong> {changeType || visualData.change?.changeType || 'Unknown'}
+                  <strong>Type:</strong> {changeType || displayData.change?.changeType || 'Unknown'}
                 </span>
                 <span>
-                  <strong>File:</strong> {filePath || visualData.spineItem?.href || 'Unknown'}
+                  <strong>File:</strong> {filePath || displayData.spineItem?.href || 'Unknown'}
                 </span>
-                {(severity || visualData.change?.severity) && (
+                {(severity || displayData.change?.severity) && (
                   <span>
-                    <strong>Severity:</strong> {severity || visualData.change?.severity}
+                    <strong>Severity:</strong> {severity || displayData.change?.severity}
                   </span>
                 )}
               </div>
@@ -743,7 +749,7 @@ export function VisualComparisonPanel({
                       Before
                     </div>
                     <pre className="text-red-900 p-3 overflow-x-auto max-h-48 text-xs">
-{visualData.beforeContent?.html?.slice(0, 500) || 'No content available'}
+{displayData.beforeContent?.html?.slice(0, 500) || 'No content available'}
                     </pre>
                   </div>
 
@@ -752,7 +758,7 @@ export function VisualComparisonPanel({
                       After
                     </div>
                     <pre className="text-green-900 p-3 overflow-x-auto max-h-48 text-xs">
-{visualData.afterContent?.html?.slice(0, 500) || 'No content available'}
+{displayData.afterContent?.html?.slice(0, 500) || 'No content available'}
                     </pre>
                   </div>
                 </div>
@@ -765,9 +771,9 @@ export function VisualComparisonPanel({
               <div className="h-full overflow-auto">
                 <EPUBRenderer
                   key={`fullscreen-before-${changeId}`}
-                  html={visualData.beforeContent.html}
-                  css={visualData.beforeContent.css}
-                  baseUrl={visualData.beforeContent.baseHref}
+                  html={displayData.beforeContent.html}
+                  css={displayData.beforeContent.css}
+                  baseUrl={displayData.beforeContent.baseHref}
                   highlights={effectiveHighlights}
                   version="before"
                   className="h-full"
@@ -778,9 +784,9 @@ export function VisualComparisonPanel({
               <div className="h-full overflow-auto">
                 <EPUBRenderer
                   key={`fullscreen-after-${changeId}`}
-                  html={visualData.afterContent.html}
-                  css={visualData.afterContent.css}
-                  baseUrl={visualData.afterContent.baseHref}
+                  html={displayData.afterContent.html}
+                  css={displayData.afterContent.css}
+                  baseUrl={displayData.afterContent.baseHref}
                   highlights={effectiveHighlights}
                   version="after"
                   className="h-full"
@@ -800,9 +806,9 @@ export function VisualComparisonPanel({
                   </div>
                   <EPUBRenderer
                     key={`compare-before-${changeId}`}
-                    html={visualData.beforeContent.html}
-                    css={visualData.beforeContent.css}
-                    baseUrl={visualData.beforeContent.baseHref}
+                    html={displayData.beforeContent.html}
+                    css={displayData.beforeContent.css}
+                    baseUrl={displayData.beforeContent.baseHref}
                     highlights={effectiveHighlights}
                     version="before"
                     className="h-full"
@@ -820,9 +826,9 @@ export function VisualComparisonPanel({
                   </div>
                   <EPUBRenderer
                     key={`compare-after-${changeId}`}
-                    html={visualData.afterContent.html}
-                    css={visualData.afterContent.css}
-                    baseUrl={visualData.afterContent.baseHref}
+                    html={displayData.afterContent.html}
+                    css={displayData.afterContent.css}
+                    baseUrl={displayData.afterContent.baseHref}
                     highlights={effectiveHighlights}
                     version="after"
                     className="h-full"
