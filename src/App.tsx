@@ -56,7 +56,7 @@ const queryClient = new QueryClient({
 });
 
 queryClient.setQueryDefaults(['visual-comparison'], {
-  staleTime: 0,
+  staleTime: 60000, // 60 seconds - allows GC while still caching for reasonable duration
   gcTime: 30000,
   refetchOnWindowFocus: false,
   refetchOnMount: false,

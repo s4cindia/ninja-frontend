@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, useTransition, lazy, Suspense } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useTransition, lazy, Suspense, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Eye, Code, Loader2 } from 'lucide-react';
@@ -42,6 +42,28 @@ export const ComparisonPage: React.FC = () => {
     (window as any).printMemorySummary = () => memoryMonitor.printSummary();
     console.log('💡 Tip: Run printMemorySummary() in console to see memory usage table');
   }, []);
+
+  // Cleanup visual comparison cache when leaving the page to free memory
+  // Use ref to avoid Strict Mode double-invoke issue
+  const isUnmountingRef = useRef(false);
+  useEffect(() => {
+    isUnmountingRef.current = false;
+    return () => {
+      // Only cleanup on genuine unmount, not Strict Mode double-invoke
+      if (!isUnmountingRef.current) {
+        isUnmountingRef.current = true;
+        // Delay cleanup slightly to ensure it's a real unmount
+        setTimeout(() => {
+          if (isUnmountingRef.current) {
+            if (import.meta.env.DEV) {
+              console.log('[ComparisonPage] Cleaning up visual comparison cache on unmount');
+            }
+            queryClient.removeQueries({ queryKey: ['visual-comparison'] });
+          }
+        }, 100);
+      }
+    };
+  }, [queryClient]);
 
 
   useEffect(() => {
@@ -111,13 +133,13 @@ export const ComparisonPage: React.FC = () => {
       queryClient.prefetchQuery({
         queryKey: ['visual-comparison', change.jobId, change.id],
         queryFn: () => getVisualComparison(change.jobId, change.id),
-        staleTime: Infinity,
+        staleTime: 60000, // 60 seconds - consistent with query defaults
       });
     };
 
+    // Only prefetch next change to reduce memory pressure during fast navigation
     const timer = setTimeout(() => {
       prefetchChange(currentIndex + 1);
-      prefetchChange(currentIndex - 1);
     }, 1000);
 
     return () => clearTimeout(timer);
