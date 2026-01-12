@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef, useTransition } from 'react';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { getVisualComparison } from '@/services/comparison.service';
 import { EPUBRenderer } from '../epub/EPUBRenderer';
 import { Loader2, ZoomIn, ZoomOut, Info, Code, AlertTriangle, Columns, Rows, Maximize2, X } from 'lucide-react';
@@ -199,8 +199,21 @@ export function VisualComparisonPanel({
     queryKey: ['visual-comparison', jobId, changeId],
     queryFn: () => getVisualComparison(jobId, changeId),
     enabled: !!jobId && !!changeId,
-    notifyOnChangeProps: ['data', 'error', 'isFetching'],
-    placeholderData: keepPreviousData
+    staleTime: Infinity, // Never refetch - data won't change during session
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    notifyOnChangeProps: ['data', 'error'],
+    // Use select to create stable object references - only recreate if content actually changed
+    select: (data) => ({
+      ...data,
+      // Freeze content references to prevent React Query from creating new objects
+      beforeContent: data.beforeContent,
+      afterContent: data.afterContent,
+      change: data.change,
+      highlightData: data.highlightData,
+      spineItem: data.spineItem,
+    }),
   });
 
   const cachedDataRef = useRef(queryData);

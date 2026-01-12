@@ -72,7 +72,13 @@ export const ComparisonPage: React.FC = () => {
       }
 
       try {
-        await getVisualComparison(currentChange!.jobId, currentChange!.id);
+        // Use ensureQueryData to reuse the same cache entry as VisualComparisonPanel
+        // This prevents duplicate 659KB downloads
+        await queryClient.ensureQueryData({
+          queryKey: ['visual-comparison', currentChange!.jobId, currentChange!.id],
+          queryFn: () => getVisualComparison(currentChange!.jobId, currentChange!.id),
+          staleTime: Infinity, // Never refetch if we have data
+        });
         return true;
       } catch (error: unknown) {
         const err = error as { response?: { status?: number }; message?: string };
@@ -86,7 +92,7 @@ export const ComparisonPage: React.FC = () => {
     },
     enabled: !!currentChange?.jobId && !!currentChange?.id,
     retry: false,
-    staleTime: 5 * 60 * 1000
+    staleTime: Infinity // Cache availability result indefinitely
   });
 
   useEffect(() => {
