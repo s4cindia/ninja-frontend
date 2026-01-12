@@ -10,7 +10,7 @@ import {
   ComparisonHeader,
   FilterBar,
   IssueNavigator,
-  ComparisonPanel,
+  CodeComparisonPanel,
 } from '@/components/comparison';
 
 const VisualComparisonPanel = lazy(() =>
@@ -306,7 +306,7 @@ export const ComparisonPage: React.FC = () => {
                   />
                 </Suspense>
               ) : (
-                <ComparisonPanel change={currentChange} />
+                <CodeComparisonPanel change={currentChange} jobId={jobId} />
               )}
             </>
           )}
