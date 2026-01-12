@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, CriterionConfidence } from '@/services/api';
 import { 
@@ -198,9 +198,91 @@ export function AcrWorkflowPage() {
   const [jobsError, setJobsError] = useState<string | null>(null);
   const [analysisResults, setAnalysisResults] = useState<CriterionConfidence[]>([]);
 
+  const [showCriteriaModal, setShowCriteriaModal] = useState(false);
+  const [criteriaData, setCriteriaData] = useState<{
+    edition: { name: string; description: string; standard: string };
+    criteriaCount: { total: number; A: number; AA: number; AAA: number };
+    criteriaByLevel: {
+      A: Array<{ id: string; number: string; name: string; description: string; wcagUrl?: string }>;
+      AA: Array<{ id: string; number: string; name: string; description: string; wcagUrl?: string }>;
+      AAA: Array<{ id: string; number: string; name: string; description: string; wcagUrl?: string }>;
+      EU: Array<{ id: string; number: string; name: string; description: string }>;
+    };
+  } | null>(null);
+  const [isLoadingCriteria, setIsLoadingCriteria] = useState(false);
+  const [criteriaError, setCriteriaError] = useState<string | null>(null);
+
   const handleCriteriaLoaded = useCallback((criteria: CriterionConfidence[]) => {
     setAnalysisResults(criteria);
   }, []);
+
+  const openCriteriaModal = useCallback(async (editionCode: string) => {
+    setShowCriteriaModal(true);
+    setIsLoadingCriteria(true);
+    setCriteriaError(null);
+
+    try {
+      const response = await api.get(`/acr/editions/${editionCode}/criteria`);
+      setCriteriaData(response.data.data);
+    } catch (error) {
+      console.error('[AcrWorkflow] Failed to fetch criteria:', error);
+      setCriteriaError('Failed to load criteria list. Please try again.');
+    } finally {
+      setIsLoadingCriteria(false);
+    }
+  }, []);
+
+  const closeCriteriaModal = useCallback(() => {
+    setShowCriteriaModal(false);
+    setCriteriaData(null);
+    setCriteriaError(null);
+  }, []);
+
+  const criteriaModalRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (showCriteriaModal) {
+      previousFocusRef.current = document.activeElement as HTMLElement;
+      
+      const timer = setTimeout(() => {
+        const closeButton = criteriaModalRef.current?.querySelector('[aria-label="Close criteria modal"]') as HTMLElement;
+        closeButton?.focus();
+      }, 50);
+
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          closeCriteriaModal();
+        }
+        
+        if (e.key === 'Tab' && criteriaModalRef.current) {
+          const focusableElements = criteriaModalRef.current.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          );
+          const firstElement = focusableElements[0];
+          const lastElement = focusableElements[focusableElements.length - 1];
+
+          if (e.shiftKey && document.activeElement === firstElement) {
+            e.preventDefault();
+            lastElement?.focus();
+          } else if (!e.shiftKey && document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement?.focus();
+          }
+        }
+      };
+
+      document.addEventListener('keydown', handleKeyDown);
+      return () => {
+        clearTimeout(timer);
+        document.removeEventListener('keydown', handleKeyDown);
+      };
+    } else {
+      if (previousFocusRef.current && previousFocusRef.current.isConnected) {
+        previousFocusRef.current.focus();
+      }
+    }
+  }, [showCriteriaModal, closeCriteriaModal]);
 
   useEffect(() => {
     if (effectiveJobId && effectiveJobId !== state.jobId) {
@@ -441,6 +523,7 @@ export function AcrWorkflowPage() {
             <EditionSelector
               selectedEdition={state.selectedEdition}
               onSelect={handleEditionSelect}
+              onViewCriteria={openCriteriaModal}
             />
             {state.selectedEdition && (
               <Alert variant="success">
@@ -890,6 +973,238 @@ export function AcrWorkflowPage() {
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}
       />
+
+      {showCriteriaModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="criteria-modal-title"
+        >
+          <div 
+            ref={criteriaModalRef}
+            className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[80vh] overflow-hidden m-4"
+          >
+            <div className="flex items-center justify-between p-6 border-b bg-gray-50">
+              <div>
+                <h2 id="criteria-modal-title" className="text-2xl font-bold text-gray-900">
+                  {criteriaData?.edition.name || 'Edition Criteria'}
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  {criteriaData?.edition.description}
+                </p>
+                {criteriaData && (
+                  <div className="flex gap-3 mt-2">
+                    <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded">
+                      {criteriaData.edition.standard}
+                    </span>
+                    <span className="text-xs px-2 py-1 bg-gray-100 text-gray-800 rounded">
+                      {criteriaData.criteriaCount.total} total criteria
+                    </span>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={closeCriteriaModal}
+                className="p-2 hover:bg-gray-200 rounded-lg transition"
+                aria-label="Close criteria modal"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[calc(80vh-200px)]">
+              {isLoadingCriteria && (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="animate-spin h-12 w-12 text-primary-600" />
+                  <span className="ml-3 text-gray-600">Loading criteria...</span>
+                </div>
+              )}
+
+              {criteriaError && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
+                  {criteriaError}
+                </div>
+              )}
+
+              {criteriaData && !isLoadingCriteria && (
+                <div className="space-y-6">
+                  {criteriaData.criteriaByLevel.A.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-3 sticky top-0 bg-white py-2">
+                        <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded">
+                          Level A
+                        </span>
+                        <span className="text-sm text-gray-600">
+                          ({criteriaData.criteriaCount.A} criteria)
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {criteriaData.criteriaByLevel.A.map((criterion) => (
+                          <div
+                            key={criterion.id}
+                            className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
+                          >
+                            <span className="font-mono text-sm font-semibold text-blue-600 min-w-[60px]">
+                              {criterion.number}
+                            </span>
+                            <div className="flex-1">
+                              <div className="text-sm font-medium text-gray-900 mb-1">
+                                {criterion.name}
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                {criterion.description}
+                              </div>
+                              {criterion.wcagUrl && (
+                                <a
+                                  href={criterion.wcagUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-blue-600 hover:underline mt-1 inline-block"
+                                >
+                                  Learn more →
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {criteriaData.criteriaByLevel.AA.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-3 sticky top-0 bg-white py-2">
+                        <span className="px-3 py-1 bg-green-100 text-green-800 text-sm font-semibold rounded">
+                          Level AA
+                        </span>
+                        <span className="text-sm text-gray-600">
+                          ({criteriaData.criteriaCount.AA} criteria)
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {criteriaData.criteriaByLevel.AA.map((criterion) => (
+                          <div
+                            key={criterion.id}
+                            className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
+                          >
+                            <span className="font-mono text-sm font-semibold text-green-600 min-w-[60px]">
+                              {criterion.number}
+                            </span>
+                            <div className="flex-1">
+                              <div className="text-sm font-medium text-gray-900 mb-1">
+                                {criterion.name}
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                {criterion.description}
+                              </div>
+                              {criterion.wcagUrl && (
+                                <a
+                                  href={criterion.wcagUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-blue-600 hover:underline mt-1 inline-block"
+                                >
+                                  Learn more →
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {criteriaData.criteriaByLevel.AAA.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-3 sticky top-0 bg-white py-2">
+                        <span className="px-3 py-1 bg-purple-100 text-purple-800 text-sm font-semibold rounded">
+                          Level AAA
+                        </span>
+                        <span className="text-sm text-gray-600">
+                          ({criteriaData.criteriaCount.AAA} criteria)
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {criteriaData.criteriaByLevel.AAA.map((criterion) => (
+                          <div
+                            key={criterion.id}
+                            className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
+                          >
+                            <span className="font-mono text-sm font-semibold text-purple-600 min-w-[60px]">
+                              {criterion.number}
+                            </span>
+                            <div className="flex-1">
+                              <div className="text-sm font-medium text-gray-900 mb-1">
+                                {criterion.name}
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                {criterion.description}
+                              </div>
+                              {criterion.wcagUrl && (
+                                <a
+                                  href={criterion.wcagUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-blue-600 hover:underline mt-1 inline-block"
+                                >
+                                  Learn more →
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {criteriaData.criteriaByLevel.EU.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-3 sticky top-0 bg-white py-2">
+                        <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-sm font-semibold rounded">
+                          EU Specific
+                        </span>
+                        <span className="text-sm text-gray-600">
+                          ({criteriaData.criteriaByLevel.EU.length} criteria)
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {criteriaData.criteriaByLevel.EU.map((criterion) => (
+                          <div
+                            key={criterion.id}
+                            className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
+                          >
+                            <span className="font-mono text-sm font-semibold text-yellow-600 min-w-[60px]">
+                              {criterion.number}
+                            </span>
+                            <div className="flex-1">
+                              <div className="text-sm font-medium text-gray-900 mb-1">
+                                {criterion.name}
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                {criterion.description}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t bg-gray-50">
+              <button
+                onClick={closeCriteriaModal}
+                className="w-full py-2 px-4 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
