@@ -334,6 +334,12 @@ export const EPUBAccessibility: React.FC = () => {
           <p className="text-gray-600 mt-1">
             Upload and audit EPUB files for accessibility compliance
           </p>
+          {auditResult?.fileName && (
+            <p className="text-gray-800 mt-2">
+              <span className="font-medium">Title:</span>{' '}
+              <span className="text-gray-700">{auditResult.fileName}</span>
+            </p>
+          )}
         </div>
         {isDemo && (
           <Badge variant="warning">Demo Mode</Badge>
