@@ -43,3 +43,6 @@ externalPort = 3000
 
 [userenv.development]
 VITE_BACKEND_URL = "https://b907a651-4525-47b0-b6ba-f60c66e201b6-00-14js038a62tsi.pike.replit.dev"
+
+[userenv.shared]
+VITE_API_URL = "https://b907a651-4525-47b0-b6ba-f60c66e201b6-00-14js038a62tsi.pike.replit.dev"
