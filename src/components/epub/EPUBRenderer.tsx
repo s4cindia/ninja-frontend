@@ -224,15 +224,24 @@ const EPUBRendererComponent = function EPUBRenderer({
         iframeRef.current = existingIframe;
         iframeRegistry.register(iframeKey, existingIframe);
         return;
-      } else if (existingIframe.parentNode) {
-        // Iframe is in a different container - can't reuse, create new
+      } else {
+        // Iframe exists but in different/no container - MOVE it to our container
         if (import.meta.env.DEV) {
-          console.log(`[EPUBRenderer] ${iframeKey} iframe exists but in different container, creating new`);
+          console.log(`[EPUBRenderer] Moving ${iframeKey} iframe to new container`);
         }
+        // Remove from old parent if needed
+        if (existingIframe.parentNode) {
+          existingIframe.parentNode.removeChild(existingIframe);
+        }
+        // Append to our container
+        containerRef.current.appendChild(existingIframe);
+        iframeRef.current = existingIframe;
+        iframeRegistry.register(iframeKey, existingIframe);
+        return;
       }
     }
 
-    // Create new iframe
+    // Create new iframe only if none exists in pool
     if (import.meta.env.DEV) {
       console.log(`[EPUBRenderer] Creating new ${iframeKey} iframe`);
     }
