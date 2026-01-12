@@ -256,10 +256,12 @@ export function VisualComparisonPanel({
            desc.toLowerCase().includes('aria');
   }, [changeType, changeDescription, displayData]);
 
+  const currentChangeId = displayData?.change?.id || changeId;
   const rendererProps = useMemo(() => {
     if (!displayData) return null;
 
     return {
+      changeId: currentChangeId,
       before: {
         html: displayData.beforeContent.html,
         css: displayData.beforeContent.css,
@@ -273,7 +275,7 @@ export function VisualComparisonPanel({
         highlights: effectiveHighlights
       }
     };
-  }, [displayData, effectiveHighlights]);
+  }, [currentChangeId, displayData?.beforeContent?.html, displayData?.afterContent?.html, effectiveHighlights]);
 
   const beforeRenderer = useMemo(() => {
     if (!rendererProps) return null;
@@ -304,6 +306,39 @@ export function VisualComparisonPanel({
       />
     );
   }, [rendererProps]);
+
+  // Memoized fullscreen renderers - only created when actually in fullscreen
+  const fullscreenBeforeRenderer = useMemo(() => {
+    if (!isFullscreen || !rendererProps) return null;
+    return (
+      <EPUBRenderer
+        key={`fullscreen-before-${currentChangeId}`}
+        poolKey="fullscreen-before"
+        html={rendererProps.before.html}
+        css={rendererProps.before.css}
+        baseUrl={rendererProps.before.baseUrl}
+        highlights={rendererProps.before.highlights}
+        version="before"
+        className="h-full"
+      />
+    );
+  }, [isFullscreen, rendererProps, currentChangeId]);
+
+  const fullscreenAfterRenderer = useMemo(() => {
+    if (!isFullscreen || !rendererProps) return null;
+    return (
+      <EPUBRenderer
+        key={`fullscreen-after-${currentChangeId}`}
+        poolKey="fullscreen-after"
+        html={rendererProps.after.html}
+        css={rendererProps.after.css}
+        baseUrl={rendererProps.after.baseUrl}
+        highlights={rendererProps.after.highlights}
+        version="after"
+        className="h-full"
+      />
+    );
+  }, [isFullscreen, rendererProps, currentChangeId]);
 
   const toggleLayout = useCallback((newLayout: 'side-by-side' | 'stacked') => {
     startTransition(() => {
@@ -788,30 +823,12 @@ export function VisualComparisonPanel({
           <div className="flex-1 overflow-hidden">
             {fullscreenMode === 'before' && (
               <div className="h-full overflow-auto">
-                <EPUBRenderer
-                  key={`fullscreen-before-${changeId}`}
-                  poolKey={`fullscreen-before`}
-                  html={displayData.beforeContent.html}
-                  css={displayData.beforeContent.css}
-                  baseUrl={displayData.beforeContent.baseHref}
-                  highlights={effectiveHighlights}
-                  version="before"
-                  className="h-full"
-                />
+                {fullscreenBeforeRenderer}
               </div>
             )}
             {fullscreenMode === 'after' && (
               <div className="h-full overflow-auto">
-                <EPUBRenderer
-                  key={`fullscreen-after-${changeId}`}
-                  poolKey={`fullscreen-after`}
-                  html={displayData.afterContent.html}
-                  css={displayData.afterContent.css}
-                  baseUrl={displayData.afterContent.baseHref}
-                  highlights={effectiveHighlights}
-                  version="after"
-                  className="h-full"
-                />
+                {fullscreenAfterRenderer}
               </div>
             )}
             {fullscreenMode === 'compare' && (
@@ -825,16 +842,7 @@ export function VisualComparisonPanel({
                   <div className="bg-red-50 px-4 py-2 sticky top-0 z-10 border-b border-red-200">
                     <span className="font-semibold text-red-700">BEFORE</span>
                   </div>
-                  <EPUBRenderer
-                    key={`compare-before-${changeId}`}
-                    poolKey={`fullscreen-before`}
-                    html={displayData.beforeContent.html}
-                    css={displayData.beforeContent.css}
-                    baseUrl={displayData.beforeContent.baseHref}
-                    highlights={effectiveHighlights}
-                    version="before"
-                    className="h-full"
-                  />
+                  {fullscreenBeforeRenderer}
                 </div>
 
                 {/* AFTER Panel */}
@@ -846,16 +854,7 @@ export function VisualComparisonPanel({
                   <div className="bg-green-50 px-4 py-2 sticky top-0 z-10 border-b border-green-200">
                     <span className="font-semibold text-green-700">AFTER</span>
                   </div>
-                  <EPUBRenderer
-                    key={`compare-after-${changeId}`}
-                    poolKey={`fullscreen-after`}
-                    html={displayData.afterContent.html}
-                    css={displayData.afterContent.css}
-                    baseUrl={displayData.afterContent.baseHref}
-                    highlights={effectiveHighlights}
-                    version="after"
-                    className="h-full"
-                  />
+                  {fullscreenAfterRenderer}
                 </div>
               </div>
             )}

@@ -289,6 +289,7 @@ export const ComparisonPage: React.FC = () => {
                   </div>
                 }>
                   <VisualComparisonPanel
+                    key="visual-panel-stable"
                     jobId={jobId}
                     changeId={currentChange.id}
                     changeDescription={currentChange.description}
