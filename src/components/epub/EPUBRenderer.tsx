@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 
 interface ChangeHighlight {
   xpath: string;
@@ -268,6 +268,16 @@ const EPUBRendererComponent = function EPUBRenderer({
     };
   }, [iframeKey, version]);
 
+  // Create a content hash to detect actual changes (not just reference changes)
+  const contentHash = useMemo(() => {
+    const cssJoined = css.join('|||');
+    const highlightsStr = highlights ? JSON.stringify(highlights) : '';
+    // Use a simple hash to compare content without full string comparison on each render
+    return `${html.length}:${cssJoined.length}:${highlightsStr.length}:${baseUrl}`;
+  }, [html, css, highlights, baseUrl]);
+
+  const lastContentHashRef = useRef<string>('');
+
   useEffect(() => {
     if (!iframeRef.current) {
       if (import.meta.env.DEV) {
@@ -276,9 +286,19 @@ const EPUBRendererComponent = function EPUBRenderer({
       return;
     }
 
+    // Skip update if content hasn't actually changed
+    if (lastContentHashRef.current === contentHash && isInitialized.current) {
+      if (import.meta.env.DEV) {
+        console.log(`[EPUBRenderer] Skipping ${version} update - content unchanged`);
+      }
+      return;
+    }
+
     if (import.meta.env.DEV) {
       console.log(`[EPUBRenderer] Updating ${version} content (${html.length} chars)`);
     }
+
+    lastContentHashRef.current = contentHash;
 
     const fullHtml = `
       <!DOCTYPE html>
@@ -334,11 +354,14 @@ const EPUBRendererComponent = function EPUBRenderer({
 
     const iframe = iframeRef.current;
     iframe.addEventListener('load', handleLoad);
+    isInitialized.current = true;
 
     return () => {
       iframe.removeEventListener('load', handleLoad);
     };
-  }, [html, css, baseUrl, highlights, version, onLoad]);
+    // Use contentHash to detect actual content changes, not reference changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contentHash, version]);
 
   return (
     <div ref={containerRef} className={`epub-renderer ${className}`} />
