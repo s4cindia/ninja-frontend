@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 interface ChangeHighlight {
   xpath: string;
@@ -14,52 +14,26 @@ interface EPUBRendererProps {
   version: 'before' | 'after';
   onLoad?: () => void;
   className?: string;
-  poolKey?: string; // Unique identifier for iframe pooling (use different keys for fullscreen vs inline)
 }
 
 class IframeRegistry {
   private iframes: Map<string, HTMLIFrameElement> = new Map();
-  private maxIframes = 6; // Allow inline-before/after + fullscreen-before/after + 2 spare
-  private reuseCount = 0;
-  private createCount = 0;
-
-  get(version: string): HTMLIFrameElement | undefined {
-    return this.iframes.get(version);
-  }
+  private maxIframes = 2;
 
   register(version: string, iframe: HTMLIFrameElement) {
-    const existing = this.iframes.get(version);
-    
-    // If same iframe is being re-registered, just track it
-    if (existing === iframe) {
-      if (import.meta.env.DEV) {
-        this.reuseCount++;
-        console.log(`[IframeRegistry] Reusing same ${version} iframe (reuse: ${this.reuseCount}, create: ${this.createCount})`);
-      }
-      return;
-    }
+    this.destroy(version);
 
-    // If there's an existing different iframe for this version, destroy it first
-    if (existing && existing !== iframe) {
-      this.destroy(version);
-    }
-
-    // Enforce pool size limit - remove oldest if at capacity
     if (this.iframes.size >= this.maxIframes) {
       const oldestKey = this.iframes.keys().next().value;
-      if (oldestKey && oldestKey !== version) {
-        console.log(`[IframeRegistry] At capacity (${this.maxIframes}), destroying oldest: ${oldestKey}`);
+      if (oldestKey) {
+        console.log(`[IframeRegistry] At capacity, destroying oldest: ${oldestKey}`);
         this.destroy(oldestKey);
       }
     }
 
     this.iframes.set(version, iframe);
-    this.createCount++;
-    
-    if (import.meta.env.DEV) {
-      console.log(`[IframeRegistry] Registered ${version} iframe. Total: ${this.iframes.size} (reuse: ${this.reuseCount}, create: ${this.createCount})`);
-      this.logDOMState();
-    }
+    console.log(`[IframeRegistry] Registered ${version} iframe. Total: ${this.iframes.size}`);
+    this.logDOMState();
   }
 
   destroy(version: string) {
@@ -78,9 +52,8 @@ class IframeRegistry {
         }
 
         this.iframes.delete(version);
-        if (import.meta.env.DEV) {
-          console.log(`[IframeRegistry] Destroyed ${version} iframe. Total: ${this.iframes.size}`);
-        }
+        console.log(`[IframeRegistry] Destroyed ${version} iframe. Total: ${this.iframes.size}`);
+        this.logDOMState();
       } catch (error) {
         console.error(`[IframeRegistry] Error destroying ${version} iframe:`, error);
       }
@@ -97,10 +70,6 @@ class IframeRegistry {
     return this.iframes.size;
   }
 
-  getStats() {
-    return { reuse: this.reuseCount, create: this.createCount, active: this.iframes.size };
-  }
-
   private logDOMState() {
     setTimeout(() => {
       const actualIframes = document.querySelectorAll('iframe').length;
@@ -108,6 +77,8 @@ class IframeRegistry {
 
       if (Math.abs(actualIframes - registryCount) > 1) {
         console.warn(`[IframeRegistry] MISMATCH! Registry: ${registryCount}, DOM: ${actualIframes}`);
+      } else if (actualIframes === registryCount) {
+        console.log(`[IframeRegistry] DOM count verified: ${actualIframes} iframes`);
       }
     }, 100);
   }
@@ -191,59 +162,21 @@ const EPUBRendererComponent = function EPUBRenderer({
   highlights,
   version,
   onLoad,
-  className = '',
-  poolKey
+  className = ''
 }: EPUBRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const isInitialized = useRef(false);
-  
-  // Use poolKey if provided, otherwise default to version
-  const iframeKey = poolKey || version;
 
   useEffect(() => {
     if (isInitialized.current) return;
     isInitialized.current = true;
 
+    console.log(`[EPUBRenderer] Initializing ${version} renderer`);
+
     if (!containerRef.current) {
-      if (import.meta.env.DEV) {
-        console.warn(`[EPUBRenderer] No container ref for ${iframeKey}`);
-      }
+      console.warn(`[EPUBRenderer] No container ref for ${version}`);
       return;
-    }
-
-    // Try to reuse existing iframe from pool
-    const existingIframe = iframeRegistry.get(iframeKey);
-    if (existingIframe) {
-      // Check if iframe is in our container or needs to be moved
-      if (existingIframe.parentNode === containerRef.current) {
-        // Already in our container - just reuse
-        if (import.meta.env.DEV) {
-          console.log(`[EPUBRenderer] Reusing ${iframeKey} iframe (same container)`);
-        }
-        iframeRef.current = existingIframe;
-        iframeRegistry.register(iframeKey, existingIframe);
-        return;
-      } else {
-        // Iframe exists but in different/no container - MOVE it to our container
-        if (import.meta.env.DEV) {
-          console.log(`[EPUBRenderer] Moving ${iframeKey} iframe to new container`);
-        }
-        // Remove from old parent if needed
-        if (existingIframe.parentNode) {
-          existingIframe.parentNode.removeChild(existingIframe);
-        }
-        // Append to our container
-        containerRef.current.appendChild(existingIframe);
-        iframeRef.current = existingIframe;
-        iframeRegistry.register(iframeKey, existingIframe);
-        return;
-      }
-    }
-
-    // Create new iframe only if none exists in pool
-    if (import.meta.env.DEV) {
-      console.log(`[EPUBRenderer] Creating new ${iframeKey} iframe`);
     }
 
     const iframe = document.createElement('iframe');
@@ -251,54 +184,28 @@ const EPUBRendererComponent = function EPUBRenderer({
     iframe.className = 'w-full h-full border-0';
     iframe.title = `EPUB ${version}`;
 
-    iframeRegistry.register(iframeKey, iframe);
+    iframeRegistry.register(version, iframe);
     iframeRef.current = iframe;
 
     containerRef.current.appendChild(iframe);
 
-    // Don't destroy on unmount - let the pool manage lifecycle
+    console.log(`[EPUBRenderer] Created ${version} iframe`);
+
     return () => {
-      if (import.meta.env.DEV) {
-        console.log(`[EPUBRenderer] Unmount triggered for ${iframeKey} (keeping in pool)`);
-      }
-      // Don't destroy - keep iframe in pool for reuse
-      // Only clear local ref
+      console.log(`[EPUBRenderer] Cleanup triggered for ${version}`);
+      iframeRegistry.destroy(version);
       iframeRef.current = null;
       isInitialized.current = false;
     };
-  }, [iframeKey, version]);
-
-  // Create a content hash to detect actual changes (not just reference changes)
-  const contentHash = useMemo(() => {
-    const cssJoined = css.join('|||');
-    const highlightsStr = highlights ? JSON.stringify(highlights) : '';
-    // Use a simple hash to compare content without full string comparison on each render
-    return `${html.length}:${cssJoined.length}:${highlightsStr.length}:${baseUrl}`;
-  }, [html, css, highlights, baseUrl]);
-
-  const lastContentHashRef = useRef<string>('');
+  }, []);
 
   useEffect(() => {
     if (!iframeRef.current) {
-      if (import.meta.env.DEV) {
-        console.warn(`[EPUBRenderer] No iframe ref for ${version}, skipping render`);
-      }
+      console.warn(`[EPUBRenderer] No iframe ref for ${version}, skipping render`);
       return;
     }
 
-    // Skip update if content hasn't actually changed
-    if (lastContentHashRef.current === contentHash && isInitialized.current) {
-      if (import.meta.env.DEV) {
-        console.log(`[EPUBRenderer] Skipping ${version} update - content unchanged`);
-      }
-      return;
-    }
-
-    if (import.meta.env.DEV) {
-      console.log(`[EPUBRenderer] Updating ${version} content (${html.length} chars)`);
-    }
-
-    lastContentHashRef.current = contentHash;
+    console.log(`[EPUBRenderer] Rendering content for ${version}`);
 
     const fullHtml = `
       <!DOCTYPE html>
@@ -342,9 +249,7 @@ const EPUBRendererComponent = function EPUBRenderer({
     iframeRef.current.srcdoc = fullHtml;
 
     const handleLoad = () => {
-      if (import.meta.env.DEV) {
-        console.log(`[EPUBRenderer] ${version} content loaded`);
-      }
+      console.log(`[EPUBRenderer] Content loaded in ${version} iframe`);
       const doc = iframeRef.current?.contentDocument;
       if (doc) {
         applyHighlights(doc, highlights, version);
@@ -354,14 +259,11 @@ const EPUBRendererComponent = function EPUBRenderer({
 
     const iframe = iframeRef.current;
     iframe.addEventListener('load', handleLoad);
-    isInitialized.current = true;
 
     return () => {
       iframe.removeEventListener('load', handleLoad);
     };
-    // Use contentHash to detect actual content changes, not reference changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contentHash, version]);
+  }, [html, css, baseUrl, highlights, version, onLoad]);
 
   return (
     <div ref={containerRef} className={`epub-renderer ${className}`} />
@@ -373,7 +275,6 @@ export const EPUBRenderer = React.memo(EPUBRendererComponent, (prevProps, nextPr
     prevProps.html === nextProps.html &&
     prevProps.version === nextProps.version &&
     prevProps.baseUrl === nextProps.baseUrl &&
-    prevProps.poolKey === nextProps.poolKey &&
     JSON.stringify(prevProps.css) === JSON.stringify(nextProps.css) &&
     JSON.stringify(prevProps.highlights) === JSON.stringify(nextProps.highlights)
   );

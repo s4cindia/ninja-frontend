@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, useTransition, lazy, Suspense, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useTransition, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Eye, Code, Loader2 } from 'lucide-react';
@@ -43,28 +43,6 @@ export const ComparisonPage: React.FC = () => {
     console.log('💡 Tip: Run printMemorySummary() in console to see memory usage table');
   }, []);
 
-  // Cleanup visual comparison cache when leaving the page to free memory
-  // Use ref to avoid Strict Mode double-invoke issue
-  const isUnmountingRef = useRef(false);
-  useEffect(() => {
-    isUnmountingRef.current = false;
-    return () => {
-      // Only cleanup on genuine unmount, not Strict Mode double-invoke
-      if (!isUnmountingRef.current) {
-        isUnmountingRef.current = true;
-        // Delay cleanup slightly to ensure it's a real unmount
-        setTimeout(() => {
-          if (isUnmountingRef.current) {
-            if (import.meta.env.DEV) {
-              console.log('[ComparisonPage] Cleaning up visual comparison cache on unmount');
-            }
-            queryClient.removeQueries({ queryKey: ['visual-comparison'] });
-          }
-        }, 100);
-      }
-    };
-  }, [queryClient]);
-
 
   useEffect(() => {
     console.log(`[ComparisonPage] Navigated to change ${currentIndex}/${data?.changes.length || 0}`);
@@ -94,13 +72,7 @@ export const ComparisonPage: React.FC = () => {
       }
 
       try {
-        // Use ensureQueryData to reuse the same cache entry as VisualComparisonPanel
-        // This prevents duplicate 659KB downloads
-        await queryClient.ensureQueryData({
-          queryKey: ['visual-comparison', currentChange!.jobId, currentChange!.id],
-          queryFn: () => getVisualComparison(currentChange!.jobId, currentChange!.id),
-          staleTime: Infinity, // Never refetch if we have data
-        });
+        await getVisualComparison(currentChange!.jobId, currentChange!.id);
         return true;
       } catch (error: unknown) {
         const err = error as { response?: { status?: number }; message?: string };
@@ -114,7 +86,7 @@ export const ComparisonPage: React.FC = () => {
     },
     enabled: !!currentChange?.jobId && !!currentChange?.id,
     retry: false,
-    staleTime: Infinity // Cache availability result indefinitely
+    staleTime: 5 * 60 * 1000
   });
 
   useEffect(() => {
@@ -133,13 +105,13 @@ export const ComparisonPage: React.FC = () => {
       queryClient.prefetchQuery({
         queryKey: ['visual-comparison', change.jobId, change.id],
         queryFn: () => getVisualComparison(change.jobId, change.id),
-        staleTime: 60000, // 60 seconds - consistent with query defaults
+        staleTime: Infinity,
       });
     };
 
-    // Only prefetch next change to reduce memory pressure during fast navigation
     const timer = setTimeout(() => {
       prefetchChange(currentIndex + 1);
+      prefetchChange(currentIndex - 1);
     }, 1000);
 
     return () => clearTimeout(timer);
@@ -317,7 +289,6 @@ export const ComparisonPage: React.FC = () => {
                   </div>
                 }>
                   <VisualComparisonPanel
-                    key="visual-panel-stable"
                     jobId={jobId}
                     changeId={currentChange.id}
                     changeDescription={currentChange.description}

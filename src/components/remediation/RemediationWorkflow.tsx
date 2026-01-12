@@ -149,130 +149,30 @@ export const RemediationWorkflow: React.FC<RemediationWorkflowProps> = ({
   useEffect(() => {
     const fetchInitialData = async () => {
       setIsLoading(true);
-      setError(null);
-
-      // First, try to get workflow status from dedicated endpoint
-      let workflowStage: string | null = null;
-      let hasAuditData = false;
-      let hasPlanData = false;
-      let hasComparisonData = false;
-
       try {
-        const statusResponse = await api.get(`${apiPrefix}/job/${jobId}/workflow-status`);
-        const statusData = statusResponse.data.data || statusResponse.data;
-        workflowStage = statusData.stage;
-        hasAuditData = statusData.hasAuditData;
-        hasPlanData = statusData.hasPlanData;
-        hasComparisonData = statusData.hasComparisonData;
-        console.log('[RemediationWorkflow] Got workflow status:', { workflowStage, hasAuditData, hasPlanData, hasComparisonData });
-      } catch (err) {
-        console.log('[RemediationWorkflow] Workflow status endpoint not available, falling back to parallel fetch');
-      }
-
-      // Fetch data based on what we need
-      const fetchPromises: Promise<unknown>[] = [];
-      const fetchKeys: string[] = [];
-
-      // Always try to get audit data
-      fetchPromises.push(api.get(`${apiPrefix}/job/${jobId}/audit/result`).catch(() => null));
-      fetchKeys.push('audit');
-
-      // Get plan data if exists or unknown
-      if (hasPlanData || !workflowStage) {
-        fetchPromises.push(api.get(`${apiPrefix}/job/${jobId}/remediation`).catch(() => null));
-        fetchKeys.push('plan');
-      }
-
-      // Get comparison data if exists or job is remediated
-      if (hasComparisonData || workflowStage === 'remediated' || workflowStage === 'exported' || !workflowStage) {
-        fetchPromises.push(api.get(`${apiPrefix}/job/${jobId}/comparison/summary`).catch(() => null));
-        fetchKeys.push('comparison');
-      }
-
-      const results = await Promise.all(fetchPromises);
-      const dataMap: Record<string, unknown> = {};
-      fetchKeys.forEach((key, i) => {
-        const result = results[i] as { data?: { data?: unknown } } | null;
-        dataMap[key] = result?.data?.data || (result as { data?: unknown })?.data || null;
-      });
-
-      const auditRaw = dataMap.audit as Record<string, unknown> | null;
-      const planRaw = dataMap.plan as Record<string, unknown> | null;
-      const comparisonRaw = dataMap.comparison as Record<string, unknown> | null;
-
-      // Determine step based on workflow stage (if available) or infer from data
-      let determinedStep: RemediationStep = 'audit';
-      let determinedCompleted: RemediationStep[] = [];
-
-      if (workflowStage) {
-        // Use backend-provided stage
-        switch (workflowStage) {
-          case 'exported':
-            determinedStep = 'export';
-            determinedCompleted = ['audit', 'plan', 'remediate', 'review', 'export'];
-            break;
-          case 'remediated':
-            determinedStep = 'review';
-            determinedCompleted = ['audit', 'plan', 'remediate', 'review'];
-            break;
-          case 'remediating':
-            determinedStep = 'remediate';
-            determinedCompleted = ['audit', 'plan'];
-            setIsRemediating(true);
-            break;
-          case 'planned':
-            determinedStep = 'plan';
-            determinedCompleted = ['audit', 'plan'];
-            break;
-          case 'audited':
-          case 'uploaded':
-          default:
-            determinedStep = 'audit';
-            determinedCompleted = ['audit'];
-        }
-        console.log('[RemediationWorkflow] Using backend stage:', workflowStage, '-> step:', determinedStep);
-      } else {
-        // Fallback: infer from available data
-        const planStatus = (planRaw as Record<string, unknown>)?.status as string | undefined;
-        
-        if (comparisonRaw && ((comparisonRaw as Record<string, unknown>).fixedIssues || (comparisonRaw as Record<string, unknown>).fixedCount || (comparisonRaw as Record<string, unknown>).fixed_count)) {
-          determinedStep = 'review';
-          determinedCompleted = ['audit', 'plan', 'remediate', 'review'];
-        } else if (planStatus === 'remediated') {
-          determinedStep = 'review';
-          determinedCompleted = ['audit', 'plan', 'remediate'];
-        } else if (planStatus === 'remediating') {
-          determinedStep = 'remediate';
-          determinedCompleted = ['audit', 'plan'];
-          setIsRemediating(true);
-        } else if (planRaw && ((planRaw as Record<string, unknown>).tasks || (planRaw as Record<string, unknown>).issues || (planRaw as Record<string, unknown>).totalTasks)) {
-          determinedStep = 'plan';
-          determinedCompleted = ['audit', 'plan'];
-        } else {
-          determinedStep = 'audit';
-          determinedCompleted = ['audit'];
-        }
-        console.log('[RemediationWorkflow] Inferred step from data:', determinedStep);
-      }
-
-      // Set component state
-      if (auditRaw) {
+        const auditResponse = await api.get(`${apiPrefix}/job/${jobId}/audit/result`);
+        const auditRaw = auditResponse.data.data || auditResponse.data;
         setAuditData(mapAuditData(auditRaw));
-      } else {
+        setCompletedSteps(['audit']);
+
+        try {
+          const planResponse = await api.get(`${apiPrefix}/job/${jobId}/remediation`);
+          const planRaw = planResponse.data.data || planResponse.data;
+          if (planRaw) {
+            setPlanData(mapPlanData(planRaw));
+            setCompletedSteps(prev => [...prev, 'plan']);
+            setCurrentStep('plan');
+          }
+        } catch {
+          // Plan not created yet - that's okay
+        }
+      } catch (err) {
+        console.error('[RemediationWorkflow] Failed to fetch initial data:', err);
         setAuditData(generateDemoAudit());
+        setCompletedSteps(['audit']);
+      } finally {
+        setIsLoading(false);
       }
-
-      if (planRaw) {
-        setPlanData(mapPlanData(planRaw));
-      }
-
-      if (comparisonRaw) {
-        setComparisonData(mapComparisonData(comparisonRaw));
-      }
-
-      setCurrentStep(determinedStep);
-      setCompletedSteps(determinedCompleted);
-      setIsLoading(false);
     };
 
     fetchInitialData();

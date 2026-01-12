@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef, useTransition } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { getVisualComparison } from '@/services/comparison.service';
 import { EPUBRenderer } from '../epub/EPUBRenderer';
 import { Loader2, ZoomIn, ZoomOut, Info, Code, AlertTriangle, Columns, Rows, Maximize2, X } from 'lucide-react';
@@ -66,9 +66,8 @@ function getChangeExplanation(changeType?: string, changeDescription?: string): 
 }
 
 function getFallbackSelector(changeType?: string): string | undefined {
-  const normalizedType = changeType?.toLowerCase().replace(/[-_]/g, '') || '';
+  const normalizedType = changeType?.toLowerCase().replace(/[-_]/g, '');
   
-  // Direct code matches
   switch (normalizedType) {
     case 'epubstruct002':
       return 'table';
@@ -77,29 +76,9 @@ function getFallbackSelector(changeType?: string): string | undefined {
       return 'img';
     case 'epublang001':
       return 'html';
+    default:
+      return undefined;
   }
-  
-  // Pattern-based fallbacks
-  if (normalizedType.includes('table') || normalizedType.includes('header')) {
-    return 'table';
-  }
-  if (normalizedType.includes('img') || normalizedType.includes('alt')) {
-    return 'img';
-  }
-  if (normalizedType.includes('lang')) {
-    return 'html';
-  }
-  if (normalizedType.includes('link') || normalizedType.includes('href')) {
-    return 'a';
-  }
-  if (normalizedType.includes('list')) {
-    return 'ul, ol';
-  }
-  if (normalizedType.includes('heading')) {
-    return 'h1, h2, h3, h4, h5, h6';
-  }
-  
-  return undefined;
 }
 
 interface VisualComparisonPanelProps {
@@ -199,21 +178,8 @@ export function VisualComparisonPanel({
     queryKey: ['visual-comparison', jobId, changeId],
     queryFn: () => getVisualComparison(jobId, changeId),
     enabled: !!jobId && !!changeId,
-    staleTime: 60000, // 60 seconds - allows GC while still caching for reasonable duration
-    gcTime: 30000, // Keep in cache for 30 seconds after becoming stale
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    notifyOnChangeProps: ['data', 'error'],
-    // Use select to create stable object references - only recreate if content actually changed
-    select: (data) => ({
-      ...data,
-      // Freeze content references to prevent React Query from creating new objects
-      beforeContent: data.beforeContent,
-      afterContent: data.afterContent,
-      change: data.change,
-      highlightData: data.highlightData,
-      spineItem: data.spineItem,
-    }),
+    notifyOnChangeProps: ['data', 'error', 'isFetching'],
+    placeholderData: keepPreviousData
   });
 
   const cachedDataRef = useRef(queryData);
@@ -269,29 +235,10 @@ export function VisualComparisonPanel({
            desc.toLowerCase().includes('aria');
   }, [changeType, changeDescription, displayData]);
 
-  const currentChangeId = displayData?.change?.id || changeId;
-  
-  // Create a stable content hash to prevent unnecessary re-renders
-  // Only changes when actual content changes, not when React Query emits new references
-  const contentHash = useMemo(() => {
-    if (!displayData) return '';
-    const beforeLen = displayData.beforeContent?.html?.length || 0;
-    const afterLen = displayData.afterContent?.html?.length || 0;
-    const highlightStr = effectiveHighlights ? JSON.stringify(effectiveHighlights) : '';
-    return `${currentChangeId}:${beforeLen}:${afterLen}:${highlightStr.length}`;
-  }, [currentChangeId, displayData?.beforeContent?.html?.length, displayData?.afterContent?.html?.length, effectiveHighlights]);
+  const rendererProps = useMemo(() => {
+    if (!displayData) return null;
 
-  // Cache the actual content to avoid prop changes when data object changes but content is same
-  const cachedContent = useRef<{
-    hash: string;
-    before: { html: string; css: string[]; baseUrl: string; highlights: typeof effectiveHighlights };
-    after: { html: string; css: string[]; baseUrl: string; highlights: typeof effectiveHighlights };
-  } | null>(null);
-
-  // Only update cached content when hash changes (real content change)
-  if (displayData && contentHash && cachedContent.current?.hash !== contentHash) {
-    cachedContent.current = {
-      hash: contentHash,
+    return {
       before: {
         html: displayData.beforeContent.html,
         css: displayData.beforeContent.css,
@@ -305,17 +252,13 @@ export function VisualComparisonPanel({
         highlights: effectiveHighlights
       }
     };
-  }
+  }, [displayData, effectiveHighlights]);
 
-  const rendererProps = cachedContent.current;
-
-  // Memoize inline renderers by contentHash to prevent re-creation when React Query emits new refs
   const beforeRenderer = useMemo(() => {
     if (!rendererProps) return null;
     return (
       <EPUBRenderer
         key="before-stable"
-        poolKey="inline-before"
         html={rendererProps.before.html}
         css={rendererProps.before.css}
         baseUrl={rendererProps.before.baseUrl}
@@ -323,15 +266,13 @@ export function VisualComparisonPanel({
         version="before"
       />
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contentHash]);
+  }, [rendererProps]);
 
   const afterRenderer = useMemo(() => {
     if (!rendererProps) return null;
     return (
       <EPUBRenderer
         key="after-stable"
-        poolKey="inline-after"
         html={rendererProps.after.html}
         css={rendererProps.after.css}
         baseUrl={rendererProps.after.baseUrl}
@@ -339,11 +280,7 @@ export function VisualComparisonPanel({
         version="after"
       />
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contentHash]);
-
-  // REMOVED: Separate fullscreen renderers were causing duplicate iframe creation
-  // Now we reuse the inline beforeRenderer/afterRenderer in fullscreen mode via CSS
+  }, [rendererProps]);
 
   const toggleLayout = useCallback((newLayout: 'side-by-side' | 'stacked') => {
     startTransition(() => {
@@ -356,12 +293,10 @@ export function VisualComparisonPanel({
       console.log('[VisualComparisonPanel] Data loaded:', {
         htmlSize: displayData.beforeContent.html.length + displayData.afterContent.html.length,
         cssFiles: displayData.beforeContent.css.length + displayData.afterContent.css.length,
-        hasHighlights: !!displayData.highlightData,
-        highlightData: displayData.highlightData,
-        effectiveHighlights: effectiveHighlights
+        hasHighlights: !!displayData.highlightData
       });
     }
-  }, [displayData, effectiveHighlights]);
+  }, [displayData]);
 
   useEffect(() => {
     if (!isFullscreen) return;
@@ -622,28 +557,69 @@ export function VisualComparisonPanel({
         </button>
       </div>
 
-      {/* 
-        IMPORTANT: Renderers are ALWAYS mounted to avoid iframe recreation.
-        In inline mode: Both visible side-by-side or stacked
-        In fullscreen mode: Container becomes fixed position overlay, showing selected mode
-      */}
-      <div 
-        className={`flex-1 overflow-hidden ${
-          isFullscreen 
-            ? 'fixed inset-0 z-50 bg-white flex flex-col' 
-            : layout === 'side-by-side' 
-              ? 'grid grid-cols-2 gap-0' 
-              : 'flex flex-col'
-        }`}
-      >
-        {/* Fullscreen header - only shown when in fullscreen mode */}
-        {isFullscreen && (
-          <div className="border-b border-gray-200 bg-gray-50 flex-shrink-0">
+      <div className={layout === 'side-by-side' ? 'grid grid-cols-2 gap-0 flex-1 overflow-hidden' : 'flex flex-col flex-1 overflow-hidden'}>
+        <div
+          className={`overflow-auto ${layout === 'side-by-side' ? 'border-r border-gray-200' : 'flex-1 border-b border-gray-200'}`}
+          style={{
+            transform: `scale(${zoom / 100})`,
+            transformOrigin: 'top left',
+            width: `${100 / (zoom / 100)}%`,
+            height: layout === 'side-by-side' ? `${100 / (zoom / 100)}%` : `${50 / (zoom / 100)}%`
+          }}
+        >
+          <div className="bg-red-50 px-4 py-2 sticky top-0 z-10 border-b border-red-200 flex items-center justify-between">
+            <span className="font-semibold text-red-700">BEFORE</span>
+            <button
+              onClick={() => {
+                setFullscreenMode('before');
+                handleOpenFullscreen();
+              }}
+              className="p-1 hover:bg-red-100 rounded"
+              title="Expand BEFORE to fullscreen"
+              aria-label="Expand BEFORE panel to fullscreen"
+            >
+              <Maximize2 size={16} className="text-red-700" />
+            </button>
+          </div>
+          {beforeRenderer}
+        </div>
+
+        <div
+          className={`overflow-auto ${layout === 'stacked' ? 'flex-1' : ''}`}
+          style={{
+            transform: `scale(${zoom / 100})`,
+            transformOrigin: 'top left',
+            width: `${100 / (zoom / 100)}%`,
+            height: layout === 'side-by-side' ? `${100 / (zoom / 100)}%` : `${50 / (zoom / 100)}%`
+          }}
+        >
+          <div className="bg-green-50 px-4 py-2 sticky top-0 z-10 border-b border-green-200 flex items-center justify-between">
+            <span className="font-semibold text-green-700">AFTER</span>
+            <button
+              onClick={() => {
+                setFullscreenMode('after');
+                handleOpenFullscreen();
+              }}
+              className="p-1 hover:bg-green-100 rounded"
+              title="Expand AFTER to fullscreen"
+              aria-label="Expand AFTER panel to fullscreen"
+            >
+              <Maximize2 size={16} className="text-green-700" />
+            </button>
+          </div>
+          {afterRenderer}
+        </div>
+      </div>
+
+      {isFullscreen && (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col">
+          <div className="border-b border-gray-200 bg-gray-50">
             {/* Top Row: Title and Close */}
             <div className="flex items-center justify-between px-6 py-3">
               <h3 className="text-lg font-semibold text-gray-900">
                 {changeDescription || displayData.change?.description || 'Visual Change'}
               </h3>
+
               <button
                 onClick={() => handleCloseFullscreen()}
                 className="p-2 hover:bg-gray-200 rounded-lg"
@@ -657,26 +633,43 @@ export function VisualComparisonPanel({
             {/* Middle Row: Change Info */}
             <div className="px-6 py-2 bg-blue-50 border-y border-blue-200">
               <div className="flex flex-wrap gap-3 text-xs text-gray-700">
-                <span><strong>Type:</strong> {changeType || displayData.change?.changeType || 'Unknown'}</span>
-                <span><strong>File:</strong> {filePath || displayData.spineItem?.href || 'Unknown'}</span>
+                <span>
+                  <strong>Type:</strong> {changeType || displayData.change?.changeType || 'Unknown'}
+                </span>
+                <span>
+                  <strong>File:</strong> {filePath || displayData.spineItem?.href || 'Unknown'}
+                </span>
                 {(severity || displayData.change?.severity) && (
-                  <span><strong>Severity:</strong> {severity || displayData.change?.severity}</span>
+                  <span>
+                    <strong>Severity:</strong> {severity || displayData.change?.severity}
+                  </span>
                 )}
               </div>
             </div>
 
             {/* Bottom Row: Navigation and Controls */}
             <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200">
+              {/* Left: Change Navigation */}
               <div className="flex items-center gap-3">
                 {currentIndex !== undefined && totalChanges !== undefined ? (
                   <>
-                    <button onClick={onNavigatePrevious} disabled={!canNavigatePrevious}
-                      className="px-3 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+                    <button
+                      onClick={onNavigatePrevious}
+                      disabled={!canNavigatePrevious}
+                      className="px-3 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    >
                       ← Previous
                     </button>
-                    <span className="text-sm font-medium text-gray-700">Change {currentIndex + 1} of {totalChanges}</span>
-                    <button onClick={onNavigateNext} disabled={!canNavigateNext}
-                      className="px-3 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+
+                    <span className="text-sm font-medium text-gray-700">
+                      Change {currentIndex + 1} of {totalChanges}
+                    </span>
+
+                    <button
+                      onClick={onNavigateNext}
+                      disabled={!canNavigateNext}
+                      className="px-3 py-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    >
                       Next →
                     </button>
                   </>
@@ -685,119 +678,161 @@ export function VisualComparisonPanel({
                 )}
               </div>
 
+              {/* Center: View Tabs */}
               <div className="flex gap-2">
-                <button onClick={() => setFullscreenMode('before')}
-                  className={`px-4 py-2 rounded-lg font-medium text-sm ${fullscreenMode === 'before' ? 'bg-red-500 text-white' : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'}`}>
+                <button
+                  onClick={() => setFullscreenMode('before')}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm ${
+                    fullscreenMode === 'before'
+                      ? 'bg-red-500 text-white'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
                   BEFORE
                 </button>
-                <button onClick={() => setFullscreenMode('after')}
-                  className={`px-4 py-2 rounded-lg font-medium text-sm ${fullscreenMode === 'after' ? 'bg-green-500 text-white' : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'}`}>
+                <button
+                  onClick={() => setFullscreenMode('after')}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm ${
+                    fullscreenMode === 'after'
+                      ? 'bg-green-500 text-white'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
                   AFTER
                 </button>
-                <button onClick={() => setFullscreenMode('compare')}
-                  className={`px-4 py-2 rounded-lg font-medium text-sm ${fullscreenMode === 'compare' ? 'bg-blue-500 text-white' : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'}`}>
+                <button
+                  onClick={() => setFullscreenMode('compare')}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm ${
+                    fullscreenMode === 'compare'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
                   COMPARE
                 </button>
               </div>
 
-              <button onClick={() => setShowCodeChanges(!showCodeChanges)}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded">
+              {/* Right: HTML Code Toggle */}
+              <button
+                onClick={() => setShowCodeChanges(!showCodeChanges)}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded"
+              >
                 <Code size={16} />
                 {showCodeChanges ? 'Hide' : 'Show'} HTML code
               </button>
             </div>
 
+            {/* HTML Code Changes Section (Collapsible) */}
             {showCodeChanges && isStructuralChange && (
               <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div className="bg-red-50 border border-red-200 rounded overflow-hidden">
-                    <div className="bg-red-100 px-3 py-1 text-red-800 font-semibold border-b border-red-200">Before</div>
+                    <div className="bg-red-100 px-3 py-1 text-red-800 font-semibold border-b border-red-200">
+                      Before
+                    </div>
                     <pre className="text-red-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all">
-                      {(() => { const html = displayData.beforeContent?.html || ''; if (!html) return 'No content available'; const truncated = html.slice(0, 1000); const lastClosingTag = truncated.lastIndexOf('>'); return lastClosingTag > 0 ? truncated.slice(0, lastClosingTag + 1) + (html.length > 1000 ? '...' : '') : truncated; })()}
+{(() => {
+  const html = displayData.beforeContent?.html || '';
+  if (!html) return 'No content available';
+  const truncated = html.slice(0, 1000);
+  const lastClosingTag = truncated.lastIndexOf('>');
+  return lastClosingTag > 0 ? truncated.slice(0, lastClosingTag + 1) + (html.length > 1000 ? '...' : '') : truncated;
+})()}
                     </pre>
                   </div>
+
                   <div className="bg-green-50 border border-green-200 rounded overflow-hidden">
-                    <div className="bg-green-100 px-3 py-1 text-green-800 font-semibold border-b border-green-200">After</div>
+                    <div className="bg-green-100 px-3 py-1 text-green-800 font-semibold border-b border-green-200">
+                      After
+                    </div>
                     <pre className="text-green-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all">
-                      {(() => { const html = displayData.afterContent?.html || ''; if (!html) return 'No content available'; const truncated = html.slice(0, 1000); const lastClosingTag = truncated.lastIndexOf('>'); return lastClosingTag > 0 ? truncated.slice(0, lastClosingTag + 1) + (html.length > 1000 ? '...' : '') : truncated; })()}
+{(() => {
+  const html = displayData.afterContent?.html || '';
+  if (!html) return 'No content available';
+  const truncated = html.slice(0, 1000);
+  const lastClosingTag = truncated.lastIndexOf('>');
+  return lastClosingTag > 0 ? truncated.slice(0, lastClosingTag + 1) + (html.length > 1000 ? '...' : '') : truncated;
+})()}
                     </pre>
                   </div>
                 </div>
               </div>
             )}
           </div>
-        )}
 
-        {/* Renderer content - structure changes based on mode but iframes stay mounted */}
-        <div className={`${isFullscreen ? 'flex-1 overflow-hidden' : 'contents'}`}>
-          {/* BEFORE panel - always mounted, visibility controlled by fullscreen mode */}
-          <div
-            className={`overflow-auto ${
-              isFullscreen 
-                ? (fullscreenMode === 'before' || fullscreenMode === 'compare' ? 'h-full' : 'hidden')
-                : layout === 'side-by-side' ? 'border-r border-gray-200' : 'flex-1 border-b border-gray-200'
-            } ${isFullscreen && fullscreenMode === 'compare' ? 'w-1/2 border-r-2 border-gray-300 float-left' : ''}`}
-            style={!isFullscreen ? {
-              transform: `scale(${zoom / 100})`,
-              transformOrigin: 'top left',
-              width: `${100 / (zoom / 100)}%`,
-              height: layout === 'side-by-side' ? `${100 / (zoom / 100)}%` : `${50 / (zoom / 100)}%`
-            } : undefined}
-            ref={beforeScrollRef}
-            onScroll={handleSyncScroll('before')}
-          >
-            <div className="bg-red-50 px-4 py-2 sticky top-0 z-10 border-b border-red-200 flex items-center justify-between">
-              <span className="font-semibold text-red-700">BEFORE</span>
-              {!isFullscreen && (
-                <button
-                  onClick={() => { setFullscreenMode('before'); handleOpenFullscreen(); }}
-                  className="p-1 hover:bg-red-100 rounded"
-                  title="Expand BEFORE to fullscreen"
-                  aria-label="Expand BEFORE panel to fullscreen"
+          <div className="flex-1 overflow-hidden">
+            {fullscreenMode === 'before' && (
+              <div className="h-full overflow-auto">
+                <EPUBRenderer
+                  key={`fullscreen-before-${changeId}`}
+                  html={displayData.beforeContent.html}
+                  css={displayData.beforeContent.css}
+                  baseUrl={displayData.beforeContent.baseHref}
+                  highlights={effectiveHighlights}
+                  version="before"
+                  className="h-full"
+                />
+              </div>
+            )}
+            {fullscreenMode === 'after' && (
+              <div className="h-full overflow-auto">
+                <EPUBRenderer
+                  key={`fullscreen-after-${changeId}`}
+                  html={displayData.afterContent.html}
+                  css={displayData.afterContent.css}
+                  baseUrl={displayData.afterContent.baseHref}
+                  highlights={effectiveHighlights}
+                  version="after"
+                  className="h-full"
+                />
+              </div>
+            )}
+            {fullscreenMode === 'compare' && (
+              <div className="grid grid-cols-2 gap-0 h-full">
+                {/* BEFORE Panel */}
+                <div
+                  ref={beforeScrollRef}
+                  onScroll={handleSyncScroll('before')}
+                  className="h-full overflow-auto border-r-2 border-gray-300"
                 >
-                  <Maximize2 size={16} className="text-red-700" />
-                </button>
-              )}
-            </div>
-            {beforeRenderer}
+                  <div className="bg-red-50 px-4 py-2 sticky top-0 z-10 border-b border-red-200">
+                    <span className="font-semibold text-red-700">BEFORE</span>
+                  </div>
+                  <EPUBRenderer
+                    key={`compare-before-${changeId}`}
+                    html={displayData.beforeContent.html}
+                    css={displayData.beforeContent.css}
+                    baseUrl={displayData.beforeContent.baseHref}
+                    highlights={effectiveHighlights}
+                    version="before"
+                    className="h-full"
+                  />
+                </div>
+
+                {/* AFTER Panel */}
+                <div
+                  ref={afterScrollRef}
+                  onScroll={handleSyncScroll('after')}
+                  className="h-full overflow-auto"
+                >
+                  <div className="bg-green-50 px-4 py-2 sticky top-0 z-10 border-b border-green-200">
+                    <span className="font-semibold text-green-700">AFTER</span>
+                  </div>
+                  <EPUBRenderer
+                    key={`compare-after-${changeId}`}
+                    html={displayData.afterContent.html}
+                    css={displayData.afterContent.css}
+                    baseUrl={displayData.afterContent.baseHref}
+                    highlights={effectiveHighlights}
+                    version="after"
+                    className="h-full"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* AFTER panel - always mounted, visibility controlled by fullscreen mode */}
-          <div
-            className={`overflow-auto ${
-              isFullscreen 
-                ? (fullscreenMode === 'after' || fullscreenMode === 'compare' ? 'h-full' : 'hidden')
-                : layout === 'stacked' ? 'flex-1' : ''
-            } ${isFullscreen && fullscreenMode === 'compare' ? 'w-1/2 float-left' : ''}`}
-            style={!isFullscreen ? {
-              transform: `scale(${zoom / 100})`,
-              transformOrigin: 'top left',
-              width: `${100 / (zoom / 100)}%`,
-              height: layout === 'side-by-side' ? `${100 / (zoom / 100)}%` : `${50 / (zoom / 100)}%`
-            } : undefined}
-            ref={afterScrollRef}
-            onScroll={handleSyncScroll('after')}
-          >
-            <div className="bg-green-50 px-4 py-2 sticky top-0 z-10 border-b border-green-200 flex items-center justify-between">
-              <span className="font-semibold text-green-700">AFTER</span>
-              {!isFullscreen && (
-                <button
-                  onClick={() => { setFullscreenMode('after'); handleOpenFullscreen(); }}
-                  className="p-1 hover:bg-green-100 rounded"
-                  title="Expand AFTER to fullscreen"
-                  aria-label="Expand AFTER panel to fullscreen"
-                >
-                  <Maximize2 size={16} className="text-green-700" />
-                </button>
-              )}
-            </div>
-            {afterRenderer}
-          </div>
-        </div>
-
-        {/* Fullscreen footer */}
-        {isFullscreen && (
-          <div className="px-6 py-2 bg-gray-100 border-t border-gray-200 text-xs text-gray-600 flex flex-wrap gap-4 flex-shrink-0">
+          <div className="px-6 py-2 bg-gray-100 border-t border-gray-200 text-xs text-gray-600 flex flex-wrap gap-4">
             <span><kbd className="px-2 py-1 bg-white border border-gray-300 rounded">ESC</kbd> Close</span>
             <span><kbd className="px-2 py-1 bg-white border border-gray-300 rounded">1</kbd> Before</span>
             <span><kbd className="px-2 py-1 bg-white border border-gray-300 rounded">2</kbd> After</span>
@@ -805,8 +840,8 @@ export function VisualComparisonPanel({
             {canNavigatePrevious && <span><kbd className="px-2 py-1 bg-white border border-gray-300 rounded">←</kbd> Previous</span>}
             {canNavigateNext && <span><kbd className="px-2 py-1 bg-white border border-gray-300 rounded">→</kbd> Next</span>}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
