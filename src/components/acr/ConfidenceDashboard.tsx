@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
-import { AlertCircle, Search, MinusCircle, AlertTriangle, CheckCircle } from 'lucide-react';
+import { AlertCircle, Search, MinusCircle, AlertTriangle, CheckCircle, LayoutGrid, Table } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
 import { fetchAcrAnalysis, CriterionConfidence } from '@/services/api';
 import { AnalysisSummaryCards } from './AnalysisSummaryCards';
 import { CriterionCard } from './CriterionCard';
 import { ExpandableSection } from './ExpandableSection';
+import { CriteriaTable, CriterionRow } from './CriteriaTable';
 
 interface ConfidenceDashboardProps {
   jobId: string;
@@ -15,6 +16,14 @@ interface ConfidenceDashboardProps {
 
 type HybridStatus = 'fail' | 'needs_verification' | 'likely_na' | 'pass';
 
+interface CriterionAnalysisEvidence {
+  source: string;
+  description: string;
+  affectedFiles?: string[];
+  issueCount?: number;
+  auditIssues?: BackendAuditIssue[];
+}
+
 interface CriterionAnalysis {
   id: string;
   number: string;
@@ -22,12 +31,7 @@ interface CriterionAnalysis {
   level: 'A' | 'AA' | 'AAA';
   confidence: number;
   status: HybridStatus;
-  evidence?: {
-    source: string;
-    description: string;
-    affectedFiles?: string[];
-    issueCount?: number;
-  };
+  evidence?: CriterionAnalysisEvidence;
   automatedChecks?: { id: string; description: string; passed: boolean }[];
   manualChecks?: string[];
 }
@@ -224,11 +228,20 @@ function extractCriterionId(c: Partial<CriterionConfidence>, index: number): str
   return `${index + 1}.0.0`;
 }
 
+interface BackendAuditIssue {
+  code: string;
+  severity: 'critical' | 'serious' | 'moderate' | 'minor';
+  message: string;
+  affectedFiles?: string[];
+  issueCount?: number;
+}
+
 interface BackendEvidence {
   source?: string;
   description?: string;
   affectedFiles?: string[];
   issueCount?: number;
+  auditIssues?: BackendAuditIssue[];
 }
 
 interface NormalizedCriterion extends CriterionConfidence {
@@ -247,6 +260,7 @@ function normalizeCriterion(c: Partial<CriterionConfidence>, index: number): Nor
       description: e.description,
       affectedFiles: e.affectedFiles,
       issueCount: e.issueCount,
+      auditIssues: Array.isArray(e.auditIssues) ? e.auditIssues : undefined,
     };
   }
   
@@ -283,20 +297,31 @@ function transformToCriterionAnalysis(criterion: NormalizedCriterion): Criterion
   
   let evidence: CriterionAnalysis['evidence'] | undefined;
   
-  if (criterion.evidence && criterion.evidence.description) {
+  const hasBackendEvidence = criterion.evidence && 
+    (criterion.evidence.description || criterion.evidence.auditIssues?.length);
+  
+  if (hasBackendEvidence && criterion.evidence) {
     evidence = {
       source: criterion.evidence.source || 'epub_audit',
-      description: criterion.evidence.description,
+      description: criterion.evidence.description || 'Audit issues found',
       affectedFiles: criterion.evidence.affectedFiles,
       issueCount: criterion.evidence.issueCount,
+      auditIssues: criterion.evidence.auditIssues,
     };
   } else {
     const failedChecks = criterion.automatedChecks?.filter(c => !c.passed) || [];
     if (failedChecks.length > 0) {
+      const syntheticIssues: BackendAuditIssue[] = failedChecks.map(check => ({
+        code: `CHECK-${check.id.toUpperCase()}`,
+        severity: 'serious' as const,
+        message: check.description,
+        issueCount: 1,
+      }));
       evidence = {
         source: 'epub_audit',
         description: failedChecks.map(c => c.description).join('; '),
         issueCount: failedChecks.length,
+        auditIssues: syntheticIssues,
       };
     }
   }
@@ -330,6 +355,29 @@ function categorizeCriteria(criteria: CriterionAnalysis[]) {
   });
 
   return { issues, needsVerification, likelyNA };
+}
+
+function convertToTableRow(criterion: CriterionAnalysis): CriterionRow {
+  return {
+    id: criterion.id,
+    number: criterion.number,
+    name: criterion.name,
+    level: criterion.level,
+    confidence: criterion.confidence,
+    status: criterion.status,
+    evidence: criterion.evidence ? {
+      source: criterion.evidence.source,
+      description: criterion.evidence.description,
+      affectedFiles: criterion.evidence.affectedFiles,
+      issueCount: criterion.evidence.issueCount,
+      auditIssues: criterion.evidence.auditIssues,
+    } : undefined,
+    automatedChecks: criterion.automatedChecks,
+    manualTest: criterion.manualChecks && criterion.manualChecks.length > 0 ? {
+      title: 'Manual Testing Required',
+      whatToCheck: criterion.manualChecks,
+    } : undefined,
+  };
 }
 
 interface CriterionDetailModalProps {
@@ -418,6 +466,8 @@ function CriterionDetailModal({ criterion, onClose }: CriterionDetailModalProps)
   );
 }
 
+type ViewMode = 'cards' | 'table';
+
 export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: ConfidenceDashboardProps) {
   const [isLoading, setIsLoading] = useState(!isDemoJob(jobId));
   const [criteria, setCriteria] = useState<NormalizedCriterion[]>(
@@ -425,6 +475,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   );
   const [error, setError] = useState<string | null>(null);
   const [selectedCriterion, setSelectedCriterion] = useState<CriterionAnalysis | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('cards');
 
   useEffect(() => {
     if (criteria.length > 0 && onCriteriaLoaded) {
@@ -468,7 +519,9 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
 
   const analysisData = useMemo(() => {
     const transformed = criteria.map(transformToCriterionAnalysis);
-    return categorizeCriteria(transformed);
+    const categorized = categorizeCriteria(transformed);
+    const tableRows = transformed.map(convertToTableRow);
+    return { ...categorized, transformed, tableRows };
   }, [criteria]);
 
   if (isLoading) {
@@ -479,7 +532,14 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     );
   }
 
-  const { issues, needsVerification, likelyNA } = analysisData;
+  const { issues, needsVerification, likelyNA, tableRows, transformed } = analysisData;
+
+  const handleViewDetails = (criterionRow: CriterionRow) => {
+    const analysis = transformed.find(c => c.id === criterionRow.id);
+    if (analysis) {
+      setSelectedCriterion(analysis);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -490,12 +550,55 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
         </div>
       )}
 
-      <AnalysisSummaryCards
-        issuesCount={issues.length}
-        verificationCount={needsVerification.length}
-        naCount={likelyNA.length}
-      />
+      <div className="flex items-center justify-between">
+        <AnalysisSummaryCards
+          issuesCount={issues.length}
+          verificationCount={needsVerification.length}
+          naCount={likelyNA.length}
+        />
+        
+        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg" role="group" aria-label="View mode">
+          <button
+            onClick={() => {
+              setViewMode('cards');
+              setSelectedCriterion(null);
+            }}
+            aria-pressed={viewMode === 'cards'}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              viewMode === 'cards'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+            Cards
+          </button>
+          <button
+            onClick={() => {
+              setViewMode('table');
+              setSelectedCriterion(null);
+            }}
+            aria-pressed={viewMode === 'table'}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              viewMode === 'table'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <Table className="h-4 w-4" aria-hidden="true" />
+            Table
+          </button>
+        </div>
+      </div>
 
+      {viewMode === 'table' ? (
+        <CriteriaTable
+          criteria={tableRows}
+          mode="preview"
+          onViewDetails={handleViewDetails}
+          showFilters={true}
+        />
+      ) : (
       <div className="space-y-4">
         <ExpandableSection
           title="Issues Found"
@@ -597,6 +700,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
           )}
         </ExpandableSection>
       </div>
+      )}
 
       {selectedCriterion && (
         <CriterionDetailModal
