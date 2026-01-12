@@ -216,6 +216,15 @@ export function AcrWorkflowPage() {
   }, [effectiveJobId, state.jobId, fileNameFromQuery]);
 
   useEffect(() => {
+    if (fileNameFromQuery) {
+      const decodedFileName = decodeURIComponent(fileNameFromQuery);
+      if (decodedFileName !== state.fileName) {
+        setState(prev => ({ ...prev, fileName: decodedFileName }));
+      }
+    }
+  }, [fileNameFromQuery, state.fileName]);
+
+  useEffect(() => {
     const fetchFileName = async () => {
       if (state.jobId && !state.fileName) {
         try {
