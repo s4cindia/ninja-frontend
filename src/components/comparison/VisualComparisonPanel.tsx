@@ -270,11 +270,28 @@ export function VisualComparisonPanel({
   }, [changeType, changeDescription, displayData]);
 
   const currentChangeId = displayData?.change?.id || changeId;
-  const rendererProps = useMemo(() => {
-    if (!displayData) return null;
+  
+  // Create a stable content hash to prevent unnecessary re-renders
+  // Only changes when actual content changes, not when React Query emits new references
+  const contentHash = useMemo(() => {
+    if (!displayData) return '';
+    const beforeLen = displayData.beforeContent?.html?.length || 0;
+    const afterLen = displayData.afterContent?.html?.length || 0;
+    const highlightStr = effectiveHighlights ? JSON.stringify(effectiveHighlights) : '';
+    return `${currentChangeId}:${beforeLen}:${afterLen}:${highlightStr.length}`;
+  }, [currentChangeId, displayData?.beforeContent?.html?.length, displayData?.afterContent?.html?.length, effectiveHighlights]);
 
-    return {
-      changeId: currentChangeId,
+  // Cache the actual content to avoid prop changes when data object changes but content is same
+  const cachedContent = useRef<{
+    hash: string;
+    before: { html: string; css: string[]; baseUrl: string; highlights: typeof effectiveHighlights };
+    after: { html: string; css: string[]; baseUrl: string; highlights: typeof effectiveHighlights };
+  } | null>(null);
+
+  // Only update cached content when hash changes (real content change)
+  if (displayData && contentHash && cachedContent.current?.hash !== contentHash) {
+    cachedContent.current = {
+      hash: contentHash,
       before: {
         html: displayData.beforeContent.html,
         css: displayData.beforeContent.css,
@@ -288,8 +305,11 @@ export function VisualComparisonPanel({
         highlights: effectiveHighlights
       }
     };
-  }, [currentChangeId, displayData?.beforeContent?.html, displayData?.afterContent?.html, effectiveHighlights]);
+  }
 
+  const rendererProps = cachedContent.current;
+
+  // Memoize inline renderers by contentHash to prevent re-creation when React Query emits new refs
   const beforeRenderer = useMemo(() => {
     if (!rendererProps) return null;
     return (
@@ -303,7 +323,8 @@ export function VisualComparisonPanel({
         version="before"
       />
     );
-  }, [rendererProps]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contentHash]);
 
   const afterRenderer = useMemo(() => {
     if (!rendererProps) return null;
@@ -318,14 +339,17 @@ export function VisualComparisonPanel({
         version="after"
       />
     );
-  }, [rendererProps]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contentHash]);
 
-  // Memoized fullscreen renderers - only created when actually in fullscreen
+  // Fullscreen renderers - ONLY create when actually in fullscreen mode
+  // This prevents 2 extra iframe creations when not in fullscreen
   const fullscreenBeforeRenderer = useMemo(() => {
+    // Critical: Return null when not in fullscreen to avoid creating iframes
     if (!isFullscreen || !rendererProps) return null;
     return (
       <EPUBRenderer
-        key={`fullscreen-before-${currentChangeId}`}
+        key={`fullscreen-before-${contentHash}`}
         poolKey="fullscreen-before"
         html={rendererProps.before.html}
         css={rendererProps.before.css}
@@ -335,13 +359,15 @@ export function VisualComparisonPanel({
         className="h-full"
       />
     );
-  }, [isFullscreen, rendererProps, currentChangeId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFullscreen, contentHash]);
 
   const fullscreenAfterRenderer = useMemo(() => {
+    // Critical: Return null when not in fullscreen to avoid creating iframes
     if (!isFullscreen || !rendererProps) return null;
     return (
       <EPUBRenderer
-        key={`fullscreen-after-${currentChangeId}`}
+        key={`fullscreen-after-${contentHash}`}
         poolKey="fullscreen-after"
         html={rendererProps.after.html}
         css={rendererProps.after.css}
@@ -351,7 +377,8 @@ export function VisualComparisonPanel({
         className="h-full"
       />
     );
-  }, [isFullscreen, rendererProps, currentChangeId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFullscreen, contentHash]);
 
   const toggleLayout = useCallback((newLayout: 'side-by-side' | 'stacked') => {
     startTransition(() => {
