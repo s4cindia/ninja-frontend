@@ -4,11 +4,11 @@ import { cn } from '@/utils/cn';
 import { Spinner } from '@/components/ui/Spinner';
 import type { AcrEdition, AcrEditionCode } from '@/types/acr.types';
 import { useEditions } from '@/hooks/useAcr';
+import { CriteriaListModal } from './CriteriaListModal';
 
 interface EditionSelectorProps {
   selectedEdition: AcrEdition | null;
   onSelect: (edition: AcrEdition) => void;
-  onViewCriteria?: (editionCode: string) => void;
   disabled?: boolean;
 }
 
@@ -110,9 +110,13 @@ function getCriteriaLabelColor(status: CriteriaStatus): string {
   }
 }
 
-export function EditionSelector({ selectedEdition, onSelect, onViewCriteria, disabled = false }: EditionSelectorProps) {
+export function EditionSelector({ selectedEdition, onSelect, disabled = false }: EditionSelectorProps) {
   const { data: editions, isLoading, error } = useEditions();
   const [hoveredEdition, setHoveredEdition] = useState<string | null>(null);
+  const [selectedEditionForModal, setSelectedEditionForModal] = useState<{
+    code: AcrEditionCode;
+    name: string;
+  } | null>(null);
 
   if (isLoading) {
     return (
@@ -218,17 +222,21 @@ export function EditionSelector({ selectedEdition, onSelect, onViewCriteria, dis
                   </div>
                 </button>
 
-                {onViewCriteria && (
-                  <button
-                    type="button"
-                    onClick={() => onViewCriteria(edition.code)}
-                    className="mt-3 text-sm text-primary-600 hover:text-primary-800 hover:underline flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 rounded"
-                    aria-label={`View criteria list for ${edition.name}`}
-                  >
-                    View criteria list
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedEditionForModal({
+                      code: edition.code as AcrEditionCode,
+                      name: edition.name
+                    });
+                  }}
+                  className="mt-3 text-sm text-primary-600 hover:text-primary-800 hover:underline flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 rounded"
+                  aria-label={`View criteria list for ${edition.name}`}
+                >
+                  View criteria list
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
 
               {isHovered && tooltip && (
@@ -252,6 +260,15 @@ export function EditionSelector({ selectedEdition, onSelect, onViewCriteria, dis
             {selectedEdition.name} - {selectedEdition.description}
           </p>
         </div>
+      )}
+
+      {selectedEditionForModal && (
+        <CriteriaListModal
+          edition={selectedEditionForModal.code}
+          editionName={selectedEditionForModal.name}
+          isOpen={!!selectedEditionForModal}
+          onClose={() => setSelectedEditionForModal(null)}
+        />
       )}
     </div>
   );
