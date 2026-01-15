@@ -159,7 +159,7 @@ export function EditionSelector({ selectedEdition, onSelect, disabled = false }:
 
           return (
             <div
-              key={edition.id}
+              key={edition.id || edition.code}
               className="relative"
               onMouseEnter={() => setHoveredEdition(edition.code)}
               onMouseLeave={() => setHoveredEdition(null)}

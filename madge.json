@@ -1,0 +1,444 @@
+{
+  "App.tsx": [],
+  "components/ProtectedRoute.tsx": [],
+  "components/acr/AcrEditor.tsx": [
+    "components/acr/CriterionRow.tsx"
+  ],
+  "components/acr/AnalysisSummaryCards.tsx": [],
+  "components/acr/ConfidenceDashboard.tsx": [
+    "components/acr/CriteriaTable.tsx"
+  ],
+  "components/acr/CriteriaListModal.tsx": [],
+  "components/acr/CriteriaTable.tsx": [],
+  "components/acr/CriterionCard.tsx": [],
+  "components/acr/CriterionRow.tsx": [
+    "components/acr/RemarksEditor.tsx"
+  ],
+  "components/acr/EditionSelector.tsx": [
+    "components/acr/CriteriaListModal.tsx"
+  ],
+  "components/acr/ExpandableSection.tsx": [],
+  "components/acr/ExportDialog.tsx": [],
+  "components/acr/RemarksEditor.tsx": [],
+  "components/acr/VerificationItem.tsx": [],
+  "components/acr/VerificationQueue.tsx": [
+    "components/acr/VerificationItem.tsx"
+  ],
+  "components/acr/VersionComparison.tsx": [],
+  "components/acr/VersionHistory.tsx": [],
+  "components/alt-text/AltTextGenerator.tsx": [
+    "components/ui/Alert.tsx",
+    "components/ui/Badge.tsx",
+    "components/ui/Button.tsx"
+  ],
+  "components/alt-text/AltTextReviewQueue.tsx": [
+    "components/ui/Alert.tsx",
+    "components/ui/Badge.tsx",
+    "components/ui/Button.tsx"
+  ],
+  "components/alt-text/BatchApprovalPanel.tsx": [
+    "components/ui/Alert.tsx",
+    "components/ui/Badge.tsx",
+    "components/ui/Button.tsx"
+  ],
+  "components/alt-text/ChartDescriptionViewer.tsx": [
+    "components/ui/Badge.tsx",
+    "components/ui/Button.tsx"
+  ],
+  "components/alt-text/ImagePreviewCard.tsx": [
+    "components/ui/Badge.tsx",
+    "components/ui/Button.tsx"
+  ],
+  "components/alt-text/LongDescriptionEditor.tsx": [
+    "components/ui/Badge.tsx",
+    "components/ui/Button.tsx"
+  ],
+  "components/audit/EpubViewer.tsx": [],
+  "components/audit/RemediationGuidance.tsx": [],
+  "components/audit/ScoreTooltip.tsx": [],
+  "components/audit/SourceBadge.tsx": [],
+  "components/audit/SummaryBySource.tsx": [
+    "components/ui/Card.tsx"
+  ],
+  "components/audit/ViewInContextButton.tsx": [
+    "components/audit/EpubViewer.tsx"
+  ],
+  "components/audit/index.ts": [
+    "components/audit/EpubViewer.tsx",
+    "components/audit/RemediationGuidance.tsx",
+    "components/audit/ScoreTooltip.tsx",
+    "components/audit/SourceBadge.tsx",
+    "components/audit/SummaryBySource.tsx",
+    "components/audit/ViewInContextButton.tsx"
+  ],
+  "components/comparison/CodeComparisonPanel.tsx": [
+    "components/ui/Badge.tsx"
+  ],
+  "components/comparison/ComparisonHeader.tsx": [
+    "components/ui/Badge.tsx"
+  ],
+  "components/comparison/ComparisonPanel.tsx": [
+    "components/ui/Badge.tsx"
+  ],
+  "components/comparison/FilterBar.tsx": [
+    "components/ui/Button.tsx"
+  ],
+  "components/comparison/IssueNavigator.tsx": [
+    "components/ui/Button.tsx"
+  ],
+  "components/comparison/VisualComparisonPanel.tsx": [
+    "components/epub/EPUBRenderer.tsx"
+  ],
+  "components/comparison/index.ts": [
+    "components/comparison/CodeComparisonPanel.tsx",
+    "components/comparison/ComparisonHeader.tsx",
+    "components/comparison/ComparisonPanel.tsx",
+    "components/comparison/FilterBar.tsx",
+    "components/comparison/IssueNavigator.tsx"
+  ],
+  "components/compliance/ComplianceScoreCard.tsx": [
+    "utils/cn.ts"
+  ],
+  "components/compliance/ConformanceBadge.tsx": [],
+  "components/epub/EPUBAuditResults.tsx": [
+    "components/audit/index.ts",
+    "components/feedback/index.ts",
+    "components/ui/Badge.tsx",
+    "components/ui/Button.tsx",
+    "components/ui/Card.tsx",
+    "components/ui/Tabs.tsx"
+  ],
+  "components/epub/EPUBExportOptions.tsx": [],
+  "components/epub/EPUBRenderer.tsx": [],
+  "components/epub/EPUBUploader.tsx": [
+    "components/ui/Alert.tsx",
+    "components/ui/Button.tsx",
+    "components/ui/Progress.tsx"
+  ],
+  "components/epub/ReAuditSection.tsx": [],
+  "components/epub/RemediationPlanView.tsx": [
+    "components/epub/RemediationProgress.tsx",
+    "components/epub/RemediationTaskCard.tsx"
+  ],
+  "components/epub/RemediationProgress.tsx": [],
+  "components/epub/RemediationTaskCard.tsx": [],
+  "components/epub/TransferToAcrButton.tsx": [],
+  "components/epub/index.ts": [
+    "components/epub/EPUBAuditResults.tsx",
+    "components/epub/EPUBExportOptions.tsx",
+    "components/epub/EPUBUploader.tsx",
+    "components/epub/ReAuditSection.tsx",
+    "components/epub/RemediationPlanView.tsx",
+    "components/epub/RemediationProgress.tsx",
+    "components/epub/RemediationTaskCard.tsx",
+    "components/epub/TransferToAcrButton.tsx"
+  ],
+  "components/feedback/AttachmentList.tsx": [
+    "components/ui/Button.tsx"
+  ],
+  "components/feedback/AttachmentUploader.tsx": [
+    "components/ui/Button.tsx"
+  ],
+  "components/feedback/FeedbackButton.tsx": [
+    "components/feedback/FeedbackModal.tsx"
+  ],
+  "components/feedback/FeedbackDetail.tsx": [
+    "components/feedback/AttachmentList.tsx",
+    "components/feedback/AttachmentUploader.tsx",
+    "components/ui/Alert.tsx",
+    "components/ui/Badge.tsx",
+    "components/ui/Button.tsx"
+  ],
+  "components/feedback/FeedbackForm.tsx": [],
+  "components/feedback/FeedbackList.tsx": [
+    "components/ui/Badge.tsx",
+    "components/ui/Button.tsx",
+    "components/ui/Card.tsx",
+    "components/ui/Spinner.tsx"
+  ],
+  "components/feedback/FeedbackModal.tsx": [
+    "components/feedback/FeedbackForm.tsx"
+  ],
+  "components/feedback/FeedbackTrends.tsx": [
+    "components/ui/Button.tsx",
+    "components/ui/Card.tsx",
+    "components/ui/Spinner.tsx"
+  ],
+  "components/feedback/QuickRating.tsx": [],
+  "components/feedback/RequiringAttention.tsx": [
+    "components/ui/Badge.tsx",
+    "components/ui/Button.tsx",
+    "components/ui/Card.tsx",
+    "components/ui/Spinner.tsx"
+  ],
+  "components/feedback/index.ts": [
+    "components/feedback/AttachmentList.tsx",
+    "components/feedback/AttachmentUploader.tsx",
+    "components/feedback/FeedbackButton.tsx",
+    "components/feedback/FeedbackDetail.tsx",
+    "components/feedback/FeedbackForm.tsx",
+    "components/feedback/FeedbackList.tsx",
+    "components/feedback/FeedbackModal.tsx",
+    "components/feedback/FeedbackTrends.tsx",
+    "components/feedback/QuickRating.tsx",
+    "components/feedback/RequiringAttention.tsx"
+  ],
+  "components/files/FileDetailsModal.tsx": [],
+  "components/files/FileUploadZone.tsx": [
+    "utils/cn.ts"
+  ],
+  "components/files/FilesList.tsx": [
+    "components/ui/Button.tsx",
+    "components/ui/Checkbox.tsx",
+    "services/files.service.ts",
+    "utils/cn.ts",
+    "utils/fileUtils.ts"
+  ],
+  "components/layout/AuthLayout.tsx": [],
+  "components/layout/MainLayout.tsx": [],
+  "components/quickfix/QuickFixCheckboxGroup.tsx": [],
+  "components/quickfix/QuickFixColorPicker.tsx": [],
+  "components/quickfix/QuickFixPanel.tsx": [
+    "components/quickfix/QuickFixCheckboxGroup.tsx",
+    "components/quickfix/QuickFixColorPicker.tsx",
+    "components/quickfix/QuickFixRadioGroup.tsx",
+    "components/quickfix/QuickFixTextInput.tsx"
+  ],
+  "components/quickfix/QuickFixRadioGroup.tsx": [],
+  "components/quickfix/QuickFixTextInput.tsx": [],
+  "components/quickfix/index.ts": [
+    "components/quickfix/QuickFixCheckboxGroup.tsx",
+    "components/quickfix/QuickFixColorPicker.tsx",
+    "components/quickfix/QuickFixPanel.tsx",
+    "components/quickfix/QuickFixRadioGroup.tsx",
+    "components/quickfix/QuickFixTextInput.tsx",
+    "components/quickfix/templates/ImageAltTemplate.tsx"
+  ],
+  "components/quickfix/templates/ImageAltTemplate.tsx": [],
+  "components/quickfix/templates/index.ts": [
+    "components/quickfix/templates/ImageAltTemplate.tsx"
+  ],
+  "components/remediation/BatchJobSelector.tsx": [],
+  "components/remediation/BatchProgress.tsx": [
+    "stores/auth.store.ts"
+  ],
+  "components/remediation/BatchQuickFixPanel.tsx": [],
+  "components/remediation/BatchResultsSummary.tsx": [],
+  "components/remediation/CodePreview.tsx": [],
+  "components/remediation/ComparisonDiff.tsx": [],
+  "components/remediation/ComparisonSummaryCard.tsx": [],
+  "components/remediation/ComparisonView.tsx": [
+    "components/remediation/ComparisonDiff.tsx",
+    "components/remediation/ComparisonSummaryCard.tsx",
+    "components/remediation/ModificationList.tsx"
+  ],
+  "components/remediation/FixTypeBadge.tsx": [],
+  "components/remediation/IssueCard.tsx": [],
+  "components/remediation/IssueTallyTracker.tsx": [],
+  "components/remediation/ModificationList.tsx": [
+    "components/remediation/ComparisonDiff.tsx"
+  ],
+  "components/remediation/RemediationComplete.tsx": [],
+  "components/remediation/RemediationHistory.tsx": [],
+  "components/remediation/RemediationPlanStats.tsx": [],
+  "components/remediation/RemediationSessionView.tsx": [
+    "components/remediation/RemediationTaskCard.tsx"
+  ],
+  "components/remediation/RemediationStepper.tsx": [],
+  "components/remediation/RemediationSummary.tsx": [],
+  "components/remediation/RemediationTaskCard.tsx": [
+    "components/remediation/CodePreview.tsx"
+  ],
+  "components/remediation/RemediationWorkflow.tsx": [
+    "components/remediation/ComparisonSummaryCard.tsx",
+    "components/remediation/RemediationStepper.tsx",
+    "components/remediation/RemediationSummary.tsx"
+  ],
+  "components/remediation/index.ts": [
+    "components/remediation/BatchJobSelector.tsx",
+    "components/remediation/BatchProgress.tsx",
+    "components/remediation/BatchQuickFixPanel.tsx",
+    "components/remediation/BatchResultsSummary.tsx",
+    "components/remediation/CodePreview.tsx",
+    "components/remediation/ComparisonDiff.tsx",
+    "components/remediation/ComparisonSummaryCard.tsx",
+    "components/remediation/ComparisonView.tsx",
+    "components/remediation/IssueCard.tsx",
+    "components/remediation/ModificationList.tsx",
+    "components/remediation/RemediationHistory.tsx",
+    "components/remediation/RemediationSessionView.tsx",
+    "components/remediation/RemediationStepper.tsx",
+    "components/remediation/RemediationSummary.tsx",
+    "components/remediation/RemediationTaskCard.tsx",
+    "components/remediation/RemediationWorkflow.tsx"
+  ],
+  "components/settings/RemediationSettings.tsx": [],
+  "components/ui/Alert.tsx": [],
+  "components/ui/Badge.tsx": [],
+  "components/ui/Breadcrumbs.tsx": [],
+  "components/ui/Button.tsx": [],
+  "components/ui/Card.tsx": [],
+  "components/ui/Checkbox.tsx": [],
+  "components/ui/Dialog.tsx": [],
+  "components/ui/EmptyState.tsx": [],
+  "components/ui/Input.tsx": [],
+  "components/ui/Logo.tsx": [],
+  "components/ui/Progress.tsx": [],
+  "components/ui/Spinner.tsx": [],
+  "components/ui/Table.tsx": [],
+  "components/ui/Tabs.tsx": [],
+  "components/ui/index.ts": [
+    "components/ui/Alert.tsx",
+    "components/ui/Badge.tsx",
+    "components/ui/Breadcrumbs.tsx",
+    "components/ui/Button.tsx",
+    "components/ui/Card.tsx",
+    "components/ui/EmptyState.tsx",
+    "components/ui/Input.tsx",
+    "components/ui/Logo.tsx",
+    "components/ui/Progress.tsx",
+    "components/ui/Spinner.tsx",
+    "components/ui/Table.tsx",
+    "components/ui/Tabs.tsx"
+  ],
+  "components/validation/IssueTable.tsx": [],
+  "data/quickFixTemplates.ts": [],
+  "data/remediationGuidance.ts": [],
+  "hooks/index.ts": [
+    "hooks/useAccessibility.ts",
+    "hooks/useAcr.ts",
+    "hooks/useAuth.ts",
+    "hooks/useCompliance.ts",
+    "hooks/useDashboard.ts",
+    "hooks/useFiles.ts",
+    "hooks/useRemediationConfig.ts"
+  ],
+  "hooks/useAccessibility.ts": [],
+  "hooks/useAcr.ts": [],
+  "hooks/useAcrEditor.ts": [],
+  "hooks/useAcrExport.ts": [],
+  "hooks/useAcrVersions.ts": [],
+  "hooks/useAltText.ts": [],
+  "hooks/useAltTextReview.ts": [],
+  "hooks/useAuth.ts": [],
+  "hooks/useComparison.ts": [],
+  "hooks/useCompliance.ts": [],
+  "hooks/useDashboard.ts": [],
+  "hooks/useFiles.ts": [],
+  "hooks/useJobPolling.ts": [],
+  "hooks/useJobs.ts": [],
+  "hooks/useQuickFixAltText.ts": [],
+  "hooks/useRemediationConfig.ts": [],
+  "hooks/useS3Upload.ts": [
+    "services/upload.service.ts"
+  ],
+  "hooks/useVerification.ts": [],
+  "lib/utils.ts": [],
+  "main.tsx": [
+    "App.tsx",
+    "styles/index.css"
+  ],
+  "pages/BatchRemediation.tsx": [],
+  "pages/ComparisonPage.tsx": [],
+  "pages/Dashboard.tsx": [],
+  "pages/EPUBAccessibility.tsx": [],
+  "pages/EPUBComparison.tsx": [],
+  "pages/EPUBRemediation.tsx": [],
+  "pages/FeedbackDashboard.tsx": [],
+  "pages/Files.tsx": [],
+  "pages/JobDetails.tsx": [],
+  "pages/Jobs.tsx": [],
+  "pages/Login.tsx": [],
+  "pages/NotFound.tsx": [],
+  "pages/Products.tsx": [],
+  "pages/Register.tsx": [],
+  "pages/Remediation.tsx": [],
+  "pages/Settings.tsx": [],
+  "pages/Unauthorized.tsx": [],
+  "pages/ValidationResults.tsx": [],
+  "pages/acr/AcrEditorPage.tsx": [],
+  "pages/acr/AcrWorkflowPage.tsx": [],
+  "pages/acr/VerificationQueuePage.tsx": [],
+  "pages/compliance/FpcPage.tsx": [],
+  "pages/compliance/Section508Page.tsx": [],
+  "pages/test/TestAcrEditor.tsx": [],
+  "pages/test/TestAcrWorkflow.tsx": [],
+  "pages/test/TestAltTextGenerator.tsx": [],
+  "pages/test/TestAltTextReviewQueue.tsx": [],
+  "pages/test/TestBatchApprovalPanel.tsx": [],
+  "pages/test/TestChartDescriptionViewer.tsx": [],
+  "pages/test/TestConfidenceDashboard.tsx": [],
+  "pages/test/TestEditionSelector.tsx": [],
+  "pages/test/TestExportDialog.tsx": [],
+  "pages/test/TestImagePreviewCard.tsx": [],
+  "pages/test/TestLongDescriptionEditor.tsx": [],
+  "pages/test/TestVerificationQueue.tsx": [],
+  "pages/test/TestVersionHistory.tsx": [],
+  "services/accessibility.service.ts": [
+    "services/api.ts"
+  ],
+  "services/acr.service.ts": [
+    "services/api.ts"
+  ],
+  "services/alt-text.service.ts": [
+    "services/api.ts"
+  ],
+  "services/api.ts": [],
+  "services/auth.service.ts": [
+    "services/api.ts"
+  ],
+  "services/comparison.service.ts": [
+    "services/api.ts"
+  ],
+  "services/compliance.service.ts": [
+    "services/api.ts"
+  ],
+  "services/config.service.ts": [
+    "services/api.ts"
+  ],
+  "services/dashboard.service.ts": [
+    "services/api.ts"
+  ],
+  "services/feedback-attachment.service.ts": [
+    "services/api.ts"
+  ],
+  "services/files.service.ts": [
+    "services/api.ts"
+  ],
+  "services/jobs.service.ts": [
+    "services/api.ts"
+  ],
+  "services/quickfix.service.ts": [
+    "services/api.ts"
+  ],
+  "services/upload.service.ts": [
+    "services/api.ts"
+  ],
+  "services/verification.service.ts": [
+    "services/api.ts"
+  ],
+  "stores/auth.store.ts": [],
+  "styles/index.css": [],
+  "types/accessibility.types.ts": [],
+  "types/acr.types.ts": [],
+  "types/alt-text.types.ts": [],
+  "types/auth.types.ts": [],
+  "types/comparison.ts": [],
+  "types/feedback.types.ts": [],
+  "types/quickfix.types.ts": [],
+  "types/remediation.types.ts": [
+    "types/accessibility.types.ts"
+  ],
+  "types/verification.types.ts": [],
+  "types/version.types.ts": [],
+  "utils/MemoryProfiler.tsx": [],
+  "utils/cn.ts": [],
+  "utils/csvExport.ts": [],
+  "utils/fileUtils.ts": [],
+  "utils/jobHelpers.tsx": [],
+  "utils/jobTypes.ts": [],
+  "utils/logger.ts": [],
+  "utils/quickFixUtils.ts": [],
+  "utils/wcag.ts": [],
+  "vite-env.d.ts": []
+}
