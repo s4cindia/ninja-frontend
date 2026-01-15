@@ -287,7 +287,7 @@ export function CriterionDetailsModal({
                           </p>
                           <Button
                             variant="outline"
-                            onClick={() => navigate(`/epub/comparison/${jobId}?criterion=${criterion.criterionId}`)}
+                            onClick={() => navigate(`/epub/compare/${jobId}?criterion=${criterion.criterionId}`)}
                             className="w-full sm:w-auto"
                           >
                             <FileText className="h-4 w-4 mr-2" />
