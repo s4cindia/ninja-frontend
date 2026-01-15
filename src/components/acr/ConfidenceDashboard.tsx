@@ -7,6 +7,8 @@ import { fetchAcrAnalysis, CriterionConfidence } from '@/services/api';
 import { CriteriaTable, CriterionRow } from './CriteriaTable';
 import { WcagDocumentationModal } from './WcagDocumentationModal';
 import { CriterionDetailsModal } from './CriterionDetailsModal';
+import { useConfidenceWithIssues } from '@/hooks/useConfidence';
+import { IssueMapping } from '@/types/confidence.types';
 
 interface ConfidenceDashboardProps {
   jobId: string;
@@ -622,6 +624,23 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   const [docsCriterion, setDocsCriterion] = useState<{ id: string; name: string } | null>(null);
   const [detailsCriterion, setDetailsCriterion] = useState<CriterionConfidence | null>(null);
 
+  const { data: confidenceData } = useConfidenceWithIssues(jobId, undefined, { enabled: !isDemoJob(jobId) });
+
+  const issuesByCriterion = useMemo(() => {
+    const map = new Map<string, { issues: IssueMapping[]; count: number }>();
+    if (confidenceData?.criteria) {
+      for (const c of confidenceData.criteria) {
+        if (c.relatedIssues && c.relatedIssues.length > 0) {
+          map.set(c.criterionId, {
+            issues: c.relatedIssues,
+            count: c.issueCount || c.relatedIssues.length,
+          });
+        }
+      }
+    }
+    return map;
+  }, [confidenceData]);
+
   const toggleRow = (id: string) => {
     setExpandedRows(prev => {
       const next = new Set(prev);
@@ -764,6 +783,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     onVerifyClick: onVerify,
     onViewDocs,
     onCriterionClick,
+    issueData,
   }: {
     criterion: CriterionConfidence;
     isExpanded: boolean;
@@ -771,6 +791,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     onVerifyClick?: (criterionId: string) => void;
     onViewDocs?: (criterionId: string, name: string) => void;
     onCriterionClick?: (criterion: CriterionConfidence) => void;
+    issueData?: { issues: IssueMapping[]; count: number };
   }) => {
     const levelColors: Record<string, string> = {
       A: 'bg-blue-100 text-blue-700',
@@ -797,6 +818,11 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
             </span>
             <span className="font-medium text-gray-900">{criterion.criterionId}</span>
             <span className="text-gray-600">{criterion.name}</span>
+            {issueData && issueData.count > 0 && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                {issueData.count} issue{issueData.count !== 1 ? 's' : ''}
+              </span>
+            )}
           </span>
           <span className="flex items-center gap-3">
             <span className="text-sm text-gray-500">{criterion.confidenceScore}%</span>
@@ -833,6 +859,15 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                     </li>
                   ))}
                 </ul>
+              </div>
+            )}
+            {issueData && issueData.issues.length > 0 && (
+              <div className="mt-2 text-xs text-gray-500 bg-gray-100 p-2 rounded">
+                <p className="font-medium text-gray-700">Related Issue:</p>
+                <p className="truncate">{issueData.issues[0].message}</p>
+                <p className="text-gray-400 mt-1">
+                  {issueData.issues[0].filePath}
+                </p>
               </div>
             )}
             <div className="pt-2 flex gap-2">
@@ -1071,6 +1106,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                                     onVerifyClick={onVerifyClick}
                                     onViewDocs={(id, name) => setDocsCriterion({ id, name })}
                                     onCriterionClick={(crit) => setDetailsCriterion(crit)}
+                                    issueData={issuesByCriterion.get(criterion.criterionId)}
                                   />
                                 ))}
                               </div>
@@ -1106,6 +1142,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
       {detailsCriterion && (
         <CriterionDetailsModal
           criterion={detailsCriterion}
+          relatedIssues={issuesByCriterion.get(detailsCriterion.criterionId)?.issues}
           isOpen={!!detailsCriterion}
           onClose={() => setDetailsCriterion(null)}
           onVerifyClick={onVerifyClick}

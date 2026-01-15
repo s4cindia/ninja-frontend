@@ -6,9 +6,11 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { wcagDocumentationService } from '@/services/wcag-documentation.service';
 import type { CriterionConfidence } from '@/services/api';
+import type { IssueMapping } from '@/types/confidence.types';
 
 interface CriterionDetailsModalProps {
   criterion: CriterionConfidence;
+  relatedIssues?: IssueMapping[];
   isOpen: boolean;
   onClose: () => void;
   onVerifyClick?: (criterionId: string) => void;
@@ -17,6 +19,7 @@ interface CriterionDetailsModalProps {
 
 export function CriterionDetailsModal({
   criterion,
+  relatedIssues,
   isOpen,
   onClose,
   onVerifyClick,
@@ -176,6 +179,39 @@ export function CriterionDetailsModal({
                         <span className={cn(check.passed ? 'text-gray-700' : 'text-red-700')}>
                           {check.description}
                         </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {relatedIssues && relatedIssues.length > 0 && (
+                <div className="border border-red-200 bg-red-50 rounded-lg p-4">
+                  <h3 className="font-semibold text-red-900 mb-3 flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5" />
+                    Related Issues ({relatedIssues.length})
+                  </h3>
+                  <ul className="space-y-3">
+                    {relatedIssues.map((issue) => (
+                      <li key={issue.issueId} className="bg-white border border-red-100 rounded p-3">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <span className="text-sm font-medium text-red-800">{issue.message}</span>
+                          <span className={cn(
+                            'px-2 py-0.5 rounded text-xs font-medium flex-shrink-0',
+                            issue.impact === 'critical' && 'bg-red-200 text-red-900',
+                            issue.impact === 'serious' && 'bg-orange-200 text-orange-900',
+                            issue.impact === 'moderate' && 'bg-yellow-200 text-yellow-900',
+                            issue.impact === 'minor' && 'bg-blue-200 text-blue-900'
+                          )}>
+                            {issue.impact}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mb-1">{issue.filePath}</p>
+                        {issue.htmlSnippet && (
+                          <pre className="text-xs bg-gray-100 p-2 rounded mt-2 overflow-x-auto">
+                            <code>{issue.htmlSnippet}</code>
+                          </pre>
+                        )}
                       </li>
                     ))}
                   </ul>
