@@ -376,34 +376,69 @@ export function CriterionDetailsModal({
                 <>
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <h3 className="font-semibold text-blue-900 mb-3">Official W3C Documentation</h3>
-                    <div className="space-y-2">
+                    <p className="text-sm text-blue-800 mb-3">
+                      Click the links below to view the official WCAG documentation in a new tab.
+                    </p>
+                    <div className="space-y-3">
                       <a
                         href={wcagDocs.wcagUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800"
+                        className="flex items-center gap-2 text-blue-600 hover:text-blue-800 p-3 bg-white rounded border hover:border-blue-300 transition-colors"
                       >
-                        <ExternalLink className="h-4 w-4" />
-                        Understanding {wcagDocs.number} - {wcagDocs.name}
+                        <ExternalLink className="h-5 w-5 flex-shrink-0" />
+                        <div>
+                          <div className="font-medium">Understanding {wcagDocs.number} - {wcagDocs.name}</div>
+                          <div className="text-xs text-gray-500">Detailed explanation of the success criterion</div>
+                        </div>
                       </a>
                       <a
                         href={wcagDocs.howToMeet.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800"
+                        className="flex items-center gap-2 text-blue-600 hover:text-blue-800 p-3 bg-white rounded border hover:border-blue-300 transition-colors"
                       >
-                        <ExternalLink className="h-4 w-4" />
-                        How to Meet {wcagDocs.number}
+                        <ExternalLink className="h-5 w-5 flex-shrink-0" />
+                        <div>
+                          <div className="font-medium">How to Meet {wcagDocs.number}</div>
+                          <div className="text-xs text-gray-500">Sufficient techniques and common failures</div>
+                        </div>
                       </a>
                     </div>
                   </div>
 
-                  <div className="border rounded-lg overflow-hidden">
-                    <iframe
-                      src={wcagDocs.wcagUrl}
-                      className="w-full h-[500px]"
-                      title={`WCAG Documentation for ${wcagDocs.number}`}
-                    />
+                  {/* Quick Reference Card */}
+                  <div className="border rounded-lg p-4">
+                    <h3 className="font-semibold text-gray-900 mb-3">Quick Reference</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Success Criterion:</span>
+                        <span className="font-medium">{wcagDocs.number}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Level:</span>
+                        <span className={cn(
+                          'px-2 py-0.5 rounded text-xs font-medium',
+                          wcagDocs.level === 'A' && 'bg-blue-100 text-blue-700',
+                          wcagDocs.level === 'AA' && 'bg-purple-100 text-purple-700',
+                          wcagDocs.level === 'AAA' && 'bg-indigo-100 text-indigo-700'
+                        )}>
+                          Level {wcagDocs.level}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Conformance:</span>
+                        <span className="font-medium">WCAG 2.1</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Why External Links */}
+                  <div className="bg-gray-50 border rounded-lg p-4">
+                    <p className="text-xs text-gray-600">
+                      <span className="font-medium">Note:</span> WCAG documentation opens in new tabs for security reasons.
+                      The W3C prevents embedding their content in other websites to protect against clickjacking attacks.
+                    </p>
                   </div>
                 </>
               ) : (
