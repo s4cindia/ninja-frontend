@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { fetchAcrAnalysis, CriterionConfidence } from '@/services/api';
 import { CriteriaTable, CriterionRow } from './CriteriaTable';
 import { WcagDocumentationModal } from './WcagDocumentationModal';
+import { CriterionDetailsModal } from './CriterionDetailsModal';
 
 interface ConfidenceDashboardProps {
   jobId: string;
@@ -581,6 +582,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   const [expandedConfidenceSections, setExpandedConfidenceSections] = useState<Set<string>>(new Set());
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [docsCriterion, setDocsCriterion] = useState<{ id: string; name: string } | null>(null);
+  const [detailsCriterion, setDetailsCriterion] = useState<CriterionConfidence | null>(null);
 
   const toggleRow = (id: string) => {
     setExpandedRows(prev => {
@@ -724,12 +726,14 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     onToggle,
     onVerifyClick: onVerify,
     onViewDocs,
+    onCriterionClick,
   }: {
     criterion: CriterionConfidence;
     isExpanded: boolean;
     onToggle: () => void;
     onVerifyClick?: (criterionId: string) => void;
     onViewDocs?: (criterionId: string, name: string) => void;
+    onCriterionClick?: (criterion: CriterionConfidence) => void;
   }) => {
     const levelColors: Record<string, string> = {
       A: 'bg-blue-100 text-blue-700',
@@ -741,7 +745,13 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
       <div className="border-b border-gray-100 last:border-b-0">
         <button
           type="button"
-          onClick={onToggle}
+          onClick={() => {
+            if (onCriterionClick) {
+              onCriterionClick(criterion);
+            } else {
+              onToggle();
+            }
+          }}
           className="w-full flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors text-left"
         >
           <span className="flex items-center gap-3">
@@ -1023,6 +1033,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                                     onToggle={() => toggleRow(criterion.id)}
                                     onVerifyClick={onVerifyClick}
                                     onViewDocs={(id, name) => setDocsCriterion({ id, name })}
+                                    onCriterionClick={(crit) => setDetailsCriterion(crit)}
                                   />
                                 ))}
                               </div>
@@ -1052,6 +1063,16 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
           criterionName={docsCriterion.name}
           isOpen={!!docsCriterion}
           onClose={() => setDocsCriterion(null)}
+        />
+      )}
+
+      {detailsCriterion && (
+        <CriterionDetailsModal
+          criterion={detailsCriterion}
+          isOpen={!!detailsCriterion}
+          onClose={() => setDetailsCriterion(null)}
+          onVerifyClick={onVerifyClick}
+          mode="interactive"
         />
       )}
     </div>
