@@ -8,6 +8,7 @@ export const confidenceService = {
   ): Promise<ConfidenceWithIssuesResponse> {
     const params = edition ? { edition } : {};
     const response = await api.get(`/confidence/job/${jobId}/issues`, { params });
-    return response.data;
+    // Unwrap the response - backend wraps it in {success: true, data: {...}}
+    return response.data.data;
   }
 };
