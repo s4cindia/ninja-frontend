@@ -528,6 +528,8 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   const [error, setError] = useState<string | null>(null);
   const [selectedCriterion, setSelectedCriterion] = useState<CriterionAnalysis | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
+  const [expandedStatusSections, setExpandedStatusSections] = useState<Set<StatusGroup>>(new Set(['fail', 'needs_review']));
+  const [expandedConfidenceSections, setExpandedConfidenceSections] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (criteria.length > 0 && onCriteriaLoaded) {
