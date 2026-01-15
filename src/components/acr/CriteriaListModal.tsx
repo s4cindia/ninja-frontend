@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { X, ChevronDown, ChevronUp } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useEditionDetails } from '@/hooks/useAcr';
 import { cn } from '@/lib/utils';
 import type { AcrEditionCode } from '@/types/acr.types';
@@ -17,6 +17,15 @@ interface CriteriaListModalProps {
 export function CriteriaListModal({ edition, editionName, isOpen, onClose }: CriteriaListModalProps) {
   const { data: editionDetails, isLoading, error } = useEditionDetails(edition, { enabled: isOpen });
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['level-a', 'level-aa']));
+
+  useEffect(() => {
+    if (error) {
+      console.error('[CriteriaListModal] Failed to load edition details:', error);
+    }
+    if (editionDetails) {
+      console.log('[CriteriaListModal] Loaded edition details:', editionDetails);
+    }
+  }, [error, editionDetails]);
 
   const toggleSection = (sectionId: string) => {
     setExpandedSections(prev => {
