@@ -1,0 +1,198 @@
+{
+  "criteriaDocumentation": [
+    {
+      "criterionId": "1.1.1-A",
+      "number": "1.1.1",
+      "name": "Non-text Content",
+      "level": "A",
+      "wcagUrl": "https://www.w3.org/WAI/WCAG21/Understanding/non-text-content.html",
+      "shortDescription": "All non-text content has a text alternative that serves the equivalent purpose.",
+      "intent": "The intent of this Success Criterion is to make information conveyed by non-text content accessible through the use of a text alternative.",
+      "benefits": [
+        "People who are blind or have low vision can access visual content",
+        "People who are deaf or hard of hearing can access audio content",
+        "People using text-only browsers or assistive technologies can access content"
+      ],
+      "howToMeet": {
+        "url": "https://www.w3.org/WAI/WCAG21/quickref/#non-text-content",
+        "techniques": [
+          {"id": "G94", "title": "Providing short text alternative for non-text content", "type": "sufficient"},
+          {"id": "H37", "title": "Using alt attributes on img elements", "type": "sufficient"},
+          {"id": "H67", "title": "Using null alt text for decorative images", "type": "sufficient"},
+          {"id": "F30", "title": "Using text alternatives that are not alternatives", "type": "failure"}
+        ],
+        "epubSpecific": [
+          "Use alt attribute on all img elements",
+          "Use aria-describedby for complex images",
+          "Ensure SVG images have appropriate text alternatives"
+        ]
+      },
+      "understanding": {
+        "url": "https://www.w3.org/WAI/WCAG21/Understanding/non-text-content.html",
+        "examples": [
+          {"title": "Data chart", "description": "A bar chart with short alt text and long description"},
+          {"title": "Decorative image", "description": "An image used purely for decoration with null alt text"}
+        ],
+        "resources": [
+          {"title": "W3C Web Accessibility Tutorials - Images", "url": "https://www.w3.org/WAI/tutorials/images/"},
+          {"title": "Alt Decision Tree", "url": "https://www.w3.org/WAI/tutorials/images/decision-tree/"}
+        ]
+      },
+      "testingProcedure": {
+        "automated": [
+          "Check that all img elements have an alt attribute",
+          "Check that alt text is not placeholder text",
+          "Verify alt text length is appropriate"
+        ],
+        "manual": [
+          "Review alt text for accuracy and appropriateness",
+          "Verify decorative images have null alt text",
+          "Check that complex images have adequate descriptions"
+        ],
+        "tools": ["axe-core", "WAVE", "ACE by DAISY"]
+      },
+      "remediationGuidance": {
+        "before": "<img src=\"chart.png\">",
+        "after": "<img src=\"chart.png\" alt=\"Bar chart showing quarterly sales: Q1 $10M, Q2 $15M, Q3 $12M, Q4 $18M\">",
+        "explanation": "Add descriptive alt text that conveys the same information as the image."
+      },
+      "applicableToEpub": true,
+      "applicableToPdf": true,
+      "commonIssues": [
+        "Missing alt attributes on images",
+        "Alt text is just the filename",
+        "Decorative images not marked as decorative",
+        "Complex images lack adequate description"
+      ]
+    },
+    {
+      "criterionId": "1.3.1-A",
+      "number": "1.3.1",
+      "name": "Info and Relationships",
+      "level": "A",
+      "wcagUrl": "https://www.w3.org/WAI/WCAG21/Understanding/info-and-relationships.html",
+      "shortDescription": "Information, structure, and relationships conveyed through presentation can be programmatically determined or are available in text.",
+      "intent": "The intent of this Success Criterion is to ensure that information and relationships that are implied by visual or auditory formatting are preserved when the presentation format changes.",
+      "benefits": [
+        "People using screen readers can understand document structure",
+        "People who use different style sheets can maintain understanding",
+        "Content can be presented in different ways without losing meaning"
+      ],
+      "howToMeet": {
+        "url": "https://www.w3.org/WAI/WCAG21/quickref/#info-and-relationships",
+        "techniques": [
+          {"id": "H42", "title": "Using h1-h6 to identify headings", "type": "sufficient"},
+          {"id": "H48", "title": "Using ol, ul and dl for lists", "type": "sufficient"},
+          {"id": "H51", "title": "Using table markup for tabular data", "type": "sufficient"},
+          {"id": "F43", "title": "Using structural markup that does not represent relationships", "type": "failure"}
+        ],
+        "epubSpecific": [
+          "Use semantic HTML elements for structure",
+          "Ensure heading hierarchy is logical",
+          "Use EPUB:type attributes for additional semantics"
+        ]
+      },
+      "understanding": {
+        "url": "https://www.w3.org/WAI/WCAG21/Understanding/info-and-relationships.html",
+        "examples": [
+          {"title": "Form with labels", "description": "Form controls with properly associated labels"},
+          {"title": "Data table", "description": "Table with proper headers and associations"}
+        ],
+        "resources": [
+          {"title": "W3C Web Accessibility Tutorials - Tables", "url": "https://www.w3.org/WAI/tutorials/tables/"},
+          {"title": "W3C Web Accessibility Tutorials - Forms", "url": "https://www.w3.org/WAI/tutorials/forms/"}
+        ]
+      },
+      "testingProcedure": {
+        "automated": [
+          "Check for proper heading hierarchy",
+          "Verify tables have appropriate headers",
+          "Check form controls have associated labels"
+        ],
+        "manual": [
+          "Review that visual structure matches semantic structure",
+          "Verify relationships are programmatically determinable",
+          "Check that content makes sense when linearized"
+        ],
+        "tools": ["axe-core", "WAVE", "ACE by DAISY"]
+      },
+      "remediationGuidance": {
+        "before": "<div class=\"heading\">Chapter 1</div>",
+        "after": "<h1>Chapter 1</h1>",
+        "explanation": "Use semantic heading elements instead of styled divs to convey document structure."
+      },
+      "applicableToEpub": true,
+      "applicableToPdf": true,
+      "commonIssues": [
+        "Using styled text instead of semantic headings",
+        "Skipping heading levels",
+        "Tables without proper headers",
+        "Form controls without labels"
+      ]
+    },
+    {
+      "criterionId": "1.4.3-AA",
+      "number": "1.4.3",
+      "name": "Contrast (Minimum)",
+      "level": "AA",
+      "wcagUrl": "https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html",
+      "shortDescription": "Text and images of text have a contrast ratio of at least 4.5:1.",
+      "intent": "The intent of this Success Criterion is to provide enough contrast between text and its background so that it can be read by people with moderately low vision.",
+      "benefits": [
+        "People with low vision can read text more easily",
+        "People with color deficiencies can distinguish text from background",
+        "Content is more readable in various lighting conditions"
+      ],
+      "howToMeet": {
+        "url": "https://www.w3.org/WAI/WCAG21/quickref/#contrast-minimum",
+        "techniques": [
+          {"id": "G18", "title": "Ensuring 4.5:1 contrast ratio for text", "type": "sufficient"},
+          {"id": "G145", "title": "Ensuring 3:1 contrast for large text", "type": "sufficient"},
+          {"id": "F83", "title": "Using text that does not meet contrast requirements", "type": "failure"}
+        ],
+        "epubSpecific": [
+          "Ensure CSS color and background-color have sufficient contrast",
+          "Check contrast in all reading modes",
+          "Consider publisher and reading system CSS interactions"
+        ]
+      },
+      "understanding": {
+        "url": "https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html",
+        "examples": [
+          {"title": "High contrast text", "description": "Black text on white background (21:1 ratio)"},
+          {"title": "Accessible link color", "description": "Links with 4.5:1 contrast against background"}
+        ],
+        "resources": [
+          {"title": "WebAIM Contrast Checker", "url": "https://webaim.org/resources/contrastchecker/"},
+          {"title": "Colour Contrast Analyzer", "url": "https://www.tpgi.com/color-contrast-checker/"}
+        ]
+      },
+      "testingProcedure": {
+        "automated": [
+          "Check all text elements for contrast ratio",
+          "Identify text that falls below 4.5:1 threshold",
+          "Check large text meets 3:1 minimum"
+        ],
+        "manual": [
+          "Review text on complex backgrounds",
+          "Check contrast in different color modes",
+          "Verify text over images has sufficient contrast"
+        ],
+        "tools": ["axe-core", "WAVE", "Colour Contrast Analyzer"]
+      },
+      "remediationGuidance": {
+        "before": "<p style=\"color: #999999;\">Light gray text</p>",
+        "after": "<p style=\"color: #595959;\">Darker gray text</p>",
+        "explanation": "Darken the text color to achieve at least 4.5:1 contrast ratio with the background."
+      },
+      "applicableToEpub": true,
+      "applicableToPdf": true,
+      "commonIssues": [
+        "Light gray text on white background",
+        "Text over images without overlay",
+        "Placeholder text with low contrast",
+        "Links that don't stand out from body text"
+      ]
+    }
+  ]
+}
