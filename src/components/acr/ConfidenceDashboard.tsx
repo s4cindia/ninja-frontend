@@ -16,6 +16,8 @@ interface ConfidenceDashboardProps {
 
 type HybridStatus = 'fail' | 'needs_verification' | 'likely_na' | 'pass';
 
+type StatusGroup = 'pass' | 'fail' | 'needs_review' | 'not_applicable';
+
 interface CriterionAnalysisEvidence {
   source: string;
   description: string;
