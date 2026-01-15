@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { AlertCircle, Search, MinusCircle, AlertTriangle, CheckCircle, LayoutGrid, Table } from 'lucide-react';
+import { AlertCircle, Search, MinusCircle, AlertTriangle, CheckCircle, LayoutGrid, Table, HelpCircle } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
 import { fetchAcrAnalysis, CriterionConfidence } from '@/services/api';
@@ -194,6 +194,43 @@ const WCAG_NAME_TO_ID: Record<string, string> = {
   'Parsing': '4.1.1',
   'Name, Role, Value': '4.1.2',
   'Status Messages': '4.1.3',
+};
+
+const STATUS_CONFIG: Record<StatusGroup, {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  bgColor: string;
+  borderColor: string;
+  textColor: string;
+}> = {
+  pass: {
+    label: 'PASSED',
+    icon: CheckCircle,
+    bgColor: 'bg-green-50',
+    borderColor: 'border-green-200',
+    textColor: 'text-green-700'
+  },
+  fail: {
+    label: 'FAILED',
+    icon: AlertCircle,
+    bgColor: 'bg-red-50',
+    borderColor: 'border-red-200',
+    textColor: 'text-red-700'
+  },
+  needs_review: {
+    label: 'NEEDS REVIEW',
+    icon: AlertTriangle,
+    bgColor: 'bg-orange-50',
+    borderColor: 'border-orange-200',
+    textColor: 'text-orange-700'
+  },
+  not_applicable: {
+    label: 'NOT APPLICABLE',
+    icon: HelpCircle,
+    bgColor: 'bg-gray-50',
+    borderColor: 'border-gray-200',
+    textColor: 'text-gray-600'
+  },
 };
 
 function isDemoJob(jobId: string): boolean {
