@@ -18,6 +18,8 @@ type HybridStatus = 'fail' | 'needs_verification' | 'likely_na' | 'pass';
 
 type StatusGroup = 'pass' | 'fail' | 'needs_review' | 'not_applicable';
 
+type ConfidenceGroup = 'high' | 'medium' | 'low' | 'manual';
+
 interface CriterionAnalysisEvidence {
   source: string;
   description: string;
@@ -244,6 +246,13 @@ function getStatusGroup(criterion: CriterionConfidence): StatusGroup {
     return 'needs_review';
   }
   return 'pass';
+}
+
+function getConfidenceGroup(criterion: CriterionConfidence): ConfidenceGroup {
+  if (criterion.confidenceScore >= 80) return 'high';
+  if (criterion.confidenceScore >= 50) return 'medium';
+  if (criterion.confidenceScore > 0) return 'low';
+  return 'manual';
 }
 
 function isDemoJob(jobId: string): boolean {
@@ -587,6 +596,33 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   }
 
   const { issues, needsVerification, likelyNA, tableRows, transformed } = analysisData;
+
+  // Group by status first, then by confidence within each status
+  const hybridGroupedCriteria: Record<StatusGroup, Record<ConfidenceGroup, CriterionConfidence[]>> = {
+    pass: { high: [], medium: [], low: [], manual: [] },
+    fail: { high: [], medium: [], low: [], manual: [] },
+    needs_review: { high: [], medium: [], low: [], manual: [] },
+    not_applicable: { high: [], medium: [], low: [], manual: [] },
+  };
+
+  criteria.forEach(c => {
+    const statusGroup = getStatusGroup(c);
+    const confidenceGroup = getConfidenceGroup(c);
+    hybridGroupedCriteria[statusGroup][confidenceGroup].push(c);
+  });
+
+  // Calculate counts for each status group
+  const statusCounts: Record<StatusGroup, number> = {
+    pass: 0,
+    fail: 0,
+    needs_review: 0,
+    not_applicable: 0,
+  };
+
+  criteria.forEach(c => {
+    const statusGroup = getStatusGroup(c);
+    statusCounts[statusGroup]++;
+  });
 
   const handleViewDetails = (criterionRow: CriterionRow) => {
     const analysis = transformed.find(c => c.id === criterionRow.id);
