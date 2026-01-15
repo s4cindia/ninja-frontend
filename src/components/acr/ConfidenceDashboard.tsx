@@ -595,6 +595,30 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     }
   };
 
+  const toggleStatusSection = (status: StatusGroup) => {
+    setExpandedStatusSections(prev => {
+      const next = new Set(prev);
+      if (next.has(status)) {
+        next.delete(status);
+      } else {
+        next.add(status);
+      }
+      return next;
+    });
+  };
+
+  const toggleConfidenceSection = (key: string) => {
+    setExpandedConfidenceSections(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
   return (
     <div className="space-y-6">
       {error && (
