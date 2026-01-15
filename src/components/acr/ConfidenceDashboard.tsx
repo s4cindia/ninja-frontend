@@ -1,11 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { AlertCircle, Search, MinusCircle, AlertTriangle, CheckCircle, LayoutGrid, Table, HelpCircle } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle, LayoutGrid, Table, HelpCircle, ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
 import { fetchAcrAnalysis, CriterionConfidence } from '@/services/api';
-import { AnalysisSummaryCards } from './AnalysisSummaryCards';
-import { CriterionCard } from './CriterionCard';
-import { ExpandableSection } from './ExpandableSection';
 import { CriteriaTable, CriterionRow } from './CriteriaTable';
 
 interface ConfidenceDashboardProps {
@@ -235,14 +233,55 @@ const STATUS_CONFIG: Record<StatusGroup, {
   },
 };
 
+const SECTION_CONFIG: Record<ConfidenceGroup, {
+  label: string;
+  bgColor: string;
+  dotColor: string;
+}> = {
+  high: {
+    label: 'High Confidence',
+    bgColor: 'bg-green-50/50',
+    dotColor: 'bg-green-500'
+  },
+  medium: {
+    label: 'Medium Confidence',
+    bgColor: 'bg-yellow-50/50',
+    dotColor: 'bg-yellow-500'
+  },
+  low: {
+    label: 'Low Confidence',
+    bgColor: 'bg-orange-50/50',
+    dotColor: 'bg-orange-500'
+  },
+  manual: {
+    label: 'Manual Review Required',
+    bgColor: 'bg-gray-50/50',
+    dotColor: 'bg-gray-400'
+  },
+};
+
+function getConfidenceColor(confidence: number): string {
+  if (confidence >= 80) return 'bg-green-500';
+  if (confidence >= 50) return 'bg-yellow-500';
+  if (confidence > 0) return 'bg-orange-500';
+  return 'bg-gray-400';
+}
+
+function getConfidenceLabel(confidence: number): string {
+  if (confidence >= 80) return 'High';
+  if (confidence >= 50) return 'Medium';
+  if (confidence > 0) return 'Low';
+  return 'Manual';
+}
+
 function getStatusGroup(criterion: CriterionConfidence): StatusGroup {
-  if (criterion.status === 'not_applicable' || criterion.status === 'not_tested') {
+  if (criterion.status === 'not_applicable') {
     return 'not_applicable';
   }
   if (criterion.status === 'fail') {
     return 'fail';
   }
-  if (criterion.needsVerification || criterion.status === 'not_tested') {
+  if (criterion.needsVerification) {
     return 'needs_review';
   }
   return 'pass';
@@ -539,6 +578,19 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
   const [expandedStatusSections, setExpandedStatusSections] = useState<Set<StatusGroup>>(new Set(['fail', 'needs_review']));
   const [expandedConfidenceSections, setExpandedConfidenceSections] = useState<Set<string>>(new Set());
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  const toggleRow = (id: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (criteria.length > 0 && onCriteriaLoaded) {
@@ -595,7 +647,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     );
   }
 
-  const { issues, needsVerification, likelyNA, tableRows, transformed } = analysisData;
+  const { tableRows, transformed } = analysisData;
 
   // Group by status first, then by confidence within each status
   const hybridGroupedCriteria: Record<StatusGroup, Record<ConfidenceGroup, CriterionConfidence[]>> = {
@@ -623,6 +675,14 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     const statusGroup = getStatusGroup(c);
     statusCounts[statusGroup]++;
   });
+
+  // Calculate overall confidence
+  const overallConfidence = criteria.length > 0
+    ? Math.round(criteria.reduce((sum, c) => sum + c.confidenceScore, 0) / criteria.length)
+    : 0;
+
+  // Count criteria needing verification
+  const needsVerificationCount = statusCounts.needs_review;
 
   const handleViewDetails = (criterionRow: CriterionRow) => {
     const analysis = transformed.find(c => c.id === criterionRow.id);
@@ -655,22 +715,141 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     });
   };
 
+  // Inline CriterionRow component for the new layout
+  const CriterionRowDisplay = ({
+    criterion,
+    isExpanded,
+    onToggle,
+    onVerifyClick: onVerify,
+  }: {
+    criterion: CriterionConfidence;
+    isExpanded: boolean;
+    onToggle: () => void;
+    onVerifyClick?: (criterionId: string) => void;
+  }) => {
+    const levelColors: Record<string, string> = {
+      A: 'bg-blue-100 text-blue-700',
+      AA: 'bg-purple-100 text-purple-700',
+      AAA: 'bg-indigo-100 text-indigo-700',
+    };
+
+    return (
+      <div className="border-b border-gray-100 last:border-b-0">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="w-full flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors text-left"
+        >
+          <span className="flex items-center gap-3">
+            <span className={cn('px-1.5 py-0.5 rounded text-xs font-medium', levelColors[criterion.level] || 'bg-gray-100 text-gray-700')}>
+              {criterion.level}
+            </span>
+            <span className="font-medium text-gray-900">{criterion.criterionId}</span>
+            <span className="text-gray-600">{criterion.name}</span>
+          </span>
+          <span className="flex items-center gap-3">
+            <span className="text-sm text-gray-500">{criterion.confidenceScore}%</span>
+            <ChevronDown className={cn('h-4 w-4 text-gray-400 transition-transform', isExpanded && 'rotate-180')} />
+          </span>
+        </button>
+        {isExpanded && (
+          <div className="px-6 py-4 bg-gray-50 space-y-3">
+            {criterion.automatedChecks && criterion.automatedChecks.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-2">Automated Checks</p>
+                <div className="space-y-1">
+                  {criterion.automatedChecks.map((check, idx) => (
+                    <div key={idx} className="flex items-start gap-2 text-sm">
+                      {check.passed ? (
+                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      ) : (
+                        <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+                      )}
+                      <span className={check.passed ? 'text-gray-600' : 'text-red-700'}>{check.description}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {criterion.manualChecks && criterion.manualChecks.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-2">Manual Checks Needed</p>
+                <ul className="space-y-1">
+                  {criterion.manualChecks.map((check, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm text-gray-600">
+                      <span className="text-orange-500">•</span>
+                      {check}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {criterion.needsVerification && onVerify && (
+              <div className="pt-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onVerify(criterion.criterionId);
+                  }}
+                >
+                  Mark as Reviewed
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const statusOrder: StatusGroup[] = ['fail', 'needs_review', 'pass', 'not_applicable'];
+  const confidenceOrder: ConfidenceGroup[] = ['high', 'medium', 'low', 'manual'];
+
   return (
     <div className="space-y-6">
       {error && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 flex items-center gap-2 text-sm text-yellow-800">
-          <AlertTriangle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
           {error}
         </div>
       )}
 
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-lg border p-4">
+          <p className="text-sm text-gray-500 mb-1">Overall Confidence</p>
+          <div className="flex items-center gap-3">
+            <div className="flex-1 bg-gray-200 rounded-full h-3">
+              <div
+                className={cn('h-3 rounded-full transition-all', getConfidenceColor(overallConfidence))}
+                style={{ width: `${overallConfidence}%` }}
+              />
+            </div>
+            <span className="text-lg font-semibold">{overallConfidence}%</span>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">{getConfidenceLabel(overallConfidence)} confidence</p>
+        </div>
+
+        <div className="bg-white rounded-lg border p-4">
+          <p className="text-sm text-gray-500 mb-1">Criteria Evaluated</p>
+          <p className="text-2xl font-semibold">{criteria.length}</p>
+          <p className="text-xs text-gray-500 mt-1">
+            {statusCounts.pass} passed, {statusCounts.fail} failed
+          </p>
+        </div>
+
+        <div className="bg-white rounded-lg border p-4">
+          <p className="text-sm text-gray-500 mb-1">Needs Verification</p>
+          <p className="text-2xl font-semibold text-orange-600">{needsVerificationCount}</p>
+          <p className="text-xs text-gray-500 mt-1">criteria require human review</p>
+        </div>
+      </div>
+
+      {/* View Mode Toggle */}
       <div className="flex items-center justify-between">
-        <AnalysisSummaryCards
-          issuesCount={issues.length}
-          verificationCount={needsVerification.length}
-          naCount={likelyNA.length}
-        />
-        
+        <h3 className="font-semibold text-gray-900">Accessibility Criteria Analysis</h3>
         <div className="flex gap-1 bg-gray-100 p-1 rounded-lg" role="group" aria-label="View mode">
           <button
             onClick={() => {
@@ -678,11 +857,12 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
               setSelectedCriterion(null);
             }}
             aria-pressed={viewMode === 'cards'}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded transition focus:outline-none focus:ring-2 focus:ring-blue-500',
               viewMode === 'cards'
                 ? 'bg-white text-gray-900 shadow-sm'
                 : 'text-gray-600 hover:text-gray-900'
-            }`}
+            )}
           >
             <LayoutGrid className="h-4 w-4" aria-hidden="true" />
             Cards
@@ -693,11 +873,12 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
               setSelectedCriterion(null);
             }}
             aria-pressed={viewMode === 'table'}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded transition focus:outline-none focus:ring-2 focus:ring-blue-500',
               viewMode === 'table'
                 ? 'bg-white text-gray-900 shadow-sm'
                 : 'text-gray-600 hover:text-gray-900'
-            }`}
+            )}
           >
             <Table className="h-4 w-4" aria-hidden="true" />
             Table
@@ -713,107 +894,131 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
           showFilters={true}
         />
       ) : (
-      <div className="space-y-4">
-        <ExpandableSection
-          title="Issues Found"
-          count={issues.length}
-          icon={<AlertCircle className="h-5 w-5 text-red-600" aria-hidden="true" />}
-          defaultExpanded={true}
-          headerColor="bg-red-50"
-        >
-          {issues.length === 0 ? (
-            <p className="text-sm text-gray-600">
-              No violations found in automated audit.
-            </p>
-          ) : (
-            <>
-              <p className="text-sm text-gray-600 mb-4">
-                Evidence from automated audit
-              </p>
-              {issues.map(criterion => (
-                <CriterionCard
-                  key={criterion.id}
-                  number={criterion.number}
-                  name={criterion.name}
-                  level={criterion.level}
-                  confidence={criterion.confidence}
-                  status={criterion.status}
-                  evidence={criterion.evidence}
-                  onViewDetails={() => setSelectedCriterion(criterion)}
-                  onViewFiles={criterion.evidence?.affectedFiles ? () => console.log('View files', criterion.id) : undefined}
-                />
-              ))}
-            </>
-          )}
-        </ExpandableSection>
+        /* Status-Based Grouped Criteria */
+        <div className="bg-white rounded-lg border overflow-hidden">
+          <div className="px-4 py-3 border-b bg-gray-50">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <p className="text-sm text-gray-500">Grouped by status with confidence levels</p>
+              </div>
+              <div className="flex items-center gap-4 text-xs text-gray-500">
+                <span className="flex items-center gap-1">
+                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium">A</span>
+                  Basic
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium">AA</span>
+                  Standard
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded font-medium">AAA</span>
+                  Enhanced
+                </span>
+              </div>
+            </div>
+          </div>
 
-        <ExpandableSection
-          title="Manual Verification Required"
-          count={needsVerification.length}
-          icon={<Search className="h-5 w-5 text-orange-600" aria-hidden="true" />}
-          defaultExpanded={false}
-          headerColor="bg-orange-50"
-        >
-          {needsVerification.length === 0 ? (
-            <p className="text-sm text-gray-600">
-              No criteria require manual verification.
-            </p>
-          ) : (
-            <>
-              <p className="text-sm text-gray-600 mb-4">
-                No automated evidence - human testing required
-              </p>
-              {needsVerification.map(criterion => (
-                <CriterionCard
-                  key={criterion.id}
-                  number={criterion.number}
-                  name={criterion.name}
-                  level={criterion.level}
-                  confidence={criterion.confidence}
-                  status={criterion.status}
-                  onViewDetails={() => setSelectedCriterion(criterion)}
-                  onMarkReviewed={() => {
-                    if (onVerifyClick) {
-                      onVerifyClick(criterion.number);
-                    }
-                  }}
-                />
-              ))}
-            </>
-          )}
-        </ExpandableSection>
+          <div className="divide-y">
+            {statusOrder.map((statusGroup) => {
+              const statusCount = statusCounts[statusGroup];
+              if (statusCount === 0) return null;
 
-        <ExpandableSection
-          title="Likely Not Applicable"
-          count={likelyNA.length}
-          icon={<MinusCircle className="h-5 w-5 text-gray-600" aria-hidden="true" />}
-          defaultExpanded={false}
-          headerColor="bg-gray-50"
-        >
-          {likelyNA.length === 0 ? (
-            <p className="text-sm text-gray-600">
-              All criteria appear applicable to this content.
-            </p>
-          ) : (
-            <>
-              <p className="text-sm text-gray-600 mb-4">
-                Content type suggests these may not apply
-              </p>
-              {likelyNA.map(criterion => (
-                <CriterionCard
-                  key={criterion.id}
-                  number={criterion.number}
-                  name={criterion.name}
-                  level={criterion.level}
-                  confidence={criterion.confidence}
-                  status={criterion.status}
-                  onViewDetails={() => setSelectedCriterion(criterion)}
-                />
-              ))}
-            </>
-          )}
-        </ExpandableSection>
-      </div>
+              const statusConfig = STATUS_CONFIG[statusGroup];
+              const isStatusExpanded = expandedStatusSections.has(statusGroup);
+              const StatusIcon = statusConfig.icon;
+
+              return (
+                <div key={statusGroup}>
+                  {/* Status Group Header */}
+                  <button
+                    type="button"
+                    onClick={() => toggleStatusSection(statusGroup)}
+                    className={cn(
+                      'w-full flex items-center justify-between px-4 py-3 transition-colors',
+                      statusConfig.bgColor,
+                      'hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500'
+                    )}
+                  >
+                    <span className="flex items-center gap-3">
+                      <StatusIcon className={cn('h-5 w-5', statusConfig.textColor)} />
+                      <span className={cn('font-semibold', statusConfig.textColor)}>
+                        {statusConfig.label}
+                      </span>
+                      <span className="text-sm text-gray-500">
+                        ({statusCount} {statusCount === 1 ? 'criterion' : 'criteria'})
+                      </span>
+                    </span>
+                    <ChevronDown
+                      className={cn(
+                        'h-5 w-5 text-gray-500 transition-transform duration-200',
+                        isStatusExpanded && 'rotate-180'
+                      )}
+                    />
+                  </button>
+
+                  {/* Confidence Sub-sections within Status Group */}
+                  {isStatusExpanded && (
+                    <div className={cn('border-l-4', statusConfig.borderColor)}>
+                      {confidenceOrder.map((confidenceGroup) => {
+                        const items = hybridGroupedCriteria[statusGroup][confidenceGroup];
+                        if (items.length === 0) return null;
+
+                        const confidenceConfig = SECTION_CONFIG[confidenceGroup];
+                        const sectionKey = `${statusGroup}-${confidenceGroup}`;
+                        const isConfidenceExpanded = expandedConfidenceSections.has(sectionKey);
+
+                        return (
+                          <div key={confidenceGroup}>
+                            {/* Confidence Sub-header */}
+                            <button
+                              type="button"
+                              onClick={() => toggleConfidenceSection(sectionKey)}
+                              className={cn(
+                                'w-full flex items-center justify-between px-6 py-2.5 transition-colors',
+                                confidenceConfig.bgColor,
+                                'hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500',
+                                'border-b border-gray-100'
+                              )}
+                            >
+                              <span className="flex items-center gap-2.5">
+                                <span className={cn('w-2.5 h-2.5 rounded-full', confidenceConfig.dotColor)} />
+                                <span className="text-sm font-medium text-gray-700">{confidenceConfig.label}</span>
+                                <span className="text-xs text-gray-500">
+                                  ({items.length} {items.length === 1 ? 'item' : 'items'})
+                                </span>
+                              </span>
+                              <ChevronDown
+                                className={cn(
+                                  'h-4 w-4 text-gray-400 transition-transform duration-200',
+                                  isConfidenceExpanded && 'rotate-180'
+                                )}
+                              />
+                            </button>
+
+                            {/* Criteria Rows */}
+                            {isConfidenceExpanded && (
+                              <div>
+                                {items.map((criterion) => (
+                                  <CriterionRowDisplay
+                                    key={criterion.id}
+                                    criterion={criterion}
+                                    isExpanded={expandedRows.has(criterion.id)}
+                                    onToggle={() => toggleRow(criterion.id)}
+                                    onVerifyClick={onVerifyClick}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       {selectedCriterion && (
