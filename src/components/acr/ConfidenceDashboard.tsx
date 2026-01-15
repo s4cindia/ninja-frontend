@@ -1176,6 +1176,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
         <CriterionDetailsModal
           criterion={detailsCriterion}
           relatedIssues={issuesByCriterion.get(detailsCriterion.criterionId)?.issues}
+          jobId={jobId}
           isOpen={!!detailsCriterion}
           onClose={() => setDetailsCriterion(null)}
           onVerifyClick={onVerifyClick}

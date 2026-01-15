@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/Button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { X, ExternalLink, CheckCircle, AlertCircle, Book, Wrench, FileText } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { wcagDocumentationService } from '@/services/wcag-documentation.service';
 import type { CriterionConfidence } from '@/services/api';
@@ -11,6 +12,7 @@ import type { IssueMapping } from '@/types/confidence.types';
 interface CriterionDetailsModalProps {
   criterion: CriterionConfidence;
   relatedIssues?: IssueMapping[];
+  jobId?: string;
   isOpen: boolean;
   onClose: () => void;
   onVerifyClick?: (criterionId: string) => void;
@@ -20,12 +22,14 @@ interface CriterionDetailsModalProps {
 export function CriterionDetailsModal({
   criterion,
   relatedIssues,
+  jobId,
   isOpen,
   onClose,
   onVerifyClick,
   mode = 'interactive'
 }: CriterionDetailsModalProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'issues' | 'testing' | 'remediation' | 'wcag'>('overview');
+  const navigate = useNavigate();
   const wcagDocs = wcagDocumentationService.getDocumentation(criterion.criterionId);
 
   const getLevelBadgeClass = (level: string) => {
@@ -271,6 +275,28 @@ export function CriterionDetailsModal({
                       </div>
                     ))}
                   </div>
+
+                  {jobId && (
+                    <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <FileText className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-blue-900 mb-1">View Remediation Changes</h4>
+                          <p className="text-sm text-blue-800 mb-3">
+                            See the actual before/after code changes made during EPUB remediation for issues related to this criterion.
+                          </p>
+                          <Button
+                            variant="outline"
+                            onClick={() => navigate(`/epub/comparison/${jobId}?criterion=${criterion.criterionId}`)}
+                            className="w-full sm:w-auto"
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            View All Remediation Changes
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="text-center py-12 text-gray-500">
