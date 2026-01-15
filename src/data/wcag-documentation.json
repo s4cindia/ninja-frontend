@@ -6,63 +6,89 @@
       "name": "Non-text Content",
       "level": "A",
       "wcagUrl": "https://www.w3.org/WAI/WCAG21/Understanding/non-text-content.html",
-      "shortDescription": "All non-text content has a text alternative that serves the equivalent purpose.",
-      "intent": "The intent of this Success Criterion is to make information conveyed by non-text content accessible through the use of a text alternative.",
+      "shortDescription": "All non-text content that is presented to the user has a text alternative that serves the equivalent purpose.",
+      "intent": "The intent of this Success Criterion is to make information conveyed by non-text content accessible through the use of a text alternative. Text alternatives are a primary way for making information accessible because they can be rendered through any sensory modality (for example, visual, auditory or tactile) to match the needs of the user.",
       "benefits": [
-        "People who are blind or have low vision can access visual content",
-        "People who are deaf or hard of hearing can access audio content",
-        "People using text-only browsers or assistive technologies can access content"
+        "Screen reader users can access descriptions of images, charts, and other visual content",
+        "Users with cognitive disabilities benefit from text descriptions that explain complex images",
+        "Text alternatives can be translated into other languages or presented in different modalities"
       ],
       "howToMeet": {
         "url": "https://www.w3.org/WAI/WCAG21/quickref/#non-text-content",
         "techniques": [
-          {"id": "G94", "title": "Providing short text alternative for non-text content", "type": "sufficient"},
-          {"id": "H37", "title": "Using alt attributes on img elements", "type": "sufficient"},
-          {"id": "H67", "title": "Using null alt text for decorative images", "type": "sufficient"},
-          {"id": "F30", "title": "Using text alternatives that are not alternatives", "type": "failure"}
+          {
+            "id": "G94",
+            "title": "Providing short text alternative for non-text content that serves the same purpose",
+            "type": "sufficient"
+          },
+          {
+            "id": "H37",
+            "title": "Using alt attributes on img elements",
+            "type": "sufficient"
+          },
+          {
+            "id": "ARIA6",
+            "title": "Using aria-label to provide labels for objects",
+            "type": "sufficient"
+          }
         ],
         "epubSpecific": [
-          "Use alt attribute on all img elements",
-          "Use aria-describedby for complex images",
-          "Ensure SVG images have appropriate text alternatives"
+          "Add alt attributes to all <img> elements in EPUB XHTML content",
+          "Use empty alt=\"\" for decorative images",
+          "Provide detailed descriptions in aria-describedby or linked descriptions for complex images like charts",
+          "Ensure SVG graphics include <title> and <desc> elements",
+          "Add alt text to MathML equations or provide text equivalents"
         ]
       },
       "understanding": {
         "url": "https://www.w3.org/WAI/WCAG21/Understanding/non-text-content.html",
         "examples": [
-          {"title": "Data chart", "description": "A bar chart with short alt text and long description"},
-          {"title": "Decorative image", "description": "An image used purely for decoration with null alt text"}
+          {
+            "title": "Image with alt text",
+            "description": "A photograph of a person has alt text describing who is in the photo and what they are doing."
+          },
+          {
+            "title": "Decorative image",
+            "description": "A decorative border image has empty alt text (alt=\"\") so it is ignored by assistive technology."
+          }
         ],
         "resources": [
-          {"title": "W3C Web Accessibility Tutorials - Images", "url": "https://www.w3.org/WAI/tutorials/images/"},
-          {"title": "Alt Decision Tree", "url": "https://www.w3.org/WAI/tutorials/images/decision-tree/"}
+          {
+            "title": "WebAIM: Alternative Text",
+            "url": "https://webaim.org/techniques/alttext/"
+          },
+          {
+            "title": "DIAGRAM Center: Image Description Guidelines",
+            "url": "http://diagramcenter.org/best-practices.html"
+          }
         ]
       },
       "testingProcedure": {
         "automated": [
-          "Check that all img elements have an alt attribute",
-          "Check that alt text is not placeholder text",
-          "Verify alt text length is appropriate"
+          "Run ACE by DAISY to check for images without alt attributes",
+          "Use epubcheck to validate image markup"
         ],
         "manual": [
-          "Review alt text for accuracy and appropriateness",
-          "Verify decorative images have null alt text",
-          "Check that complex images have adequate descriptions"
+          "Open EPUB in a reading system with a screen reader (NVDA, JAWS, VoiceOver)",
+          "Navigate to each image and verify alt text is announced",
+          "Check that decorative images are properly marked and skipped",
+          "Verify complex images have adequate descriptions"
         ],
-        "tools": ["axe-core", "WAVE", "ACE by DAISY"]
+        "tools": ["ACE by DAISY", "epubcheck", "NVDA", "JAWS", "VoiceOver"]
       },
       "remediationGuidance": {
-        "before": "<img src=\"chart.png\">",
-        "after": "<img src=\"chart.png\" alt=\"Bar chart showing quarterly sales: Q1 $10M, Q2 $15M, Q3 $12M, Q4 $18M\">",
-        "explanation": "Add descriptive alt text that conveys the same information as the image."
+        "before": "<img src=\"chart.png\" />",
+        "after": "<img src=\"chart.png\" alt=\"Bar chart showing sales growth from 2020-2023, with yearly increases of 15%, 22%, 18%, and 25%\" />",
+        "explanation": "Add descriptive alt text that conveys the meaning and data of the image. For complex images like charts, provide sufficient detail in the alt text or link to a longer description."
       },
       "applicableToEpub": true,
       "applicableToPdf": true,
       "commonIssues": [
         "Missing alt attributes on images",
-        "Alt text is just the filename",
-        "Decorative images not marked as decorative",
-        "Complex images lack adequate description"
+        "Generic alt text like 'image' or 'photo'",
+        "Decorative images not marked with empty alt text",
+        "Complex images (charts, diagrams) lacking adequate descriptions",
+        "Alt text duplicating nearby caption text"
       ]
     },
     {
@@ -72,62 +98,615 @@
       "level": "A",
       "wcagUrl": "https://www.w3.org/WAI/WCAG21/Understanding/info-and-relationships.html",
       "shortDescription": "Information, structure, and relationships conveyed through presentation can be programmatically determined or are available in text.",
-      "intent": "The intent of this Success Criterion is to ensure that information and relationships that are implied by visual or auditory formatting are preserved when the presentation format changes.",
+      "intent": "The intent of this Success Criterion is to ensure that information and relationships that are implied by visual or auditory formatting are preserved when the presentation format changes. For example, the presentation format changes when the content is read by a screen reader or when a user style sheet is substituted for the style sheet provided by the author.",
       "benefits": [
-        "People using screen readers can understand document structure",
-        "People who use different style sheets can maintain understanding",
-        "Content can be presented in different ways without losing meaning"
+        "Screen reader users can navigate by headings, lists, and other structural elements",
+        "Users can apply custom stylesheets while preserving document structure",
+        "Content can be repurposed and reformatted while maintaining meaning"
       ],
       "howToMeet": {
         "url": "https://www.w3.org/WAI/WCAG21/quickref/#info-and-relationships",
         "techniques": [
-          {"id": "H42", "title": "Using h1-h6 to identify headings", "type": "sufficient"},
-          {"id": "H48", "title": "Using ol, ul and dl for lists", "type": "sufficient"},
-          {"id": "H51", "title": "Using table markup for tabular data", "type": "sufficient"},
-          {"id": "F43", "title": "Using structural markup that does not represent relationships", "type": "failure"}
+          {
+            "id": "G115",
+            "title": "Using semantic elements to mark up structure",
+            "type": "sufficient"
+          },
+          {
+            "id": "H49",
+            "title": "Using semantic markup to mark emphasized or special text",
+            "type": "sufficient"
+          },
+          {
+            "id": "H51",
+            "title": "Using table markup to present tabular information",
+            "type": "sufficient"
+          }
         ],
         "epubSpecific": [
-          "Use semantic HTML elements for structure",
-          "Ensure heading hierarchy is logical",
-          "Use EPUB:type attributes for additional semantics"
+          "Use proper heading hierarchy (h1-h6) for chapter titles, sections, and subsections",
+          "Mark up lists with <ul>, <ol>, and <li> elements rather than styled paragraphs",
+          "Use <table>, <th>, <td> for tabular data with proper headers",
+          "Apply semantic HTML5 elements like <nav>, <aside>, <figure>",
+          "Use <strong> and <em> for emphasis rather than just <b> or <i>",
+          "Mark up definitions with <dfn> or definition lists <dl>"
         ]
       },
       "understanding": {
         "url": "https://www.w3.org/WAI/WCAG21/Understanding/info-and-relationships.html",
         "examples": [
-          {"title": "Form with labels", "description": "Form controls with properly associated labels"},
-          {"title": "Data table", "description": "Table with proper headers and associations"}
+          {
+            "title": "Heading hierarchy",
+            "description": "A document uses h1 for the title, h2 for chapter headings, and h3 for sections, allowing screen readers to navigate by heading level."
+          },
+          {
+            "title": "Table with headers",
+            "description": "A data table uses <th> elements to mark column headers, allowing screen readers to announce context when reading cells."
+          }
         ],
         "resources": [
-          {"title": "W3C Web Accessibility Tutorials - Tables", "url": "https://www.w3.org/WAI/tutorials/tables/"},
-          {"title": "W3C Web Accessibility Tutorials - Forms", "url": "https://www.w3.org/WAI/tutorials/forms/"}
+          {
+            "title": "WebAIM: Semantic Structure",
+            "url": "https://webaim.org/techniques/semanticstructure/"
+          },
+          {
+            "title": "W3C: HTML5 Structural Elements",
+            "url": "https://www.w3.org/WAI/tutorials/page-structure/"
+          }
         ]
       },
       "testingProcedure": {
         "automated": [
-          "Check for proper heading hierarchy",
-          "Verify tables have appropriate headers",
-          "Check form controls have associated labels"
+          "Run ACE by DAISY to check for heading hierarchy violations",
+          "Use epubcheck to validate HTML structure"
         ],
         "manual": [
-          "Review that visual structure matches semantic structure",
-          "Verify relationships are programmatically determinable",
-          "Check that content makes sense when linearized"
+          "Navigate the EPUB using heading navigation (H key in NVDA/JAWS)",
+          "Verify headings are in logical order (no skipped levels)",
+          "Check that lists and tables are properly announced",
+          "Verify emphasis is conveyed through semantic markup, not just styling"
         ],
-        "tools": ["axe-core", "WAVE", "ACE by DAISY"]
+        "tools": ["ACE by DAISY", "NVDA", "JAWS", "VoiceOver", "Browser developer tools"]
       },
       "remediationGuidance": {
-        "before": "<div class=\"heading\">Chapter 1</div>",
-        "after": "<h1>Chapter 1</h1>",
-        "explanation": "Use semantic heading elements instead of styled divs to convey document structure."
+        "before": "<div class=\"heading\">Chapter 1: Introduction</div>\n<div class=\"subheading\">Overview</div>\n<div>• First point</div>\n<div>• Second point</div>",
+        "after": "<h1>Chapter 1: Introduction</h1>\n<h2>Overview</h2>\n<ul>\n  <li>First point</li>\n  <li>Second point</li>\n</ul>",
+        "explanation": "Replace styled divs with proper semantic HTML elements. Use heading elements (h1-h6) for headings and list elements (ul, ol, li) for lists. This allows assistive technology to identify and navigate the structure."
       },
       "applicableToEpub": true,
       "applicableToPdf": true,
       "commonIssues": [
-        "Using styled text instead of semantic headings",
-        "Skipping heading levels",
-        "Tables without proper headers",
-        "Form controls without labels"
+        "Using styled divs or paragraphs instead of heading elements",
+        "Skipping heading levels (e.g., h2 to h4)",
+        "Using line breaks and asterisks instead of list markup",
+        "Tables missing <th> elements for headers",
+        "Using <b> or <i> for semantic emphasis instead of <strong> or <em>"
+      ]
+    },
+    {
+      "criterionId": "1.3.2-A",
+      "number": "1.3.2",
+      "name": "Meaningful Sequence",
+      "level": "A",
+      "wcagUrl": "https://www.w3.org/WAI/WCAG21/Understanding/meaningful-sequence.html",
+      "shortDescription": "When the sequence in which content is presented affects its meaning, a correct reading sequence can be programmatically determined.",
+      "intent": "The intent of this Success Criterion is to enable a user agent to provide an alternative presentation of content while preserving the reading order needed to understand the meaning. It is important that it be possible to programmatically determine at least one sequence of the content that makes sense.",
+      "benefits": [
+        "Screen reader users hear content in a logical order",
+        "Users can navigate sequentially through content in the intended order",
+        "Content maintains meaning when CSS is disabled or custom stylesheets are applied"
+      ],
+      "howToMeet": {
+        "url": "https://www.w3.org/WAI/WCAG21/quickref/#meaningful-sequence",
+        "techniques": [
+          {
+            "id": "G57",
+            "title": "Ordering the content in a meaningful sequence",
+            "type": "sufficient"
+          },
+          {
+            "id": "C27",
+            "title": "Making the DOM order match the visual order",
+            "type": "sufficient"
+          }
+        ],
+        "epubSpecific": [
+          "Ensure HTML source order matches logical reading order",
+          "Avoid using CSS positioning (absolute, float) that changes reading order",
+          "Place sidebars and asides in logical positions in the source",
+          "Ensure footnotes appear after their reference in the source",
+          "Test reading order by disabling CSS or using reading mode"
+        ]
+      },
+      "understanding": {
+        "url": "https://www.w3.org/WAI/WCAG21/Understanding/meaningful-sequence.html",
+        "examples": [
+          {
+            "title": "Two-column layout",
+            "description": "A two-column article has the left column followed by the right column in the HTML source, matching the intended reading order."
+          },
+          {
+            "title": "Form with labels",
+            "description": "Form labels appear before their inputs in the source code, ensuring screen readers announce labels before the input fields."
+          }
+        ],
+        "resources": [
+          {
+            "title": "WebAIM: Keyboard Accessibility",
+            "url": "https://webaim.org/techniques/keyboard/"
+          }
+        ]
+      },
+      "testingProcedure": {
+        "automated": [
+          "Run ACE by DAISY (limited automated detection)",
+          "Use browser extensions to visualize tab order"
+        ],
+        "manual": [
+          "Read the EPUB with a screen reader from start to finish",
+          "Verify content is announced in logical order",
+          "Disable CSS and verify source order makes sense",
+          "Check that sidebars, footnotes, and figures appear in appropriate positions"
+        ],
+        "tools": ["Screen readers", "Browser developer tools", "Reading mode"]
+      },
+      "remediationGuidance": {
+        "before": "<!-- HTML source -->\n<div class=\"sidebar\" style=\"float: right\">Sidebar content</div>\n<p>Main paragraph 1</p>\n<p>Main paragraph 2</p>\n\n<!-- Reading order: Sidebar, Para 1, Para 2 (incorrect) -->",
+        "after": "<!-- HTML source -->\n<p>Main paragraph 1</p>\n<p>Main paragraph 2</p>\n<aside class=\"sidebar\">Sidebar content</aside>\n\n<!-- Reading order: Para 1, Para 2, Sidebar (correct) -->",
+        "explanation": "Arrange HTML elements in the source code to match the intended reading order. Use CSS for visual positioning without disrupting the logical sequence."
+      },
+      "applicableToEpub": true,
+      "applicableToPdf": true,
+      "commonIssues": [
+        "CSS floats or positioning that changes reading order",
+        "Sidebars appearing before main content in source",
+        "Multi-column layouts with incorrect source order",
+        "Footnotes appearing before the text they reference",
+        "Tab order not matching visual layout"
+      ]
+    },
+    {
+      "criterionId": "1.4.1-A",
+      "number": "1.4.1",
+      "name": "Use of Color",
+      "level": "A",
+      "wcagUrl": "https://www.w3.org/WAI/WCAG21/Understanding/use-of-color.html",
+      "shortDescription": "Color is not used as the only visual means of conveying information, indicating an action, prompting a response, or distinguishing a visual element.",
+      "intent": "The intent of this Success Criterion is to ensure that all users can access information that is conveyed by color differences, that is, by the use of color where each color has a meaning assigned to it. If the information is conveyed through color differences in an image (or other non-text format), the color may not be seen by users with color deficiencies.",
+      "benefits": [
+        "Users with color blindness can understand content that relies on color",
+        "Users with low vision or using monochrome displays can access all information",
+        "Content is accessible when printed in black and white"
+      ],
+      "howToMeet": {
+        "url": "https://www.w3.org/WAI/WCAG21/quickref/#use-of-color",
+        "techniques": [
+          {
+            "id": "G182",
+            "title": "Ensuring that additional visual cues are available when text color differences are used to convey information",
+            "type": "sufficient"
+          },
+          {
+            "id": "G111",
+            "title": "Using color and pattern",
+            "type": "sufficient"
+          }
+        ],
+        "epubSpecific": [
+          "Don't use only color to indicate required form fields (add asterisk or text label)",
+          "Don't rely on color alone for links (use underline or other visual indicator)",
+          "In charts and graphs, use patterns or labels in addition to color",
+          "Ensure error messages include text, not just red coloring",
+          "Provide textual indicators for color-coded elements"
+        ]
+      },
+      "understanding": {
+        "url": "https://www.w3.org/WAI/WCAG21/Understanding/use-of-color.html",
+        "examples": [
+          {
+            "title": "Required form fields",
+            "description": "Required fields are marked with both a red border AND an asterisk (*), not just color alone."
+          },
+          {
+            "title": "Color-coded chart",
+            "description": "A pie chart uses different colors AND patterns/textures to distinguish sections, with a text legend."
+          }
+        ],
+        "resources": [
+          {
+            "title": "WebAIM: Color Contrast Checker",
+            "url": "https://webaim.org/resources/contrastchecker/"
+          }
+        ]
+      },
+      "testingProcedure": {
+        "automated": [
+          "Limited automated detection available"
+        ],
+        "manual": [
+          "View EPUB in grayscale mode or print preview",
+          "Verify all information is still conveyed",
+          "Check that links are distinguishable without color",
+          "Ensure charts and diagrams use patterns or labels",
+          "Verify form validation errors include text"
+        ],
+        "tools": ["Browser grayscale extensions", "Color blindness simulators"]
+      },
+      "remediationGuidance": {
+        "before": "<p style=\"color: red\">This field is required</p>\n<input type=\"text\" />",
+        "after": "<p style=\"color: red\"><strong>* Required:</strong> This field is required</p>\n<input type=\"text\" aria-required=\"true\" />",
+        "explanation": "Add visual indicators beyond color (asterisk, bold text) and programmatic indicators (aria-required) to convey required status."
+      },
+      "applicableToEpub": true,
+      "applicableToPdf": true,
+      "commonIssues": [
+        "Links indicated only by color without underline",
+        "Required form fields shown only with red asterisks",
+        "Color-coded charts without labels or patterns",
+        "Error messages conveyed only through red text",
+        "Status indicators using only color (red/yellow/green)"
+      ]
+    },
+    {
+      "criterionId": "2.4.2-A",
+      "number": "2.4.2",
+      "name": "Page Titled",
+      "level": "A",
+      "wcagUrl": "https://www.w3.org/WAI/WCAG21/Understanding/page-titled.html",
+      "shortDescription": "Web pages have titles that describe topic or purpose.",
+      "intent": "The intent of this Success Criterion is to help users find content and orient themselves within it by ensuring that each Web page has a descriptive title. Titles identify the current location without requiring users to read or interpret page content.",
+      "benefits": [
+        "Screen reader users hear the page title when loading a new page",
+        "Users can identify pages when multiple browser tabs are open",
+        "Search engines use page titles to index content",
+        "Users can bookmark pages with meaningful titles"
+      ],
+      "howToMeet": {
+        "url": "https://www.w3.org/WAI/WCAG21/quickref/#page-titled",
+        "techniques": [
+          {
+            "id": "G88",
+            "title": "Providing descriptive titles for Web pages",
+            "type": "sufficient"
+          },
+          {
+            "id": "H25",
+            "title": "Providing a title using the title element",
+            "type": "sufficient"
+          }
+        ],
+        "epubSpecific": [
+          "Ensure every XHTML file has a <title> element in the <head>",
+          "Use descriptive titles that identify the chapter or section",
+          "Include book title or chapter context in page titles",
+          "For multi-part chapters, distinguish parts in titles (e.g., 'Chapter 1, Part 2')",
+          "Match spine item titles to their content"
+        ]
+      },
+      "understanding": {
+        "url": "https://www.w3.org/WAI/WCAG21/Understanding/page-titled.html",
+        "examples": [
+          {
+            "title": "Chapter title",
+            "description": "An EPUB chapter file has <title>Chapter 3: The Journey Begins - My Book Title</title>"
+          },
+          {
+            "title": "Section title",
+            "description": "A subsection has <title>Introduction - Chapter 1 - My Book Title</title>"
+          }
+        ],
+        "resources": [
+          {
+            "title": "W3C: HTML title element",
+            "url": "https://www.w3.org/TR/html5/document-metadata.html#the-title-element"
+          }
+        ]
+      },
+      "testingProcedure": {
+        "automated": [
+          "Run ACE by DAISY to check for missing titles",
+          "Use epubcheck to validate title elements"
+        ],
+        "manual": [
+          "Open each XHTML file and verify it has a <title> element",
+          "Check that titles are descriptive and unique",
+          "Verify titles help identify the content",
+          "Use a screen reader to confirm titles are announced"
+        ],
+        "tools": ["ACE by DAISY", "epubcheck", "Screen readers"]
+      },
+      "remediationGuidance": {
+        "before": "<head>\n  <meta charset=\"UTF-8\">\n  <link rel=\"stylesheet\" href=\"styles.css\">\n</head>",
+        "after": "<head>\n  <meta charset=\"UTF-8\">\n  <title>Chapter 5: The Discovery - Adventures in Science</title>\n  <link rel=\"stylesheet\" href=\"styles.css\">\n</head>",
+        "explanation": "Add a descriptive <title> element to every XHTML file. Include the chapter/section name and optionally the book title for context."
+      },
+      "applicableToEpub": true,
+      "applicableToPdf": true,
+      "commonIssues": [
+        "Missing <title> elements in XHTML files",
+        "Generic titles like 'Untitled' or 'Chapter'",
+        "All pages having identical titles",
+        "Titles that don't describe the content",
+        "Empty title elements"
+      ]
+    },
+    {
+      "criterionId": "3.1.1-A",
+      "number": "3.1.1",
+      "name": "Language of Page",
+      "level": "A",
+      "wcagUrl": "https://www.w3.org/WAI/WCAG21/Understanding/language-of-page.html",
+      "shortDescription": "The default human language of each Web page can be programmatically determined.",
+      "intent": "The intent of this Success Criterion is to ensure that content developers provide information in the Web page that user agents need to present text and other linguistic content correctly. Both assistive technologies and conventional user agents can render text more accurately when the language of the Web page is identified.",
+      "benefits": [
+        "Screen readers can load correct pronunciation rules",
+        "Visual browsers can display characters and scripts correctly",
+        "Braille translators can generate correct output",
+        "Search engines can identify language for better indexing"
+      ],
+      "howToMeet": {
+        "url": "https://www.w3.org/WAI/WCAG21/quickref/#language-of-page",
+        "techniques": [
+          {
+            "id": "H57",
+            "title": "Using language attributes on the html element",
+            "type": "sufficient"
+          }
+        ],
+        "epubSpecific": [
+          "Add lang attribute to <html> element in every XHTML file",
+          "Use valid BCP 47 language codes (e.g., 'en', 'en-US', 'fr', 'es')",
+          "Set xml:lang as well for XHTML compatibility",
+          "Declare language in OPF metadata using dc:language",
+          "For multi-language EPUBs, set appropriate lang on each file"
+        ]
+      },
+      "understanding": {
+        "url": "https://www.w3.org/WAI/WCAG21/Understanding/language-of-page.html",
+        "examples": [
+          {
+            "title": "English EPUB",
+            "description": "An English book has <html lang=\"en\" xml:lang=\"en\"> in all XHTML files"
+          },
+          {
+            "title": "French EPUB",
+            "description": "A French book uses <html lang=\"fr\" xml:lang=\"fr\">"
+          }
+        ],
+        "resources": [
+          {
+            "title": "BCP 47 Language Tags",
+            "url": "https://www.w3.org/International/questions/qa-choosing-language-tags"
+          }
+        ]
+      },
+      "testingProcedure": {
+        "automated": [
+          "Run ACE by DAISY to check for missing lang attributes",
+          "Use epubcheck to validate language declarations"
+        ],
+        "manual": [
+          "Check each XHTML file has lang and xml:lang on <html> element",
+          "Verify language code is correct for the content",
+          "Test with screen reader to ensure correct pronunciation",
+          "Check OPF metadata includes dc:language"
+        ],
+        "tools": ["ACE by DAISY", "epubcheck", "Screen readers"]
+      },
+      "remediationGuidance": {
+        "before": "<html xmlns=\"http://www.w3.org/1999/xhtml\">\n<head>\n  <title>Chapter 1</title>\n</head>",
+        "after": "<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\" xml:lang=\"en\">\n<head>\n  <title>Chapter 1</title>\n</head>",
+        "explanation": "Add both lang and xml:lang attributes to the <html> element with the appropriate language code. Use 'en' for English, 'fr' for French, 'es' for Spanish, etc."
+      },
+      "applicableToEpub": true,
+      "applicableToPdf": true,
+      "commonIssues": [
+        "Missing lang attribute on <html> element",
+        "Incorrect language code for content",
+        "Missing xml:lang attribute in XHTML",
+        "Language not declared in OPF metadata",
+        "Multi-language content without per-file language declaration"
+      ]
+    },
+    {
+      "criterionId": "4.1.1-A",
+      "number": "4.1.1",
+      "name": "Parsing",
+      "level": "A",
+      "wcagUrl": "https://www.w3.org/WAI/WCAG21/Understanding/parsing.html",
+      "shortDescription": "In content implemented using markup languages, elements have complete start and end tags, elements are nested according to their specifications, elements do not contain duplicate attributes, and any IDs are unique.",
+      "intent": "The intent of this Success Criterion is to ensure that user agents, including assistive technologies, can accurately interpret and parse content. If the content cannot be parsed into a data structure, then different user agents may present it differently or be completely unable to parse it.",
+      "benefits": [
+        "Assistive technologies can reliably parse and process content",
+        "Content works consistently across different reading systems",
+        "Reduces rendering errors and unexpected behavior",
+        "Ensures compatibility with current and future technologies"
+      ],
+      "howToMeet": {
+        "url": "https://www.w3.org/WAI/WCAG21/quickref/#parsing",
+        "techniques": [
+          {
+            "id": "G134",
+            "title": "Validating Web pages",
+            "type": "sufficient"
+          },
+          {
+            "id": "G192",
+            "title": "Fully conforming to specifications",
+            "type": "sufficient"
+          },
+          {
+            "id": "H74",
+            "title": "Ensuring that opening and closing tags are used according to specification",
+            "type": "sufficient"
+          },
+          {
+            "id": "H93",
+            "title": "Ensuring that id attributes are unique on a Web page",
+            "type": "sufficient"
+          },
+          {
+            "id": "H94",
+            "title": "Ensuring that elements do not contain duplicate attributes",
+            "type": "sufficient"
+          }
+        ],
+        "epubSpecific": [
+          "Validate all XHTML files with epubcheck",
+          "Ensure all elements have closing tags",
+          "Properly nest elements (no overlapping tags)",
+          "Use unique id attributes across each XHTML file",
+          "Avoid duplicate attributes on elements",
+          "Follow XHTML syntax (lowercase tags, quoted attributes)"
+        ]
+      },
+      "understanding": {
+        "url": "https://www.w3.org/WAI/WCAG21/Understanding/parsing.html",
+        "examples": [
+          {
+            "title": "Valid XHTML",
+            "description": "All tags are properly closed and nested: <p><strong>Text</strong></p>"
+          },
+          {
+            "title": "Unique IDs",
+            "description": "Each id attribute value appears only once in the file: <div id=\"chapter1\">...</div>"
+          }
+        ],
+        "resources": [
+          {
+            "title": "W3C Markup Validation Service",
+            "url": "https://validator.w3.org/"
+          },
+          {
+            "title": "EPUB Check",
+            "url": "https://github.com/w3c/epubcheck"
+          }
+        ]
+      },
+      "testingProcedure": {
+        "automated": [
+          "Run epubcheck on the entire EPUB",
+          "Use ACE by DAISY which includes parsing validation",
+          "Validate individual XHTML files with W3C validator"
+        ],
+        "manual": [
+          "Review epubcheck output for parsing errors",
+          "Check for unclosed tags in source code",
+          "Verify id attributes are unique",
+          "Ensure elements are properly nested"
+        ],
+        "tools": ["epubcheck", "ACE by DAISY", "W3C Markup Validator"]
+      },
+      "remediationGuidance": {
+        "before": "<!-- Invalid markup -->\n<p>Text <strong>bold</p></strong>\n<div id=\"intro\" class=\"section\" class=\"intro\">\n<img src=\"image.png\">",
+        "after": "<!-- Valid markup -->\n<p>Text <strong>bold</strong></p>\n<div id=\"intro\" class=\"section\">\n<img src=\"image.png\" alt=\"Description\" />",
+        "explanation": "Fix all parsing errors: properly nest tags (strong inside p), remove duplicate attributes, close void elements with />, ensure all tags are closed in the correct order."
+      },
+      "applicableToEpub": true,
+      "applicableToPdf": false,
+      "commonIssues": [
+        "Unclosed or improperly nested tags",
+        "Duplicate id attributes",
+        "Duplicate attributes on same element",
+        "Void elements not self-closed in XHTML",
+        "Malformed attribute syntax",
+        "Invalid XML/XHTML structure"
+      ]
+    },
+    {
+      "criterionId": "4.1.2-A",
+      "number": "4.1.2",
+      "name": "Name, Role, Value",
+      "level": "A",
+      "wcagUrl": "https://www.w3.org/WAI/WCAG21/Understanding/name-role-value.html",
+      "shortDescription": "For all user interface components, the name and role can be programmatically determined; states, properties, and values that can be set by the user can be programmatically set; and notification of changes to these items is available to user agents, including assistive technologies.",
+      "intent": "The intent of this Success Criterion is to ensure that Assistive Technologies (AT) can gather information about, activate (or set) and keep up to date on the status of user interface controls in the content.",
+      "benefits": [
+        "Screen reader users can identify and interact with form controls",
+        "Users understand the purpose and state of interactive elements",
+        "Assistive technologies can programmatically determine control properties",
+        "Changes in state are announced to users"
+      ],
+      "howToMeet": {
+        "url": "https://www.w3.org/WAI/WCAG21/quickref/#name-role-value",
+        "techniques": [
+          {
+            "id": "G108",
+            "title": "Using markup features to expose the name and role",
+            "type": "sufficient"
+          },
+          {
+            "id": "H91",
+            "title": "Using HTML form controls and links",
+            "type": "sufficient"
+          },
+          {
+            "id": "ARIA14",
+            "title": "Using aria-label to provide an invisible label",
+            "type": "sufficient"
+          },
+          {
+            "id": "ARIA16",
+            "title": "Using aria-labelledby to name regions and landmarks",
+            "type": "sufficient"
+          }
+        ],
+        "epubSpecific": [
+          "Use native HTML form controls (<input>, <button>, <select>) when possible",
+          "Associate labels with form controls using <label> or aria-label",
+          "Use aria-required for required fields",
+          "Use aria-invalid for fields with errors",
+          "For custom controls, use appropriate ARIA roles and properties",
+          "Ensure interactive elements are keyboard accessible"
+        ]
+      },
+      "understanding": {
+        "url": "https://www.w3.org/WAI/WCAG21/Understanding/name-role-value.html",
+        "examples": [
+          {
+            "title": "Labeled input",
+            "description": "<label for=\"name\">Name:</label> <input id=\"name\" type=\"text\" />"
+          },
+          {
+            "title": "Required field",
+            "description": "<input type=\"text\" aria-required=\"true\" aria-label=\"Email address\" />"
+          }
+        ],
+        "resources": [
+          {
+            "title": "WAI-ARIA Authoring Practices",
+            "url": "https://www.w3.org/WAI/ARIA/apg/"
+          }
+        ]
+      },
+      "testingProcedure": {
+        "automated": [
+          "Run ACE by DAISY to check for unlabeled form controls",
+          "Use axe DevTools to check ARIA implementation"
+        ],
+        "manual": [
+          "Navigate to form controls with screen reader",
+          "Verify each control announces its name/label",
+          "Check required fields are identified",
+          "Verify error states are announced",
+          "Test custom widgets with ARIA"
+        ],
+        "tools": ["ACE by DAISY", "NVDA", "JAWS", "axe DevTools"]
+      },
+      "remediationGuidance": {
+        "before": "<div>Email:</div>\n<input type=\"text\" />",
+        "after": "<label for=\"email\">Email:</label>\n<input id=\"email\" type=\"email\" aria-required=\"true\" />",
+        "explanation": "Associate the label with the input using for/id attributes. Add aria-required to programmatically convey the required state to assistive technologies."
+      },
+      "applicableToEpub": true,
+      "applicableToPdf": true,
+      "commonIssues": [
+        "Form inputs without associated labels",
+        "Custom widgets without ARIA roles",
+        "Required fields not marked with aria-required",
+        "Error states not conveyed programmatically",
+        "Interactive elements not keyboard accessible",
+        "Dynamic content changes not announced"
       ]
     },
     {
@@ -136,62 +715,174 @@
       "name": "Contrast (Minimum)",
       "level": "AA",
       "wcagUrl": "https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html",
-      "shortDescription": "Text and images of text have a contrast ratio of at least 4.5:1.",
-      "intent": "The intent of this Success Criterion is to provide enough contrast between text and its background so that it can be read by people with moderately low vision.",
+      "shortDescription": "The visual presentation of text and images of text has a contrast ratio of at least 4.5:1, except for large text (at least 3:1), incidental text, and logotypes.",
+      "intent": "The intent of this Success Criterion is to provide enough contrast between text and its background so that it can be read by people with moderately low vision (who do not use contrast-enhancing assistive technology).",
       "benefits": [
-        "People with low vision can read text more easily",
-        "People with color deficiencies can distinguish text from background",
-        "Content is more readable in various lighting conditions"
+        "Users with low vision can read text more easily",
+        "Users with color deficiencies benefit from adequate contrast",
+        "Content is readable in bright environments or on low-quality displays",
+        "Older users with age-related vision decline can read content"
       ],
       "howToMeet": {
         "url": "https://www.w3.org/WAI/WCAG21/quickref/#contrast-minimum",
         "techniques": [
-          {"id": "G18", "title": "Ensuring 4.5:1 contrast ratio for text", "type": "sufficient"},
-          {"id": "G145", "title": "Ensuring 3:1 contrast for large text", "type": "sufficient"},
-          {"id": "F83", "title": "Using text that does not meet contrast requirements", "type": "failure"}
+          {
+            "id": "G18",
+            "title": "Ensuring that a contrast ratio of at least 4.5:1 exists between text and background",
+            "type": "sufficient"
+          },
+          {
+            "id": "G145",
+            "title": "Ensuring that a contrast ratio of at least 3:1 exists between text and background for large text",
+            "type": "sufficient"
+          }
         ],
         "epubSpecific": [
-          "Ensure CSS color and background-color have sufficient contrast",
-          "Check contrast in all reading modes",
-          "Consider publisher and reading system CSS interactions"
+          "Ensure body text has 4.5:1 contrast ratio against background",
+          "Large text (18pt+ or 14pt+ bold) needs 3:1 minimum",
+          "Check contrast in CSS stylesheets for text colors",
+          "Test common background/text combinations",
+          "Avoid low-contrast design themes",
+          "Consider dark mode alternatives with adequate contrast"
         ]
       },
       "understanding": {
         "url": "https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html",
         "examples": [
-          {"title": "High contrast text", "description": "Black text on white background (21:1 ratio)"},
-          {"title": "Accessible link color", "description": "Links with 4.5:1 contrast against background"}
+          {
+            "title": "Black on white",
+            "description": "Black text (#000000) on white background (#FFFFFF) has 21:1 contrast ratio (excellent)"
+          },
+          {
+            "title": "Dark gray on white",
+            "description": "Dark gray (#595959) on white has 7:1 contrast ratio (passes for normal text)"
+          }
         ],
         "resources": [
-          {"title": "WebAIM Contrast Checker", "url": "https://webaim.org/resources/contrastchecker/"},
-          {"title": "Colour Contrast Analyzer", "url": "https://www.tpgi.com/color-contrast-checker/"}
+          {
+            "title": "WebAIM Contrast Checker",
+            "url": "https://webaim.org/resources/contrastchecker/"
+          },
+          {
+            "title": "Color Safe",
+            "url": "http://colorsafe.co/"
+          }
         ]
       },
       "testingProcedure": {
         "automated": [
-          "Check all text elements for contrast ratio",
-          "Identify text that falls below 4.5:1 threshold",
-          "Check large text meets 3:1 minimum"
+          "Run ACE by DAISY to check contrast ratios",
+          "Use axe DevTools browser extension"
         ],
         "manual": [
-          "Review text on complex backgrounds",
-          "Check contrast in different color modes",
-          "Verify text over images has sufficient contrast"
+          "Use WebAIM Contrast Checker to test color combinations",
+          "Identify all text color and background color pairs in CSS",
+          "Test each combination for 4.5:1 (normal text) or 3:1 (large text)",
+          "Check images of text for contrast",
+          "Test in different reading modes (day/night)"
         ],
-        "tools": ["axe-core", "WAVE", "Colour Contrast Analyzer"]
+        "tools": ["ACE by DAISY", "WebAIM Contrast Checker", "Colour Contrast Analyser", "axe DevTools"]
       },
       "remediationGuidance": {
-        "before": "<p style=\"color: #999999;\">Light gray text</p>",
-        "after": "<p style=\"color: #595959;\">Darker gray text</p>",
-        "explanation": "Darken the text color to achieve at least 4.5:1 contrast ratio with the background."
+        "before": "body {\n  color: #888888; /* Light gray */\n  background: #FFFFFF; /* White */\n}\n/* Contrast ratio: 2.85:1 (FAIL) */",
+        "after": "body {\n  color: #595959; /* Darker gray */\n  background: #FFFFFF; /* White */\n}\n/* Contrast ratio: 7:1 (PASS) */",
+        "explanation": "Darken the text color from light gray (#888) to darker gray (#595959) to achieve at least 4.5:1 contrast ratio for normal-sized body text."
       },
       "applicableToEpub": true,
       "applicableToPdf": true,
       "commonIssues": [
         "Light gray text on white background",
-        "Text over images without overlay",
-        "Placeholder text with low contrast",
-        "Links that don't stand out from body text"
+        "Low contrast in custom color schemes",
+        "Insufficient contrast in dark mode themes",
+        "Links without sufficient contrast",
+        "Placeholder text with poor contrast",
+        "Text over background images with inadequate contrast"
+      ]
+    },
+    {
+      "criterionId": "1.4.4-AA",
+      "number": "1.4.4",
+      "name": "Resize Text",
+      "level": "AA",
+      "wcagUrl": "https://www.w3.org/WAI/WCAG21/Understanding/resize-text.html",
+      "shortDescription": "Except for captions and images of text, text can be resized without assistive technology up to 200 percent without loss of content or functionality.",
+      "intent": "The intent of this Success Criterion is to ensure that visually rendered text, including text-based controls can be scaled successfully so that it can be read directly by people with mild visual disabilities, without requiring the use of assistive technology such as a screen magnifier.",
+      "benefits": [
+        "Users with low vision can enlarge text to a comfortable reading size",
+        "Text remains readable and functional when zoomed",
+        "Content doesn't become truncated or overlapped when enlarged",
+        "Users don't need additional assistive technology to read content"
+      ],
+      "howToMeet": {
+        "url": "https://www.w3.org/WAI/WCAG21/quickref/#resize-text",
+        "techniques": [
+          {
+            "id": "G179",
+            "title": "Ensuring that there is no loss of content or functionality when the text resizes",
+            "type": "sufficient"
+          },
+          {
+            "id": "C28",
+            "title": "Specifying the size of text containers using em units",
+            "type": "sufficient"
+          }
+        ],
+        "epubSpecific": [
+          "Use relative font sizes (em, rem, %) instead of fixed px values",
+          "Allow reading systems to override font sizes",
+          "Don't use fixed-width containers that truncate text when enlarged",
+          "Test EPUB at 200% zoom in various reading systems",
+          "Avoid using images of text that can't be resized",
+          "Ensure text reflows when user changes font size settings"
+        ]
+      },
+      "understanding": {
+        "url": "https://www.w3.org/WAI/WCAG21/Understanding/resize-text.html",
+        "examples": [
+          {
+            "title": "Relative font sizing",
+            "description": "CSS uses em or rem units: body { font-size: 1rem; } h1 { font-size: 2em; }"
+          },
+          {
+            "title": "Reflowable text",
+            "description": "EPUB allows text to reflow when user increases font size in reading system settings"
+          }
+        ],
+        "resources": [
+          {
+            "title": "W3C: Resize Text Understanding",
+            "url": "https://www.w3.org/WAI/WCAG21/Understanding/resize-text.html"
+          }
+        ]
+      },
+      "testingProcedure": {
+        "automated": [
+          "Limited automated testing available"
+        ],
+        "manual": [
+          "Open EPUB in reading system (Apple Books, Thorium, etc.)",
+          "Increase font size to largest setting (typically 200%+)",
+          "Verify all text is still visible and readable",
+          "Check that no content is cut off or overlapping",
+          "Ensure functionality remains intact (buttons, links work)",
+          "Test in multiple reading systems"
+        ],
+        "tools": ["Various EPUB reading systems", "Browser zoom (for EPUB testing)"]
+      },
+      "remediationGuidance": {
+        "before": "body {\n  font-size: 14px; /* Fixed pixel size */\n}\n.container {\n  width: 600px; /* Fixed width */\n  height: 400px; /* Fixed height */\n}",
+        "after": "body {\n  font-size: 1rem; /* Relative size */\n}\n.container {\n  max-width: 100%; /* Responsive */\n  min-height: 400px; /* Minimum, not fixed */\n}",
+        "explanation": "Use relative units (rem, em, %) for font sizes so text can scale. Use responsive container sizing (max-width, min-height) instead of fixed dimensions to prevent text overflow when zoomed."
+      },
+      "applicableToEpub": true,
+      "applicableToPdf": false,
+      "commonIssues": [
+        "Fixed pixel font sizes that don't scale with user settings",
+        "Fixed-width containers causing text overflow when enlarged",
+        "Text in images that can't be resized",
+        "Absolute positioning causing overlapping text when zoomed",
+        "Horizontal scrolling required at 200% zoom",
+        "Content cut off or hidden when text is enlarged"
       ]
     }
   ]

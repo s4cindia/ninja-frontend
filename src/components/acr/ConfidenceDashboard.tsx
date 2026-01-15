@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
-import { AlertCircle, AlertTriangle, CheckCircle, LayoutGrid, Table, HelpCircle, ChevronDown } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle, LayoutGrid, Table, HelpCircle, ChevronDown, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
 import { fetchAcrAnalysis, CriterionConfidence } from '@/services/api';
 import { CriteriaTable, CriterionRow } from './CriteriaTable';
+import { WcagDocumentationModal } from './WcagDocumentationModal';
 
 interface ConfidenceDashboardProps {
   jobId: string;
@@ -579,6 +580,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   const [expandedStatusSections, setExpandedStatusSections] = useState<Set<StatusGroup>>(new Set(['fail', 'needs_review']));
   const [expandedConfidenceSections, setExpandedConfidenceSections] = useState<Set<string>>(new Set());
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [docsCriterion, setDocsCriterion] = useState<{ id: string; name: string } | null>(null);
 
   const toggleRow = (id: string) => {
     setExpandedRows(prev => {
@@ -721,11 +723,13 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     isExpanded,
     onToggle,
     onVerifyClick: onVerify,
+    onViewDocs,
   }: {
     criterion: CriterionConfidence;
     isExpanded: boolean;
     onToggle: () => void;
     onVerifyClick?: (criterionId: string) => void;
+    onViewDocs?: (criterionId: string, name: string) => void;
   }) => {
     const levelColors: Record<string, string> = {
       A: 'bg-blue-100 text-blue-700',
@@ -784,8 +788,21 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                 </ul>
               </div>
             )}
-            {criterion.needsVerification && onVerify && (
-              <div className="pt-2">
+            <div className="pt-2 flex gap-2">
+              {onViewDocs && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onViewDocs(criterion.criterionId, criterion.name);
+                  }}
+                >
+                  <BookOpen className="h-3.5 w-3.5 mr-1.5" />
+                  View WCAG Docs
+                </Button>
+              )}
+              {criterion.needsVerification && onVerify && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -796,8 +813,8 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                 >
                   Mark as Reviewed
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -1005,6 +1022,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                                     isExpanded={expandedRows.has(criterion.id)}
                                     onToggle={() => toggleRow(criterion.id)}
                                     onVerifyClick={onVerifyClick}
+                                    onViewDocs={(id, name) => setDocsCriterion({ id, name })}
                                   />
                                 ))}
                               </div>
@@ -1025,6 +1043,15 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
         <CriterionDetailModal
           criterion={selectedCriterion}
           onClose={() => setSelectedCriterion(null)}
+        />
+      )}
+
+      {docsCriterion && (
+        <WcagDocumentationModal
+          criterionId={docsCriterion.id}
+          criterionName={docsCriterion.name}
+          isOpen={!!docsCriterion}
+          onClose={() => setDocsCriterion(null)}
         />
       )}
     </div>
