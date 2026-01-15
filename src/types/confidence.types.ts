@@ -20,7 +20,7 @@ export interface CriterionConfidenceWithIssues {
   criterionId: string;
   name: string;
   level: 'A' | 'AA' | 'AAA';
-  status: 'pass' | 'fail' | 'needs_review' | 'not_applicable';
+  status: 'pass' | 'fail' | 'not_applicable' | 'not_tested';
   confidenceScore: number;
   remarks: string;
   relatedIssues?: IssueMapping[];

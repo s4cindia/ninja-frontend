@@ -625,18 +625,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   const [detailsCriterion, setDetailsCriterion] = useState<CriterionConfidence | null>(null);
   const [showOnlyWithIssues, setShowOnlyWithIssues] = useState(false);
 
-  const {
-    data: confidenceData,
-    isLoading: isLoadingIssues,
-    error: issuesError
-  } = useConfidenceWithIssues(jobId, undefined, { enabled: !isDemoJob(jobId) });
-
-  console.log('🔍 [ConfidenceDashboard] Job ID:', jobId);
-  console.log('🔍 [ConfidenceDashboard] Loading:', isLoadingIssues);
-  console.log('🔍 [ConfidenceDashboard] Error:', issuesError);
-  console.log('🔍 [ConfidenceDashboard] Confidence Data:', confidenceData);
-  console.log('🔍 [ConfidenceDashboard] Criteria Count:', confidenceData?.criteria?.length);
-  console.log('🔍 [ConfidenceDashboard] Total Issues:', confidenceData?.summary?.totalIssues);
+  const { data: confidenceData } = useConfidenceWithIssues(jobId, undefined, { enabled: !isDemoJob(jobId) });
 
   const issuesByCriterion = useMemo(() => {
     const map = new Map<string, { issues: IssueMapping[]; count: number }>();
