@@ -10,7 +10,7 @@ import {
   ComparisonHeader,
   FilterBar,
   IssueNavigator,
-  ComparisonPanel,
+  CodeComparisonPanel,
 } from '@/components/comparison';
 
 const VisualComparisonPanel = lazy(() =>
@@ -40,13 +40,7 @@ export const ComparisonPage: React.FC = () => {
 
   useEffect(() => {
     (window as any).printMemorySummary = () => memoryMonitor.printSummary();
-    console.log('💡 Tip: Run printMemorySummary() in console to see memory usage table');
   }, []);
-
-
-  useEffect(() => {
-    console.log(`[ComparisonPage] Navigated to change ${currentIndex}/${data?.changes.length || 0}`);
-  }, [currentIndex, data?.changes.length]);
 
   const currentChange = data?.changes[currentIndex];
 
@@ -295,7 +289,7 @@ export const ComparisonPage: React.FC = () => {
                   />
                 </Suspense>
               ) : (
-                <ComparisonPanel change={currentChange} />
+                <CodeComparisonPanel change={currentChange} jobId={jobId} />
               )}
             </>
           )}

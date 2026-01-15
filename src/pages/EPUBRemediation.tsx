@@ -986,11 +986,30 @@ export const EPUBRemediation: React.FC = () => {
     if (elementToFocus?.isConnected) {
       elementToFocus.focus();
     }
-    await Promise.all([
-      queryClient.refetchQueries({ queryKey: ['remediation-plan', jobId] }),
-      queryClient.refetchQueries({ queryKey: ['similar-issues', jobId] })
-    ]);
-  }, [queryClient, jobId]);
+
+    // Refresh the plan data from the API to get updated task statuses
+    if (jobId && !isDemo) {
+      try {
+        const response = await api.get(`/epub/job/${jobId}/remediation`, {
+          params: { _t: Date.now() },
+        });
+        const data = response.data.data || response.data;
+        if (data.tasks) {
+          const normalizedTasks = data.tasks.map(
+            (t: RawAceAssertion, i: number) => normalizeAceTask(t, i)
+          );
+          const dedupedTasks = groupAndDeduplicateTasks(normalizedTasks);
+          setPlan((prev) => prev ? { ...prev, tasks: dedupedTasks } : null);
+          console.log('[Batch Fix Complete] Plan refreshed with', dedupedTasks.length, 'tasks');
+        }
+      } catch (err) {
+        console.warn('[Batch Fix Complete] Failed to refresh plan:', err);
+      }
+    }
+
+    // Also invalidate similar-issues query
+    queryClient.invalidateQueries({ queryKey: ['similar-issues', jobId] });
+  }, [jobId, isDemo, queryClient]);
 
   // Fetch similar issues grouping for batch quick fixes
   const { data: similarIssuesFromApi } = useQuery({

@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react';
-import { AlertCircle, CheckCircle, AlertTriangle, HelpCircle, ChevronDown, Bot, User } from 'lucide-react';
-import { cn } from '@/utils/cn';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { AlertCircle, AlertTriangle, CheckCircle, LayoutGrid, Table, HelpCircle, ChevronDown, BookOpen } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
 import { fetchAcrAnalysis, CriterionConfidence } from '@/services/api';
+import { CriteriaTable, CriterionRow } from './CriteriaTable';
+import { WcagDocumentationModal } from './WcagDocumentationModal';
+import { CriterionDetailsModal } from './CriterionDetailsModal';
 
 interface ConfidenceDashboardProps {
   jobId: string;
@@ -11,7 +14,31 @@ interface ConfidenceDashboardProps {
   onCriteriaLoaded?: (criteria: CriterionConfidence[]) => void;
 }
 
+type HybridStatus = 'fail' | 'needs_verification' | 'likely_na' | 'pass';
+
+type StatusGroup = 'pass' | 'fail' | 'needs_review' | 'not_applicable';
+
 type ConfidenceGroup = 'high' | 'medium' | 'low' | 'manual';
+
+interface CriterionAnalysisEvidence {
+  source: string;
+  description: string;
+  affectedFiles?: string[];
+  issueCount?: number;
+  auditIssues?: BackendAuditIssue[];
+}
+
+interface CriterionAnalysis {
+  id: string;
+  number: string;
+  name: string;
+  level: 'A' | 'AA' | 'AAA';
+  confidence: number;
+  status: HybridStatus;
+  evidence?: CriterionAnalysisEvidence;
+  automatedChecks?: { id: string; description: string; passed: boolean }[];
+  manualChecks?: string[];
+}
 
 const mockCriteria: CriterionConfidence[] = [
   { 
@@ -34,27 +61,22 @@ const mockCriteria: CriterionConfidence[] = [
     criterionId: '1.2.1', 
     name: 'Audio-only and Video-only', 
     level: 'A', 
-    confidenceScore: 72, 
-    status: 'pass', 
-    needsVerification: true,
-    automatedChecks: [
-      { id: '2a', description: 'Media elements detected', passed: true },
-      { id: '2b', description: 'Transcript file references found', passed: false },
-    ],
-    manualChecks: ['Verify transcript accuracy', 'Test audio description availability', 'Confirm captions are synchronized']
+    confidenceScore: 0, 
+    status: 'not_applicable', 
+    needsVerification: false,
+    automatedChecks: [],
+    manualChecks: ['Determine if media content exists']
   },
   { 
     id: '3', 
     criterionId: '1.3.1', 
     name: 'Info and Relationships', 
     level: 'A', 
-    confidenceScore: 88, 
-    status: 'pass', 
-    needsVerification: false,
+    confidenceScore: 0, 
+    status: 'fail', 
+    needsVerification: true,
     automatedChecks: [
-      { id: '3a', description: 'Heading hierarchy validated', passed: true },
-      { id: '3b', description: 'Table headers properly marked', passed: true },
-      { id: '3c', description: 'Form labels associated correctly', passed: true },
+      { id: '3a', description: '9 tables missing header cells across 8 files', passed: false },
     ],
     manualChecks: ['Review semantic markup accuracy']
   },
@@ -64,12 +86,9 @@ const mockCriteria: CriterionConfidence[] = [
     name: 'Use of Color', 
     level: 'A', 
     confidenceScore: 45, 
-    status: 'fail', 
+    status: 'pass', 
     needsVerification: true,
-    automatedChecks: [
-      { id: '4a', description: 'Color-only indicators detected', passed: false },
-      { id: '4b', description: 'Link differentiation checked', passed: false },
-    ],
+    automatedChecks: [],
     manualChecks: ['Verify information conveyed by color has text alternative', 'Check form error states use more than color']
   },
   { 
@@ -83,7 +102,6 @@ const mockCriteria: CriterionConfidence[] = [
     automatedChecks: [
       { id: '5a', description: 'Text contrast ratio >= 4.5:1 verified', passed: true },
       { id: '5b', description: 'Large text contrast ratio >= 3:1 verified', passed: true },
-      { id: '5c', description: 'UI component contrast checked', passed: true },
     ],
     manualChecks: ['Verify contrast on images with text overlay']
   },
@@ -95,12 +113,8 @@ const mockCriteria: CriterionConfidence[] = [
     confidenceScore: 60, 
     status: 'pass', 
     needsVerification: true,
-    automatedChecks: [
-      { id: '6a', description: 'Tab order follows logical sequence', passed: true },
-      { id: '6b', description: 'No keyboard traps detected', passed: true },
-      { id: '6c', description: 'Custom controls have keyboard handlers', passed: false },
-    ],
-    manualChecks: ['Test all interactive elements with keyboard only', 'Verify custom widgets are fully operable', 'Check modal dialogs trap focus correctly']
+    automatedChecks: [],
+    manualChecks: ['Test all interactive elements with keyboard only', 'Verify custom widgets are fully operable']
   },
   { 
     id: '7', 
@@ -115,196 +129,18 @@ const mockCriteria: CriterionConfidence[] = [
   },
   { 
     id: '8', 
-    criterionId: '2.4.4', 
-    name: 'Link Purpose', 
+    criterionId: '4.1.2', 
+    name: 'Name, Role, Value', 
     level: 'A', 
-    confidenceScore: 82, 
-    status: 'pass', 
-    needsVerification: false,
+    confidenceScore: 0, 
+    status: 'fail', 
+    needsVerification: true,
     automatedChecks: [
-      { id: '8a', description: 'Generic link text detected (e.g., "click here")', passed: true },
-      { id: '8b', description: 'Links have descriptive text or aria-label', passed: true },
+      { id: '8a', description: 'Affected by table structure issues', passed: false },
     ],
-    manualChecks: ['Verify link purpose is clear in context']
+    manualChecks: ['Verify custom controls have accessible names']
   },
 ];
-
-const SECTION_CONFIG: Record<ConfidenceGroup, { label: string; bgColor: string; dotColor: string; borderColor: string }> = {
-  high: { label: 'HIGH Confidence (90%+)', bgColor: 'bg-green-50', dotColor: 'bg-green-500', borderColor: 'border-green-200' },
-  medium: { label: 'MEDIUM Confidence (60-89%)', bgColor: 'bg-yellow-50', dotColor: 'bg-yellow-500', borderColor: 'border-yellow-200' },
-  low: { label: 'LOW Confidence (<60%)', bgColor: 'bg-orange-50', dotColor: 'bg-orange-500', borderColor: 'border-orange-200' },
-  manual: { label: 'MANUAL REQUIRED', bgColor: 'bg-red-50', dotColor: 'bg-red-500', borderColor: 'border-red-200' },
-};
-
-function getConfidenceGroup(criterion: CriterionConfidence): ConfidenceGroup {
-  if (criterion.status === 'not_applicable' || criterion.status === 'not_tested') {
-    return 'manual';
-  }
-  if (criterion.confidenceScore >= 90) return 'high';
-  if (criterion.confidenceScore >= 60) return 'medium';
-  return 'low';
-}
-
-function getConfidenceColor(score: number): string {
-  if (score >= 90) return 'bg-green-500';
-  if (score >= 70) return 'bg-yellow-500';
-  if (score >= 50) return 'bg-orange-500';
-  return 'bg-red-500';
-}
-
-function getConfidenceLabel(score: number): string {
-  if (score >= 90) return 'High';
-  if (score >= 70) return 'Medium';
-  if (score >= 50) return 'Low';
-  return 'Very Low';
-}
-
-function getStatusIcon(status: CriterionConfidence['status']) {
-  switch (status) {
-    case 'pass':
-      return <CheckCircle className="h-5 w-5 text-green-600" />;
-    case 'fail':
-      return <AlertCircle className="h-5 w-5 text-red-600" />;
-    case 'not_applicable':
-      return <HelpCircle className="h-5 w-5 text-gray-400" />;
-    case 'not_tested':
-      return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
-  }
-}
-
-interface CriterionRowProps {
-  criterion: CriterionConfidence;
-  isExpanded: boolean;
-  onToggle: () => void;
-  onVerifyClick?: (criterionId: string) => void;
-}
-
-function CriterionRow({ criterion, isExpanded, onToggle, onVerifyClick }: CriterionRowProps) {
-  const hasDetails = criterion.automatedChecks.length > 0 || criterion.manualChecks.length > 0;
-
-  return (
-    <div className="border-b last:border-b-0">
-      <button
-        type="button"
-        onClick={() => hasDetails && onToggle()}
-        disabled={!hasDetails}
-        className={cn(
-          'w-full px-4 py-3 flex items-center gap-4 text-left transition-colors',
-          criterion.needsVerification && 'bg-orange-50/50',
-          hasDetails && 'hover:bg-gray-50 cursor-pointer',
-          !hasDetails && 'cursor-default'
-        )}
-      >
-        <div className="flex-shrink-0">
-          {getStatusIcon(criterion.status)}
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-gray-900">{criterion.criterionId}</span>
-            <span className="text-sm text-gray-600 truncate">{criterion.name}</span>
-            <span className={cn(
-              'text-xs px-1.5 py-0.5 rounded font-medium',
-              criterion.level === 'A' && 'bg-blue-100 text-blue-700',
-              criterion.level === 'AA' && 'bg-purple-100 text-purple-700',
-              criterion.level === 'AAA' && 'bg-indigo-100 text-indigo-700'
-            )}>
-              {criterion.level}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 flex-shrink-0">
-          {criterion.status !== 'not_applicable' && criterion.status !== 'not_tested' && (
-            <div className="w-24">
-              <div className="flex items-center gap-2">
-                <div className="flex-1 bg-gray-200 rounded-full h-2">
-                  <div
-                    className={cn('h-2 rounded-full', getConfidenceColor(criterion.confidenceScore))}
-                    style={{ width: `${criterion.confidenceScore}%` }}
-                  />
-                </div>
-                <span className="text-xs font-medium text-gray-600 w-8">{criterion.confidenceScore}%</span>
-              </div>
-            </div>
-          )}
-
-          {criterion.needsVerification && onVerifyClick && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={(e) => {
-                e.stopPropagation();
-                onVerifyClick(criterion.criterionId);
-              }}
-            >
-              Verify
-            </Button>
-          )}
-
-          {hasDetails && (
-            <ChevronDown 
-              className={cn(
-                'h-5 w-5 text-gray-400 transition-transform duration-200',
-                isExpanded && 'rotate-180'
-              )} 
-            />
-          )}
-        </div>
-      </button>
-
-      {isExpanded && hasDetails && (
-        <div className="px-4 py-4 bg-gray-50 border-t border-gray-100">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-9">
-            {criterion.automatedChecks.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <Bot className="h-4 w-4 text-blue-600" />
-                  <h4 className="text-sm font-medium text-gray-900">Automated Checks</h4>
-                </div>
-                <ul className="space-y-2">
-                  {criterion.automatedChecks.map((check) => (
-                    <li key={check.id} className="flex items-start gap-2 text-sm">
-                      {check.passed ? (
-                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                      ) : (
-                        <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
-                      )}
-                      <span className={cn(check.passed ? 'text-gray-600' : 'text-red-700')}>
-                        {check.description}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {criterion.manualChecks.length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <User className="h-4 w-4 text-orange-600" />
-                  <h4 className="text-sm font-medium text-gray-900">Manual Checks Needed</h4>
-                </div>
-                <ul className="space-y-2">
-                  {criterion.manualChecks.map((check, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-sm text-gray-600">
-                      <span className="h-4 w-4 flex items-center justify-center text-orange-500 mt-0.5 flex-shrink-0">•</span>
-                      {check}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function isDemoJob(jobId: string): boolean {
-  return !jobId || jobId === 'demo' || jobId === 'new' || jobId.startsWith('upload-') || jobId.startsWith('demo-');
-}
 
 const WCAG_NAME_TO_ID: Record<string, string> = {
   'Non-text Content': '1.1.1',
@@ -362,6 +198,108 @@ const WCAG_NAME_TO_ID: Record<string, string> = {
   'Status Messages': '4.1.3',
 };
 
+const STATUS_CONFIG: Record<StatusGroup, {
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  bgColor: string;
+  borderColor: string;
+  textColor: string;
+}> = {
+  pass: {
+    label: 'PASSED',
+    icon: CheckCircle,
+    bgColor: 'bg-green-50',
+    borderColor: 'border-green-200',
+    textColor: 'text-green-700'
+  },
+  fail: {
+    label: 'FAILED',
+    icon: AlertCircle,
+    bgColor: 'bg-red-50',
+    borderColor: 'border-red-200',
+    textColor: 'text-red-700'
+  },
+  needs_review: {
+    label: 'NEEDS REVIEW',
+    icon: AlertTriangle,
+    bgColor: 'bg-orange-50',
+    borderColor: 'border-orange-200',
+    textColor: 'text-orange-700'
+  },
+  not_applicable: {
+    label: 'NOT APPLICABLE',
+    icon: HelpCircle,
+    bgColor: 'bg-gray-50',
+    borderColor: 'border-gray-200',
+    textColor: 'text-gray-600'
+  },
+};
+
+const SECTION_CONFIG: Record<ConfidenceGroup, {
+  label: string;
+  bgColor: string;
+  dotColor: string;
+}> = {
+  high: {
+    label: 'High Confidence',
+    bgColor: 'bg-green-50/50',
+    dotColor: 'bg-green-500'
+  },
+  medium: {
+    label: 'Medium Confidence',
+    bgColor: 'bg-yellow-50/50',
+    dotColor: 'bg-yellow-500'
+  },
+  low: {
+    label: 'Low Confidence',
+    bgColor: 'bg-orange-50/50',
+    dotColor: 'bg-orange-500'
+  },
+  manual: {
+    label: 'Manual Review Required',
+    bgColor: 'bg-gray-50/50',
+    dotColor: 'bg-gray-400'
+  },
+};
+
+function getConfidenceColor(confidence: number): string {
+  if (confidence >= 80) return 'bg-green-500';
+  if (confidence >= 50) return 'bg-yellow-500';
+  if (confidence > 0) return 'bg-orange-500';
+  return 'bg-gray-400';
+}
+
+function getConfidenceLabel(confidence: number): string {
+  if (confidence >= 80) return 'High';
+  if (confidence >= 50) return 'Medium';
+  if (confidence > 0) return 'Low';
+  return 'Manual';
+}
+
+function getStatusGroup(criterion: CriterionConfidence): StatusGroup {
+  if (criterion.status === 'not_applicable') {
+    return 'not_applicable';
+  }
+  if (criterion.status === 'fail') {
+    return 'fail';
+  }
+  if (criterion.needsVerification) {
+    return 'needs_review';
+  }
+  return 'pass';
+}
+
+function getConfidenceGroup(criterion: CriterionConfidence): ConfidenceGroup {
+  if (criterion.confidenceScore >= 80) return 'high';
+  if (criterion.confidenceScore >= 50) return 'medium';
+  if (criterion.confidenceScore > 0) return 'low';
+  return 'manual';
+}
+
+function isDemoJob(jobId: string): boolean {
+  return !jobId || jobId === 'demo' || jobId === 'new' || jobId.startsWith('upload-') || jobId.startsWith('demo-');
+}
+
 function isValidWcagId(value: unknown): value is string {
   if (typeof value !== 'string') return false;
   if (value === '' || value.includes('earl:') || value.includes('@type')) return false;
@@ -392,8 +330,42 @@ function extractCriterionId(c: Partial<CriterionConfidence>, index: number): str
   return `${index + 1}.0.0`;
 }
 
-function normalizeCriterion(c: Partial<CriterionConfidence>, index: number): CriterionConfidence {
+interface BackendAuditIssue {
+  code: string;
+  severity: 'critical' | 'serious' | 'moderate' | 'minor';
+  message: string;
+  affectedFiles?: string[];
+  issueCount?: number;
+}
+
+interface BackendEvidence {
+  source?: string;
+  description?: string;
+  affectedFiles?: string[];
+  issueCount?: number;
+  auditIssues?: BackendAuditIssue[];
+}
+
+interface NormalizedCriterion extends CriterionConfidence {
+  evidence?: BackendEvidence;
+}
+
+function normalizeCriterion(c: Partial<CriterionConfidence>, index: number): NormalizedCriterion {
   const criterionId = extractCriterionId(c, index);
+  const rawData = c as Record<string, unknown>;
+  
+  let evidence: BackendEvidence | undefined;
+  if (rawData.evidence && typeof rawData.evidence === 'object') {
+    const e = rawData.evidence as BackendEvidence;
+    evidence = {
+      source: e.source || 'epub_audit',
+      description: e.description,
+      affectedFiles: e.affectedFiles,
+      issueCount: e.issueCount,
+      auditIssues: Array.isArray(e.auditIssues) ? e.auditIssues : undefined,
+    };
+  }
+  
   return {
     id: c.id || `criterion-${index}`,
     criterionId,
@@ -405,15 +377,262 @@ function normalizeCriterion(c: Partial<CriterionConfidence>, index: number): Cri
     remarks: c.remarks,
     automatedChecks: Array.isArray(c.automatedChecks) ? c.automatedChecks : [],
     manualChecks: Array.isArray(c.manualChecks) ? c.manualChecks : [],
+    evidence,
   };
 }
 
+function determineHybridStatus(criterion: NormalizedCriterion): HybridStatus {
+  if (criterion.status === 'fail') {
+    return 'fail';
+  }
+  if (criterion.status === 'not_applicable' || criterion.status === 'not_tested') {
+    return 'likely_na';
+  }
+  if (criterion.confidenceScore >= 80) {
+    return 'pass';
+  }
+  return 'needs_verification';
+}
+
+function transformToCriterionAnalysis(criterion: NormalizedCriterion): CriterionAnalysis {
+  const hybridStatus = determineHybridStatus(criterion);
+  
+  let evidence: CriterionAnalysis['evidence'] | undefined;
+  
+  const hasBackendEvidence = criterion.evidence && 
+    (criterion.evidence.description || criterion.evidence.auditIssues?.length);
+  
+  if (hasBackendEvidence && criterion.evidence) {
+    evidence = {
+      source: criterion.evidence.source || 'epub_audit',
+      description: criterion.evidence.description || 'Audit issues found',
+      affectedFiles: criterion.evidence.affectedFiles,
+      issueCount: criterion.evidence.issueCount,
+      auditIssues: criterion.evidence.auditIssues,
+    };
+  } else {
+    const failedChecks = criterion.automatedChecks?.filter(c => !c.passed) || [];
+    if (failedChecks.length > 0) {
+      const syntheticIssues: BackendAuditIssue[] = failedChecks.map(check => ({
+        code: `CHECK-${check.id.toUpperCase()}`,
+        severity: 'serious' as const,
+        message: check.description,
+        issueCount: 1,
+      }));
+      evidence = {
+        source: 'epub_audit',
+        description: failedChecks.map(c => c.description).join('; '),
+        issueCount: failedChecks.length,
+        auditIssues: syntheticIssues,
+      };
+    }
+  }
+
+  return {
+    id: criterion.id,
+    number: criterion.criterionId,
+    name: criterion.name,
+    level: criterion.level,
+    confidence: criterion.confidenceScore,
+    status: hybridStatus,
+    evidence,
+    automatedChecks: criterion.automatedChecks,
+    manualChecks: criterion.manualChecks,
+  };
+}
+
+function convertToTableRow(criterion: CriterionAnalysis): CriterionRow {
+  return {
+    id: criterion.id,
+    number: criterion.number,
+    name: criterion.name,
+    level: criterion.level,
+    confidence: criterion.confidence,
+    status: criterion.status,
+    evidence: criterion.evidence ? {
+      source: criterion.evidence.source,
+      description: criterion.evidence.description,
+      affectedFiles: criterion.evidence.affectedFiles,
+      issueCount: criterion.evidence.issueCount,
+      auditIssues: criterion.evidence.auditIssues,
+    } : undefined,
+    automatedChecks: criterion.automatedChecks,
+    manualTest: criterion.manualChecks && criterion.manualChecks.length > 0 ? {
+      title: 'Manual Testing Required',
+      whatToCheck: criterion.manualChecks,
+    } : undefined,
+  };
+}
+
+interface CriterionDetailModalProps {
+  criterion: CriterionAnalysis;
+  onClose: () => void;
+}
+
+function CriterionDetailModal({ criterion, onClose }: CriterionDetailModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement as HTMLElement;
+    
+    const getFocusableElements = () => {
+      if (!modalRef.current) return [];
+      return Array.from(
+        modalRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter(el => !el.hasAttribute('disabled'));
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+
+      if (e.key === 'Tab') {
+        const focusable = getFocusableElements();
+        if (focusable.length === 0) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    
+    const focusable = getFocusableElements();
+    if (focusable.length > 0) {
+      focusable[0].focus();
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if (previousFocusRef.current && typeof previousFocusRef.current.focus === 'function') {
+        previousFocusRef.current.focus();
+      }
+    };
+  }, [onClose]);
+
+  return (
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="criterion-detail-title"
+    >
+      <div 
+        ref={modalRef}
+        className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden m-4"
+      >
+        <div className="flex items-center justify-between p-4 border-b bg-gray-50">
+          <h2 id="criterion-detail-title" className="text-lg font-semibold text-gray-900">
+            {criterion.number} - {criterion.name}
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-200 rounded-full"
+            aria-label="Close detail modal"
+          >
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div className="p-6 overflow-y-auto max-h-[60vh]">
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-gray-500">Level</p>
+              <p className="font-medium">{criterion.level}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Confidence</p>
+              <p className="font-medium">{criterion.confidence}%</p>
+            </div>
+            {criterion.evidence && (
+              <div>
+                <p className="text-sm text-gray-500">Evidence</p>
+                <p className="font-medium">{criterion.evidence.description}</p>
+              </div>
+            )}
+            {criterion.automatedChecks && criterion.automatedChecks.length > 0 && (
+              <div>
+                <p className="text-sm text-gray-500 mb-2">Automated Checks</p>
+                <ul className="space-y-1">
+                  {criterion.automatedChecks.map((check) => (
+                    <li key={check.id} className="flex items-start gap-2 text-sm">
+                      {check.passed ? (
+                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      ) : (
+                        <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+                      )}
+                      <span className={check.passed ? 'text-gray-600' : 'text-red-700'}>
+                        {check.description}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {criterion.manualChecks && criterion.manualChecks.length > 0 && (
+              <div>
+                <p className="text-sm text-gray-500 mb-2">Manual Checks Needed</p>
+                <ul className="space-y-1">
+                  {criterion.manualChecks.map((check, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm text-gray-600">
+                      <span className="text-orange-500">•</span>
+                      {check}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="p-4 border-t bg-gray-50">
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type ViewMode = 'cards' | 'table';
+
 export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: ConfidenceDashboardProps) {
-  const [expandedSections, setExpandedSections] = useState<Set<ConfidenceGroup>>(new Set(['high']));
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(!isDemoJob(jobId));
-  const [criteria, setCriteria] = useState<CriterionConfidence[]>(isDemoJob(jobId) ? mockCriteria : []);
+  const [criteria, setCriteria] = useState<NormalizedCriterion[]>(
+    isDemoJob(jobId) ? mockCriteria.map((c, i) => normalizeCriterion(c, i)) : []
+  );
   const [error, setError] = useState<string | null>(null);
+  const [selectedCriterion, setSelectedCriterion] = useState<CriterionAnalysis | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('cards');
+  const [expandedStatusSections, setExpandedStatusSections] = useState<Set<StatusGroup>>(new Set(['fail', 'needs_review']));
+  const [expandedConfidenceSections, setExpandedConfidenceSections] = useState<Set<string>>(new Set());
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [docsCriterion, setDocsCriterion] = useState<{ id: string; name: string } | null>(null);
+  const [detailsCriterion, setDetailsCriterion] = useState<CriterionConfidence | null>(null);
+
+  const toggleRow = (id: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (criteria.length > 0 && onCriteriaLoaded) {
@@ -423,7 +642,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
 
   useEffect(() => {
     if (isDemoJob(jobId)) {
-      setCriteria(mockCriteria);
+      setCriteria(mockCriteria.map((c, i) => normalizeCriterion(c, i)));
       setIsLoading(false);
       return;
     }
@@ -445,7 +664,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
         if (!cancelled) {
           console.error('[ACR Step 3] API error, falling back to mock data:', err);
           setError('Failed to load analysis data. Showing demo data.');
-          setCriteria(mockCriteria);
+          setCriteria(mockCriteria.map((c, i) => normalizeCriterion(c, i)));
           setIsLoading(false);
         }
       });
@@ -455,48 +674,11 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     };
   }, [jobId]);
 
-  const toggleSection = (group: ConfidenceGroup) => {
-    setExpandedSections(prev => {
-      const next = new Set(prev);
-      if (next.has(group)) {
-        next.delete(group);
-      } else {
-        next.add(group);
-      }
-      return next;
-    });
-  };
-
-  const toggleRow = (id: string) => {
-    setExpandedRows(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
-
-  const groupedCriteria: Record<ConfidenceGroup, CriterionConfidence[]> = {
-    high: [],
-    medium: [],
-    low: [],
-    manual: [],
-  };
-
-  criteria.forEach(c => {
-    const group = getConfidenceGroup(c);
-    groupedCriteria[group].push(c);
-  });
-
-  const applicableCriteria = criteria.filter(c => c.status !== 'not_applicable' && c.status !== 'not_tested');
-  const overallConfidence = applicableCriteria.length > 0
-    ? Math.round(applicableCriteria.reduce((acc, c) => acc + c.confidenceScore, 0) / applicableCriteria.length)
-    : 0;
-
-  const needsVerificationCount = criteria.filter(c => c.needsVerification).length;
+  const analysisData = useMemo(() => {
+    const transformed = criteria.map(transformToCriterionAnalysis);
+    const tableRows = transformed.map(convertToTableRow);
+    return { transformed, tableRows };
+  }, [criteria]);
 
   if (isLoading) {
     return (
@@ -506,7 +688,188 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     );
   }
 
-  const sectionOrder: ConfidenceGroup[] = ['high', 'medium', 'low', 'manual'];
+  const { tableRows, transformed } = analysisData;
+
+  // Group by status first, then by confidence within each status
+  const hybridGroupedCriteria: Record<StatusGroup, Record<ConfidenceGroup, CriterionConfidence[]>> = {
+    pass: { high: [], medium: [], low: [], manual: [] },
+    fail: { high: [], medium: [], low: [], manual: [] },
+    needs_review: { high: [], medium: [], low: [], manual: [] },
+    not_applicable: { high: [], medium: [], low: [], manual: [] },
+  };
+
+  criteria.forEach(c => {
+    const statusGroup = getStatusGroup(c);
+    const confidenceGroup = getConfidenceGroup(c);
+    hybridGroupedCriteria[statusGroup][confidenceGroup].push(c);
+  });
+
+  // Calculate counts for each status group
+  const statusCounts: Record<StatusGroup, number> = {
+    pass: 0,
+    fail: 0,
+    needs_review: 0,
+    not_applicable: 0,
+  };
+
+  criteria.forEach(c => {
+    const statusGroup = getStatusGroup(c);
+    statusCounts[statusGroup]++;
+  });
+
+  // Calculate overall confidence
+  const overallConfidence = criteria.length > 0
+    ? Math.round(criteria.reduce((sum, c) => sum + c.confidenceScore, 0) / criteria.length)
+    : 0;
+
+  // Count criteria needing verification
+  const needsVerificationCount = statusCounts.needs_review;
+
+  const handleViewDetails = (criterionRow: CriterionRow) => {
+    const analysis = transformed.find(c => c.id === criterionRow.id);
+    if (analysis) {
+      setSelectedCriterion(analysis);
+    }
+  };
+
+  const toggleStatusSection = (status: StatusGroup) => {
+    setExpandedStatusSections(prev => {
+      const next = new Set(prev);
+      if (next.has(status)) {
+        next.delete(status);
+      } else {
+        next.add(status);
+      }
+      return next;
+    });
+  };
+
+  const toggleConfidenceSection = (key: string) => {
+    setExpandedConfidenceSections(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  // Inline CriterionRow component for the new layout
+  const CriterionRowDisplay = ({
+    criterion,
+    isExpanded,
+    onToggle,
+    onVerifyClick: onVerify,
+    onViewDocs,
+    onCriterionClick,
+  }: {
+    criterion: CriterionConfidence;
+    isExpanded: boolean;
+    onToggle: () => void;
+    onVerifyClick?: (criterionId: string) => void;
+    onViewDocs?: (criterionId: string, name: string) => void;
+    onCriterionClick?: (criterion: CriterionConfidence) => void;
+  }) => {
+    const levelColors: Record<string, string> = {
+      A: 'bg-blue-100 text-blue-700',
+      AA: 'bg-purple-100 text-purple-700',
+      AAA: 'bg-indigo-100 text-indigo-700',
+    };
+
+    return (
+      <div className="border-b border-gray-100 last:border-b-0">
+        <button
+          type="button"
+          onClick={() => {
+            if (onCriterionClick) {
+              onCriterionClick(criterion);
+            } else {
+              onToggle();
+            }
+          }}
+          className="w-full flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors text-left"
+        >
+          <span className="flex items-center gap-3">
+            <span className={cn('px-1.5 py-0.5 rounded text-xs font-medium', levelColors[criterion.level] || 'bg-gray-100 text-gray-700')}>
+              {criterion.level}
+            </span>
+            <span className="font-medium text-gray-900">{criterion.criterionId}</span>
+            <span className="text-gray-600">{criterion.name}</span>
+          </span>
+          <span className="flex items-center gap-3">
+            <span className="text-sm text-gray-500">{criterion.confidenceScore}%</span>
+            <ChevronDown className={cn('h-4 w-4 text-gray-400 transition-transform', isExpanded && 'rotate-180')} />
+          </span>
+        </button>
+        {isExpanded && (
+          <div className="px-6 py-4 bg-gray-50 space-y-3">
+            {criterion.automatedChecks && criterion.automatedChecks.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-2">Automated Checks</p>
+                <div className="space-y-1">
+                  {criterion.automatedChecks.map((check, idx) => (
+                    <div key={idx} className="flex items-start gap-2 text-sm">
+                      {check.passed ? (
+                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      ) : (
+                        <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+                      )}
+                      <span className={check.passed ? 'text-gray-600' : 'text-red-700'}>{check.description}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {criterion.manualChecks && criterion.manualChecks.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-2">Manual Checks Needed</p>
+                <ul className="space-y-1">
+                  {criterion.manualChecks.map((check, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm text-gray-600">
+                      <span className="text-orange-500">•</span>
+                      {check}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="pt-2 flex gap-2">
+              {onViewDocs && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onViewDocs(criterion.criterionId, criterion.name);
+                  }}
+                >
+                  <BookOpen className="h-3.5 w-3.5 mr-1.5" />
+                  View WCAG Docs
+                </Button>
+              )}
+              {criterion.needsVerification && onVerify && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onVerify(criterion.criterionId);
+                  }}
+                >
+                  Mark as Reviewed
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const statusOrder: StatusGroup[] = ['fail', 'needs_review', 'pass', 'not_applicable'];
+  const confidenceOrder: ConfidenceGroup[] = ['high', 'medium', 'low', 'manual'];
 
   return (
     <div className="space-y-6">
@@ -516,6 +879,8 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
           {error}
         </div>
       )}
+
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-lg border p-4">
           <p className="text-sm text-gray-500 mb-1">Overall Confidence</p>
@@ -535,7 +900,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
           <p className="text-sm text-gray-500 mb-1">Criteria Evaluated</p>
           <p className="text-2xl font-semibold">{criteria.length}</p>
           <p className="text-xs text-gray-500 mt-1">
-            {criteria.filter(c => c.status === 'pass').length} passed, {criteria.filter(c => c.status === 'fail').length} failed
+            {statusCounts.pass} passed, {statusCounts.fail} failed
           </p>
         </div>
 
@@ -546,80 +911,207 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border overflow-hidden">
-        <div className="px-4 py-3 border-b bg-gray-50">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <h3 className="font-semibold text-gray-900">Criterion Confidence Scores</h3>
-              <p className="text-sm text-gray-500">Job ID: {jobId}</p>
-            </div>
-            <div className="flex items-center gap-4 text-xs text-gray-500">
-              <span className="flex items-center gap-1">
-                <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium">A</span>
-                Basic
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium">AA</span>
-                Standard
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded font-medium">AAA</span>
-                Enhanced
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="divide-y">
-          {sectionOrder.map((group) => {
-            const items = groupedCriteria[group];
-            if (items.length === 0) return null;
-
-            const config = SECTION_CONFIG[group];
-            const isExpanded = expandedSections.has(group);
-
-            return (
-              <div key={group}>
-                <button
-                  type="button"
-                  onClick={() => toggleSection(group)}
-                  className={cn(
-                    'w-full flex items-center justify-between px-4 py-3 transition-colors',
-                    config.bgColor,
-                    'hover:opacity-90'
-                  )}
-                >
-                  <span className="flex items-center gap-3">
-                    <span className={cn('w-3 h-3 rounded-full', config.dotColor)} />
-                    <span className="font-medium text-gray-900">{config.label}</span>
-                    <span className="text-sm text-gray-500">({items.length} {items.length === 1 ? 'item' : 'items'})</span>
-                  </span>
-                  <ChevronDown 
-                    className={cn(
-                      'h-5 w-5 text-gray-500 transition-transform duration-200',
-                      isExpanded && 'rotate-180'
-                    )} 
-                  />
-                </button>
-
-                {isExpanded && (
-                  <div className={cn('border-l-4', config.borderColor)}>
-                    {items.map((criterion) => (
-                      <CriterionRow
-                        key={criterion.id}
-                        criterion={criterion}
-                        isExpanded={expandedRows.has(criterion.id)}
-                        onToggle={() => toggleRow(criterion.id)}
-                        onVerifyClick={onVerifyClick}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+      {/* View Mode Toggle */}
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-gray-900">Accessibility Criteria Analysis</h3>
+        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg" role="group" aria-label="View mode">
+          <button
+            onClick={() => {
+              setViewMode('cards');
+              setSelectedCriterion(null);
+            }}
+            aria-pressed={viewMode === 'cards'}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded transition focus:outline-none focus:ring-2 focus:ring-blue-500',
+              viewMode === 'cards'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            )}
+          >
+            <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+            Cards
+          </button>
+          <button
+            onClick={() => {
+              setViewMode('table');
+              setSelectedCriterion(null);
+            }}
+            aria-pressed={viewMode === 'table'}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded transition focus:outline-none focus:ring-2 focus:ring-blue-500',
+              viewMode === 'table'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            )}
+          >
+            <Table className="h-4 w-4" aria-hidden="true" />
+            Table
+          </button>
         </div>
       </div>
+
+      {viewMode === 'table' ? (
+        <CriteriaTable
+          criteria={tableRows}
+          mode="preview"
+          onViewDetails={handleViewDetails}
+          showFilters={true}
+        />
+      ) : (
+        /* Status-Based Grouped Criteria */
+        <div className="bg-white rounded-lg border overflow-hidden">
+          <div className="px-4 py-3 border-b bg-gray-50">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <p className="text-sm text-gray-500">Grouped by status with confidence levels</p>
+              </div>
+              <div className="flex items-center gap-4 text-xs text-gray-500">
+                <span className="flex items-center gap-1">
+                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium">A</span>
+                  Basic
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium">AA</span>
+                  Standard
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded font-medium">AAA</span>
+                  Enhanced
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="divide-y">
+            {statusOrder.map((statusGroup) => {
+              const statusCount = statusCounts[statusGroup];
+              if (statusCount === 0) return null;
+
+              const statusConfig = STATUS_CONFIG[statusGroup];
+              const isStatusExpanded = expandedStatusSections.has(statusGroup);
+              const StatusIcon = statusConfig.icon;
+
+              return (
+                <div key={statusGroup}>
+                  {/* Status Group Header */}
+                  <button
+                    type="button"
+                    onClick={() => toggleStatusSection(statusGroup)}
+                    className={cn(
+                      'w-full flex items-center justify-between px-4 py-3 transition-colors',
+                      statusConfig.bgColor,
+                      'hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500'
+                    )}
+                  >
+                    <span className="flex items-center gap-3">
+                      <StatusIcon className={cn('h-5 w-5', statusConfig.textColor)} />
+                      <span className={cn('font-semibold', statusConfig.textColor)}>
+                        {statusConfig.label}
+                      </span>
+                      <span className="text-sm text-gray-500">
+                        ({statusCount} {statusCount === 1 ? 'criterion' : 'criteria'})
+                      </span>
+                    </span>
+                    <ChevronDown
+                      className={cn(
+                        'h-5 w-5 text-gray-500 transition-transform duration-200',
+                        isStatusExpanded && 'rotate-180'
+                      )}
+                    />
+                  </button>
+
+                  {/* Confidence Sub-sections within Status Group */}
+                  {isStatusExpanded && (
+                    <div className={cn('border-l-4', statusConfig.borderColor)}>
+                      {confidenceOrder.map((confidenceGroup) => {
+                        const items = hybridGroupedCriteria[statusGroup][confidenceGroup];
+                        if (items.length === 0) return null;
+
+                        const confidenceConfig = SECTION_CONFIG[confidenceGroup];
+                        const sectionKey = `${statusGroup}-${confidenceGroup}`;
+                        const isConfidenceExpanded = expandedConfidenceSections.has(sectionKey);
+
+                        return (
+                          <div key={confidenceGroup}>
+                            {/* Confidence Sub-header */}
+                            <button
+                              type="button"
+                              onClick={() => toggleConfidenceSection(sectionKey)}
+                              className={cn(
+                                'w-full flex items-center justify-between px-6 py-2.5 transition-colors',
+                                confidenceConfig.bgColor,
+                                'hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500',
+                                'border-b border-gray-100'
+                              )}
+                            >
+                              <span className="flex items-center gap-2.5">
+                                <span className={cn('w-2.5 h-2.5 rounded-full', confidenceConfig.dotColor)} />
+                                <span className="text-sm font-medium text-gray-700">{confidenceConfig.label}</span>
+                                <span className="text-xs text-gray-500">
+                                  ({items.length} {items.length === 1 ? 'item' : 'items'})
+                                </span>
+                              </span>
+                              <ChevronDown
+                                className={cn(
+                                  'h-4 w-4 text-gray-400 transition-transform duration-200',
+                                  isConfidenceExpanded && 'rotate-180'
+                                )}
+                              />
+                            </button>
+
+                            {/* Criteria Rows */}
+                            {isConfidenceExpanded && (
+                              <div>
+                                {items.map((criterion) => (
+                                  <CriterionRowDisplay
+                                    key={criterion.id}
+                                    criterion={criterion}
+                                    isExpanded={expandedRows.has(criterion.id)}
+                                    onToggle={() => toggleRow(criterion.id)}
+                                    onVerifyClick={onVerifyClick}
+                                    onViewDocs={(id, name) => setDocsCriterion({ id, name })}
+                                    onCriterionClick={(crit) => setDetailsCriterion(crit)}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {selectedCriterion && (
+        <CriterionDetailModal
+          criterion={selectedCriterion}
+          onClose={() => setSelectedCriterion(null)}
+        />
+      )}
+
+      {docsCriterion && (
+        <WcagDocumentationModal
+          criterionId={docsCriterion.id}
+          criterionName={docsCriterion.name}
+          isOpen={!!docsCriterion}
+          onClose={() => setDocsCriterion(null)}
+        />
+      )}
+
+      {detailsCriterion && (
+        <CriterionDetailsModal
+          criterion={detailsCriterion}
+          isOpen={!!detailsCriterion}
+          onClose={() => setDetailsCriterion(null)}
+          onVerifyClick={onVerifyClick}
+          mode="interactive"
+        />
+      )}
     </div>
   );
 }

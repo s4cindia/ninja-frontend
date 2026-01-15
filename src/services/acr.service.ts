@@ -10,6 +10,21 @@ import type {
   UpdateCriterionRequest,
 } from '@/types/acr.types';
 
+const EDITION_CODE_MAP: Record<string, string> = {
+  'VPAT2.5-508': 'section508',
+  'VPAT2.5-WCAG': 'wcag',
+  'VPAT2.5-EU': 'eu',
+  'VPAT2.5-INT': 'international',
+  'section508': 'section508',
+  'wcag': 'wcag',
+  'eu': 'eu',
+  'international': 'international',
+};
+
+function normalizeEditionCode(edition: string): string {
+  return EDITION_CODE_MAP[edition] || edition.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 export const acrService = {
   async getEditions(): Promise<AcrEdition[]> {
     const response = await api.get<ApiResponse<AcrEdition[]>>('/acr/editions');
@@ -17,7 +32,8 @@ export const acrService = {
   },
 
   async getEditionDetails(edition: string): Promise<EditionDetails> {
-    const response = await api.get<ApiResponse<EditionDetails>>(`/acr/editions/${edition}`);
+    const normalizedEdition = normalizeEditionCode(edition);
+    const response = await api.get<ApiResponse<EditionDetails>>(`/acr/editions/${normalizedEdition}`);
     return response.data.data;
   },
 

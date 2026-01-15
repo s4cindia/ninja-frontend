@@ -65,9 +65,11 @@ function getChangeExplanation(changeType?: string, changeDescription?: string): 
   };
 }
 
-function getFallbackSelector(changeType?: string): string | undefined {
-  const normalizedType = changeType?.toLowerCase().replace(/[-_]/g, '');
+function getFallbackSelector(changeType?: string, changeDescription?: string): string | undefined {
+  const normalizedType = changeType?.toLowerCase().replace(/[-_]/g, '') || '';
+  const desc = changeDescription?.toLowerCase() || '';
   
+  // Match EPUB codes
   switch (normalizedType) {
     case 'epubstruct002':
       return 'table';
@@ -76,9 +78,49 @@ function getFallbackSelector(changeType?: string): string | undefined {
       return 'img';
     case 'epublang001':
       return 'html';
-    default:
-      return undefined;
   }
+  
+  // Match common change type patterns
+  if (normalizedType.includes('table') || normalizedType.includes('header')) {
+    return 'table';
+  }
+  if (normalizedType.includes('img') || normalizedType.includes('alt')) {
+    return 'img';
+  }
+  if (normalizedType.includes('lang')) {
+    return 'html';
+  }
+  if (normalizedType.includes('list')) {
+    return 'ul, ol';
+  }
+  if (normalizedType.includes('heading')) {
+    return 'h1, h2, h3, h4, h5, h6';
+  }
+  if (normalizedType.includes('link')) {
+    return 'a';
+  }
+  
+  // Match by description content
+  if (desc.includes('table') || desc.includes('header')) {
+    return 'table';
+  }
+  if (desc.includes('image') || desc.includes('alt text') || desc.includes('alt=')) {
+    return 'img';
+  }
+  if (desc.includes('language') || desc.includes('lang')) {
+    return 'html';
+  }
+  if (desc.includes('list')) {
+    return 'ul, ol';
+  }
+  if (desc.includes('heading')) {
+    return 'h1, h2, h3, h4, h5, h6';
+  }
+  if (desc.includes('link')) {
+    return 'a';
+  }
+  
+  return undefined;
 }
 
 interface VisualComparisonPanelProps {
@@ -208,21 +250,25 @@ export function VisualComparisonPanel({
 
   const effectiveHighlights = useMemo(() => {
     const actualType = changeType || displayData?.change?.changeType;
+    const actualDescription = changeDescription || displayData?.change?.description;
     const baseHighlight = displayData?.highlightData;
     
+    // Use API-provided highlight if available
     if (baseHighlight?.xpath || baseHighlight?.cssSelector) {
       return [baseHighlight];
     }
     
-    const fallbackSelector = getFallbackSelector(actualType);
+    // Fall back to inferred selector based on change type and description
+    const fallbackSelector = getFallbackSelector(actualType, actualDescription);
     if (fallbackSelector) {
       return [{
         xpath: '',
         cssSelector: fallbackSelector,
-        description: changeDescription || displayData?.change?.description || 'Changed element'
+        description: actualDescription || 'Changed element'
       }];
     }
     
+    // If no selector found, return undefined (no highlighting)
     return undefined;
   }, [displayData, changeType, changeDescription]);
 

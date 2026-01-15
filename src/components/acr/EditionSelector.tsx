@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Check, Info, Star } from 'lucide-react';
+import { Check, Info, Star, ChevronRight } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Spinner } from '@/components/ui/Spinner';
 import type { AcrEdition, AcrEditionCode } from '@/types/acr.types';
 import { useEditions } from '@/hooks/useAcr';
+import { CriteriaListModal } from './CriteriaListModal';
 
 interface EditionSelectorProps {
   selectedEdition: AcrEdition | null;
@@ -112,6 +113,10 @@ function getCriteriaLabelColor(status: CriteriaStatus): string {
 export function EditionSelector({ selectedEdition, onSelect, disabled = false }: EditionSelectorProps) {
   const { data: editions, isLoading, error } = useEditions();
   const [hoveredEdition, setHoveredEdition] = useState<string | null>(null);
+  const [selectedEditionForModal, setSelectedEditionForModal] = useState<{
+    code: AcrEditionCode;
+    name: string;
+  } | null>(null);
 
   if (isLoading) {
     return (
@@ -154,20 +159,14 @@ export function EditionSelector({ selectedEdition, onSelect, disabled = false }:
 
           return (
             <div
-              key={edition.id}
+              key={edition.id || edition.code}
               className="relative"
               onMouseEnter={() => setHoveredEdition(edition.code)}
               onMouseLeave={() => setHoveredEdition(null)}
             >
-              <button
-                type="button"
-                onClick={() => !disabled && onSelect(edition)}
-                disabled={disabled}
-                aria-pressed={isSelected}
-                aria-label={`Select ${edition.name} edition`}
+              <div
                 className={cn(
                   'w-full p-4 rounded-lg border-2 text-left transition-all duration-200',
-                  'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
                   isSelected
                     ? 'border-primary-500 bg-primary-50 shadow-md'
                     : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm',
@@ -184,36 +183,61 @@ export function EditionSelector({ selectedEdition, onSelect, disabled = false }:
                   </div>
                 )}
 
-                <div className="flex items-start justify-between mb-3 mt-1">
-                  <div>
-                    <h3 className={cn(
-                      'font-semibold text-base',
-                      isSelected ? 'text-primary-700' : 'text-gray-900'
+                <button
+                  type="button"
+                  onClick={() => !disabled && onSelect(edition)}
+                  disabled={disabled}
+                  aria-pressed={isSelected}
+                  aria-label={`Select ${edition.name} edition`}
+                  className="w-full text-left focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 rounded"
+                >
+                  <div className="flex items-start justify-between mb-3 mt-1">
+                    <div>
+                      <h3 className={cn(
+                        'font-semibold text-base',
+                        isSelected ? 'text-primary-700' : 'text-gray-900'
+                      )}>
+                        {labels?.title || edition.name}
+                      </h3>
+                      <p className="text-sm text-gray-500">
+                        {labels?.subtitle || edition.code}
+                      </p>
+                    </div>
+                    
+                    <div className={cn(
+                      'flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors',
+                      isSelected
+                        ? 'border-primary-500 bg-primary-500'
+                        : 'border-gray-300 bg-white'
                     )}>
-                      {labels?.title || edition.name}
-                    </h3>
-                    <p className="text-sm text-gray-500">
-                      {labels?.subtitle || edition.code}
-                    </p>
+                      {isSelected && <Check className="h-3 w-3 text-white" />}
+                    </div>
                   </div>
-                  
-                  <div className={cn(
-                    'flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors',
-                    isSelected
-                      ? 'border-primary-500 bg-primary-500'
-                      : 'border-gray-300 bg-white'
-                  )}>
-                    {isSelected && <Check className="h-3 w-3 text-white" />}
-                  </div>
-                </div>
 
-                <div className="flex items-center justify-between">
-                  <span className={cn('text-sm font-medium', criteriaColor)}>
-                    {criteriaLabel}
-                  </span>
-                  <Info className="h-4 w-4 text-gray-400" />
-                </div>
-              </button>
+                  <div className="flex items-center justify-between">
+                    <span className={cn('text-sm font-medium', criteriaColor)}>
+                      {criteriaLabel}
+                    </span>
+                    <Info className="h-4 w-4 text-gray-400" />
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedEditionForModal({
+                      code: edition.code as AcrEditionCode,
+                      name: edition.name
+                    });
+                  }}
+                  className="mt-3 text-sm text-primary-600 hover:text-primary-800 hover:underline flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 rounded"
+                  aria-label={`View criteria list for ${edition.name}`}
+                >
+                  View criteria list
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
 
               {isHovered && tooltip && (
                 <div
@@ -236,6 +260,15 @@ export function EditionSelector({ selectedEdition, onSelect, disabled = false }:
             {selectedEdition.name} - {selectedEdition.description}
           </p>
         </div>
+      )}
+
+      {selectedEditionForModal && (
+        <CriteriaListModal
+          edition={selectedEditionForModal.code}
+          editionName={selectedEditionForModal.name}
+          isOpen={!!selectedEditionForModal}
+          onClose={() => setSelectedEditionForModal(null)}
+        />
       )}
     </div>
   );

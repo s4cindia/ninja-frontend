@@ -14,7 +14,8 @@ import {
   Loader2,
   X,
   File,
-  RotateCcw
+  RotateCcw,
+  BookOpen
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
@@ -72,6 +73,7 @@ interface WorkflowState {
   verificationComplete: boolean;
   isFinalized: boolean;
   verifications: VerificationData;
+  fileName: string | null;
 }
 
 const STORAGE_KEY = 'acr-workflow-state';
@@ -95,6 +97,7 @@ function loadWorkflowState(jobId?: string): WorkflowState {
     verificationComplete: false,
     isFinalized: false,
     verifications: {},
+    fileName: null,
   };
 }
 
@@ -181,6 +184,7 @@ export function AcrWorkflowPage() {
   const { jobId: urlJobId } = useParams<{ jobId?: string }>();
   const [searchParams] = useSearchParams();
   const jobIdFromQuery = searchParams.get('jobId');
+  const fileNameFromQuery = searchParams.get('fileName');
   const navigate = useNavigate();
   
   const effectiveJobId = urlJobId || jobIdFromQuery;
@@ -206,9 +210,50 @@ export function AcrWorkflowPage() {
         documentSource: 'existing',
         jobId: effectiveJobId,
         acrId: `acr-${effectiveJobId}`,
+        fileName: fileNameFromQuery ? decodeURIComponent(fileNameFromQuery) : loadedState.fileName,
       });
     }
-  }, [effectiveJobId, state.jobId]);
+  }, [effectiveJobId, state.jobId, fileNameFromQuery]);
+
+  useEffect(() => {
+    if (fileNameFromQuery) {
+      const decodedFileName = decodeURIComponent(fileNameFromQuery);
+      setState(prev => {
+        if (decodedFileName !== prev.fileName) {
+          return { ...prev, fileName: decodedFileName };
+        }
+        return prev;
+      });
+    }
+  }, [fileNameFromQuery]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    
+    const fetchFileName = async () => {
+      if (state.jobId && !state.fileName) {
+        try {
+          const response = await api.get(`/epub/job/${state.jobId}`, { signal: controller.signal });
+          if (controller.signal.aborted) return;
+          const jobData = response.data?.data || response.data;
+          const name = jobData.input?.fileName ||
+                       jobData.output?.fileName ||
+                       jobData.fileName ||
+                       'Untitled Document';
+          setState(prev => ({ ...prev, fileName: name }));
+        } catch (err: unknown) {
+          if (controller.signal.aborted) return;
+          if ((err as { name?: string })?.name === 'AbortError') return;
+          setState(prev => ({ ...prev, fileName: 'Untitled Document' }));
+        }
+      }
+    };
+    fetchFileName();
+    
+    return () => {
+      controller.abort();
+    };
+  }, [state.jobId, state.fileName]);
 
   useEffect(() => {
     const fetchJobs = async () => {
@@ -290,6 +335,7 @@ export function AcrWorkflowPage() {
       verificationComplete: false,
       isFinalized: false,
       verifications: {},
+      fileName: null,
     });
   };
 
@@ -806,6 +852,18 @@ export function AcrWorkflowPage() {
           </span>
         </div>
       </div>
+
+      {state.fileName && (
+        <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-5 w-5 text-blue-600 flex-shrink-0" />
+            <span className="text-sm font-medium text-gray-600">Title:</span>
+            <span className="text-sm font-semibold text-gray-900 truncate" title={state.fileName}>
+              {state.fileName.length > 60 ? `${state.fileName.substring(0, 57)}...` : state.fileName}
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-lg border p-6 min-h-[400px]">
         {renderStepContent()}

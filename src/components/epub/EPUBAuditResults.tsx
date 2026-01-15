@@ -177,7 +177,10 @@ function ActionButtons({
       </Button>
       <Button 
         variant="secondary"
-        onClick={() => navigate(`/acr/workflow?jobId=${jobId}`)}
+        onClick={() => {
+          const encodedFileName = encodeURIComponent(fileName || 'Untitled Document');
+          navigate(`/acr/workflow?jobId=${jobId}&fileName=${encodedFileName}`);
+        }}
       >
         <FileCheck className="h-4 w-4 mr-2" />
         Generate ACR Report
