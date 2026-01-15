@@ -28,13 +28,16 @@ export type AttributionTag = 'AUTOMATED' | 'AI-SUGGESTED' | 'HUMAN-VERIFIED';
 
 export interface AcrCriterion {
   id: string;
-  criterionId: string;
-  criterionName: string;
-  wcagLevel: 'A' | 'AA' | 'AAA';
+  criterionId?: string;  // May not be present in edition criteria
+  criterionName?: string;  // May not be present in edition criteria
+  name: string;  // Backend uses 'name'
+  level: 'A' | 'AA' | 'AAA';  // Backend uses 'level', not 'wcagLevel'
+  wcagLevel?: 'A' | 'AA' | 'AAA';  // Keep for backward compatibility
   conformanceLevel: ConformanceLevel;
   remarks: string;
-  attribution: AttributionTag;
-  isSuspicious: boolean;
+  attribution?: AttributionTag;
+  attributionTag?: AttributionTag;  // Backend uses this
+  isSuspicious?: boolean;
   lastModifiedBy?: string;
   lastModifiedAt?: string;
 }
