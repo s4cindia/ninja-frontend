@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { AlertCircle, AlertTriangle, CheckCircle, LayoutGrid, Table, HelpCircle, ChevronDown, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/Spinner';
@@ -441,24 +441,6 @@ function transformToCriterionAnalysis(criterion: NormalizedCriterion): Criterion
   };
 }
 
-function categorizeCriteria(criteria: CriterionAnalysis[]) {
-  const issues: CriterionAnalysis[] = [];
-  const needsVerification: CriterionAnalysis[] = [];
-  const likelyNA: CriterionAnalysis[] = [];
-
-  criteria.forEach(criterion => {
-    if (criterion.status === 'fail' && criterion.evidence) {
-      issues.push(criterion);
-    } else if (criterion.status === 'likely_na') {
-      likelyNA.push(criterion);
-    } else if (criterion.status === 'needs_verification' || (criterion.status === 'fail' && !criterion.evidence)) {
-      needsVerification.push(criterion);
-    }
-  });
-
-  return { issues, needsVerification, likelyNA };
-}
-
 function convertToTableRow(criterion: CriterionAnalysis): CriterionRow {
   return {
     id: criterion.id,
@@ -488,6 +470,59 @@ interface CriterionDetailModalProps {
 }
 
 function CriterionDetailModal({ criterion, onClose }: CriterionDetailModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement as HTMLElement;
+    
+    const getFocusableElements = () => {
+      if (!modalRef.current) return [];
+      return Array.from(
+        modalRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter(el => !el.hasAttribute('disabled'));
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+
+      if (e.key === 'Tab') {
+        const focusable = getFocusableElements();
+        if (focusable.length === 0) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    
+    const focusable = getFocusableElements();
+    if (focusable.length > 0) {
+      focusable[0].focus();
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if (previousFocusRef.current && typeof previousFocusRef.current.focus === 'function') {
+        previousFocusRef.current.focus();
+      }
+    };
+  }, [onClose]);
+
   return (
     <div 
       className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
@@ -495,7 +530,10 @@ function CriterionDetailModal({ criterion, onClose }: CriterionDetailModalProps)
       aria-modal="true"
       aria-labelledby="criterion-detail-title"
     >
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden m-4">
+      <div 
+        ref={modalRef}
+        className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden m-4"
+      >
         <div className="flex items-center justify-between p-4 border-b bg-gray-50">
           <h2 id="criterion-detail-title" className="text-lg font-semibold text-gray-900">
             {criterion.number} - {criterion.name}
@@ -638,9 +676,8 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
 
   const analysisData = useMemo(() => {
     const transformed = criteria.map(transformToCriterionAnalysis);
-    const categorized = categorizeCriteria(transformed);
     const tableRows = transformed.map(convertToTableRow);
-    return { ...categorized, transformed, tableRows };
+    return { transformed, tableRows };
   }, [criteria]);
 
   if (isLoading) {

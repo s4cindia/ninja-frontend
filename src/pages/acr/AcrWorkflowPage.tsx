@@ -218,30 +218,41 @@ export function AcrWorkflowPage() {
   useEffect(() => {
     if (fileNameFromQuery) {
       const decodedFileName = decodeURIComponent(fileNameFromQuery);
-      if (decodedFileName !== state.fileName) {
-        setState(prev => ({ ...prev, fileName: decodedFileName }));
-      }
+      setState(prev => {
+        if (decodedFileName !== prev.fileName) {
+          return { ...prev, fileName: decodedFileName };
+        }
+        return prev;
+      });
     }
-  }, [fileNameFromQuery, state.fileName]);
+  }, [fileNameFromQuery]);
 
   useEffect(() => {
+    const controller = new AbortController();
+    
     const fetchFileName = async () => {
       if (state.jobId && !state.fileName) {
         try {
-          const response = await api.get(`/epub/job/${state.jobId}`);
+          const response = await api.get(`/epub/job/${state.jobId}`, { signal: controller.signal });
+          if (controller.signal.aborted) return;
           const jobData = response.data?.data || response.data;
           const name = jobData.input?.fileName ||
                        jobData.output?.fileName ||
                        jobData.fileName ||
                        'Untitled Document';
           setState(prev => ({ ...prev, fileName: name }));
-        } catch (err) {
-          console.error('[AcrWorkflow] Failed to fetch fileName:', err);
+        } catch (err: unknown) {
+          if (controller.signal.aborted) return;
+          if ((err as { name?: string })?.name === 'AbortError') return;
           setState(prev => ({ ...prev, fileName: 'Untitled Document' }));
         }
       }
     };
     fetchFileName();
+    
+    return () => {
+      controller.abort();
+    };
   }, [state.jobId, state.fileName]);
 
   useEffect(() => {
