@@ -233,6 +233,19 @@ const STATUS_CONFIG: Record<StatusGroup, {
   },
 };
 
+function getStatusGroup(criterion: CriterionConfidence): StatusGroup {
+  if (criterion.status === 'not_applicable' || criterion.status === 'not_tested') {
+    return 'not_applicable';
+  }
+  if (criterion.status === 'fail') {
+    return 'fail';
+  }
+  if (criterion.needsVerification || criterion.status === 'not_tested') {
+    return 'needs_review';
+  }
+  return 'pass';
+}
+
 function isDemoJob(jobId: string): boolean {
   return !jobId || jobId === 'demo' || jobId === 'new' || jobId.startsWith('upload-') || jobId.startsWith('demo-');
 }
