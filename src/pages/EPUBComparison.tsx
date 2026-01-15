@@ -77,27 +77,27 @@ export const EPUBComparison: React.FC = () => {
         return;
       }
 
-      const stateFileName = locationState?.epubFileName || 'uploaded-file.epub';
-      const stateFixedCount = locationState?.fixedCount ?? 0;
-      const stateFailedCount = locationState?.failedCount ?? 0;
-      const stateSkippedCount = locationState?.skippedCount ?? 0;
-      const stateBeforeScore = locationState?.beforeScore ?? 45;
-      const stateAfterScore = locationState?.afterScore ?? 85;
-
       try {
-        const response = await api.get(`/epub/job/${jobId}/comparison/summary`);
-        const data = response.data.data || response.data;
+        // Fetch job data to get the actual EPUB filename
+        const jobResponse = await api.get(`/jobs/${jobId}`);
+        const jobData = jobResponse.data.data || jobResponse.data;
+        const actualFileName = jobData.originalFile?.name || jobData.file?.name || 'uploaded-file.epub';
+
+        // Fetch comparison data
+        const comparisonResponse = await api.get(`/epub/job/${jobId}/comparison/summary`);
+        const data = comparisonResponse.data.data || comparisonResponse.data;
+
         setComparison({
           jobId: data.jobId || jobId,
-          epubFileName: data.epubFileName || stateFileName,
-          fixedCount: data.fixedCount ?? stateFixedCount,
-          failedCount: data.failedCount ?? stateFailedCount,
-          skippedCount: data.skippedCount ?? stateSkippedCount,
-          beforeScore: data.beforeScore ?? stateBeforeScore,
-          afterScore: data.afterScore ?? stateAfterScore,
-          filesModified: data.filesModified ?? stateFixedCount,
+          epubFileName: data.epubFileName || actualFileName,
+          fixedCount: data.fixedCount ?? locationState?.fixedCount ?? 0,
+          failedCount: data.failedCount ?? locationState?.failedCount ?? 0,
+          skippedCount: data.skippedCount ?? locationState?.skippedCount ?? 0,
+          beforeScore: data.beforeScore ?? locationState?.beforeScore ?? 0,
+          afterScore: data.afterScore ?? locationState?.afterScore ?? 100,
+          filesModified: data.filesModified ?? data.fixedCount ?? 0,
           modificationsByCategory: data.modificationsByCategory || {
-            metadata: stateFixedCount,
+            metadata: data.fixedCount ?? 0,
             accessibility: 0,
             structure: 0,
             content: 0,
@@ -105,25 +105,53 @@ export const EPUBComparison: React.FC = () => {
           changes: data.changes || [],
         });
         setIsDemo(false);
-      } catch {
-        setComparison({
-          jobId,
-          epubFileName: stateFileName,
-          fixedCount: stateFixedCount,
-          failedCount: stateFailedCount,
-          skippedCount: stateSkippedCount,
-          beforeScore: stateBeforeScore,
-          afterScore: stateAfterScore,
-          filesModified: stateFixedCount,
-          modificationsByCategory: {
-            metadata: stateFixedCount,
-            accessibility: 0,
-            structure: 0,
-            content: 0,
-          },
-          changes: [],
-        });
-        setIsDemo(false);
+      } catch (error) {
+        console.error('[EPUBComparison] Failed to load data:', error);
+
+        // Try to at least get the job filename for the fallback
+        try {
+          const jobResponse = await api.get(`/jobs/${jobId}`);
+          const jobData = jobResponse.data.data || jobResponse.data;
+          const actualFileName = jobData.originalFile?.name || jobData.file?.name || 'uploaded-file.epub';
+
+          setComparison({
+            jobId,
+            epubFileName: actualFileName,
+            fixedCount: locationState?.fixedCount ?? 0,
+            failedCount: locationState?.failedCount ?? 0,
+            skippedCount: locationState?.skippedCount ?? 0,
+            beforeScore: locationState?.beforeScore ?? 0,
+            afterScore: locationState?.afterScore ?? 100,
+            filesModified: locationState?.fixedCount ?? 0,
+            modificationsByCategory: {
+              metadata: locationState?.fixedCount ?? 0,
+              accessibility: 0,
+              structure: 0,
+              content: 0,
+            },
+            changes: [],
+          });
+        } catch {
+          // Complete fallback
+          setComparison({
+            jobId,
+            epubFileName: locationState?.epubFileName || 'uploaded-file.epub',
+            fixedCount: locationState?.fixedCount ?? 0,
+            failedCount: locationState?.failedCount ?? 0,
+            skippedCount: locationState?.skippedCount ?? 0,
+            beforeScore: locationState?.beforeScore ?? 0,
+            afterScore: locationState?.afterScore ?? 100,
+            filesModified: locationState?.fixedCount ?? 0,
+            modificationsByCategory: {
+              metadata: locationState?.fixedCount ?? 0,
+              accessibility: 0,
+              structure: 0,
+              content: 0,
+            },
+            changes: [],
+          });
+        }
+        setIsDemo(true);
       } finally {
         setLoading(false);
       }
