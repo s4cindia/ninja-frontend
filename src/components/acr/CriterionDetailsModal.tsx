@@ -1,9 +1,10 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { X, ExternalLink, CheckCircle, AlertCircle, Book, Wrench, FileText } from 'lucide-react';
-import { useState } from 'react';
+import { X, ExternalLink, CheckCircle, AlertCircle, Book, Wrench, FileText, BookOpen } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { api } from '@/services/api';
 import { cn } from '@/lib/utils';
 import { wcagDocumentationService } from '@/services/wcag-documentation.service';
 import type { CriterionConfidence } from '@/services/api';
@@ -29,8 +30,25 @@ export function CriterionDetailsModal({
   mode = 'interactive'
 }: CriterionDetailsModalProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'issues' | 'testing' | 'remediation' | 'wcag'>('overview');
+  const [epubTitle, setEpubTitle] = useState<string>('');
   const navigate = useNavigate();
   const wcagDocs = wcagDocumentationService.getDocumentation(criterion.criterionId);
+
+  useEffect(() => {
+    const fetchJobData = async () => {
+      if (!jobId) return;
+      try {
+        const response = await api.get(`/jobs/${jobId}`);
+        const job = response.data.data || response.data;
+        const fileName = job.originalFile?.name || job.file?.name || '';
+        setEpubTitle(fileName);
+      } catch (error) {
+        console.error('Failed to fetch job data:', error);
+      }
+    };
+
+    fetchJobData();
+  }, [jobId]);
 
   const getLevelBadgeClass = (level: string) => {
     switch (level) {
@@ -78,6 +96,16 @@ export function CriterionDetailsModal({
             </Button>
           </div>
         </DialogHeader>
+
+        {epubTitle && (
+          <div className="px-6 py-3 bg-blue-50 border-b border-blue-200">
+            <div className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4 text-blue-600" />
+              <span className="text-sm text-gray-600">EPUB:</span>
+              <span className="text-sm font-medium text-gray-900">{epubTitle}</span>
+            </div>
+          </div>
+        )}
 
         <Tabs defaultValue="overview" value={activeTab} onValueChange={(v) => setActiveTab(v as 'overview' | 'issues' | 'testing' | 'remediation' | 'wcag')} className="flex-1 flex flex-col overflow-hidden">
           <TabsList className="grid w-full grid-cols-5">
