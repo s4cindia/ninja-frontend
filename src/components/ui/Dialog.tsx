@@ -1,6 +1,12 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useId, createContext, useContext } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+interface DialogContextValue {
+  titleId: string;
+}
+
+const DialogContext = createContext<DialogContextValue | null>(null);
 
 interface DialogProps {
   open: boolean;
@@ -11,6 +17,7 @@ interface DialogProps {
 export function Dialog({ open, onOpenChange, children }: DialogProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const titleId = useId();
 
   useEffect(() => {
     if (!open) return;
@@ -77,15 +84,18 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
   };
 
   return (
-    <div
-      ref={overlayRef}
-      onClick={handleOverlayClick}
-      className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-    >
-      {children}
-    </div>
+    <DialogContext.Provider value={{ titleId }}>
+      <div
+        ref={overlayRef}
+        onClick={handleOverlayClick}
+        className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
+        {children}
+      </div>
+    </DialogContext.Provider>
   );
 }
 
@@ -127,8 +137,12 @@ interface DialogTitleProps {
 }
 
 export function DialogTitle({ children, className }: DialogTitleProps) {
+  const context = useContext(DialogContext);
   return (
-    <h2 className={cn('text-lg font-semibold text-gray-900', className)}>
+    <h2 
+      id={context?.titleId}
+      className={cn('text-lg font-semibold text-gray-900', className)}
+    >
       {children}
     </h2>
   );
