@@ -15,7 +15,7 @@ interface CriteriaListModalProps {
 }
 
 export function CriteriaListModal({ edition, editionName, isOpen, onClose }: CriteriaListModalProps) {
-  const { data: editionDetails, isLoading, error } = useEditionDetails(isOpen ? edition : null);
+  const { data: editionDetails, isLoading, error } = useEditionDetails(edition, { enabled: isOpen });
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['level-a', 'level-aa']));
 
   const toggleSection = (sectionId: string) => {

@@ -17,11 +17,11 @@ export function useEditions() {
   });
 }
 
-export function useEditionDetails(edition: string | null) {
+export function useEditionDetails(edition: string, options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: ['acr', 'editions', edition],
-    queryFn: () => acrService.getEditionDetails(edition!),
-    enabled: !!edition,
+    queryKey: ['acr', 'edition-details', edition],
+    queryFn: () => acrService.getEditionDetails(edition),
     staleTime: 10 * 60 * 1000,
+    enabled: options?.enabled ?? true,
   });
 }
