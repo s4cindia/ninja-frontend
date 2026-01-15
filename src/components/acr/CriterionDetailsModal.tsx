@@ -6,9 +6,11 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { wcagDocumentationService } from '@/services/wcag-documentation.service';
 import type { CriterionConfidence } from '@/services/api';
+import type { IssueMapping } from '@/types/confidence.types';
 
 interface CriterionDetailsModalProps {
   criterion: CriterionConfidence;
+  relatedIssues?: IssueMapping[];
   isOpen: boolean;
   onClose: () => void;
   onVerifyClick?: (criterionId: string) => void;
@@ -17,12 +19,13 @@ interface CriterionDetailsModalProps {
 
 export function CriterionDetailsModal({
   criterion,
+  relatedIssues,
   isOpen,
   onClose,
   onVerifyClick,
   mode = 'interactive'
 }: CriterionDetailsModalProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'testing' | 'remediation' | 'wcag'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'issues' | 'testing' | 'remediation' | 'wcag'>('overview');
   const wcagDocs = wcagDocumentationService.getDocumentation(criterion.criterionId);
 
   const getLevelBadgeClass = (level: string) => {
@@ -72,11 +75,20 @@ export function CriterionDetailsModal({
           </div>
         </DialogHeader>
 
-        <Tabs defaultValue="overview" value={activeTab} onValueChange={(v) => setActiveTab(v as 'overview' | 'testing' | 'remediation' | 'wcag')} className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="grid w-full grid-cols-4">
+        <Tabs defaultValue="overview" value={activeTab} onValueChange={(v) => setActiveTab(v as 'overview' | 'issues' | 'testing' | 'remediation' | 'wcag')} className="flex-1 flex flex-col overflow-hidden">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview" className="flex items-center gap-1.5">
               <FileText className="h-4 w-4" />
               Overview
+            </TabsTrigger>
+            <TabsTrigger value="issues" className="flex items-center gap-1.5">
+              <AlertCircle className="h-4 w-4" />
+              Issues
+              {relatedIssues && relatedIssues.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 rounded-full text-xs bg-red-100 text-red-800">
+                  {relatedIssues.length}
+                </span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="testing" className="flex items-center gap-1.5">
               <CheckCircle className="h-4 w-4" />
@@ -179,6 +191,94 @@ export function CriterionDetailsModal({
                       </li>
                     ))}
                   </ul>
+                </div>
+              )}
+
+              {relatedIssues && relatedIssues.length > 0 && (
+                <div className="border border-red-200 bg-red-50 rounded-lg p-4">
+                  <h3 className="font-semibold text-red-900 mb-3 flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5" />
+                    Related Issues ({relatedIssues.length})
+                  </h3>
+                  <p className="text-sm text-red-800 mb-2">
+                    See the Issues tab for detailed information.
+                  </p>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="issues" className="space-y-4 mt-0">
+              {relatedIssues && relatedIssues.length > 0 ? (
+                <>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h3 className="font-semibold text-blue-900 mb-2">EPUB Audit Issues</h3>
+                    <p className="text-sm text-blue-800">
+                      Found {relatedIssues.length} issue{relatedIssues.length !== 1 ? 's' : ''} in the EPUB that relate to this criterion.
+                      These issues were automatically mapped from the accessibility audit.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    {relatedIssues.map((issue) => (
+                      <div key={issue.issueId} className="border rounded-lg p-4 bg-white">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-sm text-gray-600">{issue.ruleId}</span>
+                              <span className={cn(
+                                'px-2 py-0.5 rounded-full text-xs font-medium',
+                                issue.impact === 'critical' && 'bg-red-100 text-red-800',
+                                issue.impact === 'serious' && 'bg-orange-100 text-orange-800',
+                                issue.impact === 'moderate' && 'bg-yellow-100 text-yellow-800',
+                                issue.impact === 'minor' && 'bg-gray-100 text-gray-800'
+                              )}>
+                                {issue.impact}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-700 mt-2">{issue.message}</p>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 bg-gray-50 rounded p-2">
+                          <p className="text-xs text-gray-600 font-medium">Location:</p>
+                          <p className="text-xs text-gray-800 font-mono">{issue.filePath}</p>
+                          {issue.location && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              Line {issue.location.startLine}
+                              {issue.location.endLine && issue.location.endLine !== issue.location.startLine &&
+                                `-${issue.location.endLine}`}
+                            </p>
+                          )}
+                        </div>
+
+                        {issue.htmlSnippet && (
+                          <div className="mt-3">
+                            <p className="text-xs text-gray-600 font-medium mb-1">HTML:</p>
+                            <pre className="bg-gray-900 text-gray-100 p-2 rounded text-xs overflow-x-auto">
+                              <code>{issue.htmlSnippet}</code>
+                            </pre>
+                          </div>
+                        )}
+
+                        {issue.xpath && (
+                          <div className="mt-2">
+                            <p className="text-xs text-gray-600 font-medium">XPath:</p>
+                            <code className="text-xs text-purple-700 bg-purple-50 px-2 py-1 rounded">
+                              {issue.xpath}
+                            </code>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-12 text-gray-500">
+                  <p className="text-lg font-medium mb-2">No Issues Found</p>
+                  <p className="text-sm">
+                    No EPUB audit issues were mapped to this criterion.
+                    This could mean the content passes this criterion.
+                  </p>
                 </div>
               )}
             </TabsContent>
