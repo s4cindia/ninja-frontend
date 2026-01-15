@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Zap, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Zap, CheckCircle, XCircle, Loader2, BookOpen } from 'lucide-react';
 import { applyBatchQuickFix, BatchQuickFixResult } from '@/services/quickfix.service';
+import { api } from '@/services/api';
 
 interface BatchFixResults extends BatchQuickFixResult {
   errorMessage?: string;
@@ -150,9 +151,26 @@ export function BatchQuickFixPanel({
   onCancel
 }: BatchQuickFixPanelProps) {
   const [results, setResults] = useState<BatchFixResults | null>(null);
+  const [epubTitle, setEpubTitle] = useState<string>('');
   const queryClient = useQueryClient();
   const panelRef = useRef<HTMLDivElement>(null);
   const applyButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const fetchJobData = async () => {
+      if (!jobId) return;
+      try {
+        const response = await api.get(`/jobs/${jobId}`);
+        const job = response.data.data || response.data;
+        const fileName = job.originalFile?.name || job.file?.name || '';
+        setEpubTitle(fileName);
+      } catch (error) {
+        console.error('Failed to fetch job data:', error);
+      }
+    };
+
+    fetchJobData();
+  }, [jobId]);
 
   useEffect(() => {
     if (import.meta.env.DEV) {
@@ -228,6 +246,16 @@ export function BatchQuickFixPanel({
         </div>
       </div>
 
+      {epubTitle && (
+        <div className="px-4 py-3 bg-blue-50 border-b border-blue-200 mb-4 rounded-lg">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4 text-blue-600" />
+            <span className="text-sm text-gray-600">EPUB:</span>
+            <span className="text-sm font-medium text-gray-900">{epubTitle}</span>
+          </div>
+        </div>
+      )}
+
       <div className="mb-6 max-h-64 overflow-y-auto">
         <p className="text-sm font-medium text-gray-700 mb-2">
           This will fix the following issues:
@@ -237,9 +265,6 @@ export function BatchQuickFixPanel({
             <li key={issue.id} className="text-sm bg-gray-50 p-2 rounded">
               <div className="font-medium text-gray-900">{issue.message}</div>
               <div className="text-xs text-gray-600">{issue.filePath}</div>
-              {issue.location && (
-                <div className="text-xs text-gray-500">{issue.location}</div>
-              )}
             </li>
           ))}
         </ul>
