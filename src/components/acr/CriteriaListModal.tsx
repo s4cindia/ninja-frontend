@@ -101,7 +101,7 @@ export function CriteriaListModal({ edition, editionName, isOpen, onClose }: Cri
               {editionDetails.sections?.map((section) => {
                 const isExpanded = expandedSections.has(section.id);
                 const sectionCriteria = editionDetails.criteria?.filter(
-                  c => c.wcagLevel === section.name.replace('Level ', '')
+                  c => (c.level || c.wcagLevel) === section.name.replace('Level ', '')
                 ) || [];
 
                 return (
@@ -147,17 +147,17 @@ export function CriteriaListModal({ edition, editionName, isOpen, onClose }: Cri
                             <div className="flex items-start gap-3">
                               <span className={cn(
                                 'px-1.5 py-0.5 rounded text-xs font-medium flex-shrink-0',
-                                getLevelBadgeClass(criterion.wcagLevel)
+                                getLevelBadgeClass(criterion.level || criterion.wcagLevel || 'A')
                               )}>
-                                {criterion.wcagLevel}
+                                {criterion.level || criterion.wcagLevel}
                               </span>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-baseline gap-2">
                                   <span className="font-medium text-gray-900">
-                                    {criterion.criterionId}
+                                    {criterion.id}
                                   </span>
                                   <span className="text-sm text-gray-700">
-                                    {criterion.criterionName}
+                                    {criterion.name || criterion.criterionName}
                                   </span>
                                 </div>
                               </div>
