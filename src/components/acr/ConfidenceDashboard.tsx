@@ -623,6 +623,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [docsCriterion, setDocsCriterion] = useState<{ id: string; name: string } | null>(null);
   const [detailsCriterion, setDetailsCriterion] = useState<CriterionConfidence | null>(null);
+  const [showOnlyWithIssues, setShowOnlyWithIssues] = useState(false);
 
   const {
     data: confidenceData,
@@ -720,6 +721,14 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
 
   const { tableRows, transformed } = analysisData;
 
+  // Filter criteria based on showOnlyWithIssues
+  const filteredCriteria = showOnlyWithIssues
+    ? criteria.filter(c => {
+        const issueInfo = issuesByCriterion.get(c.criterionId);
+        return issueInfo && issueInfo.count > 0;
+      })
+    : criteria;
+
   // Group by status first, then by confidence within each status
   const hybridGroupedCriteria: Record<StatusGroup, Record<ConfidenceGroup, CriterionConfidence[]>> = {
     pass: { high: [], medium: [], low: [], manual: [] },
@@ -728,13 +737,13 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     not_applicable: { high: [], medium: [], low: [], manual: [] },
   };
 
-  criteria.forEach(c => {
+  filteredCriteria.forEach(c => {
     const statusGroup = getStatusGroup(c);
     const confidenceGroup = getConfidenceGroup(c);
     hybridGroupedCriteria[statusGroup][confidenceGroup].push(c);
   });
 
-  // Calculate counts for each status group
+  // Calculate counts for each status group (use filteredCriteria for display)
   const statusCounts: Record<StatusGroup, number> = {
     pass: 0,
     fail: 0,
@@ -742,7 +751,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     not_applicable: 0,
   };
 
-  criteria.forEach(c => {
+  filteredCriteria.forEach(c => {
     const statusGroup = getStatusGroup(c);
     statusCounts[statusGroup]++;
   });
@@ -828,6 +837,11 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
               {criterion.level}
             </span>
             <span className="font-medium text-gray-900">{criterion.criterionId}</span>
+            {issueData && issueData.count > 0 && (
+              <span title={`${issueData.count} issue${issueData.count !== 1 ? 's' : ''}`}>
+                <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+              </span>
+            )}
             <span className="text-gray-600">{criterion.name}</span>
             {issueData && issueData.count > 0 && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
@@ -958,8 +972,27 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
       </div>
 
       {/* View Mode Toggle */}
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-gray-900">Accessibility Criteria Analysis</h3>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-3">
+          <h3 className="font-semibold text-gray-900">Accessibility Criteria Analysis</h3>
+          <button
+            className={cn(
+              'px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center',
+              showOnlyWithIssues
+                ? 'bg-red-100 text-red-800 border-2 border-red-500'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            )}
+            onClick={() => setShowOnlyWithIssues(!showOnlyWithIssues)}
+          >
+            <AlertCircle className="mr-1 h-4 w-4" />
+            Has Issues
+            {showOnlyWithIssues && confidenceData && (
+              <span className="ml-2 px-1.5 py-0.5 bg-red-200 rounded-full text-xs">
+                {confidenceData.criteria.filter(c => (c.issueCount || 0) > 0).length}
+              </span>
+            )}
+          </button>
+        </div>
         <div className="flex gap-1 bg-gray-100 p-1 rounded-lg" role="group" aria-label="View mode">
           <button
             onClick={() => {
