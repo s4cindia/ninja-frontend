@@ -342,11 +342,31 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
   }, [criteriaFromAnalysis]);
 
   const handleViewGuidance = useCallback((itemId: string) => {
-    const criterion = criteriaMap.get(itemId);
+    let criterion = criteriaMap.get(itemId);
+    
+    if (!criterion) {
+      const item = items.find(i => i.id === itemId);
+      if (item) {
+        criterion = {
+          id: item.id,
+          criterionId: item.criterionId,
+          name: item.criterionName,
+          level: item.wcagLevel,
+          status: item.automatedResult === 'pass' ? 'pass' : 
+                  item.automatedResult === 'fail' ? 'fail' : 'not_tested',
+          confidenceScore: item.confidenceScore,
+          remarks: item.automatedNotes,
+          needsVerification: true,
+          automatedChecks: [],
+          manualChecks: [],
+        };
+      }
+    }
+    
     if (criterion) {
       setSelectedCriterionForGuidance(criterion);
     }
-  }, [criteriaMap]);
+  }, [criteriaMap, items]);
 
   const handleSelectItem = (id: string, selected: boolean) => {
     setSelectedItems(prev => {
@@ -639,7 +659,7 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
                 onSelect={handleSelectItem}
                 onSubmit={handleSubmitVerification}
                 isSubmitting={isSubmitting}
-                onViewGuidance={criteriaFromAnalysis ? handleViewGuidance : undefined}
+                onViewGuidance={handleViewGuidance}
               />
             ))
           )}
