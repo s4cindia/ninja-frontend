@@ -102,6 +102,7 @@ export type ExportFormat = 'docx' | 'pdf' | 'html';
 export interface ExportOptions {
   format: ExportFormat;
   includeMethodology: boolean;
+  
   includeAttributionTags: boolean;
   includeLegalDisclaimer: boolean;
   branding?: {
