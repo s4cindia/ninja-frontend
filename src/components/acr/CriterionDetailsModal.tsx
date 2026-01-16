@@ -97,9 +97,10 @@ export function CriterionDetailsModal({
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className="h-8 w-8 p-0 flex-shrink-0"
+              className="h-10 w-10 p-0 flex-shrink-0 rounded-full hover:bg-gray-100"
+              aria-label="Close dialog"
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5 text-gray-500" />
             </Button>
           </div>
         </DialogHeader>
