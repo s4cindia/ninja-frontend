@@ -295,6 +295,7 @@ export function AcrWorkflowPage() {
                       job.file?.name ||
                       job.input?.fileName ||
                       job.output?.fileName ||
+                      job.output?.epubTitle ||
                       'Untitled Document';
 
         setDocumentTitle(title);
@@ -491,7 +492,7 @@ export function AcrWorkflowPage() {
 
       case 2: {
         const getJobDisplayName = (job: AuditJob) => {
-          return job.input?.fileName || job.output?.fileName || 'Untitled Document';
+          return job.input?.fileName || job.output?.fileName || (job.output as { epubTitle?: string })?.epubTitle || 'Untitled Document';
         };
 
         return (
