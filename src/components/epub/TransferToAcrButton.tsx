@@ -35,7 +35,7 @@ export const TransferToAcrButton: React.FC<TransferToAcrButtonProps> = ({
         setAcrWorkflowId(demoAcrId);
         setTransferred(true);
       } else {
-        const response = await api.post(`/epub/remediation/${jobId}/transfer-to-acr`);
+        const response = await api.post(`/epub/job/${jobId}/transfer-to-acr`);
         const data = response.data.data || response.data;
         setAcrWorkflowId(data.acrWorkflowId || data.id);
         setTransferred(true);
