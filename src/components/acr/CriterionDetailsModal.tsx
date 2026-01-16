@@ -31,6 +31,7 @@ export function CriterionDetailsModal({
 }: CriterionDetailsModalProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'issues' | 'testing' | 'remediation' | 'wcag'>('overview');
   const [epubTitle, setEpubTitle] = useState<string>('');
+  const [hasRemediationData, setHasRemediationData] = useState<boolean>(false);
   const navigate = useNavigate();
   const wcagDocs = wcagDocumentationService.getDocumentation(criterion.criterionId);
 
@@ -42,6 +43,12 @@ export function CriterionDetailsModal({
         const job = response.data.data || response.data;
         const fileName = job.originalFile?.name || job.file?.name || '';
         setEpubTitle(fileName);
+
+        // Check if the job has remediation data (remediated file exists)
+        const hasRemediated = Boolean(job.remediatedFile);
+        setHasRemediationData(hasRemediated);
+
+        console.log('[CriterionDetailsModal] Has remediation:', hasRemediated);
       } catch (error) {
         console.error('Failed to fetch job data:', error);
       }
@@ -304,7 +311,8 @@ export function CriterionDetailsModal({
                     ))}
                   </div>
 
-                  {jobId && (
+                  {/* View Remediation Changes CTA - Only show if remediation completed */}
+                  {jobId && (hasRemediationData ? (
                     <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
                       <div className="flex items-start gap-3">
                         <FileText className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
@@ -324,7 +332,19 @@ export function CriterionDetailsModal({
                         </div>
                       </div>
                     </div>
-                  )}
+                  ) : (
+                    <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-yellow-900 mb-1">Remediation Pending</h4>
+                          <p className="text-sm text-yellow-800">
+                            These issues have not been remediated yet. Complete the EPUB remediation workflow first to see before/after code changes.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </>
               ) : (
                 <div className="text-center py-12 text-gray-500">
