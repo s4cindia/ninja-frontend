@@ -1671,7 +1671,7 @@ export const EPUBRemediation: React.FC = () => {
     }));
   };
 
-  if (pageState === "loading") {
+  if (pageState === "loading" || (pageState === "complete" && !plan)) {
     return (
       <div className="p-6 max-w-4xl mx-auto">
         <div className="flex items-center justify-center py-12">
