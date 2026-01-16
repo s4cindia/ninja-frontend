@@ -1839,7 +1839,7 @@ export const EPUBRemediation: React.FC = () => {
                   <Eye className="h-4 w-4 mr-2" />
                   View Comparison
                 </Button>
-                <Button onClick={() => navigate(`/epub/compare/${jobId}`)} variant="outline">
+                <Button onClick={() => navigate(`/remediation/${jobId}/comparison`)} variant="outline">
                   <Eye className="h-4 w-4 mr-2" />
                   Review Changes
                 </Button>
