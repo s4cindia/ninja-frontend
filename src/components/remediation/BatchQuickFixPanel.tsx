@@ -158,14 +158,20 @@ export function BatchQuickFixPanel({
 
   useEffect(() => {
     const fetchJobData = async () => {
-      if (!jobId) return;
+      if (!jobId) {
+        console.log('[BatchQuickFixPanel] No jobId provided');
+        return;
+      }
       try {
+        console.log('[BatchQuickFixPanel] Fetching job data for:', jobId);
         const response = await api.get(`/jobs/${jobId}`);
+        console.log('[BatchQuickFixPanel] Job response:', response.data);
         const job = response.data.data || response.data;
-        const fileName = job.originalFile?.name || job.file?.name || '';
+        const fileName = job.originalFile?.name || job.file?.name || job.fileName || '';
+        console.log('[BatchQuickFixPanel] Extracted fileName:', fileName);
         setEpubTitle(fileName);
       } catch (error) {
-        console.error('Failed to fetch job data:', error);
+        console.error('[BatchQuickFixPanel] Failed to fetch job data:', error);
       }
     };
 
