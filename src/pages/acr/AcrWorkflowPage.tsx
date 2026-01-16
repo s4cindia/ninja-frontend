@@ -14,8 +14,7 @@ import {
   Loader2,
   X,
   File,
-  RotateCcw,
-  BookOpen
+  RotateCcw
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
@@ -892,18 +891,6 @@ export function AcrWorkflowPage() {
           </span>
         </div>
       </div>
-
-      {state.fileName && (
-        <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-blue-600 flex-shrink-0" />
-            <span className="text-sm font-medium text-gray-600">Title:</span>
-            <span className="text-sm font-semibold text-gray-900 truncate" title={state.fileName}>
-              {state.fileName.length > 60 ? `${state.fileName.substring(0, 57)}...` : state.fileName}
-            </span>
-          </div>
-        </div>
-      )}
 
       <div className="bg-white rounded-lg border p-6 min-h-[400px]">
         {renderStepContent()}
