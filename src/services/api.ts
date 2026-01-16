@@ -150,6 +150,17 @@ export interface CriterionCheck {
   passed: boolean;
 }
 
+export interface CriterionIssue {
+  issueId?: string;
+  ruleId?: string;
+  impact?: 'critical' | 'serious' | 'moderate' | 'minor';
+  message: string;
+  filePath?: string;
+  location?: string;
+  htmlSnippet?: string;
+  suggestedFix?: string;
+}
+
 export interface CriterionConfidence {
   id: string;
   criterionId: string;
@@ -161,6 +172,8 @@ export interface CriterionConfidence {
   remarks?: string;
   automatedChecks: CriterionCheck[];
   manualChecks: string[];
+  relatedIssues?: CriterionIssue[];
+  issueCount?: number;
 }
 
 export interface AcrAnalysisResponse {

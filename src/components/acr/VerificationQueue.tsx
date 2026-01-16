@@ -13,7 +13,8 @@ import type {
   VerificationMethod,
   Severity,
   ConfidenceLevel,
-  VerificationFilters 
+  VerificationFilters,
+  VerificationIssue
 } from '@/types/verification.types';
 
 interface SavedVerification {
@@ -65,6 +66,20 @@ function convertCriteriaToVerificationItems(
         c.status === 'fail' ? 'fail' :
         c.status === 'not_tested' ? 'not_tested' : 'warning';
 
+      const issues: VerificationIssue[] | undefined = c.relatedIssues?.map((issue) => ({
+        id: issue.issueId,
+        message: issue.message,
+        severity: issue.impact as Severity | undefined,
+        location: issue.location || issue.filePath,
+        html: issue.htmlSnippet,
+        suggestedFix: issue.suggestedFix,
+      }));
+
+      const issueCount = c.issueCount || issues?.length || 0;
+      const automatedNotesWithIssues = issueCount > 0
+        ? `Found ${issueCount} issue${issueCount !== 1 ? 's' : ''} requiring review. ${c.remarks || ''}`
+        : c.remarks || `Automated analysis flagged this criterion for human review. Confidence: ${score}%`;
+
       const baseItem: VerificationItemType = {
         id: c.id || `criterion-${index}`,
         criterionId: c.criterionId || `Unknown-${index}`,
@@ -74,9 +89,10 @@ function convertCriteriaToVerificationItems(
         confidenceLevel,
         confidenceScore: score,
         automatedResult,
-        automatedNotes: c.remarks || `Automated analysis flagged this criterion for human review. Confidence: ${score}%`,
+        automatedNotes: automatedNotesWithIssues,
         status: 'pending',
         history: [],
+        issues: issues && issues.length > 0 ? issues : undefined,
       };
 
       if (saved) {
