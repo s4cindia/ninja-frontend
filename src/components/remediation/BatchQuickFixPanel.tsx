@@ -12,6 +12,7 @@ interface BatchQuickFixPanelProps {
   jobId: string;
   fixType: string;
   fixName: string;
+  epubFileName?: string;
   issues: Array<{
     id: string;
     code: string;
@@ -146,37 +147,36 @@ export function BatchQuickFixPanel({
   jobId,
   fixType,
   fixName,
+  epubFileName,
   issues,
   onComplete,
   onCancel
 }: BatchQuickFixPanelProps) {
   const [results, setResults] = useState<BatchFixResults | null>(null);
-  const [epubTitle, setEpubTitle] = useState<string>('');
+  const [epubTitle, setEpubTitle] = useState<string>(epubFileName || '');
   const queryClient = useQueryClient();
   const panelRef = useRef<HTMLDivElement>(null);
   const applyButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    const fetchJobData = async () => {
-      if (!jobId) {
-        console.log('[BatchQuickFixPanel] No jobId provided');
-        return;
-      }
-      try {
-        console.log('[BatchQuickFixPanel] Fetching job data for:', jobId);
-        const response = await api.get(`/jobs/${jobId}`);
-        console.log('[BatchQuickFixPanel] Job response:', response.data);
-        const job = response.data.data || response.data;
-        const fileName = job.originalFile?.name || job.file?.name || job.fileName || '';
-        console.log('[BatchQuickFixPanel] Extracted fileName:', fileName);
-        setEpubTitle(fileName);
-      } catch (error) {
-        console.error('[BatchQuickFixPanel] Failed to fetch job data:', error);
-      }
-    };
-
-    fetchJobData();
-  }, [jobId]);
+    if (epubFileName && !epubTitle) {
+      setEpubTitle(epubFileName);
+    } else if (!epubTitle && jobId) {
+      const fetchJobData = async () => {
+        try {
+          const response = await api.get(`/jobs/${jobId}`);
+          const job = response.data.data || response.data;
+          const fileName = job.originalFile?.name || job.file?.name || job.fileName || '';
+          if (fileName) {
+            setEpubTitle(fileName);
+          }
+        } catch (error) {
+          console.error('[BatchQuickFixPanel] Failed to fetch job data:', error);
+        }
+      };
+      fetchJobData();
+    }
+  }, [jobId, epubFileName, epubTitle]);
 
   useEffect(() => {
     if (import.meta.env.DEV) {

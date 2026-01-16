@@ -1973,6 +1973,7 @@ export const EPUBRemediation: React.FC = () => {
               jobId={jobId || ''}
               fixType={selectedBatch.fixType}
               fixName={selectedBatch.fixName}
+              epubFileName={fileName}
               issues={selectedBatch.issues}
               onComplete={handleBatchFixComplete}
               onCancel={handleBatchFixCancel}
