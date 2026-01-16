@@ -197,6 +197,7 @@ export function AcrWorkflowPage() {
   const [isLoadingJobs, setIsLoadingJobs] = useState(false);
   const [jobsError, setJobsError] = useState<string | null>(null);
   const [analysisResults, setAnalysisResults] = useState<CriterionConfidence[]>([]);
+  const [documentTitle, setDocumentTitle] = useState<string>('Untitled Document');
 
   const handleCriteriaLoaded = useCallback((criteria: CriterionConfidence[]) => {
     setAnalysisResults(criteria);
@@ -278,6 +279,34 @@ export function AcrWorkflowPage() {
     };
     fetchJobs();
   }, []);
+
+  useEffect(() => {
+    const fetchJobTitle = async () => {
+      if (!state.jobId) {
+        setDocumentTitle('Untitled Document');
+        return;
+      }
+
+      try {
+        const response = await api.get(`/jobs/${state.jobId}`);
+        const job = response.data.data || response.data;
+
+        // Try multiple possible locations for the filename
+        const title = job.originalFile?.name ||
+                      job.file?.name ||
+                      job.input?.fileName ||
+                      job.output?.fileName ||
+                      'Untitled Document';
+
+        setDocumentTitle(title);
+      } catch (error) {
+        console.error('Failed to fetch job title:', error);
+        setDocumentTitle('Untitled Document');
+      }
+    };
+
+    fetchJobTitle();
+  }, [state.jobId]);
 
   useEffect(() => {
     if (state.jobId) {
@@ -805,6 +834,17 @@ export function AcrWorkflowPage() {
           Complete each step to generate your Accessibility Conformance Report.
         </p>
       </div>
+
+      {/* Document Title Display */}
+      {state.jobId && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-blue-600" />
+            <span className="text-sm text-gray-600">Title:</span>
+            <span className="text-sm font-semibold text-gray-900">{documentTitle}</span>
+          </div>
+        </div>
+      )}
 
       <div className="mb-8">
         <ProgressBar currentStep={state.currentStep} totalSteps={WORKFLOW_STEPS.length} />
