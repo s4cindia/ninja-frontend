@@ -624,6 +624,16 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   const [docsCriterion, setDocsCriterion] = useState<{ id: string; name: string } | null>(null);
   const [detailsCriterion, setDetailsCriterion] = useState<CriterionConfidence | null>(null);
   const [showOnlyWithIssues, setShowOnlyWithIssues] = useState(false);
+  const [showOtherIssues, setShowOtherIssues] = useState(false);
+  const [otherIssues, setOtherIssues] = useState<{
+    count: number;
+    issues: Array<{
+      code: string;
+      message: string;
+      severity: string;
+      location?: string;
+    }>;
+  } | null>(null);
 
   const { data: confidenceData } = useConfidenceWithIssues(jobId, undefined, { enabled: !isDemoJob(jobId) });
 
@@ -677,6 +687,9 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
           console.log('[ACR Step 3] Analysis data from API:', response);
           const normalizedCriteria = (response.criteria || []).map((c, i) => normalizeCriterion(c, i));
           setCriteria(normalizedCriteria);
+          if (response.otherIssues) {
+            setOtherIssues(response.otherIssues);
+          }
           setIsLoading(false);
         }
       })
@@ -981,6 +994,26 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
               </span>
             )}
           </button>
+          {otherIssues && otherIssues.count > 0 && (
+            <button
+              className={cn(
+                'px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center',
+                showOtherIssues
+                  ? 'bg-orange-100 text-orange-800 border-2 border-orange-500'
+                  : 'bg-gray-100 text-orange-600 hover:bg-orange-50'
+              )}
+              onClick={() => {
+                setShowOtherIssues(!showOtherIssues);
+                if (!showOtherIssues) setShowOnlyWithIssues(false);
+              }}
+            >
+              <AlertTriangle className="mr-1 h-4 w-4" />
+              Other Issues
+              <span className="ml-2 px-1.5 py-0.5 bg-orange-200 rounded-full text-xs">
+                {otherIssues.count}
+              </span>
+            </button>
+          )}
         </div>
         <div className="flex gap-1 bg-gray-100 p-1 rounded-lg" role="group" aria-label="View mode">
           <button
@@ -1152,6 +1185,54 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Display other issues when filtered */}
+      {showOtherIssues && otherIssues && otherIssues.count > 0 && (
+        <div className="mt-6 space-y-4">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle className="h-5 w-5 text-orange-600" />
+            <h3 className="text-lg font-semibold text-gray-900">
+              Other Quality Issues (Non-WCAG)
+            </h3>
+            <span className="text-sm text-gray-500">
+              These are structural or validation issues that don't map to specific WCAG criteria
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {otherIssues.issues.map((issue, idx) => (
+              <div
+                key={idx}
+                className="p-4 bg-orange-50 border border-orange-200 rounded-lg"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-sm font-mono text-orange-700 bg-orange-100 px-2 py-0.5 rounded">
+                        {issue.code}
+                      </span>
+                      <span className={cn(
+                        'text-xs px-2 py-0.5 rounded',
+                        issue.severity === 'serious' && 'bg-red-100 text-red-700',
+                        issue.severity === 'moderate' && 'bg-yellow-100 text-yellow-700',
+                        issue.severity === 'minor' && 'bg-blue-100 text-blue-700'
+                      )}>
+                        {issue.severity}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-900 mb-2">{issue.message}</p>
+                    {issue.location && (
+                      <p className="text-xs text-gray-500 font-mono">
+                        Location: {issue.location}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
