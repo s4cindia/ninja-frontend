@@ -1,9 +1,10 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Filter, CheckSquare } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { VerificationItem } from './VerificationItem';
+import { CriterionDetailsModal } from './CriterionDetailsModal';
 import { useVerificationQueue, useSubmitVerification, useBulkVerification } from '@/hooks/useVerification';
 import type { CriterionConfidence } from '@/services/api';
 import type { 
@@ -237,6 +238,7 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
   const [bulkStatus, setBulkStatus] = useState<VerificationStatus>('verified_pass');
   const [bulkMethod, setBulkMethod] = useState<VerificationMethod>('Manual Review');
   const [bulkNotes, setBulkNotes] = useState('');
+  const [selectedCriterionForGuidance, setSelectedCriterionForGuidance] = useState<CriterionConfidence | null>(null);
   
   const hasCriteriaFromAnalysis = criteriaFromAnalysis && criteriaFromAnalysis.length > 0;
   
@@ -328,6 +330,23 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
   ).length;
   const totalCount = apiData?.totalCount ?? items.length;
   const progressPercent = totalCount > 0 ? Math.round((verifiedCount / totalCount) * 100) : 0;
+
+  const criteriaMap = useMemo(() => {
+    const map = new Map<string, CriterionConfidence>();
+    if (criteriaFromAnalysis) {
+      criteriaFromAnalysis.forEach((c) => {
+        map.set(c.id, c);
+      });
+    }
+    return map;
+  }, [criteriaFromAnalysis]);
+
+  const handleViewGuidance = useCallback((itemId: string) => {
+    const criterion = criteriaMap.get(itemId);
+    if (criterion) {
+      setSelectedCriterionForGuidance(criterion);
+    }
+  }, [criteriaMap]);
 
   const handleSelectItem = (id: string, selected: boolean) => {
     setSelectedItems(prev => {
@@ -620,6 +639,7 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
                 onSelect={handleSelectItem}
                 onSubmit={handleSubmitVerification}
                 isSubmitting={isSubmitting}
+                onViewGuidance={criteriaFromAnalysis ? handleViewGuidance : undefined}
               />
             ))
           )}
@@ -632,6 +652,16 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
             Complete Verification
           </Button>
         </div>
+      )}
+
+      {/* Criterion Guidance Modal */}
+      {selectedCriterionForGuidance && (
+        <CriterionDetailsModal
+          criterion={selectedCriterionForGuidance}
+          isOpen={!!selectedCriterionForGuidance}
+          onClose={() => setSelectedCriterionForGuidance(null)}
+          jobId={jobId}
+        />
       )}
     </div>
   );

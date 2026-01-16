@@ -1,24 +1,13 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, Clock, CheckCircle, XCircle, AlertTriangle, History, FileText, CheckSquare, Wrench, ExternalLink } from 'lucide-react';
+import { ChevronDown, Clock, CheckCircle, XCircle, AlertTriangle, History, FileText } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import type { 
   VerificationItem as VerificationItemType, 
   VerificationStatus, 
   VerificationMethod 
 } from '@/types/verification.types';
-
-interface CriterionGuidance {
-  intent?: string;
-  whoBenefits?: string[];
-  commonIssues?: string[];
-  testingSteps?: string[];
-  successIndicators?: string[];
-  remediationSteps?: string[];
-  bestPractices?: string[];
-}
 
 interface VerificationItemProps {
   item: VerificationItemType;
@@ -26,7 +15,7 @@ interface VerificationItemProps {
   onSelect: (id: string, selected: boolean) => void;
   onSubmit: (itemId: string, status: VerificationStatus, method: VerificationMethod, notes: string) => void;
   isSubmitting: boolean;
-  guidance?: CriterionGuidance;
+  onViewGuidance?: (itemId: string) => void;
 }
 
 const SEVERITY_CONFIG = {
@@ -61,7 +50,7 @@ const VERIFICATION_STATUSES: { value: VerificationStatus; label: string }[] = [
   { value: 'deferred', label: 'Deferred' },
 ];
 
-export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmitting, guidance }: VerificationItemProps) {
+export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmitting, onViewGuidance }: VerificationItemProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
@@ -222,164 +211,20 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
               <p className="text-sm text-gray-600">{item.automatedNotes}</p>
             </div>
 
-            {/* Criterion Guidance Tabs */}
-            <Tabs defaultValue="overview" className="w-full">
-              <TabsList className="grid w-full grid-cols-4 mb-4">
-                <TabsTrigger value="overview" className="text-xs sm:text-sm">
-                  <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  <span className="hidden sm:inline">Overview</span>
-                </TabsTrigger>
-                <TabsTrigger value="testing" className="text-xs sm:text-sm">
-                  <CheckSquare className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  <span className="hidden sm:inline">Testing</span>
-                </TabsTrigger>
-                <TabsTrigger value="remediation" className="text-xs sm:text-sm">
-                  <Wrench className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  <span className="hidden sm:inline">Fix</span>
-                </TabsTrigger>
-                <TabsTrigger value="wcag" className="text-xs sm:text-sm">
-                  <ExternalLink className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  <span className="hidden sm:inline">WCAG</span>
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="overview" className="space-y-4">
-                <div>
-                  <h4 className="font-semibold text-sm text-blue-900 mb-2">Intent</h4>
-                  <p className="text-sm text-gray-700 leading-relaxed">
-                    {guidance?.intent || 'The intent of this Success Criterion is to ensure accessibility compliance.'}
-                  </p>
-                </div>
-
-                <div>
-                  <h4 className="font-semibold text-sm text-green-900 mb-2">Who Benefits</h4>
-                  <ul className="space-y-1">
-                    {guidance?.whoBenefits?.map((benefit, idx) => (
-                      <li key={idx} className="text-sm text-gray-700 flex items-start">
-                        <span className="text-green-600 mr-2">✓</span>
-                        {benefit}
-                      </li>
-                    )) || (
-                      <li className="text-sm text-gray-500 italic">No benefit information available</li>
-                    )}
-                  </ul>
-                </div>
-
-                <div>
-                  <h4 className="font-semibold text-sm text-orange-900 mb-2">Common Issues</h4>
-                  <ul className="space-y-1">
-                    {guidance?.commonIssues?.map((issue, idx) => (
-                      <li key={idx} className="text-sm text-gray-700 flex items-start">
-                        <span className="text-orange-600 mr-2">⚠</span>
-                        {issue}
-                      </li>
-                    )) || (
-                      <li className="text-sm text-gray-500 italic">No common issues listed</li>
-                    )}
-                  </ul>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="testing" className="space-y-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h4 className="font-semibold text-sm text-blue-900 mb-3">How to Test</h4>
-                  {guidance?.testingSteps ? (
-                    <ol className="space-y-2 list-decimal list-inside">
-                      {guidance.testingSteps.map((step, idx) => (
-                        <li key={idx} className="text-sm text-gray-700 leading-relaxed">
-                          {step}
-                        </li>
-                      ))}
-                    </ol>
-                  ) : (
-                    <p className="text-sm text-gray-600">
-                      Manual testing required. Review the EPUB content against the criterion requirements.
-                    </p>
-                  )}
-                </div>
-
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <h4 className="font-semibold text-sm text-green-900 mb-2">Success Indicators</h4>
-                  <ul className="space-y-1">
-                    {guidance?.successIndicators?.map((indicator, idx) => (
-                      <li key={idx} className="text-sm text-gray-700 flex items-start">
-                        <span className="text-green-600 mr-2">✓</span>
-                        {indicator}
-                      </li>
-                    )) || (
-                      <li className="text-sm text-gray-600">
-                        Content meets all requirements of {item.criterionId}
-                      </li>
-                    )}
-                  </ul>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="remediation" className="space-y-4">
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                  <h4 className="font-semibold text-sm text-purple-900 mb-3">Remediation Steps</h4>
-                  {guidance?.remediationSteps ? (
-                    <ol className="space-y-2 list-decimal list-inside">
-                      {guidance.remediationSteps.map((step, idx) => (
-                        <li key={idx} className="text-sm text-gray-700 leading-relaxed">
-                          {step}
-                        </li>
-                      ))}
-                    </ol>
-                  ) : (
-                    <p className="text-sm text-gray-600">
-                      Review the criterion requirements and update the EPUB content accordingly.
-                    </p>
-                  )}
-                </div>
-
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <h4 className="font-semibold text-sm text-yellow-900 mb-2">Best Practices</h4>
-                  <ul className="space-y-1">
-                    {guidance?.bestPractices?.map((practice, idx) => (
-                      <li key={idx} className="text-sm text-gray-700 flex items-start">
-                        <span className="text-yellow-600 mr-2">★</span>
-                        {practice}
-                      </li>
-                    )) || (
-                      <li className="text-sm text-gray-600">
-                        Follow WCAG {item.wcagLevel} guidelines for {item.criterionId}
-                      </li>
-                    )}
-                  </ul>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="wcag" className="space-y-4">
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <h4 className="font-semibold text-sm text-gray-900 mb-3">
-                    WCAG 2.1 - {item.criterionId} {item.criterionName}
-                  </h4>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Level {item.wcagLevel}
-                  </p>
-
-                  <a
-                    href={`https://www.w3.org/WAI/WCAG21/Understanding/${item.criterionId.replace(/\./g, '')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 hover:underline"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    View Official WCAG Documentation
-                  </a>
-
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <h5 className="font-semibold text-xs text-gray-700 mb-2">Applicable to:</h5>
-                    <div className="flex gap-2">
-                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">EPUB</span>
-                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">PDF</span>
-                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Web</span>
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-            </Tabs>
+            {/* View Guidance Button */}
+            {onViewGuidance && (
+              <div className="mt-4 mb-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onViewGuidance(item.id)}
+                  className="w-full sm:w-auto"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  View Testing Guidance & Resources
+                </Button>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
