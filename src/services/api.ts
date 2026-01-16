@@ -168,6 +168,21 @@ export interface AcrAnalysisResponse {
   criteria: CriterionConfidence[];
   overallConfidence: number;
   analyzedAt: string;
+  summary: {
+    supports: number;
+    partiallySupports: number;
+    doesNotSupport: number;
+    notApplicable: number;
+  };
+  otherIssues?: {
+    count: number;
+    issues: Array<{
+      code: string;
+      message: string;
+      severity: string;
+      location?: string;
+    }>;
+  };
 }
 
 export async function fetchAcrAnalysis(jobId: string): Promise<AcrAnalysisResponse> {
