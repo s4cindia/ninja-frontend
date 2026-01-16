@@ -287,7 +287,7 @@ export function AcrWorkflowPage() {
       }
 
       try {
-        const response = await api.get(`/jobs/${state.jobId}`);
+        const response = await api.get(`/epub/job/${state.jobId}`);
         const job = response.data.data || response.data;
 
         // Try multiple possible locations for the filename
@@ -840,7 +840,9 @@ export function AcrWorkflowPage() {
           <div className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-blue-600" />
             <span className="text-sm text-gray-600">Title:</span>
-            <span className="text-sm font-semibold text-gray-900">{documentTitle}</span>
+            <span className="text-sm font-semibold text-gray-900">
+              {state.fileName && state.fileName !== 'Untitled Document' ? state.fileName : documentTitle}
+            </span>
           </div>
         </div>
       )}
