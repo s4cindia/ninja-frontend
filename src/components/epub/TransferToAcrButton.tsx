@@ -9,12 +9,14 @@ interface TransferToAcrButtonProps {
   jobId: string;
   pendingCount: number;
   isDemo?: boolean;
+  fileName?: string;
 }
 
 export const TransferToAcrButton: React.FC<TransferToAcrButtonProps> = ({
   jobId,
   pendingCount,
   isDemo = false,
+  fileName,
 }) => {
   const [isTransferring, setIsTransferring] = useState(false);
   const [transferred, setTransferred] = useState(false);
@@ -49,10 +51,16 @@ export const TransferToAcrButton: React.FC<TransferToAcrButtonProps> = ({
   };
 
   const handleGoToAcr = () => {
+    const params = new URLSearchParams();
+    if (fileName) {
+      params.set('fileName', encodeURIComponent(fileName));
+    }
+    const queryString = params.toString();
+    
     if (acrWorkflowId) {
-      navigate(`/acr/workflow/${acrWorkflowId}`);
+      navigate(`/acr/workflow/${acrWorkflowId}${queryString ? `?${queryString}` : ''}`);
     } else {
-      navigate('/acr');
+      navigate(`/acr${queryString ? `?${queryString}` : ''}`);
     }
   };
 

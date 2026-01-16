@@ -1953,6 +1953,7 @@ export const EPUBRemediation: React.FC = () => {
             jobId={jobId || "demo"}
             pendingCount={pendingManualCount}
             isDemo={isDemo}
+            fileName={fileName !== "Loading..." ? fileName : undefined}
           />
         </>
       )}
