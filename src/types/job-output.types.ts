@@ -101,3 +101,43 @@ export function getScoreLabel(score: number): string {
   if (score >= 50) return 'Needs Work';
   return 'Poor';
 }
+
+export function isValidJobOutput(output: unknown): output is JobOutput {
+  if (!output || typeof output !== 'object') return false;
+
+  const obj = output as Record<string, unknown>;
+
+  const hasValidScore = obj.score === undefined || typeof obj.score === 'number';
+  const hasValidAccessible = obj.isAccessible === undefined || typeof obj.isAccessible === 'boolean';
+  const hasValidSummary = obj.summary === undefined || typeof obj.summary === 'object';
+  const hasValidIssues = obj.combinedIssues === undefined || Array.isArray(obj.combinedIssues);
+
+  return hasValidScore && hasValidAccessible && hasValidSummary && hasValidIssues;
+}
+
+export function parseJobOutput(output: unknown): JobOutput | null {
+  if (!output || typeof output !== 'object') return null;
+
+  const obj = output as Record<string, unknown>;
+  const summary = obj.summary as Record<string, unknown> | undefined;
+
+  return {
+    jobId: (obj.jobId as string) || '',
+    score: typeof obj.score === 'number' ? obj.score : 0,
+    isValid: Boolean(obj.isValid),
+    isAccessible: Boolean(obj.isAccessible),
+    fileName: (obj.fileName as string) || 'Unknown',
+    epubVersion: (obj.epubVersion as string) || '',
+    auditedAt: (obj.auditedAt as string) || '',
+    summary: {
+      total: (summary?.total as number) ?? 0,
+      critical: (summary?.critical as number) ?? 0,
+      serious: (summary?.serious as number) ?? 0,
+      moderate: (summary?.moderate as number) ?? 0,
+      minor: (summary?.minor as number) ?? 0,
+    },
+    combinedIssues: Array.isArray(obj.combinedIssues) 
+      ? mapIssuesToDisplay(obj.combinedIssues) 
+      : [],
+  };
+}
