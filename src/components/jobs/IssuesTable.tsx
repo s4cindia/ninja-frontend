@@ -6,8 +6,11 @@ import { CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { DisplayIssue, SEVERITY_CONFIG, SeverityLevel } from '../../types/job-output.types';
 import { sanitizeText, sanitizeFilePath } from '@/utils/sanitize';
 
+/** Pixels per row in virtualized list */
 const ROW_HEIGHT = 64;
+/** Maximum visible rows before requiring scroll */
 const VISIBLE_ROWS = 10;
+/** Minimum issue count before enabling virtualization for performance */
 const VIRTUALIZATION_THRESHOLD = 50;
 
 interface IssuesTableProps {
@@ -250,6 +253,9 @@ export const IssuesTable = React.memo(function IssuesTable({ issues }: IssuesTab
       {tableHeader}
       <div className="overflow-x-auto border border-gray-200 rounded-lg">
         <table className="min-w-full divide-y divide-gray-200">
+          <caption className="sr-only">
+            Accessibility issues found in document, sortable by column
+          </caption>
           <thead className="bg-gray-50">
             <tr>
               <th

@@ -49,8 +49,9 @@ export const ComplianceScore = React.memo(function ComplianceScore({ score, isAc
             cy={width / 2}
             r={radius}
             fill="none"
-            stroke="#e5e7eb"
+            stroke="currentColor"
             strokeWidth={strokeWidth}
+            className="text-gray-200"
           />
           <circle
             cx={width / 2}

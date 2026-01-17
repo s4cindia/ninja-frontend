@@ -121,7 +121,7 @@ export function JobDetails() {
             </Button>
           )}
           {outputUrl && (
-            <a href={outputUrl} download>
+            <a href={outputUrl} download rel="noopener noreferrer">
               <Button>
                 <Download className="w-4 h-4 mr-2" />
                 Download

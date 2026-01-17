@@ -6,7 +6,7 @@ export function sanitizeHtml(dirty: string): string {
   }
   return DOMPurify.sanitize(dirty, {
     ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'code', 'span', 'br'],
-    ALLOWED_ATTR: ['class'],
+    ALLOWED_ATTR: [],
     ALLOW_DATA_ATTR: false,
   });
 }
