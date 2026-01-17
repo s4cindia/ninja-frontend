@@ -1,5 +1,3 @@
-import { AccessibilityIssue as BackendIssue } from './accessibility.types';
-
 export interface IssueSummary {
   total: number;
   critical: number;
@@ -21,27 +19,77 @@ export interface DisplayIssue {
   suggestion?: string;
 }
 
-export function mapToDisplayIssue(issue: BackendIssue | Record<string, unknown>): DisplayIssue {
+/**
+ * Generates a unique fallback ID using crypto API or timestamp fallback
+ */
+function generateFallbackId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `issue-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+}
+
+/**
+ * Safely gets a string value from an unknown object property
+ */
+function safeString(value: unknown, fallback: string = ''): string {
+  return typeof value === 'string' ? value : fallback;
+}
+
+/**
+ * Safely gets a boolean value from an unknown object property
+ */
+function safeBoolean(value: unknown, fallback: boolean = false): boolean {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+/**
+ * Maps a backend issue to a display-friendly format with defensive type checking
+ */
+export function mapToDisplayIssue(issue: unknown): DisplayIssue {
+  if (!issue || typeof issue !== 'object') {
+    return {
+      id: generateFallbackId(),
+      code: '',
+      severity: 'minor',
+      description: 'Unknown issue',
+      location: 'Unknown',
+      autoFixable: false,
+    };
+  }
+
   const i = issue as Record<string, unknown>;
+
+  const rawSeverity = safeString(i.severity, 'minor');
+  const validSeverities = ['critical', 'serious', 'moderate', 'minor'] as const;
+  const severity = validSeverities.includes(rawSeverity as typeof validSeverities[number])
+    ? (rawSeverity as DisplayIssue['severity'])
+    : 'minor';
+
+  let wcagCriteria: string | undefined;
+  if (Array.isArray(i.wcagCriteria)) {
+    wcagCriteria = i.wcagCriteria.filter(c => typeof c === 'string').join(', ');
+  } else if (typeof i.wcagCriteria === 'string') {
+    wcagCriteria = i.wcagCriteria;
+  }
+
   return {
-    id: (i.id as string) || `issue-${Math.random().toString(36).substr(2, 9)}`,
-    code: (i.code as string) || '',
-    severity: (i.severity as DisplayIssue['severity']) || 'minor',
-    description: (i.message as string) || (i.description as string) || 'Unknown issue',
-    location: (i.location as string) || (i.filePath as string) || 'Unknown',
-    element: i.html as string | undefined,
-    autoFixable: (i.autoFixable as boolean | undefined) ?? (i.fixType === 'autofix'),
-    fixCode: i.fixCode as string | undefined,
-    wcagCriteria: Array.isArray(i.wcagCriteria)
-      ? (i.wcagCriteria as string[]).join(', ')
-      : (i.wcagCriteria as string | undefined),
-    suggestion: (i.remediation as string) || (i.suggestion as string),
+    id: safeString(i.id) || generateFallbackId(),
+    code: safeString(i.code),
+    severity,
+    description: safeString(i.message) || safeString(i.description) || 'Unknown issue',
+    location: safeString(i.location, 'Unknown'),
+    element: safeString(i.element) || undefined,
+    autoFixable: safeBoolean(i.autoFixable) || safeString(i.fixType) === 'autofix',
+    fixCode: safeString(i.fixCode) || undefined,
+    wcagCriteria,
+    suggestion: safeString(i.suggestion) || undefined,
   };
 }
 
 export function mapIssuesToDisplay(issues: unknown[]): DisplayIssue[] {
   if (!Array.isArray(issues)) return [];
-  return issues.map((issue) => mapToDisplayIssue(issue as BackendIssue | Record<string, unknown>));
+  return issues.map((issue) => mapToDisplayIssue(issue));
 }
 
 export interface JobOutput {
