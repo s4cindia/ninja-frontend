@@ -38,13 +38,11 @@ export function JobDetails() {
       return { parsedOutput: null, parseError: null };
     }
 
-    try {
-      return { parsedOutput: parseJobOutput(job.output), parseError: null };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to parse job output';
-      console.error('Job output parsing error:', err);
-      return { parsedOutput: null, parseError: message };
+    const result = parseJobOutput(job.output);
+    if (!result) {
+      return { parsedOutput: null, parseError: 'Failed to parse job output' };
     }
+    return { parsedOutput: result, parseError: null };
   }, [job?.output]);
 
   const handleCancel = async () => {
