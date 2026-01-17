@@ -188,9 +188,17 @@ export function IssuesTable({ issues }: IssuesTableProps) {
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     {issue.autoFixable ? (
-                      <CheckCircle className="w-5 h-5 text-green-500" />
+                      <CheckCircle
+                        className="w-5 h-5 text-green-500"
+                        role="img"
+                        aria-label="Auto-fix available"
+                      />
                     ) : (
-                      <XCircle className="w-5 h-5 text-gray-400" />
+                      <XCircle
+                        className="w-5 h-5 text-gray-400"
+                        role="img"
+                        aria-label="Auto-fix not available"
+                      />
                     )}
                   </td>
                 </tr>
