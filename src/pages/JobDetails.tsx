@@ -1,3 +1,4 @@
+import { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { Button } from '@/components/ui/Button';
@@ -30,6 +31,24 @@ export function JobDetails() {
   const { jobId } = useParams<{ jobId: string }>();
   const { data: job, isLoading, isError, error, refetch } = useJob(jobId || null);
   const cancelJob = useCancelJob();
+  const [parseError, setParseError] = useState<string | null>(null);
+
+  const parsedOutput = useMemo(() => {
+    if (!job?.output) {
+      setParseError(null);
+      return null;
+    }
+
+    try {
+      setParseError(null);
+      return parseJobOutput(job.output);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to parse job output';
+      setParseError(message);
+      console.error('Job output parsing error:', err);
+      return null;
+    }
+  }, [job?.output]);
 
   const handleCancel = async () => {
     if (!jobId) return;
@@ -201,73 +220,77 @@ export function JobDetails() {
 
       </div>
 
-      {(() => {
-        const output = job.output ? parseJobOutput(job.output) : null;
-        
-        if (!output) {
-          return (
-            <div className="mt-6 bg-white rounded-lg shadow p-6">
-              <div className="text-center py-12 bg-gray-50 rounded-lg">
-                <p className="text-gray-500">
-                  {job.status === 'PROCESSING' ? 'Job is still processing...' : 'No output data available'}
-                </p>
-              </div>
-            </div>
-          );
-        }
+      {parseError && (
+        <div className="mt-6 bg-white rounded-lg shadow p-6">
+          <div className="text-center py-8 bg-red-50 rounded-lg border border-red-200">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+            <p className="text-red-700 font-medium">Failed to parse job output</p>
+            <p className="text-red-600 text-sm mt-1">{parseError}</p>
+          </div>
+        </div>
+      )}
 
-        return (
-          <div className="mt-6 space-y-6">
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-6">Audit Results</h2>
-              
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <div className="lg:col-span-1 flex justify-center">
-                    <ComplianceScore
-                      score={output.score}
-                      isAccessible={output.isAccessible}
-                    />
-                  </div>
+      {!parseError && !parsedOutput && (
+        <div className="mt-6 bg-white rounded-lg shadow p-6">
+          <div className="text-center py-12 bg-gray-50 rounded-lg">
+            <p className="text-gray-500">
+              {job.status === 'PROCESSING' ? 'Job is still processing...' : 'No output data available'}
+            </p>
+          </div>
+        </div>
+      )}
 
-                  <div className="lg:col-span-2">
-                    <SeveritySummary summary={output.summary} />
-                  </div>
+      {!parseError && parsedOutput && (
+        <div className="mt-6 space-y-6">
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-6">Audit Results</h2>
+            
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-1 flex justify-center">
+                  <ComplianceScore
+                    score={parsedOutput.score}
+                    isAccessible={parsedOutput.isAccessible}
+                  />
                 </div>
 
-                <div className="flex flex-wrap items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">Valid:</span>
-                    <span className={output.isValid ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                      {output.isValid ? 'Yes' : 'No'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">Accessible:</span>
-                    <span className={output.isAccessible ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                      {output.isAccessible ? 'Yes' : 'No'}
-                    </span>
-                  </div>
-                  {output.epubVersion && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600">EPUB Version:</span>
-                      <span className="text-gray-900 font-medium">
-                        {output.epubVersion}
-                      </span>
-                    </div>
-                  )}
+                <div className="lg:col-span-2">
+                  <SeveritySummary summary={parsedOutput.summary} />
                 </div>
-
-                <IssuesTable issues={output.combinedIssues} />
-
-                <JobActions jobId={job.id} />
-
-                <RawDataToggle data={output} />
               </div>
+
+              <div className="flex flex-wrap items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">Valid:</span>
+                  <span className={parsedOutput.isValid ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+                    {parsedOutput.isValid ? 'Yes' : 'No'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">Accessible:</span>
+                  <span className={parsedOutput.isAccessible ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+                    {parsedOutput.isAccessible ? 'Yes' : 'No'}
+                  </span>
+                </div>
+                {parsedOutput.epubVersion && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">EPUB Version:</span>
+                    <span className="text-gray-900 font-medium">
+                      {parsedOutput.epubVersion}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <IssuesTable issues={parsedOutput.combinedIssues} />
+
+              <JobActions jobId={job.id} />
+
+              <RawDataToggle data={parsedOutput} />
             </div>
           </div>
-        );
-      })()}
+        </div>
+      )}
     </div>
   );
 }
