@@ -28,14 +28,16 @@ describe('ComplianceScore', () => {
     expect(screen.getByText('100')).toBeInTheDocument();
   });
 
-  it('normalizes NaN to 0', () => {
+  it('shows N/A for NaN score', () => {
     render(<ComplianceScore score={NaN} isAccessible={false} />);
-    expect(screen.getByText('0')).toBeInTheDocument();
+    expect(screen.getByText('N/A')).toBeInTheDocument();
+    expect(screen.getByLabelText('Compliance score not available')).toBeInTheDocument();
   });
 
-  it('normalizes Infinity to 0', () => {
+  it('shows N/A for Infinity score', () => {
     render(<ComplianceScore score={Infinity} isAccessible={false} />);
-    expect(screen.getByText('0')).toBeInTheDocument();
+    expect(screen.getByText('N/A')).toBeInTheDocument();
+    expect(screen.getByLabelText('Compliance score not available')).toBeInTheDocument();
   });
 
   it('applies correct color tier at boundary 90 (Excellent - green)', () => {

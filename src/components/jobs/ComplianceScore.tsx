@@ -18,26 +18,32 @@ const SIZE_CONFIG = {
 export const ComplianceScore = React.memo(function ComplianceScore({ score, isAccessible, size = 'lg' }: ComplianceScoreProps) {
   const { width, strokeWidth, fontSize, labelSize } = SIZE_CONFIG[size];
 
+  // Check if score is valid (finite number)
+  const isValidScore = Number.isFinite(score);
+  
   // Normalize score to valid range, handling NaN and Infinity
-  const normalizedScore = Number.isFinite(score)
+  const normalizedScore = isValidScore
     ? Math.min(Math.max(score, MIN_SCORE), MAX_SCORE)
-    : 0;
+    : null;
 
   // Calculate SVG values
   const radius = (width - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (normalizedScore / MAX_SCORE) * circumference;
-  const colors = getScoreColorConfig(normalizedScore);
+  const displayScore = normalizedScore ?? 0;
+  const strokeDashoffset = circumference - (displayScore / MAX_SCORE) * circumference;
+  const colors = getScoreColorConfig(displayScore);
 
   return (
     <div className="flex flex-col items-center gap-3">
       <div
         className="relative"
         role="progressbar"
-        aria-valuenow={normalizedScore}
+        aria-valuenow={normalizedScore ?? undefined}
         aria-valuemin={MIN_SCORE}
         aria-valuemax={MAX_SCORE}
-        aria-label={`Compliance score: ${normalizedScore} out of ${MAX_SCORE}`}
+        aria-label={normalizedScore !== null 
+          ? `Compliance score: ${normalizedScore} out of ${MAX_SCORE}` 
+          : 'Compliance score not available'}
       >
         <svg
           width={width}
@@ -53,22 +59,24 @@ export const ComplianceScore = React.memo(function ComplianceScore({ score, isAc
             strokeWidth={strokeWidth}
             className="text-gray-200"
           />
-          <circle
-            cx={width / 2}
-            cy={width / 2}
-            r={radius}
-            fill="none"
-            stroke={colors.stroke}
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={strokeDashoffset}
-            className="motion-safe:transition-all motion-safe:duration-1000 motion-safe:ease-out"
-          />
+          {normalizedScore !== null && (
+            <circle
+              cx={width / 2}
+              cy={width / 2}
+              r={radius}
+              fill="none"
+              stroke={colors.stroke}
+              strokeWidth={strokeWidth}
+              strokeLinecap="round"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+              className="motion-safe:transition-all motion-safe:duration-1000 motion-safe:ease-out"
+            />
+          )}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className={`font-bold text-gray-900 ${fontSize}`}>
-            {Math.round(normalizedScore)}
+            {normalizedScore !== null ? Math.round(normalizedScore) : 'N/A'}
           </span>
           <span className={`text-gray-500 ${labelSize}`}>Score</span>
         </div>

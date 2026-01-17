@@ -5,18 +5,20 @@ interface Props {
   children: ReactNode;
   fallback?: ReactNode;
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
+  onRetry?: () => void;
 }
 
 interface State {
   hasError: boolean;
   error: Error | null;
   errorInfo: ErrorInfo | null;
+  retryCount: number;
 }
 
 class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
+    this.state = { hasError: false, error: null, errorInfo: null, retryCount: 0 };
   }
 
   static getDerivedStateFromError(error: Error): Partial<State> {
@@ -36,7 +38,13 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   handleRetry = (): void => {
-    this.setState({ hasError: false, error: null, errorInfo: null });
+    this.props.onRetry?.();
+    this.setState((prev) => ({ 
+      hasError: false, 
+      error: null, 
+      errorInfo: null,
+      retryCount: prev.retryCount + 1
+    }));
   };
 
   handleGoHome = (): void => {
@@ -80,7 +88,11 @@ class ErrorBoundary extends Component<Props, State> {
       );
     }
 
-    return this.props.children;
+    return (
+      <div key={this.state.retryCount}>
+        {this.props.children}
+      </div>
+    );
   }
 }
 
