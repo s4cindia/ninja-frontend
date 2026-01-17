@@ -43,8 +43,10 @@ function getScoreColors(score: number) {
 export const ComplianceScore = React.memo(function ComplianceScore({ score, isAccessible, size = 'lg' }: ComplianceScoreProps) {
   const { width, strokeWidth, fontSize, labelSize } = SIZE_CONFIG[size];
 
-  // Normalize score to valid range
-  const normalizedScore = Math.min(Math.max(score, MIN_SCORE), MAX_SCORE);
+  // Normalize score to valid range, handling NaN and Infinity
+  const normalizedScore = Number.isFinite(score)
+    ? Math.min(Math.max(score, MIN_SCORE), MAX_SCORE)
+    : 0;
 
   // Calculate SVG values
   const radius = (width - strokeWidth) / 2;
