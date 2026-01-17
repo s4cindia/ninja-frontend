@@ -1,0 +1,60 @@
+name: Frontend PR Checks
+
+  on:
+    pull_request:
+      branches: [main, develop]
+    push:
+      branches: [main, develop]
+
+  jobs:
+    lint-and-test:
+      name: Lint, Type Check & Unit Tests
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - uses: actions/setup-node@v4
+          with:
+            node-version: '20'
+            cache: 'npm'
+        - run: npm ci
+        - run: npm run lint
+        - run: npm run type-check
+        - run: npm test -- --run
+
+    e2e-tests:
+      name: E2E Tests
+      runs-on: ubuntu-latest
+      needs: lint-and-test
+      steps:
+        - uses: actions/checkout@v4
+        - uses: actions/setup-node@v4
+          with:
+            node-version: '20'
+            cache: 'npm'
+        - run: npm ci
+        - run: npx playwright install chromium --with-deps
+        - run: npm run test:e2e:chromium
+          env:
+            CI: true
+        - uses: actions/upload-artifact@v4
+          if: always()
+          with:
+            name: playwright-report
+            path: playwright-report/
+            retention-days: 7
+
+    accessibility-tests:
+      name: Accessibility Tests
+      runs-on: ubuntu-latest
+      needs: lint-and-test
+      steps:
+        - uses: actions/checkout@v4
+        - uses: actions/setup-node@v4
+          with:
+            node-version: '20'
+            cache: 'npm'
+        - run: npm ci
+        - run: npx playwright install chromium --with-deps
+        - run: npm run test:a11y
+          env:
+            CI: true
