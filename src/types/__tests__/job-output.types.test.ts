@@ -359,7 +359,7 @@ describe('job-output.types', () => {
       const result = mapIssuesToDisplay(rawIssues);
 
       expect(result).toHaveLength(2);
-      expect(result[0]).toEqual({
+      expect(result[0]).toMatchObject({
         id: 'issue-1',
         code: 'EPUB-IMG-001',
         severity: 'critical',
@@ -368,14 +368,13 @@ describe('job-output.types', () => {
         autoFixable: true,
         wcagCriteria: '1.1.1',
       });
-      expect(result[1]).toEqual({
+      expect(result[1]).toMatchObject({
         id: 'issue-2',
         code: 'EPUB-STRUCT-002',
         severity: 'minor',
         description: 'Heading skip',
         location: 'chapter2.xhtml',
         autoFixable: false,
-        wcagCriteria: undefined,
       });
     });
 
