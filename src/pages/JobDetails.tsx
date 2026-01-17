@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { Button } from '@/components/ui/Button';
-import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBoundary } from '@/components/ui';
 import { useJob, useCancelJob } from '@/hooks/useJobs';
 import { getJobTypeLabel, extractFileNameFromJob } from '@/utils/jobTypes';
@@ -17,7 +16,8 @@ import {
   SeveritySummary, 
   IssuesTable, 
   JobActions, 
-  RawDataToggle 
+  RawDataToggle,
+  JobDetailSkeleton
 } from '@/components/jobs';
 import { parseJobOutput } from '@/types/job-output.types';
 import { 
@@ -61,8 +61,9 @@ export function JobDetails() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner className="w-8 h-8" />
+      <div>
+        <Breadcrumbs items={[{ label: 'Jobs', path: '/jobs' }, { label: 'Loading...' }]} />
+        <JobDetailSkeleton />
       </div>
     );
   }
