@@ -100,9 +100,9 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label="Close feedback form"
-            className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="h-10 w-10 p-0 flex items-center justify-center flex-shrink-0 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
-            <X className="h-5 w-5" />
+            <X className="h-5 w-5 text-gray-500" />
           </button>
         </div>
 

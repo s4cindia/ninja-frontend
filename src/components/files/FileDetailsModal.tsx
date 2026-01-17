@@ -51,8 +51,14 @@ export function FileDetailsModal({ file, isOpen, onClose, onAudit, onView, onDel
       <div className="relative bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-4 border-b">
           <h2 className="text-lg font-semibold">File Details</h2>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <X className="h-4 w-4" />
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={onClose}
+            className="h-10 w-10 p-0 flex-shrink-0 rounded-full hover:bg-gray-100"
+            aria-label="Close dialog"
+          >
+            <X className="h-5 w-5 text-gray-500" />
           </Button>
         </div>
 
