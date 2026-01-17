@@ -1,8 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { List } from 'react-window';
 import { CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
-// Note: react-window v2 uses rowCount/rowHeight/rowComponent/rowProps API
-// This differs from v1 which used itemCount/itemSize/children pattern
 import { DisplayIssue, SEVERITY_CONFIG, SeverityLevel } from '../../types/job-output.types';
 import { sanitizeText, sanitizeFilePath } from '@/utils/sanitize';
 
