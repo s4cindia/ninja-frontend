@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { CheckCircle, XCircle, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, Info, LucideIcon } from 'lucide-react';
 import { DisplayIssue, SEVERITY_CONFIG, SeverityLevel } from '../../types/job-output.types';
+import { sanitizeText } from '@/utils/sanitize';
 
 const SEVERITY_ICONS: Record<SeverityLevel, LucideIcon> = {
   critical: AlertCircle,
@@ -174,10 +175,10 @@ export function IssuesTable({ issues }: IssuesTableProps) {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="text-sm text-gray-900">{issue.description}</div>
+                    <div className="text-sm text-gray-900">{sanitizeText(issue.description)}</div>
                     {issue.wcagCriteria && (
                       <div className="text-xs text-gray-500 mt-1">
-                        WCAG: {issue.wcagCriteria}
+                        WCAG: {sanitizeText(issue.wcagCriteria)}
                       </div>
                     )}
                   </td>
