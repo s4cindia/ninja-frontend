@@ -11,6 +11,14 @@ import {
   formatDuration 
 } from '@/utils/jobHelpers';
 import { 
+  ComplianceScore, 
+  SeveritySummary, 
+  IssuesTable, 
+  JobActions, 
+  RawDataToggle 
+} from '@/components/jobs';
+import { JobOutput } from '@/types/job-output.types';
+import { 
   AlertCircle,
   ArrowLeft,
   Download,
@@ -191,15 +199,68 @@ export function JobDetails() {
           </div>
         )}
 
-        {job.output && Object.keys(job.output).length > 0 && (
-          <div className="bg-white rounded-lg shadow p-6 lg:col-span-2">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Output</h2>
-            <pre className="bg-gray-50 border border-gray-200 rounded-md p-4 text-sm text-gray-800 overflow-x-auto">
-              {JSON.stringify(job.output, null, 2)}
-            </pre>
-          </div>
-        )}
       </div>
+
+      {job.output && Object.keys(job.output).length > 0 && (() => {
+        const output = job.output as unknown as JobOutput;
+        return (
+          <div className="mt-6 space-y-6">
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-6">Audit Results</h2>
+              
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-1 flex justify-center">
+                    <ComplianceScore
+                      score={output.score || 0}
+                      isAccessible={output.isAccessible || false}
+                    />
+                  </div>
+
+                  <div className="lg:col-span-2">
+                    <SeveritySummary
+                      summary={output.summary || { total: 0, critical: 0, serious: 0, moderate: 0, minor: 0 }}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">Valid:</span>
+                    {output.isValid ? (
+                      <span className="text-green-600 font-medium">Yes</span>
+                    ) : (
+                      <span className="text-red-600 font-medium">No</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">Accessible:</span>
+                    {output.isAccessible ? (
+                      <span className="text-green-600 font-medium">Yes</span>
+                    ) : (
+                      <span className="text-red-600 font-medium">No</span>
+                    )}
+                  </div>
+                  {output.epubVersion && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600">EPUB Version:</span>
+                      <span className="text-gray-900 font-medium">
+                        {output.epubVersion}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <IssuesTable issues={output.combinedIssues || []} />
+
+                <JobActions jobId={job.id} />
+
+                <RawDataToggle data={job.output} />
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
