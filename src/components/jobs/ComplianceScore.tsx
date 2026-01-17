@@ -17,19 +17,19 @@ export function ComplianceScore({ score, isAccessible, size = 'lg' }: Compliance
   const config = SIZE_CONFIG[size];
   const radius = (config.width - config.strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const progress = Math.min(Math.max(score, 0), 100);
-  const strokeDashoffset = circumference - (progress / 100) * circumference;
-  const scoreColor = getScoreColor(score);
+  const normalizedScore = Math.min(Math.max(score, 0), 100);
+  const strokeDashoffset = circumference - (normalizedScore / 100) * circumference;
+  const scoreColor = getScoreColor(normalizedScore);
 
   return (
     <div className="flex flex-col items-center gap-3">
       <div
         className="relative"
         role="progressbar"
-        aria-valuenow={score}
+        aria-valuenow={normalizedScore}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-label={`Compliance score: ${score} out of 100`}
+        aria-label={`Compliance score: ${normalizedScore} out of 100`}
       >
         <svg
           width={config.width}
@@ -59,7 +59,7 @@ export function ComplianceScore({ score, isAccessible, size = 'lg' }: Compliance
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className={`font-bold text-gray-900 ${config.fontSize}`}>
-            {Math.round(score)}
+            {Math.round(normalizedScore)}
           </span>
           <span className={`text-gray-500 ${config.labelSize}`}>Score</span>
         </div>

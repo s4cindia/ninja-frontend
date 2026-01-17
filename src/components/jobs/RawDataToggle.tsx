@@ -5,6 +5,31 @@ interface RawDataToggleProps {
   data: unknown;
 }
 
+function safeStringify(data: unknown): string {
+  try {
+    const seen = new WeakSet();
+    return JSON.stringify(
+      data,
+      (_key, value) => {
+        if (typeof value === 'bigint') {
+          return value.toString();
+        }
+        if (typeof value === 'object' && value !== null) {
+          if (seen.has(value)) {
+            return '[Circular Reference]';
+          }
+          seen.add(value);
+        }
+        return value;
+      },
+      2
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return `Unable to serialize data: ${message}`;
+  }
+}
+
 export function RawDataToggle({ data }: RawDataToggleProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -29,7 +54,7 @@ export function RawDataToggle({ data }: RawDataToggleProps) {
       {isExpanded && (
         <div className="bg-gray-900 p-4 overflow-x-auto">
           <pre className="text-green-400 font-mono text-sm whitespace-pre">
-            {JSON.stringify(data, null, 2)}
+            {safeStringify(data)}
           </pre>
         </div>
       )}
