@@ -5,21 +5,39 @@ interface RawDataToggleProps {
   data: unknown;
 }
 
+/**
+ * Safely stringifies data, handling circular references and BigInt values
+ */
 function safeStringify(data: unknown): string {
   try {
-    const seen = new WeakSet();
+    const seen = new WeakSet<object>();
+
     return JSON.stringify(
       data,
-      (_key, value) => {
+      (_key: string, value: unknown): unknown => {
         if (typeof value === 'bigint') {
           return value.toString();
         }
-        if (typeof value === 'object' && value !== null) {
+
+        if (value !== null && typeof value === 'object') {
           if (seen.has(value)) {
             return '[Circular Reference]';
           }
           seen.add(value);
         }
+
+        if (value === undefined) {
+          return '[undefined]';
+        }
+
+        if (typeof value === 'function') {
+          return '[Function]';
+        }
+
+        if (typeof value === 'symbol') {
+          return value.toString();
+        }
+
         return value;
       },
       2
