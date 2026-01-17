@@ -1,3 +1,4 @@
+import React from 'react';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 import { getScoreColor } from '../../types/job-output.types';
 
@@ -18,7 +19,7 @@ const SIZE_CONFIG = {
   lg: { width: 160, strokeWidth: 10, fontSize: 'text-4xl', labelSize: 'text-base' },
 } as const;
 
-export function ComplianceScore({ score, isAccessible, size = 'lg' }: ComplianceScoreProps) {
+export const ComplianceScore = React.memo(function ComplianceScore({ score, isAccessible, size = 'lg' }: ComplianceScoreProps) {
   const { width, strokeWidth, fontSize, labelSize } = SIZE_CONFIG[size];
 
   // Normalize score to valid range
@@ -97,4 +98,4 @@ export function ComplianceScore({ score, isAccessible, size = 'lg' }: Compliance
       </div>
     </div>
   );
-}
+});

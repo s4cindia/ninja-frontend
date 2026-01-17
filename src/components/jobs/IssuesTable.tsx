@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { CheckCircle, XCircle, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, Info, LucideIcon } from 'lucide-react';
 import { DisplayIssue, SEVERITY_CONFIG, SeverityLevel } from '../../types/job-output.types';
 import { sanitizeText } from '@/utils/sanitize';
@@ -31,7 +31,7 @@ const SEVERITY_PRIORITY: Record<DisplayIssue['severity'], number> = {
   minor: 3,
 };
 
-export function IssuesTable({ issues }: IssuesTableProps) {
+export const IssuesTable = React.memo(function IssuesTable({ issues }: IssuesTableProps) {
   const [sortField, setSortField] = useState<SortField>('severity');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [filterSeverity, setFilterSeverity] = useState<FilterSeverity>('all');
@@ -59,14 +59,14 @@ export function IssuesTable({ issues }: IssuesTableProps) {
     return sorted;
   }, [filteredIssues, sortField, sortOrder]);
 
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortOrder('asc');
-    }
-  };
+  const handleSort = useCallback((field: SortField) => {
+    setSortOrder(prev => sortField === field && prev === 'asc' ? 'desc' : 'asc');
+    setSortField(field);
+  }, [sortField]);
+
+  const handleFilterChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    setFilterSeverity(e.target.value as FilterSeverity);
+  }, []);
 
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) return null;
@@ -101,7 +101,7 @@ export function IssuesTable({ issues }: IssuesTableProps) {
           <select
             id="severity-filter"
             value={filterSeverity}
-            onChange={(e) => setFilterSeverity(e.target.value as FilterSeverity)}
+            onChange={handleFilterChange}
             className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
           >
             <option value="all">All Severities</option>
@@ -210,4 +210,4 @@ export function IssuesTable({ issues }: IssuesTableProps) {
       </div>
     </div>
   );
-}
+});

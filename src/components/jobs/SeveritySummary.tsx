@@ -1,3 +1,4 @@
+import React from 'react';
 import { AlertCircle, AlertTriangle, Info, LucideIcon } from 'lucide-react';
 import { IssueSummary, SEVERITY_CONFIG, SeverityLevel } from '../../types/job-output.types';
 
@@ -14,7 +15,7 @@ const SEVERITY_ICONS: Record<SeverityLevel, LucideIcon> = {
   minor: Info,
 };
 
-export function SeveritySummary({ summary }: SeveritySummaryProps) {
+export const SeveritySummary = React.memo(function SeveritySummary({ summary }: SeveritySummaryProps) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
       {SEVERITY_ORDER.map((severity) => {
@@ -42,4 +43,4 @@ export function SeveritySummary({ summary }: SeveritySummaryProps) {
       })}
     </div>
   );
-}
+});

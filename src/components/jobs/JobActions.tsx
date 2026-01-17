@@ -1,3 +1,4 @@
+import React, { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, Download, RefreshCw } from 'lucide-react';
 import { Button } from '../ui/Button';
@@ -19,7 +20,7 @@ interface TooltipButtonProps {
   leftIcon?: React.ReactNode;
 }
 
-function TooltipButton({ children, onClick, disabled, tooltip, leftIcon }: TooltipButtonProps) {
+const TooltipButton = React.memo(function TooltipButton({ children, onClick, disabled, tooltip, leftIcon }: TooltipButtonProps) {
   return (
     <div className="relative group">
       <Button
@@ -38,9 +39,9 @@ function TooltipButton({ children, onClick, disabled, tooltip, leftIcon }: Toolt
       )}
     </div>
   );
-}
+});
 
-export function JobActions({
+export const JobActions = React.memo(function JobActions({
   jobId,
   onDownloadReport,
   onReAudit,
@@ -50,9 +51,9 @@ export function JobActions({
   const navigate = useNavigate();
   const isDisabled = loading || disabled;
 
-  const handleStartRemediation = () => {
+  const handleStartRemediation = useCallback(() => {
     navigate(ROUTES.REMEDIATION(jobId));
-  };
+  }, [navigate, jobId]);
 
   return (
     <div className="flex flex-col sm:flex-row gap-3">
@@ -84,4 +85,4 @@ export function JobActions({
       </TooltipButton>
     </div>
   );
-}
+});
