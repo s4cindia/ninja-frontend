@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play, Download, RefreshCw } from 'lucide-react';
 import { Button } from '../ui/Button';
@@ -12,33 +12,80 @@ interface JobActionsProps {
   disabled?: boolean;
 }
 
-interface TooltipButtonProps {
+interface TooltipProps {
+  content: string;
   children: React.ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-  tooltip?: string;
-  leftIcon?: React.ReactNode;
+  id: string;
 }
 
-const TooltipButton = React.memo(function TooltipButton({ children, onClick, disabled, tooltip, leftIcon }: TooltipButtonProps) {
+function Tooltip({ content, children, id }: TooltipProps) {
+  const [isVisible, setIsVisible] = useState(false);
+
   return (
-    <div className="relative group">
-      <Button
-        onClick={onClick}
-        disabled={disabled}
-        variant="outline"
-        leftIcon={leftIcon}
-      >
+    <div
+      className="relative inline-block"
+      onMouseEnter={() => setIsVisible(true)}
+      onMouseLeave={() => setIsVisible(false)}
+      onFocus={() => setIsVisible(true)}
+      onBlur={() => setIsVisible(false)}
+    >
+      <div aria-describedby={isVisible ? id : undefined}>
         {children}
-      </Button>
-      {tooltip && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-          {tooltip}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+      </div>
+      {isVisible && (
+        <div
+          id={id}
+          role="tooltip"
+          className="absolute z-10 px-2 py-1 text-xs text-white bg-gray-900 rounded shadow-lg whitespace-nowrap bottom-full left-1/2 transform -translate-x-1/2 mb-2"
+        >
+          {content}
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
         </div>
       )}
     </div>
   );
+}
+
+interface ActionButtonProps {
+  onClick?: () => void;
+  disabled?: boolean;
+  tooltip?: string;
+  tooltipId: string;
+  leftIcon?: React.ReactNode;
+  ariaLabel: string;
+  children: React.ReactNode;
+}
+
+const ActionButton = React.memo(function ActionButton({
+  onClick,
+  disabled,
+  tooltip,
+  tooltipId,
+  leftIcon,
+  ariaLabel,
+  children,
+}: ActionButtonProps) {
+  const button = (
+    <Button
+      onClick={onClick}
+      disabled={disabled}
+      variant="outline"
+      leftIcon={leftIcon}
+      aria-label={ariaLabel}
+    >
+      {children}
+    </Button>
+  );
+
+  if (tooltip) {
+    return (
+      <Tooltip content={tooltip} id={tooltipId}>
+        {button}
+      </Tooltip>
+    );
+  }
+
+  return button;
 });
 
 export const JobActions = React.memo(function JobActions({
@@ -62,27 +109,32 @@ export const JobActions = React.memo(function JobActions({
         disabled={isDisabled}
         variant="primary"
         leftIcon={<Play className="w-4 h-4" />}
+        aria-label="Start accessibility remediation for this document"
       >
         Start Remediation
       </Button>
 
-      <TooltipButton
+      <ActionButton
         onClick={onDownloadReport}
         disabled={isDisabled || !onDownloadReport}
         tooltip={!onDownloadReport ? 'Coming soon' : undefined}
+        tooltipId="tooltip-download-report"
         leftIcon={<Download className="w-4 h-4" />}
+        ariaLabel="Download accessibility report"
       >
         Download Report
-      </TooltipButton>
+      </ActionButton>
 
-      <TooltipButton
+      <ActionButton
         onClick={onReAudit}
         disabled={isDisabled || !onReAudit}
         tooltip={!onReAudit ? 'Coming soon' : undefined}
+        tooltipId="tooltip-re-audit"
         leftIcon={<RefreshCw className="w-4 h-4" />}
+        ariaLabel="Re-run accessibility audit"
       >
         Re-Audit
-      </TooltipButton>
+      </ActionButton>
     </div>
   );
 });
