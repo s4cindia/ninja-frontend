@@ -154,13 +154,14 @@ export const IssuesTable = React.memo(function IssuesTable({ issues }: IssuesTab
         Issues ({filteredIssues.length} of {issues.length})
       </h3>
       <div className="flex items-center gap-2">
-        <label htmlFor="severity-filter" className="sr-only">
-          Filter by severity
+        <label htmlFor="severity-filter" className="text-sm text-gray-600">
+          Filter:
         </label>
         <select
           id="severity-filter"
           value={filterSeverity}
           onChange={handleFilterChange}
+          aria-label="Filter issues by severity level"
           className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
         >
           <option value="all">All Severities</option>
