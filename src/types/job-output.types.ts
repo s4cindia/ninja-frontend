@@ -1,3 +1,5 @@
+import { AccessibilityIssue as BackendIssue } from './accessibility.types';
+
 export interface IssueSummary {
   total: number;
   critical: number;
@@ -6,7 +8,7 @@ export interface IssueSummary {
   minor: number;
 }
 
-export interface AccessibilityIssue {
+export interface DisplayIssue {
   id: string;
   code: string;
   severity: 'critical' | 'serious' | 'moderate' | 'minor';
@@ -19,6 +21,29 @@ export interface AccessibilityIssue {
   suggestion?: string;
 }
 
+export function mapToDisplayIssue(issue: BackendIssue | Record<string, unknown>): DisplayIssue {
+  const i = issue as Record<string, unknown>;
+  return {
+    id: (i.id as string) || `issue-${Math.random().toString(36).substr(2, 9)}`,
+    code: (i.code as string) || '',
+    severity: (i.severity as DisplayIssue['severity']) || 'minor',
+    description: (i.message as string) || (i.description as string) || 'Unknown issue',
+    location: (i.location as string) || (i.filePath as string) || 'Unknown',
+    element: i.html as string | undefined,
+    autoFixable: (i.autoFixable as boolean | undefined) ?? (i.fixType === 'autofix'),
+    fixCode: i.fixCode as string | undefined,
+    wcagCriteria: Array.isArray(i.wcagCriteria)
+      ? (i.wcagCriteria as string[]).join(', ')
+      : (i.wcagCriteria as string | undefined),
+    suggestion: (i.remediation as string) || (i.suggestion as string),
+  };
+}
+
+export function mapIssuesToDisplay(issues: unknown[]): DisplayIssue[] {
+  if (!Array.isArray(issues)) return [];
+  return issues.map((issue) => mapToDisplayIssue(issue as BackendIssue | Record<string, unknown>));
+}
+
 export interface JobOutput {
   jobId: string;
   score: number;
@@ -28,7 +53,7 @@ export interface JobOutput {
   epubVersion: string;
   auditedAt: string;
   summary: IssueSummary;
-  combinedIssues: AccessibilityIssue[];
+  combinedIssues: DisplayIssue[];
 }
 
 export type SeverityLevel = 'critical' | 'serious' | 'moderate' | 'minor';

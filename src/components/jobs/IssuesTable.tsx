@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
 import { CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
-import { AccessibilityIssue, SEVERITY_CONFIG, SeverityLevel } from '../../types/job-output.types';
+import { DisplayIssue, SEVERITY_CONFIG, SeverityLevel } from '../../types/job-output.types';
 
 interface IssuesTableProps {
-  issues: AccessibilityIssue[];
+  issues: DisplayIssue[];
 }
 
 type SortField = 'severity' | 'description' | 'location';
