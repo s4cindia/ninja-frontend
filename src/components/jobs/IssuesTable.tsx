@@ -10,7 +10,7 @@ type SortField = 'severity' | 'description' | 'location';
 type SortOrder = 'asc' | 'desc';
 type FilterSeverity = SeverityLevel | 'all';
 
-const SEVERITY_PRIORITY: Record<SeverityLevel, number> = {
+const SEVERITY_PRIORITY: Record<DisplayIssue['severity'], number> = {
   critical: 0,
   serious: 1,
   moderate: 2,
@@ -139,7 +139,9 @@ export function IssuesTable({ issues }: IssuesTableProps) {
                     <div className="text-sm text-gray-900">{issue.description}</div>
                     {issue.wcagCriteria && (
                       <div className="text-xs text-gray-500 mt-1">
-                        WCAG: {issue.wcagCriteria}
+                        WCAG: {Array.isArray(issue.wcagCriteria)
+                          ? issue.wcagCriteria.join(', ')
+                          : issue.wcagCriteria}
                       </div>
                     )}
                   </td>
