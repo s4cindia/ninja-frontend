@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 
 export interface TooltipProps {
   content: string;
@@ -23,6 +23,19 @@ const ARROW_CLASSES = {
 
 export function Tooltip({ content, children, id, position = 'top' }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape' && isVisible) {
+      setIsVisible(false);
+    }
+  }, [isVisible]);
+
+  useEffect(() => {
+    if (isVisible) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isVisible, handleKeyDown]);
 
   return (
     <div
