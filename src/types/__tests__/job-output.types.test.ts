@@ -3,6 +3,7 @@ import {
   parseJobOutput,
   isValidJobOutput,
   mapToDisplayIssue,
+  mapIssuesToDisplay,
   getSeverityConfig,
   getScoreColor,
   getScoreLabel,
@@ -320,6 +321,107 @@ describe('job-output.types', () => {
     it('rejects malformed URLs that are not relative paths', () => {
       expect(extractDownloadUrl({ downloadUrl: 'not-a-valid-url' })).toBeUndefined();
       expect(extractDownloadUrl({ downloadUrl: 'example.com/file.pdf' })).toBeUndefined();
+    });
+  });
+
+  describe('mapIssuesToDisplay', () => {
+    it('returns empty array for empty input', () => {
+      expect(mapIssuesToDisplay([])).toEqual([]);
+    });
+
+    it('returns empty array for non-array input', () => {
+      expect(mapIssuesToDisplay(null as unknown as unknown[])).toEqual([]);
+      expect(mapIssuesToDisplay(undefined as unknown as unknown[])).toEqual([]);
+      expect(mapIssuesToDisplay('string' as unknown as unknown[])).toEqual([]);
+    });
+
+    it('maps a list of valid issues to display objects', () => {
+      const rawIssues = [
+        {
+          id: 'issue-1',
+          code: 'EPUB-IMG-001',
+          severity: 'critical',
+          description: 'Missing alt text',
+          location: 'chapter1.xhtml',
+          autoFixable: true,
+          wcagCriteria: '1.1.1',
+        },
+        {
+          id: 'issue-2',
+          code: 'EPUB-STRUCT-002',
+          severity: 'minor',
+          description: 'Heading skip',
+          location: 'chapter2.xhtml',
+          autoFixable: false,
+        },
+      ];
+
+      const result = mapIssuesToDisplay(rawIssues);
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({
+        id: 'issue-1',
+        code: 'EPUB-IMG-001',
+        severity: 'critical',
+        description: 'Missing alt text',
+        location: 'chapter1.xhtml',
+        autoFixable: true,
+        wcagCriteria: '1.1.1',
+      });
+      expect(result[1]).toEqual({
+        id: 'issue-2',
+        code: 'EPUB-STRUCT-002',
+        severity: 'minor',
+        description: 'Heading skip',
+        location: 'chapter2.xhtml',
+        autoFixable: false,
+        wcagCriteria: undefined,
+      });
+    });
+
+    it('handles issues with missing fields by providing defaults', () => {
+      const rawIssues = [
+        { id: 'issue-1' },
+        {},
+      ];
+
+      const result = mapIssuesToDisplay(rawIssues);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].id).toBe('issue-1');
+      expect(result[0].severity).toBe('minor');
+      expect(result[0].description).toBe('Unknown issue');
+      expect(result[0].location).toBe('Unknown');
+      expect(result[0].autoFixable).toBe(false);
+      expect(result[1].id).toBeDefined();
+    });
+
+    it('normalizes invalid severity values to minor', () => {
+      const rawIssues = [
+        { id: 'issue-1', severity: 'invalid-severity' },
+        { id: 'issue-2', severity: 123 },
+      ];
+
+      const result = mapIssuesToDisplay(rawIssues);
+
+      expect(result[0].severity).toBe('minor');
+      expect(result[1].severity).toBe('minor');
+    });
+
+    it('preserves all valid severity levels', () => {
+      const rawIssues = [
+        { id: '1', severity: 'critical' },
+        { id: '2', severity: 'serious' },
+        { id: '3', severity: 'moderate' },
+        { id: '4', severity: 'minor' },
+      ];
+
+      const result = mapIssuesToDisplay(rawIssues);
+
+      expect(result[0].severity).toBe('critical');
+      expect(result[1].severity).toBe('serious');
+      expect(result[2].severity).toBe('moderate');
+      expect(result[3].severity).toBe('minor');
     });
   });
 });
