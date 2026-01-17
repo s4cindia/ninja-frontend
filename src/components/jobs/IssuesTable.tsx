@@ -1,14 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { CheckCircle, XCircle, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, Info, LucideIcon } from 'lucide-react';
+import { CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { DisplayIssue, SEVERITY_CONFIG, SeverityLevel } from '../../types/job-output.types';
 import { sanitizeText } from '@/utils/sanitize';
-
-const SEVERITY_ICONS: Record<SeverityLevel, LucideIcon> = {
-  critical: AlertCircle,
-  serious: AlertTriangle,
-  moderate: AlertTriangle,
-  minor: Info,
-};
 
 interface IssuesTableProps {
   issues: DisplayIssue[];
@@ -23,13 +16,6 @@ function getAriaSortValue(currentField: SortField, targetField: SortField, order
   if (currentField !== targetField) return 'none';
   return order === 'asc' ? 'ascending' : 'descending';
 }
-
-const SEVERITY_PRIORITY: Record<DisplayIssue['severity'], number> = {
-  critical: 0,
-  serious: 1,
-  moderate: 2,
-  minor: 3,
-};
 
 export const IssuesTable = React.memo(function IssuesTable({ issues }: IssuesTableProps) {
   const [sortField, setSortField] = useState<SortField>('severity');
@@ -46,7 +32,7 @@ export const IssuesTable = React.memo(function IssuesTable({ issues }: IssuesTab
       let comparison = 0;
 
       if (sortField === 'severity') {
-        comparison = SEVERITY_PRIORITY[a.severity] - SEVERITY_PRIORITY[b.severity];
+        comparison = SEVERITY_CONFIG[a.severity].order - SEVERITY_CONFIG[b.severity].order;
       } else if (sortField === 'description') {
         comparison = a.description.localeCompare(b.description);
       } else if (sortField === 'location') {
@@ -164,7 +150,7 @@ export const IssuesTable = React.memo(function IssuesTable({ issues }: IssuesTab
           <tbody className="bg-white divide-y divide-gray-200">
             {sortedIssues.map((issue) => {
               const config = SEVERITY_CONFIG[issue.severity];
-              const Icon = SEVERITY_ICONS[issue.severity];
+              const Icon = config.icon;
               return (
                 <tr key={issue.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 whitespace-nowrap">

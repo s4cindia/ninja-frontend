@@ -1,19 +1,9 @@
 import React from 'react';
-import { AlertCircle, AlertTriangle, Info, LucideIcon } from 'lucide-react';
-import { IssueSummary, SEVERITY_CONFIG, SeverityLevel } from '../../types/job-output.types';
+import { IssueSummary, SEVERITY_CONFIG, SEVERITY_ORDER } from '../../types/job-output.types';
 
 interface SeveritySummaryProps {
   summary: IssueSummary;
 }
-
-const SEVERITY_ORDER: SeverityLevel[] = ['critical', 'serious', 'moderate', 'minor'];
-
-const SEVERITY_ICONS: Record<SeverityLevel, LucideIcon> = {
-  critical: AlertCircle,
-  serious: AlertTriangle,
-  moderate: AlertTriangle,
-  minor: Info,
-};
 
 export const SeveritySummary = React.memo(function SeveritySummary({ summary }: SeveritySummaryProps) {
   return (
@@ -21,7 +11,7 @@ export const SeveritySummary = React.memo(function SeveritySummary({ summary }: 
       {SEVERITY_ORDER.map((severity) => {
         const config = SEVERITY_CONFIG[severity];
         const count = summary[severity];
-        const Icon = SEVERITY_ICONS[severity];
+        const Icon = config.icon;
 
         return (
           <div

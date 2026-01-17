@@ -1,3 +1,5 @@
+import { AlertCircle, AlertTriangle, Info, LucideIcon } from 'lucide-react';
+
 export interface IssueSummary {
   total: number;
   critical: number;
@@ -107,42 +109,56 @@ export interface JobOutput {
 
 export type SeverityLevel = 'critical' | 'serious' | 'moderate' | 'minor';
 
-export const SEVERITY_CONFIG: Record<SeverityLevel, {
+export interface SeverityConfig {
+  icon: LucideIcon;
   label: string;
   bgColor: string;
   textColor: string;
   borderColor: string;
-  iconName: 'alert-circle' | 'alert-triangle' | 'info';
-}> = {
+  order: number;
+}
+
+export const SEVERITY_CONFIG: Record<SeverityLevel, SeverityConfig> = {
   critical: {
+    icon: AlertCircle,
     label: 'Critical',
     bgColor: 'bg-red-50',
     textColor: 'text-red-700',
     borderColor: 'border-red-200',
-    iconName: 'alert-circle',
+    order: 0,
   },
   serious: {
+    icon: AlertTriangle,
     label: 'Serious',
     bgColor: 'bg-orange-50',
     textColor: 'text-orange-700',
     borderColor: 'border-orange-200',
-    iconName: 'alert-triangle',
+    order: 1,
   },
   moderate: {
+    icon: AlertTriangle,
     label: 'Moderate',
     bgColor: 'bg-yellow-50',
     textColor: 'text-yellow-700',
     borderColor: 'border-yellow-200',
-    iconName: 'alert-triangle',
+    order: 2,
   },
   minor: {
+    icon: Info,
     label: 'Minor',
     bgColor: 'bg-blue-50',
     textColor: 'text-blue-700',
     borderColor: 'border-blue-200',
-    iconName: 'info',
+    order: 3,
   },
-} as const;
+};
+
+export const SEVERITY_ORDER: SeverityLevel[] = ['critical', 'serious', 'moderate', 'minor'];
+
+export function getSeverityConfig(severity: string): SeverityConfig {
+  const normalized = severity.toLowerCase() as SeverityLevel;
+  return SEVERITY_CONFIG[normalized] || SEVERITY_CONFIG.minor;
+}
 
 // Score thresholds for color coding and labels
 export const SCORE_THRESHOLDS = {
