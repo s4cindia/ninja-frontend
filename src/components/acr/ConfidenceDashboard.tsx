@@ -726,8 +726,11 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   // Filter criteria based on showOnlyWithIssues
   const filteredCriteria = showOnlyWithIssues
     ? criteria.filter(c => {
+        const hasIssueCount = (c.issueCount || 0) > 0 || (c.remainingCount || 0) > 0;
+        const hasFailingStatus = c.status === 'fail' || c.needsVerification;
         const issueInfo = issuesByCriterion.get(c.criterionId);
-        return issueInfo && issueInfo.count > 0;
+        const hasRelatedIssues = issueInfo && issueInfo.count > 0;
+        return hasIssueCount || hasFailingStatus || hasRelatedIssues;
       })
     : criteria;
 
@@ -977,23 +980,40 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">
           <h3 className="font-semibold text-gray-900">Accessibility Criteria Analysis</h3>
-          <button
-            className={cn(
-              'px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center',
-              showOnlyWithIssues
-                ? 'bg-red-100 text-red-800 border-2 border-red-500'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            )}
-            onClick={() => setShowOnlyWithIssues(!showOnlyWithIssues)}
-          >
-            <AlertCircle className="mr-1 h-4 w-4" />
-            Has Issues
-            {showOnlyWithIssues && confidenceData && (
-              <span className="ml-2 px-1.5 py-0.5 bg-red-200 rounded-full text-xs">
-                {confidenceData.criteria.filter(c => (c.issueCount || 0) > 0).length}
-              </span>
-            )}
-          </button>
+          {(() => {
+            // Count criteria with issues using issueCount, remainingCount, or status-based detection
+            const criteriaWithIssuesCount = criteria.filter(c => {
+              const hasIssueCount = (c.issueCount || 0) > 0 || (c.remainingCount || 0) > 0;
+              const hasFailingStatus = c.status === 'fail' || c.needsVerification;
+              const issueInfo = issuesByCriterion.get(c.criterionId);
+              const hasRelatedIssues = issueInfo && issueInfo.count > 0;
+              return hasIssueCount || hasFailingStatus || hasRelatedIssues;
+            }).length;
+
+            return (
+              <button
+                className={cn(
+                  'px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center',
+                  showOnlyWithIssues
+                    ? 'bg-red-100 text-red-800 border-2 border-red-500'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                )}
+                onClick={() => setShowOnlyWithIssues(!showOnlyWithIssues)}
+                aria-pressed={showOnlyWithIssues}
+              >
+                <AlertCircle className="mr-1 h-4 w-4" />
+                Has Issues
+                {criteriaWithIssuesCount > 0 && (
+                  <span className={cn(
+                    'ml-2 px-1.5 py-0.5 rounded-full text-xs',
+                    showOnlyWithIssues ? 'bg-red-200' : 'bg-red-100'
+                  )}>
+                    {criteriaWithIssuesCount}
+                  </span>
+                )}
+              </button>
+            );
+          })()}
           {otherIssues && otherIssues.count > 0 && (
             <button
               className={cn(
