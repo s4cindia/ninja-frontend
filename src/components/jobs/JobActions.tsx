@@ -21,6 +21,7 @@ interface ActionButtonProps {
   leftIcon?: React.ReactNode;
   ariaLabel: string;
   children: React.ReactNode;
+  type?: 'button' | 'submit' | 'reset';
 }
 
 const ActionButton = React.memo(function ActionButton({
@@ -31,9 +32,11 @@ const ActionButton = React.memo(function ActionButton({
   leftIcon,
   ariaLabel,
   children,
+  type = 'button',
 }: ActionButtonProps) {
   const button = (
     <Button
+      type={type}
       onClick={onClick}
       disabled={disabled}
       variant="outline"
@@ -72,6 +75,7 @@ export const JobActions = React.memo(function JobActions({
   return (
     <div className="flex flex-col sm:flex-row gap-3">
       <Button
+        type="button"
         onClick={handleStartRemediation}
         disabled={isDisabled}
         variant="primary"
@@ -82,6 +86,7 @@ export const JobActions = React.memo(function JobActions({
       </Button>
 
       <ActionButton
+        type="button"
         onClick={onDownloadReport}
         disabled={isDisabled || !onDownloadReport}
         tooltip={!onDownloadReport ? 'Coming soon' : undefined}
@@ -93,6 +98,7 @@ export const JobActions = React.memo(function JobActions({
       </ActionButton>
 
       <ActionButton
+        type="button"
         onClick={onReAudit}
         disabled={isDisabled || !onReAudit}
         tooltip={!onReAudit ? 'Coming soon' : undefined}
