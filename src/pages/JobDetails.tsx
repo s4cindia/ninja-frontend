@@ -17,7 +17,7 @@ import {
   JobActions, 
   RawDataToggle 
 } from '@/components/jobs';
-import { JobOutput } from '@/types/job-output.types';
+import { parseJobOutput } from '@/types/job-output.types';
 import { 
   AlertCircle,
   ArrowLeft,
@@ -201,8 +201,21 @@ export function JobDetails() {
 
       </div>
 
-      {job.output && Object.keys(job.output).length > 0 && (() => {
-        const output = job.output as unknown as JobOutput;
+      {(() => {
+        const output = job.output ? parseJobOutput(job.output) : null;
+        
+        if (!output) {
+          return (
+            <div className="mt-6 bg-white rounded-lg shadow p-6">
+              <div className="text-center py-12 bg-gray-50 rounded-lg">
+                <p className="text-gray-500">
+                  {job.status === 'PROCESSING' ? 'Job is still processing...' : 'No output data available'}
+                </p>
+              </div>
+            </div>
+          );
+        }
+
         return (
           <div className="mt-6 space-y-6">
             <div className="bg-white rounded-lg shadow p-6">
@@ -212,34 +225,28 @@ export function JobDetails() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div className="lg:col-span-1 flex justify-center">
                     <ComplianceScore
-                      score={output.score || 0}
-                      isAccessible={output.isAccessible || false}
+                      score={output.score}
+                      isAccessible={output.isAccessible}
                     />
                   </div>
 
                   <div className="lg:col-span-2">
-                    <SeveritySummary
-                      summary={output.summary || { total: 0, critical: 0, serious: 0, moderate: 0, minor: 0 }}
-                    />
+                    <SeveritySummary summary={output.summary} />
                   </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-4 p-4 bg-gray-50 rounded-lg">
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-600">Valid:</span>
-                    {output.isValid ? (
-                      <span className="text-green-600 font-medium">Yes</span>
-                    ) : (
-                      <span className="text-red-600 font-medium">No</span>
-                    )}
+                    <span className={output.isValid ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+                      {output.isValid ? 'Yes' : 'No'}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-600">Accessible:</span>
-                    {output.isAccessible ? (
-                      <span className="text-green-600 font-medium">Yes</span>
-                    ) : (
-                      <span className="text-red-600 font-medium">No</span>
-                    )}
+                    <span className={output.isAccessible ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+                      {output.isAccessible ? 'Yes' : 'No'}
+                    </span>
                   </div>
                   {output.epubVersion && (
                     <div className="flex items-center gap-2">
@@ -251,11 +258,11 @@ export function JobDetails() {
                   )}
                 </div>
 
-                <IssuesTable issues={output.combinedIssues || []} />
+                <IssuesTable issues={output.combinedIssues} />
 
                 <JobActions jobId={job.id} />
 
-                <RawDataToggle data={job.output} />
+                <RawDataToggle data={output} />
               </div>
             </div>
           </div>
