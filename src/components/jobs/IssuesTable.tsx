@@ -102,6 +102,8 @@ export const IssuesTable = React.memo(function IssuesTable({ issues }: IssuesTab
   }, [issues, filterSeverity]);
 
   const sortedIssues = useMemo(() => {
+    if (filteredIssues.length <= 1) return filteredIssues;
+    
     const sorted = [...filteredIssues].sort((a, b) => {
       let comparison = 0;
 
