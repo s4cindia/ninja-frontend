@@ -174,17 +174,62 @@ export const IssuesTable = React.memo(function IssuesTable({ issues }: IssuesTab
     </div>
   );
 
+  const sortableColumnHeader = (
+    <div className="flex bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+      <div
+        className="w-28 px-4 py-3 flex-shrink-0"
+        role="columnheader"
+        aria-sort={getAriaSortValue(sortState.field, 'severity', sortState.order)}
+      >
+        <button
+          type="button"
+          onClick={() => handleSort('severity')}
+          className="inline-flex items-center gap-1 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded"
+        >
+          Severity
+          <SortIcon field="severity" />
+        </button>
+      </div>
+      <div
+        className="flex-1 px-4 py-3"
+        role="columnheader"
+        aria-sort={getAriaSortValue(sortState.field, 'description', sortState.order)}
+      >
+        <button
+          type="button"
+          onClick={() => handleSort('description')}
+          className="inline-flex items-center gap-1 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded"
+        >
+          Description
+          <SortIcon field="description" />
+        </button>
+      </div>
+      <div
+        className="w-32 px-4 py-3 flex-shrink-0"
+        role="columnheader"
+        aria-sort={getAriaSortValue(sortState.field, 'location', sortState.order)}
+      >
+        <button
+          type="button"
+          onClick={() => handleSort('location')}
+          className="inline-flex items-center gap-1 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded"
+        >
+          Location
+          <SortIcon field="location" />
+        </button>
+      </div>
+      <div className="w-20 px-4 py-3 flex-shrink-0 text-center" role="columnheader">
+        Auto-Fix
+      </div>
+    </div>
+  );
+
   if (useVirtualization) {
     return (
       <div>
         {tableHeader}
-        <div className="border border-gray-200 rounded-lg overflow-hidden">
-          <div className="flex bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
-            <div className="w-28 px-4 py-3 flex-shrink-0">Severity</div>
-            <div className="flex-1 px-4 py-3">Description</div>
-            <div className="w-32 px-4 py-3 flex-shrink-0">Location</div>
-            <div className="w-20 px-4 py-3 flex-shrink-0 text-center">Auto-Fix</div>
-          </div>
+        <div className="border border-gray-200 rounded-lg overflow-hidden" role="grid" aria-label="Issues list">
+          {sortableColumnHeader}
           <List<VirtualizedRowProps>
             rowCount={sortedIssues.length}
             rowHeight={ROW_HEIGHT}
