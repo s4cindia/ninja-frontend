@@ -159,6 +159,14 @@ export const SEVERITY_CONFIG: Record<SeverityLevel, SeverityConfig> = {
 
 export const SEVERITY_ORDER: SeverityLevel[] = ['critical', 'serious', 'moderate', 'minor'];
 
+// Hex colors for SVG/canvas rendering where Tailwind classes cannot be used
+export const SEVERITY_HEX_COLORS: Record<SeverityLevel, string> = {
+  critical: '#b91c1c',  // red-700
+  serious: '#c2410c',   // orange-700
+  moderate: '#a16207',  // yellow-700
+  minor: '#1d4ed8',     // blue-700
+};
+
 export function getSeverityConfig(severity: string): SeverityConfig {
   const normalized = severity.toLowerCase() as SeverityLevel;
   return SEVERITY_CONFIG[normalized] || SEVERITY_CONFIG.minor;
