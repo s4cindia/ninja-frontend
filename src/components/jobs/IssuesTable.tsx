@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { List } from 'react-window';
 import { CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 // Note: react-window v2 uses rowCount/rowHeight/rowComponent/rowProps API
@@ -88,14 +88,24 @@ interface SortState {
   order: SortOrder;
 }
 
+const FILTER_DEBOUNCE_MS = 150;
+
 export const IssuesTable = React.memo(function IssuesTable({ issues }: IssuesTableProps) {
   const [sortState, setSortState] = useState<SortState>({ field: 'severity', order: 'asc' });
   const [filterSeverity, setFilterSeverity] = useState<FilterSeverity>('all');
+  const [debouncedFilter, setDebouncedFilter] = useState<FilterSeverity>('all');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedFilter(filterSeverity);
+    }, FILTER_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [filterSeverity]);
 
   const filteredIssues = useMemo(() => {
-    if (filterSeverity === 'all') return issues;
-    return issues.filter((issue) => issue.severity === filterSeverity);
-  }, [issues, filterSeverity]);
+    if (debouncedFilter === 'all') return issues;
+    return issues.filter((issue) => issue.severity === debouncedFilter);
+  }, [issues, debouncedFilter]);
 
   const sortedIssues = useMemo(() => {
     const sorted = [...filteredIssues].sort((a, b) => {

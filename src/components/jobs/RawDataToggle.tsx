@@ -1,13 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { ChevronDown, ChevronRight, Code } from 'lucide-react';
 
 interface RawDataToggleProps {
   data: unknown;
 }
 
-/**
- * Safely stringifies data, handling circular references and BigInt values
- */
 function safeStringify(data: unknown): string {
   try {
     const seen = new WeakSet<object>();
@@ -51,6 +48,11 @@ function safeStringify(data: unknown): string {
 export function RawDataToggle({ data }: RawDataToggleProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
+  const stringifiedData = useMemo(() => {
+    if (!isExpanded) return null;
+    return safeStringify(data);
+  }, [data, isExpanded]);
+
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
       <button
@@ -69,10 +71,10 @@ export function RawDataToggle({ data }: RawDataToggleProps) {
         </span>
       </button>
 
-      {isExpanded && (
+      {isExpanded && stringifiedData && (
         <div className="bg-gray-900 p-4 overflow-x-auto">
           <pre className="text-green-400 font-mono text-sm whitespace-pre">
-            {safeStringify(data)}
+            {stringifiedData}
           </pre>
         </div>
       )}
