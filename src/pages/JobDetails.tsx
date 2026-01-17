@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
+import { ErrorBoundary } from '@/components/ui';
 import { useJob, useCancelJob } from '@/hooks/useJobs';
 import { getJobTypeLabel, extractFileNameFromJob } from '@/utils/jobTypes';
 import { 
@@ -237,55 +238,57 @@ export function JobDetails() {
       )}
 
       {!parseError && parsedOutput && (
-        <div className="mt-6 space-y-6">
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-6">Audit Results</h2>
-            
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-1 flex justify-center">
-                  <ComplianceScore
-                    score={parsedOutput.score}
-                    isAccessible={parsedOutput.isAccessible}
-                  />
+        <ErrorBoundary>
+          <div className="mt-6 space-y-6">
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-6">Audit Results</h2>
+              
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-1 flex justify-center">
+                    <ComplianceScore
+                      score={parsedOutput.score}
+                      isAccessible={parsedOutput.isAccessible}
+                    />
+                  </div>
+
+                  <div className="lg:col-span-2">
+                    <SeveritySummary summary={parsedOutput.summary} />
+                  </div>
                 </div>
 
-                <div className="lg:col-span-2">
-                  <SeveritySummary summary={parsedOutput.summary} />
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600">Valid:</span>
-                  <span className={parsedOutput.isValid ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                    {parsedOutput.isValid ? 'Yes' : 'No'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600">Accessible:</span>
-                  <span className={parsedOutput.isAccessible ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                    {parsedOutput.isAccessible ? 'Yes' : 'No'}
-                  </span>
-                </div>
-                {parsedOutput.epubVersion && (
+                <div className="flex flex-wrap items-center gap-4 p-4 bg-gray-50 rounded-lg">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">EPUB Version:</span>
-                    <span className="text-gray-900 font-medium">
-                      {parsedOutput.epubVersion}
+                    <span className="text-sm text-gray-600">Valid:</span>
+                    <span className={parsedOutput.isValid ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+                      {parsedOutput.isValid ? 'Yes' : 'No'}
                     </span>
                   </div>
-                )}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">Accessible:</span>
+                    <span className={parsedOutput.isAccessible ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+                      {parsedOutput.isAccessible ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                  {parsedOutput.epubVersion && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600">EPUB Version:</span>
+                      <span className="text-gray-900 font-medium">
+                        {parsedOutput.epubVersion}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <IssuesTable issues={parsedOutput.combinedIssues} />
+
+                <JobActions jobId={job.id} />
+
+                <RawDataToggle data={parsedOutput} />
               </div>
-
-              <IssuesTable issues={parsedOutput.combinedIssues} />
-
-              <JobActions jobId={job.id} />
-
-              <RawDataToggle data={parsedOutput} />
             </div>
           </div>
-        </div>
+        </ErrorBoundary>
       )}
     </div>
   );

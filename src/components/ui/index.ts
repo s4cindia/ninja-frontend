@@ -10,3 +10,4 @@ export * from './Logo';
 export * from './Progress';
 export * from './Tabs';
 export * from './Breadcrumbs';
+export { default as ErrorBoundary } from './ErrorBoundary';
