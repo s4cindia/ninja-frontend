@@ -38,26 +38,26 @@ export function Tooltip({ content, children, id, position = 'top' }: TooltipProp
   }, [isVisible, handleKeyDown]);
 
   return (
-    <div
+    <span
       className="relative inline-block"
       onMouseEnter={() => setIsVisible(true)}
       onMouseLeave={() => setIsVisible(false)}
       onFocus={() => setIsVisible(true)}
       onBlur={() => setIsVisible(false)}
     >
-      <div aria-describedby={isVisible ? id : undefined}>
+      <span aria-describedby={isVisible ? id : undefined}>
         {children}
-      </div>
+      </span>
       {isVisible && (
-        <div
+        <span
           id={id}
           role="tooltip"
           className={`absolute z-10 px-2 py-1 text-xs text-white bg-gray-900 rounded shadow-lg whitespace-nowrap ${POSITION_CLASSES[position]}`}
         >
           {content}
-          <div className={`absolute border-4 border-transparent ${ARROW_CLASSES[position]}`} />
-        </div>
+          <span className={`absolute border-4 border-transparent ${ARROW_CLASSES[position]}`} />
+        </span>
       )}
-    </div>
+    </span>
   );
 }

@@ -266,13 +266,13 @@ export function parseJobOutput(output: unknown): JobOutput | null {
   const summary = obj.summary as Record<string, unknown> | undefined;
 
   return {
-    jobId: (obj.jobId as string) || '',
+    jobId: typeof obj.jobId === 'string' ? obj.jobId : '',
     score: typeof obj.score === 'number' ? obj.score : 0,
     isValid: Boolean(obj.isValid),
     isAccessible: Boolean(obj.isAccessible),
-    fileName: (obj.fileName as string) || 'Unknown',
-    epubVersion: (obj.epubVersion as string) || '',
-    auditedAt: (obj.auditedAt as string) || '',
+    fileName: typeof obj.fileName === 'string' ? obj.fileName : 'Unknown',
+    epubVersion: typeof obj.epubVersion === 'string' ? obj.epubVersion : '',
+    auditedAt: typeof obj.auditedAt === 'string' ? obj.auditedAt : '',
     summary: {
       total: (summary?.total as number) ?? 0,
       critical: (summary?.critical as number) ?? 0,
