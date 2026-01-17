@@ -10,3 +10,5 @@ export * from './Logo';
 export * from './Progress';
 export * from './Tabs';
 export * from './Breadcrumbs';
+export { ErrorBoundary } from './ErrorBoundary';
+export * from './Tooltip';

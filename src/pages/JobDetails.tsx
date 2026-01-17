@@ -1,7 +1,8 @@
+import { useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { Button } from '@/components/ui/Button';
-import { Spinner } from '@/components/ui/Spinner';
+import { ErrorBoundary } from '@/components/ui';
 import { useJob, useCancelJob } from '@/hooks/useJobs';
 import { getJobTypeLabel, extractFileNameFromJob } from '@/utils/jobTypes';
 import { 
@@ -10,6 +11,15 @@ import {
   formatDateTime, 
   formatDuration 
 } from '@/utils/jobHelpers';
+import { 
+  ComplianceScore, 
+  SeveritySummary, 
+  IssuesTable, 
+  JobActions, 
+  RawDataToggle,
+  JobDetailSkeleton
+} from '@/components/jobs';
+import { parseJobOutput, extractDownloadUrl } from '@/types/job-output.types';
 import { 
   AlertCircle,
   ArrowLeft,
@@ -23,6 +33,18 @@ export function JobDetails() {
   const { data: job, isLoading, isError, error, refetch } = useJob(jobId || null);
   const cancelJob = useCancelJob();
 
+  const { parsedOutput, parseError } = useMemo(() => {
+    if (!job?.output) {
+      return { parsedOutput: null, parseError: null };
+    }
+
+    const result = parseJobOutput(job.output);
+    if (!result) {
+      return { parsedOutput: null, parseError: 'Failed to parse job output' };
+    }
+    return { parsedOutput: result, parseError: null };
+  }, [job?.output]);
+
   const handleCancel = async () => {
     if (!jobId) return;
     try {
@@ -30,15 +52,25 @@ export function JobDetails() {
       toast.success('Job cancelled successfully');
     } catch (error) {
       console.error('Failed to cancel job:', error);
-      const message = error instanceof Error ? error.message : 'Failed to cancel job';
+      let message = 'Failed to cancel job';
+      if (error instanceof Error) {
+        if (error.message.toLowerCase().includes('network') || error.message.includes('fetch')) {
+          message = 'Network error. Please check your connection.';
+        } else if (error.message.includes('401') || error.message.includes('403')) {
+          message = 'You do not have permission to cancel this job.';
+        } else if (error.message.includes('404')) {
+          message = 'Job not found.';
+        }
+      }
       toast.error(message);
     }
   };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner className="w-8 h-8" />
+      <div>
+        <Breadcrumbs items={[{ label: 'Jobs', path: '/jobs' }, { label: 'Loading...' }]} />
+        <JobDetailSkeleton />
       </div>
     );
   }
@@ -73,7 +105,7 @@ export function JobDetails() {
 
   const fileName = extractFileNameFromJob(job);
   const canCancel = job.status === 'QUEUED' || job.status === 'PROCESSING';
-  const outputUrl = (job.output as Record<string, unknown>)?.downloadUrl as string | undefined;
+  const outputUrl = extractDownloadUrl(job.output);
 
   return (
     <div>
@@ -98,7 +130,7 @@ export function JobDetails() {
             </Button>
           )}
           {outputUrl && (
-            <a href={outputUrl} download>
+            <a href={outputUrl} download rel="noopener noreferrer">
               <Button>
                 <Download className="w-4 h-4 mr-2" />
                 Download
@@ -191,15 +223,81 @@ export function JobDetails() {
           </div>
         )}
 
-        {job.output && Object.keys(job.output).length > 0 && (
-          <div className="bg-white rounded-lg shadow p-6 lg:col-span-2">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Output</h2>
-            <pre className="bg-gray-50 border border-gray-200 rounded-md p-4 text-sm text-gray-800 overflow-x-auto">
-              {JSON.stringify(job.output, null, 2)}
-            </pre>
-          </div>
-        )}
       </div>
+
+      {parseError && (
+        <div className="mt-6 bg-white rounded-lg shadow p-6">
+          <div className="text-center py-8 bg-red-50 rounded-lg border border-red-200">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+            <p className="text-red-700 font-medium">Failed to parse job output</p>
+            <p className="text-red-600 text-sm mt-1">{parseError}</p>
+          </div>
+        </div>
+      )}
+
+      {!parseError && !parsedOutput && (
+        <div className="mt-6 bg-white rounded-lg shadow p-6">
+          <div className="text-center py-12 bg-gray-50 rounded-lg">
+            <p className="text-gray-500">
+              {job.status === 'PROCESSING' ? 'Job is still processing...' : 'No output data available'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {!parseError && parsedOutput && (
+        <ErrorBoundary>
+          <div className="mt-6 space-y-6">
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-6">Audit Results</h2>
+              
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-1 flex justify-center">
+                    <ComplianceScore
+                      score={parsedOutput.score}
+                      isAccessible={parsedOutput.isAccessible}
+                    />
+                  </div>
+
+                  <div className="lg:col-span-2">
+                    <SeveritySummary summary={parsedOutput.summary} />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">Valid:</span>
+                    <span className={parsedOutput.isValid ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+                      {parsedOutput.isValid ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">Accessible:</span>
+                    <span className={parsedOutput.isAccessible ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+                      {parsedOutput.isAccessible ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                  {parsedOutput.epubVersion && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600">EPUB Version:</span>
+                      <span className="text-gray-900 font-medium">
+                        {parsedOutput.epubVersion}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <IssuesTable issues={parsedOutput.combinedIssues} />
+
+                <JobActions jobId={job.id} />
+
+                <RawDataToggle data={parsedOutput} />
+              </div>
+            </div>
+          </div>
+        </ErrorBoundary>
+      )}
     </div>
   );
 }
