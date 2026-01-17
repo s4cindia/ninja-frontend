@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, isValidElement, cloneElement } from 'react';
 
 export interface TooltipProps {
   content: string;
@@ -21,6 +21,12 @@ const ARROW_CLASSES = {
   right: 'right-full top-1/2 transform -translate-y-1/2 border-r-gray-900',
 } as const;
 
+function mergeAriaDescribedBy(existing: string | undefined, newId: string | undefined): string | undefined {
+  if (!newId) return existing;
+  if (!existing) return newId;
+  return `${existing} ${newId}`;
+}
+
 export function Tooltip({ content, children, id, position = 'top' }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
 
@@ -37,17 +43,58 @@ export function Tooltip({ content, children, id, position = 'top' }: TooltipProp
     }
   }, [isVisible, handleKeyDown]);
 
+  const show = useCallback(() => setIsVisible(true), []);
+  const hide = useCallback(() => setIsVisible(false), []);
+
+  const renderChild = () => {
+    if (isValidElement(children)) {
+      const childProps = children.props as Record<string, unknown>;
+      const existingDescribedBy = childProps['aria-describedby'] as string | undefined;
+      
+      return cloneElement(children, {
+        'aria-describedby': mergeAriaDescribedBy(existingDescribedBy, isVisible ? id : undefined),
+        onMouseEnter: (e: React.MouseEvent) => {
+          show();
+          if (typeof childProps.onMouseEnter === 'function') {
+            (childProps.onMouseEnter as (e: React.MouseEvent) => void)(e);
+          }
+        },
+        onMouseLeave: (e: React.MouseEvent) => {
+          hide();
+          if (typeof childProps.onMouseLeave === 'function') {
+            (childProps.onMouseLeave as (e: React.MouseEvent) => void)(e);
+          }
+        },
+        onFocus: (e: React.FocusEvent) => {
+          show();
+          if (typeof childProps.onFocus === 'function') {
+            (childProps.onFocus as (e: React.FocusEvent) => void)(e);
+          }
+        },
+        onBlur: (e: React.FocusEvent) => {
+          hide();
+          if (typeof childProps.onBlur === 'function') {
+            (childProps.onBlur as (e: React.FocusEvent) => void)(e);
+          }
+        },
+      } as React.HTMLAttributes<HTMLElement>);
+    }
+    return children;
+  };
+
+  const isCloneable = isValidElement(children);
+
   return (
     <span
       className="relative inline-block"
-      onMouseEnter={() => setIsVisible(true)}
-      onMouseLeave={() => setIsVisible(false)}
-      onFocus={() => setIsVisible(true)}
-      onBlur={() => setIsVisible(false)}
+      {...(!isCloneable && {
+        onMouseEnter: show,
+        onMouseLeave: hide,
+        onFocus: show,
+        onBlur: hide,
+      })}
     >
-      <span aria-describedby={isVisible ? id : undefined}>
-        {children}
-      </span>
+      {renderChild()}
       {isVisible && (
         <span
           id={id}
