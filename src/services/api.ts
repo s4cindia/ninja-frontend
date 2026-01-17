@@ -153,7 +153,7 @@ export interface CriterionCheck {
 export interface CriterionIssue {
   issueId?: string;
   ruleId?: string;
-  impact?: 'critical' | 'serious' | 'moderate' | 'minor';
+  impact?: string;
   message: string;
   filePath?: string;
   location?: string;
