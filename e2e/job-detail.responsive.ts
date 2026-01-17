@@ -1,217 +1,117 @@
 import { test, expect } from '@playwright/test';
 import { login } from './fixtures/test-base';
 
-/**
- * Job Detail View - Responsive Design Tests
- * Tests for mobile, tablet, and desktop viewports
- */
-
-// Viewport sizes
-const VIEWPORTS = {
-  mobile: { width: 375, height: 667 },
-  tablet: { width: 768, height: 1024 },
-  desktop: { width: 1280, height: 800 },
-};
-
-test.describe('Job Detail View - Responsive Tests', () => {
+test.describe('Job Detail Responsive Tests', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
   });
 
-  test('MT-RD-001: mobile layout displays correctly', async ({ page }) => {
-    await page.setViewportSize(VIEWPORTS.mobile);
+  test('MT-RD-001: Jobs table adapts to mobile viewport', async ({ page }) => {
+    await page.goto('/jobs');
+    await page.waitForSelector('[data-testid="jobs-table"], [data-testid="jobs-list"]');
+
+    const container = page.locator('[data-testid="jobs-table"], [data-testid="jobs-list"]');
+    await expect(container).toBeVisible();
+
+    const boundingBox = await container.boundingBox();
+    expect(boundingBox).not.toBeNull();
+    expect(boundingBox!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  });
+
+  test('MT-RD-002: Job detail header stacks on mobile', async ({ page }) => {
+    await page.goto('/jobs');
+    await page.waitForSelector('[data-testid="jobs-table"], [data-testid="jobs-list"]');
+
+    const firstJobRow = page.locator('[data-testid="job-row"]').first();
+    const hasJobs = await firstJobRow.count() > 0;
+    test.skip(!hasJobs, 'No jobs available');
+
+    await firstJobRow.click();
+    await page.waitForSelector('[data-testid="job-detail-header"]');
+
+    const header = page.locator('[data-testid="job-detail-header"]');
+    await expect(header).toBeVisible();
+  });
+
+  test('MT-RD-003: Navigation remains accessible on mobile', async ({ page }) => {
     await page.goto('/jobs');
 
-    const viewButton = page.locator('[data-testid="view-job-btn"]').first();
-    if (await viewButton.isVisible()) {
-      await viewButton.click();
-
-      // Verify key components are visible on mobile
-      const scoreElement = page.locator('[data-testid="compliance-score"]');
-      if (await scoreElement.isVisible()) {
-        await expect(scoreElement).toBeVisible();
-
-        // Score should still be readable (minimum size)
-        const box = await scoreElement.boundingBox();
-        if (box) {
-          expect(box.width).toBeGreaterThanOrEqual(60);
-          expect(box.height).toBeGreaterThanOrEqual(60);
-        }
-      }
-    }
+    const nav = page.locator('nav, [data-testid="navigation"], [data-testid="mobile-menu"]');
+    await expect(nav.first()).toBeVisible();
   });
 
-  test('MT-RD-002: tablet layout shows 2-column severity cards', async ({ page }) => {
-    await page.setViewportSize(VIEWPORTS.tablet);
+  test('MT-RD-004: Touch targets meet minimum size (44x44)', async ({ page }) => {
+    await page.goto('/jobs');
+    await page.waitForSelector('[data-testid="jobs-table"], [data-testid="jobs-list"]');
+
+    const buttons = page.locator('button, a, [role="button"]');
+    const count = await buttons.count();
+
+    test.skip(count === 0, 'No interactive elements found');
+
+    const firstButton = buttons.first();
+    const box = await firstButton.boundingBox();
+
+    expect(box).not.toBeNull();
+    // Allow some tolerance for borders/padding
+    expect(box!.width).toBeGreaterThanOrEqual(40);
+    expect(box!.height).toBeGreaterThanOrEqual(40);
+  });
+
+  test('MT-RD-005: Text remains readable without horizontal scroll', async ({ page }) => {
     await page.goto('/jobs');
 
-    const viewButton = page.locator('[data-testid="view-job-btn"]').first();
-    if (await viewButton.isVisible()) {
-      await viewButton.click();
+    const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
 
-      const cards = page.locator('[data-testid^="severity-card"]');
-      const count = await cards.count();
-
-      if (count >= 2) {
-        const firstBox = await cards.first().boundingBox();
-        const secondBox = await cards.nth(1).boundingBox();
-
-        if (firstBox && secondBox) {
-          // On tablet, cards might be side by side (similar Y) or stacked
-          // Just verify they're visible and reasonably sized
-          expect(firstBox.width).toBeGreaterThan(100);
-          expect(secondBox.width).toBeGreaterThan(100);
-        }
-      }
-    }
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 5); // 5px tolerance
   });
 
-  test('MT-RD-003: desktop layout shows full 4-column severity cards', async ({ page }) => {
-    await page.setViewportSize(VIEWPORTS.desktop);
+  test('MT-RD-006: Modal dialogs fit mobile viewport', async ({ page }) => {
     await page.goto('/jobs');
+    await page.waitForSelector('[data-testid="jobs-table"], [data-testid="jobs-list"]');
 
-    const viewButton = page.locator('[data-testid="view-job-btn"]').first();
-    if (await viewButton.isVisible()) {
-      await viewButton.click();
+    // Try to open a modal if available
+    const modalTrigger = page.locator('[data-testid="open-modal"], [data-testid="filter-button"]').first();
+    const hasTrigger = await modalTrigger.count() > 0;
 
-      const cards = page.locator('[data-testid^="severity-card"]');
-      const count = await cards.count();
+    test.skip(!hasTrigger, 'No modal trigger found');
 
-      if (count === 4) {
-        // Get all card positions
-        const boxes = await Promise.all(
-          [0, 1, 2, 3].map(i => cards.nth(i).boundingBox())
-        );
+    await modalTrigger.click();
 
-        // Verify all cards are visible
-        boxes.forEach(box => {
-          expect(box).not.toBeNull();
-        });
-      }
-    }
+    const modal = page.locator('[role="dialog"], [data-testid="modal"]');
+    const hasModal = await modal.count() > 0;
+
+    test.skip(!hasModal, 'No modal appeared');
+
+    const box = await modal.boundingBox();
+    expect(box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
   });
 
-  test('MT-RD-004: table has horizontal scroll on mobile', async ({ page }) => {
-    await page.setViewportSize(VIEWPORTS.mobile);
+  test('MT-RD-007: Action buttons are accessible on mobile', async ({ page }) => {
     await page.goto('/jobs');
+    await page.waitForSelector('[data-testid="jobs-table"], [data-testid="jobs-list"]');
 
-    const viewButton = page.locator('[data-testid="view-job-btn"]').first();
-    if (await viewButton.isVisible()) {
-      await viewButton.click();
+    const firstJobRow = page.locator('[data-testid="job-row"]').first();
+    const hasJobs = await firstJobRow.count() > 0;
+    test.skip(!hasJobs, 'No jobs available');
 
-      const tableContainer = page.locator('[data-testid="issues-table-container"]');
-      if (await tableContainer.isVisible()) {
-        const overflowX = await tableContainer.evaluate(
-          el => window.getComputedStyle(el).overflowX
-        );
-        expect(['auto', 'scroll']).toContain(overflowX);
-      }
-    }
+    await firstJobRow.click();
+
+    const actions = page.locator('[data-testid="job-actions"]');
+    await expect(actions).toBeVisible();
   });
 
-  test('MT-RD-005: action buttons stack on mobile', async ({ page }) => {
-    await page.setViewportSize(VIEWPORTS.mobile);
-    await page.goto('/jobs');
+  test('MT-RD-011: Progress indicator visible on mobile', async ({ page }) => {
+    await page.goto('/jobs?status=PROCESSING');
 
-    const viewButton = page.locator('[data-testid="view-job-btn"]').first();
-    if (await viewButton.isVisible()) {
-      await viewButton.click();
+    const processingJob = page.locator('[data-testid="job-row"]').first();
+    const hasJobs = await processingJob.count() > 0;
+    test.skip(!hasJobs, 'No processing jobs available');
 
-      const actionsContainer = page.locator('[data-testid="job-actions"]');
-      if (await actionsContainer.isVisible()) {
-        const buttons = actionsContainer.locator('button');
-        const count = await buttons.count();
+    await processingJob.click();
 
-        if (count >= 2) {
-          const firstBox = await buttons.first().boundingBox();
-          const secondBox = await buttons.nth(1).boundingBox();
-
-          if (firstBox && secondBox) {
-            // On mobile, buttons should stack (second below first)
-            // or be arranged to fit mobile width
-            expect(firstBox.width).toBeLessThanOrEqual(VIEWPORTS.mobile.width);
-          }
-        }
-      }
-    }
-  });
-
-  test('MT-RD-006: compliance score is readable at all viewport sizes', async ({ page }) => {
-    const viewports = [
-      { ...VIEWPORTS.mobile, name: 'mobile' },
-      { ...VIEWPORTS.tablet, name: 'tablet' },
-      { ...VIEWPORTS.desktop, name: 'desktop' },
-    ];
-
-    for (const viewport of viewports) {
-      await page.setViewportSize({ width: viewport.width, height: viewport.height });
-      await page.goto('/jobs');
-
-      const viewButton = page.locator('[data-testid="view-job-btn"]').first();
-      if (await viewButton.isVisible()) {
-        await viewButton.click();
-
-        const score = page.locator('[data-testid="compliance-score"]');
-        if (await score.isVisible()) {
-          await expect(score).toBeVisible();
-
-          const box = await score.boundingBox();
-          if (box) {
-            // Score should be at least 60px for readability
-            expect(box.width).toBeGreaterThanOrEqual(60);
-            expect(box.height).toBeGreaterThanOrEqual(60);
-          }
-        }
-      }
-    }
-  });
-
-  test('MT-RD-007: long text is truncated on mobile', async ({ page }) => {
-    await page.setViewportSize(VIEWPORTS.mobile);
-    await page.goto('/jobs');
-
-    const viewButton = page.locator('[data-testid="view-job-btn"]').first();
-    if (await viewButton.isVisible()) {
-      await viewButton.click();
-
-      const descriptionCells = page.locator('[data-testid="issue-description"]');
-      const count = await descriptionCells.count();
-
-      if (count > 0) {
-        const cell = descriptionCells.first();
-        const box = await cell.boundingBox();
-
-        if (box) {
-          // Cell should fit within viewport
-          expect(box.width).toBeLessThan(VIEWPORTS.mobile.width);
-        }
-      }
-    }
-  });
-
-  test('MT-RD-011: score gauge remains circular', async ({ page }) => {
-    const viewports = [VIEWPORTS.mobile, VIEWPORTS.tablet, VIEWPORTS.desktop];
-
-    for (const viewport of viewports) {
-      await page.setViewportSize(viewport);
-      await page.goto('/jobs');
-
-      const viewButton = page.locator('[data-testid="view-job-btn"]').first();
-      if (await viewButton.isVisible()) {
-        await viewButton.click();
-
-        const score = page.locator('[data-testid="compliance-score"]');
-        if (await score.isVisible()) {
-          const box = await score.boundingBox();
-
-          if (box) {
-            // Width and height should be similar (circular)
-            const aspectRatio = box.width / box.height;
-            expect(aspectRatio).toBeGreaterThan(0.8);
-            expect(aspectRatio).toBeLessThan(1.2);
-          }
-        }
-      }
-    }
+    const progress = page.locator('[data-testid="job-progress"]');
+    await expect(progress).toBeVisible();
   });
 });

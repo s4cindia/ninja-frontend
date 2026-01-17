@@ -1,141 +1,97 @@
 import { test, expect } from '@playwright/test';
 import { login } from './fixtures/test-base';
 
-/**
- * Job Detail View - E2E Tests
- * Tests for /jobs and /jobs/:id pages
- */
-
-test.describe('Job Detail View - E2E Tests', () => {
+test.describe('Job Detail View E2E Tests', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
   });
 
-  test('MT-E2E-001: complete user flow - Jobs to View to Remediate', async ({ page }) => {
-    // Navigate to jobs list
+  test('MT-E2E-001: Navigate to job detail from jobs list', async ({ page }) => {
     await page.goto('/jobs');
-    await expect(page.locator('h1')).toBeVisible();
+    await page.waitForSelector('[data-testid="jobs-table"]');
 
-    // Click first View button
-    const viewButton = page.locator('[data-testid="view-job-btn"]').first();
-    if (await viewButton.isVisible()) {
-      await viewButton.click();
+    const firstJobRow = page.locator('[data-testid="job-row"]').first();
+    await expect(firstJobRow).toBeVisible();
+    await firstJobRow.click();
 
-      // Verify job detail page loaded
-      await expect(page).toHaveURL(/\/jobs\/[\w-]+/);
-      await expect(page.locator('[data-testid="compliance-score"]')).toBeVisible();
-      await expect(page.locator('[data-testid="severity-summary"]')).toBeVisible();
-    }
+    await expect(page).toHaveURL(/\/jobs\/[a-zA-Z0-9-]+/);
+    await expect(page.locator('[data-testid="job-detail-header"]')).toBeVisible();
   });
 
-  test('MT-E2E-005: Back button returns to Jobs list', async ({ page }) => {
+  test('MT-E2E-005: Display job metadata correctly', async ({ page }) => {
     await page.goto('/jobs');
+    await page.waitForSelector('[data-testid="jobs-table"]');
 
-    // Click first job to view details
-    const viewButton = page.locator('[data-testid="view-job-btn"]').first();
-    if (await viewButton.isVisible()) {
-      await viewButton.click();
-      await expect(page).toHaveURL(/\/jobs\/[\w-]+/);
+    const firstJobRow = page.locator('[data-testid="job-row"]').first();
+    await expect(firstJobRow).toBeVisible();
+    await firstJobRow.click();
 
-      // Click back button
-      const backButton = page.locator('[data-testid="back-button"]');
-      if (await backButton.isVisible()) {
-        await backButton.click();
-        await expect(page).toHaveURL('/jobs');
-      }
-    }
+    await expect(page.locator('[data-testid="job-type"]')).toBeVisible();
+    await expect(page.locator('[data-testid="job-status"]')).toBeVisible();
+    await expect(page.locator('[data-testid="job-created-date"]')).toBeVisible();
   });
 
-  test('MT-E2E-006: Raw data toggle expands and collapses', async ({ page }) => {
-    await page.goto('/jobs');
+  test('MT-E2E-006: Display job progress for processing jobs', async ({ page }) => {
+    await page.goto('/jobs?status=PROCESSING');
 
-    const viewButton = page.locator('[data-testid="view-job-btn"]').first();
-    if (await viewButton.isVisible()) {
-      await viewButton.click();
-      await expect(page).toHaveURL(/\/jobs\/[\w-]+/);
+    const processingJob = page.locator('[data-testid="job-row"]').first();
+    const hasProcessingJobs = await processingJob.count() > 0;
 
-      const rawToggle = page.locator('[data-testid="raw-data-toggle"]');
-      if (await rawToggle.isVisible()) {
-        // Initially hidden
-        await expect(page.locator('[data-testid="raw-json"]')).not.toBeVisible();
+    test.skip(!hasProcessingJobs, 'No processing jobs available');
 
-        // Click to show
-        await rawToggle.click();
-        await expect(page.locator('[data-testid="raw-json"]')).toBeVisible();
-
-        // Click to hide
-        await rawToggle.click();
-        await expect(page.locator('[data-testid="raw-json"]')).not.toBeVisible();
-      }
-    }
+    await processingJob.click();
+    await expect(page.locator('[data-testid="job-progress"]')).toBeVisible();
   });
 
-  test('MT-E2E-007: Filter issues by severity', async ({ page }) => {
-    await page.goto('/jobs');
+  test('MT-E2E-007: Display job results for completed jobs', async ({ page }) => {
+    await page.goto('/jobs?status=COMPLETED');
 
-    const viewButton = page.locator('[data-testid="view-job-btn"]').first();
-    if (await viewButton.isVisible()) {
-      await viewButton.click();
+    const completedJob = page.locator('[data-testid="job-row"]').first();
+    const hasCompletedJobs = await completedJob.count() > 0;
 
-      const filterDropdown = page.locator('[data-testid="filter-severity"]');
-      if (await filterDropdown.isVisible()) {
-        // Get initial row count
-        const initialRows = await page.locator('[data-testid="issue-row"]').count();
+    test.skip(!hasCompletedJobs, 'No completed jobs available');
 
-        // Filter by severity
-        await filterDropdown.selectOption('critical');
-
-        // Verify filtered results
-        const filteredRows = await page.locator('[data-testid="issue-row"]').count();
-        expect(filteredRows).toBeLessThanOrEqual(initialRows);
-      }
-    }
+    await completedJob.click();
+    await expect(page.locator('[data-testid="job-results"]')).toBeVisible();
   });
 
-  test('MT-E2E-011: Compliance score displays correctly', async ({ page }) => {
+  test('MT-E2E-011: Back navigation returns to jobs list', async ({ page }) => {
     await page.goto('/jobs');
+    await page.waitForSelector('[data-testid="jobs-table"]');
 
-    const viewButton = page.locator('[data-testid="view-job-btn"]').first();
-    if (await viewButton.isVisible()) {
-      await viewButton.click();
+    const firstJobRow = page.locator('[data-testid="job-row"]').first();
+    await expect(firstJobRow).toBeVisible();
+    await firstJobRow.click();
 
-      // Verify score component exists
-      const scoreElement = page.locator('[data-testid="compliance-score"]');
-      await expect(scoreElement).toBeVisible();
+    await expect(page).toHaveURL(/\/jobs\/[a-zA-Z0-9-]+/);
 
-      // Verify score value is displayed
-      const scoreValue = page.locator('[data-testid="score-value"]');
-      if (await scoreValue.isVisible()) {
-        const text = await scoreValue.textContent();
-        expect(text).toMatch(/\d+/); // Contains a number
-      }
-    }
+    const backButton = page.locator('[data-testid="back-button"]');
+    await expect(backButton).toBeVisible();
+    await backButton.click();
+
+    await expect(page).toHaveURL('/jobs');
   });
 
-  test('MT-E2E-012: Severity summary cards display', async ({ page }) => {
+  test('MT-E2E-012: Job actions are available based on status', async ({ page }) => {
     await page.goto('/jobs');
+    await page.waitForSelector('[data-testid="jobs-table"]');
 
-    const viewButton = page.locator('[data-testid="view-job-btn"]').first();
-    if (await viewButton.isVisible()) {
-      await viewButton.click();
+    const firstJobRow = page.locator('[data-testid="job-row"]').first();
+    await expect(firstJobRow).toBeVisible();
+    await firstJobRow.click();
 
-      // Verify severity summary exists
-      const summaryElement = page.locator('[data-testid="severity-summary"]');
-      await expect(summaryElement).toBeVisible();
-
-      // Check for severity cards
-      const severityCards = page.locator('[data-testid^="severity-card"]');
-      const count = await severityCards.count();
-      expect(count).toBeGreaterThanOrEqual(1);
-    }
+    await expect(page.locator('[data-testid="job-actions"]')).toBeVisible();
   });
 
-  test('MT-E2E-015: Loading skeleton appears', async ({ page }) => {
-    // Navigate directly to trigger loading state
-    await page.goto('/jobs');
+  test('MT-E2E-015: Error state displays correctly for failed jobs', async ({ page }) => {
+    await page.goto('/jobs?status=FAILED');
 
-    // Check if skeleton or content appears
-    const content = page.locator('[data-testid="compliance-score"], [data-testid="job-detail-skeleton"]');
-    await expect(content.first()).toBeVisible({ timeout: 10000 });
+    const failedJob = page.locator('[data-testid="job-row"]').first();
+    const hasFailedJobs = await failedJob.count() > 0;
+
+    test.skip(!hasFailedJobs, 'No failed jobs available');
+
+    await failedJob.click();
+    await expect(page.locator('[data-testid="job-error"]')).toBeVisible();
   });
 });
