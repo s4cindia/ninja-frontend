@@ -9,6 +9,12 @@ interface IssuesTableProps {
 type SortField = 'severity' | 'description' | 'location';
 type SortOrder = 'asc' | 'desc';
 type FilterSeverity = SeverityLevel | 'all';
+type AriaSortValue = 'ascending' | 'descending' | 'none';
+
+function getAriaSortValue(currentField: SortField, targetField: SortField, order: SortOrder): AriaSortValue {
+  if (currentField !== targetField) return 'none';
+  return order === 'asc' ? 'ascending' : 'descending';
+}
 
 const SEVERITY_PRIORITY: Record<DisplayIssue['severity'], number> = {
   critical: 0,
@@ -80,17 +86,23 @@ export function IssuesTable({ issues }: IssuesTableProps) {
         <h3 className="text-lg font-semibold text-gray-900">
           Issues ({filteredIssues.length} of {issues.length})
         </h3>
-        <select
-          value={filterSeverity}
-          onChange={(e) => setFilterSeverity(e.target.value as FilterSeverity)}
-          className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
-        >
-          <option value="all">All Severities</option>
-          <option value="critical">Critical</option>
-          <option value="serious">Serious</option>
-          <option value="moderate">Moderate</option>
-          <option value="minor">Minor</option>
-        </select>
+        <div className="flex items-center gap-2">
+          <label htmlFor="severity-filter" className="sr-only">
+            Filter by severity
+          </label>
+          <select
+            id="severity-filter"
+            value={filterSeverity}
+            onChange={(e) => setFilterSeverity(e.target.value as FilterSeverity)}
+            className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+          >
+            <option value="all">All Severities</option>
+            <option value="critical">Critical</option>
+            <option value="serious">Serious</option>
+            <option value="moderate">Moderate</option>
+            <option value="minor">Minor</option>
+          </select>
+        </div>
       </div>
 
       <div className="overflow-x-auto border border-gray-200 rounded-lg">
@@ -98,25 +110,43 @@ export function IssuesTable({ issues }: IssuesTableProps) {
           <thead className="bg-gray-50">
             <tr>
               <th
-                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('severity')}
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                aria-sort={getAriaSortValue(sortField, 'severity', sortOrder)}
               >
-                Severity
-                <SortIcon field="severity" />
+                <button
+                  type="button"
+                  onClick={() => handleSort('severity')}
+                  className="inline-flex items-center gap-1 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded"
+                >
+                  Severity
+                  <SortIcon field="severity" />
+                </button>
               </th>
               <th
-                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('description')}
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                aria-sort={getAriaSortValue(sortField, 'description', sortOrder)}
               >
-                Description
-                <SortIcon field="description" />
+                <button
+                  type="button"
+                  onClick={() => handleSort('description')}
+                  className="inline-flex items-center gap-1 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded"
+                >
+                  Description
+                  <SortIcon field="description" />
+                </button>
               </th>
               <th
-                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('location')}
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                aria-sort={getAriaSortValue(sortField, 'location', sortOrder)}
               >
-                Location
-                <SortIcon field="location" />
+                <button
+                  type="button"
+                  onClick={() => handleSort('location')}
+                  className="inline-flex items-center gap-1 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded"
+                >
+                  Location
+                  <SortIcon field="location" />
+                </button>
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Auto-Fix
