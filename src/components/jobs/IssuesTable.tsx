@@ -236,13 +236,15 @@ export const IssuesTable = React.memo(function IssuesTable({ issues }: IssuesTab
         {tableHeader}
         <div className="border border-gray-200 rounded-lg overflow-hidden" role="grid" aria-label="Issues list">
           {sortableColumnHeader}
-          <List<VirtualizedRowProps>
-            rowCount={sortedIssues.length}
-            rowHeight={ROW_HEIGHT}
-            rowComponent={VirtualizedRowComponent}
-            rowProps={{ data: sortedIssues }}
-            style={{ height: ROW_HEIGHT * Math.min(VISIBLE_ROWS, sortedIssues.length) }}
-          />
+          <div className="w-full">
+            <List<VirtualizedRowProps>
+              rowCount={sortedIssues.length}
+              rowHeight={ROW_HEIGHT}
+              rowComponent={VirtualizedRowComponent}
+              rowProps={{ data: sortedIssues }}
+              style={{ height: ROW_HEIGHT * Math.min(VISIBLE_ROWS, sortedIssues.length), width: '100%' }}
+            />
+          </div>
         </div>
         <p className="text-xs text-gray-500 mt-2">
           Showing {sortedIssues.length} issues (virtualized for performance)
