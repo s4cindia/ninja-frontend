@@ -1,6 +1,13 @@
 import { useState, useMemo } from 'react';
-import { CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle, XCircle, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, Info, LucideIcon } from 'lucide-react';
 import { DisplayIssue, SEVERITY_CONFIG, SeverityLevel } from '../../types/job-output.types';
+
+const SEVERITY_ICONS: Record<SeverityLevel, LucideIcon> = {
+  critical: AlertCircle,
+  serious: AlertTriangle,
+  moderate: AlertTriangle,
+  minor: Info,
+};
 
 interface IssuesTableProps {
   issues: DisplayIssue[];
@@ -156,13 +163,14 @@ export function IssuesTable({ issues }: IssuesTableProps) {
           <tbody className="bg-white divide-y divide-gray-200">
             {sortedIssues.map((issue) => {
               const config = SEVERITY_CONFIG[issue.severity];
+              const Icon = SEVERITY_ICONS[issue.severity];
               return (
                 <tr key={issue.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 whitespace-nowrap">
                     <span
                       className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${config.bgColor} ${config.textColor}`}
                     >
-                      {config.icon} {config.label}
+                      <Icon className="w-3.5 h-3.5" /> {config.label}
                     </span>
                   </td>
                   <td className="px-4 py-3">

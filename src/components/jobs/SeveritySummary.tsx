@@ -1,3 +1,4 @@
+import { AlertCircle, AlertTriangle, Info, LucideIcon } from 'lucide-react';
 import { IssueSummary, SEVERITY_CONFIG, SeverityLevel } from '../../types/job-output.types';
 
 interface SeveritySummaryProps {
@@ -6,12 +7,20 @@ interface SeveritySummaryProps {
 
 const SEVERITY_ORDER: SeverityLevel[] = ['critical', 'serious', 'moderate', 'minor'];
 
+const SEVERITY_ICONS: Record<SeverityLevel, LucideIcon> = {
+  critical: AlertCircle,
+  serious: AlertTriangle,
+  moderate: AlertTriangle,
+  minor: Info,
+};
+
 export function SeveritySummary({ summary }: SeveritySummaryProps) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
       {SEVERITY_ORDER.map((severity) => {
         const config = SEVERITY_CONFIG[severity];
         const count = summary[severity];
+        const Icon = SEVERITY_ICONS[severity];
 
         return (
           <div
@@ -20,7 +29,7 @@ export function SeveritySummary({ summary }: SeveritySummaryProps) {
             data-testid={`${severity}-count`}
           >
             <div className="flex items-center gap-2 mb-1">
-              <span>{config.icon}</span>
+              <Icon className={`w-4 h-4 ${config.textColor}`} />
               <span className={`text-sm font-medium ${config.textColor}`}>
                 {config.label}
               </span>

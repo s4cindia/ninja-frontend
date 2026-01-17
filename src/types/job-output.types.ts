@@ -58,34 +58,40 @@ export interface JobOutput {
 
 export type SeverityLevel = 'critical' | 'serious' | 'moderate' | 'minor';
 
-export const SEVERITY_CONFIG = {
+export const SEVERITY_CONFIG: Record<SeverityLevel, {
+  label: string;
+  bgColor: string;
+  textColor: string;
+  borderColor: string;
+  iconName: 'alert-circle' | 'alert-triangle' | 'info';
+}> = {
   critical: {
     label: 'Critical',
     bgColor: 'bg-red-50',
     textColor: 'text-red-700',
     borderColor: 'border-red-200',
-    icon: '🔴',
+    iconName: 'alert-circle',
   },
   serious: {
     label: 'Serious',
     bgColor: 'bg-orange-50',
     textColor: 'text-orange-700',
     borderColor: 'border-orange-200',
-    icon: '🟠',
+    iconName: 'alert-triangle',
   },
   moderate: {
     label: 'Moderate',
     bgColor: 'bg-yellow-50',
     textColor: 'text-yellow-700',
     borderColor: 'border-yellow-200',
-    icon: '🟡',
+    iconName: 'alert-triangle',
   },
   minor: {
     label: 'Minor',
     bgColor: 'bg-blue-50',
     textColor: 'text-blue-700',
     borderColor: 'border-blue-200',
-    icon: '🔵',
+    iconName: 'info',
   },
 } as const;
 
