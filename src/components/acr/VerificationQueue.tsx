@@ -14,7 +14,8 @@ import type {
   Severity,
   ConfidenceLevel,
   VerificationFilters,
-  VerificationIssue
+  VerificationIssue,
+  FixedVerificationIssue
 } from '@/types/verification.types';
 
 interface SavedVerification {
@@ -80,10 +81,39 @@ function convertCriteriaToVerificationItems(
         suggestedFix: issue.suggestedFix,
       }));
 
-      const issueCount = c.issueCount || issues?.length || 0;
-      const automatedNotesWithIssues = issueCount > 0
-        ? `Found ${issueCount} issue${issueCount !== 1 ? 's' : ''} requiring review. ${c.remarks || ''}`
-        : c.remarks || `Automated analysis flagged this criterion for human review. Confidence: ${score}%`;
+      const fixedIssues: FixedVerificationIssue[] | undefined = c.fixedIssues?.map((issue) => ({
+        id: issue.issueId,
+        issueId: issue.issueId,
+        ruleId: issue.ruleId,
+        impact: issue.impact,
+        message: issue.message,
+        severity: issue.impact as Severity | undefined,
+        location: issue.location,
+        filePath: issue.filePath,
+        html: issue.htmlSnippet,
+        htmlSnippet: issue.htmlSnippet,
+        suggestedFix: issue.suggestedFix,
+        fixedAt: issue.fixedAt,
+        fixMethod: issue.fixMethod,
+      }));
+
+      const remainingCount = c.remainingCount ?? issues?.length ?? 0;
+      const fixedCount = c.fixedCount ?? fixedIssues?.length ?? 0;
+      const totalIssueCount = remainingCount + fixedCount;
+      
+      let automatedNotesWithIssues: string;
+      if (totalIssueCount > 0) {
+        const parts: string[] = [];
+        if (remainingCount > 0) {
+          parts.push(`${remainingCount} issue${remainingCount !== 1 ? 's' : ''} remaining`);
+        }
+        if (fixedCount > 0) {
+          parts.push(`${fixedCount} fixed`);
+        }
+        automatedNotesWithIssues = parts.join(', ') + '. ' + (c.remarks || '');
+      } else {
+        automatedNotesWithIssues = c.remarks || `Automated analysis flagged this criterion for human review. Confidence: ${score}%`;
+      }
 
       const baseItem: VerificationItemType = {
         id: c.id || `criterion-${index}`,
@@ -98,6 +128,9 @@ function convertCriteriaToVerificationItems(
         status: 'pending',
         history: [],
         issues: issues && issues.length > 0 ? issues : undefined,
+        fixedIssues: fixedIssues && fixedIssues.length > 0 ? fixedIssues : undefined,
+        fixedCount,
+        remainingCount,
       };
 
       if (saved) {

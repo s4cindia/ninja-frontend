@@ -26,6 +26,11 @@ export interface VerificationIssue {
   suggestedFix?: string;
 }
 
+export interface FixedVerificationIssue extends VerificationIssue {
+  fixedAt?: string;
+  fixMethod?: 'automated' | 'manual';
+}
+
 export interface VerificationItem {
   id: string;
   criterionId: string;
@@ -39,6 +44,9 @@ export interface VerificationItem {
   status: VerificationStatus;
   history: VerificationHistoryEntry[];
   issues?: VerificationIssue[];
+  fixedIssues?: FixedVerificationIssue[];
+  fixedCount?: number;
+  remainingCount?: number;
 }
 
 export interface VerificationQueueData {

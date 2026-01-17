@@ -68,6 +68,7 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
   const [showHistory, setShowHistory] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [showIssues, setShowIssues] = useState(false);
+  const [showFixedIssues, setShowFixedIssues] = useState(false);
   
   const latestHistory = item.history.length > 0 ? item.history[item.history.length - 1] : null;
   const historyLength = item.history.length;
@@ -355,6 +356,124 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
                               View in EPUB
                             </Button>
                           </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Fixed Issues Section */}
+            {item.fixedIssues && item.fixedIssues.length > 0 && (
+              <div className="mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowFixedIssues(!showFixedIssues)}
+                  className="w-full sm:w-auto border-green-300 text-green-700 hover:bg-green-50"
+                >
+                  {showFixedIssues ? (
+                    <>
+                      <ChevronUp className="h-4 w-4 mr-2" />
+                      Hide {item.fixedIssues.length} Fixed Issue{item.fixedIssues.length > 1 ? 's' : ''}
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-4 w-4 mr-2" />
+                      Show {item.fixedIssues.length} Fixed Issue{item.fixedIssues.length > 1 ? 's' : ''} (Audit Trail)
+                    </>
+                  )}
+                </Button>
+
+                {showFixedIssues && (
+                  <div className="mt-4 space-y-4">
+                    {item.fixedIssues.map((issue, idx) => {
+                      const htmlContent = issue.html || issue.htmlSnippet;
+                      const impactLabel = issue.impact || issue.severity;
+                      
+                      return (
+                        <div
+                          key={issue.id || issue.issueId || idx}
+                          className="p-4 bg-green-50 border border-green-200 rounded-lg"
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                              <span className="text-sm font-semibold text-gray-900">
+                                Fixed Issue {idx + 1} of {item.fixedIssues!.length}
+                              </span>
+                              {impactLabel && (
+                                <span className={cn(
+                                  'text-xs px-2 py-0.5 rounded font-medium uppercase line-through opacity-60',
+                                  (impactLabel === 'critical') && 'bg-red-100 text-red-700',
+                                  (impactLabel === 'serious') && 'bg-orange-100 text-orange-700',
+                                  (impactLabel === 'moderate') && 'bg-yellow-100 text-yellow-700',
+                                  (impactLabel === 'minor') && 'bg-blue-100 text-blue-700'
+                                )}>
+                                  {impactLabel}
+                                </span>
+                              )}
+                              {issue.ruleId && (
+                                <span className="text-xs text-gray-500 font-mono">
+                                  {issue.ruleId}
+                                </span>
+                              )}
+                            </div>
+                            {issue.fixMethod && (
+                              <span className={cn(
+                                'text-xs px-2 py-0.5 rounded',
+                                issue.fixMethod === 'automated' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                              )}>
+                                {issue.fixMethod === 'automated' ? 'Auto-fixed' : 'Manually fixed'}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="mb-3">
+                            <p className="text-sm text-gray-700 line-through opacity-70">{issue.message}</p>
+                          </div>
+
+                          {issue.fixedAt && (
+                            <div className="mb-2">
+                              <p className="text-xs text-gray-500">
+                                Fixed: {new Date(issue.fixedAt).toLocaleString()}
+                              </p>
+                            </div>
+                          )}
+
+                          {issue.location && (
+                            <div className="mb-3">
+                              <p className="text-xs font-medium text-gray-700 mb-1">Location:</p>
+                              <p className="text-xs text-gray-600 bg-white px-2 py-1 rounded font-mono border">
+                                {issue.location}
+                              </p>
+                            </div>
+                          )}
+
+                          {htmlContent && (
+                            <div className="mb-3">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Code className="h-4 w-4 text-gray-600" />
+                                <span className="text-xs font-semibold text-gray-700">Original HTML (now fixed):</span>
+                              </div>
+                              <pre className="text-xs text-gray-600 bg-white p-2 rounded overflow-x-auto border opacity-70">
+                                <code>{htmlContent}</code>
+                              </pre>
+                            </div>
+                          )}
+
+                          {issue.suggestedFix && (
+                            <div className="mb-3">
+                              <div className="flex items-center gap-2 mb-1">
+                                <CheckCircle className="h-4 w-4 text-green-600" />
+                                <span className="text-xs font-semibold text-gray-700">Applied Fix:</span>
+                              </div>
+                              <pre className="text-xs text-green-800 bg-white p-2 rounded border border-green-200 overflow-x-auto">
+                                <code>{issue.suggestedFix}</code>
+                              </pre>
+                            </div>
+                          )}
                         </div>
                       );
                     })}

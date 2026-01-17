@@ -161,6 +161,11 @@ export interface CriterionIssue {
   suggestedFix?: string;
 }
 
+export interface FixedIssue extends CriterionIssue {
+  fixedAt?: string;
+  fixMethod?: 'automated' | 'manual';
+}
+
 export interface CriterionConfidence {
   id: string;
   criterionId: string;
@@ -174,6 +179,9 @@ export interface CriterionConfidence {
   manualChecks: string[];
   relatedIssues?: CriterionIssue[];
   issueCount?: number;
+  fixedIssues?: FixedIssue[];
+  fixedCount?: number;
+  remainingCount?: number;
 }
 
 export interface AcrAnalysisResponse {
