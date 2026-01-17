@@ -14,6 +14,8 @@ describe('job-output.types', () => {
   describe('isValidJobOutput', () => {
     it('returns true for valid job output', () => {
       const valid = {
+        jobId: 'job-123',
+        fileName: 'test.epub',
         score: 85,
         isAccessible: true,
         summary: { critical: 0, serious: 0, moderate: 0, minor: 0, total: 0 },
@@ -22,9 +24,15 @@ describe('job-output.types', () => {
       expect(isValidJobOutput(valid)).toBe(true);
     });
 
-    it('returns true for output with optional fields undefined', () => {
-      const valid = {};
+    it('returns true for output with only required fields', () => {
+      const valid = { jobId: 'job-123', fileName: 'test.epub' };
       expect(isValidJobOutput(valid)).toBe(true);
+    });
+
+    it('returns false for missing required fields', () => {
+      expect(isValidJobOutput({})).toBe(false);
+      expect(isValidJobOutput({ jobId: 'job-123' })).toBe(false);
+      expect(isValidJobOutput({ fileName: 'test.epub' })).toBe(false);
     });
 
     it('returns false for null', () => {
@@ -41,15 +49,15 @@ describe('job-output.types', () => {
     });
 
     it('returns false for invalid score type', () => {
-      expect(isValidJobOutput({ score: 'high' })).toBe(false);
+      expect(isValidJobOutput({ jobId: 'job-123', fileName: 'test.epub', score: 'high' })).toBe(false);
     });
 
     it('returns false for invalid isAccessible type', () => {
-      expect(isValidJobOutput({ isAccessible: 'yes' })).toBe(false);
+      expect(isValidJobOutput({ jobId: 'job-123', fileName: 'test.epub', isAccessible: 'yes' })).toBe(false);
     });
 
     it('returns false for invalid combinedIssues type', () => {
-      expect(isValidJobOutput({ combinedIssues: 'not an array' })).toBe(false);
+      expect(isValidJobOutput({ jobId: 'job-123', fileName: 'test.epub', combinedIssues: 'not an array' })).toBe(false);
     });
   });
 

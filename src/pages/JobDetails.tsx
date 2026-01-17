@@ -52,7 +52,16 @@ export function JobDetails() {
       toast.success('Job cancelled successfully');
     } catch (error) {
       console.error('Failed to cancel job:', error);
-      const message = error instanceof Error ? error.message : 'Failed to cancel job';
+      let message = 'Failed to cancel job';
+      if (error instanceof Error) {
+        if (error.message.toLowerCase().includes('network') || error.message.includes('fetch')) {
+          message = 'Network error. Please check your connection.';
+        } else if (error.message.includes('401') || error.message.includes('403')) {
+          message = 'You do not have permission to cancel this job.';
+        } else if (error.message.includes('404')) {
+          message = 'Job not found.';
+        }
+      }
       toast.error(message);
     }
   };

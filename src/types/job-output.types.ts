@@ -210,12 +210,16 @@ export function isValidJobOutput(output: unknown): output is JobOutput {
 
   const obj = output as Record<string, unknown>;
 
+  const hasRequiredFields = 
+    typeof obj.jobId === 'string' &&
+    typeof obj.fileName === 'string';
+
   const hasValidScore = obj.score === undefined || typeof obj.score === 'number';
   const hasValidAccessible = obj.isAccessible === undefined || typeof obj.isAccessible === 'boolean';
-  const hasValidSummary = obj.summary === undefined || typeof obj.summary === 'object';
+  const hasValidSummary = obj.summary === undefined || (typeof obj.summary === 'object' && obj.summary !== null);
   const hasValidIssues = obj.combinedIssues === undefined || Array.isArray(obj.combinedIssues);
 
-  return hasValidScore && hasValidAccessible && hasValidSummary && hasValidIssues;
+  return hasRequiredFields && hasValidScore && hasValidAccessible && hasValidSummary && hasValidIssues;
 }
 
 const SAFE_URL_PROTOCOLS = ['http:', 'https:'];

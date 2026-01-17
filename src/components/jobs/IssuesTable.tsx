@@ -31,8 +31,7 @@ function getAriaSortValue(currentField: SortField, targetField: SortField, order
   return order === 'asc' ? 'ascending' : 'descending';
 }
 
-function VirtualizedRowComponent({ index, style, data, ariaAttributes }: {
-  ariaAttributes: { "aria-posinset": number; "aria-setsize": number; role: "listitem" };
+function VirtualizedRowComponent({ index, style, data }: {
   index: number;
   style: React.CSSProperties;
   data: DisplayIssue[];
@@ -44,7 +43,9 @@ function VirtualizedRowComponent({ index, style, data, ariaAttributes }: {
   return (
     <div
       style={style}
-      {...ariaAttributes}
+      role="listitem"
+      aria-posinset={index + 1}
+      aria-setsize={data.length}
       className={`flex items-center border-b border-gray-200 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100`}
     >
       <div className="w-28 px-4 py-2 flex-shrink-0">

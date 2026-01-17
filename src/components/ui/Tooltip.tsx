@@ -25,10 +25,10 @@ export function Tooltip({ content, children, id, position = 'top' }: TooltipProp
   const [isVisible, setIsVisible] = useState(false);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape' && isVisible) {
+    if (e.key === 'Escape') {
       setIsVisible(false);
     }
-  }, [isVisible]);
+  }, []);
 
   useEffect(() => {
     if (isVisible) {

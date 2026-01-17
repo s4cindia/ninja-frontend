@@ -63,7 +63,7 @@ export const ComplianceScore = React.memo(function ComplianceScore({ score, isAc
             strokeLinecap="round"
             strokeDasharray={circumference}
             strokeDashoffset={strokeDashoffset}
-            className="transition-all duration-1000 ease-out"
+            className="motion-safe:transition-all motion-safe:duration-1000 motion-safe:ease-out"
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
