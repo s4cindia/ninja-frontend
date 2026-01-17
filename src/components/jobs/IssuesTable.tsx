@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { List } from 'react-window';
 import { CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
+// Note: react-window v2 uses rowCount/rowHeight/rowComponent/rowProps API
+// This differs from v1 which used itemCount/itemSize/children pattern
 import { DisplayIssue, SEVERITY_CONFIG, SeverityLevel } from '../../types/job-output.types';
 import { sanitizeText } from '@/utils/sanitize';
 
@@ -26,7 +28,7 @@ function getAriaSortValue(currentField: SortField, targetField: SortField, order
   return order === 'asc' ? 'ascending' : 'descending';
 }
 
-function VirtualizedRowComponent({ index, style, data }: {
+function VirtualizedRowComponent({ index, style, data, ariaAttributes }: {
   ariaAttributes: { "aria-posinset": number; "aria-setsize": number; role: "listitem" };
   index: number;
   style: React.CSSProperties;
@@ -39,6 +41,7 @@ function VirtualizedRowComponent({ index, style, data }: {
   return (
     <div
       style={style}
+      {...ariaAttributes}
       className={`flex items-center border-b border-gray-200 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100`}
     >
       <div className="w-28 px-4 py-2 flex-shrink-0">
