@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { Button } from '@/components/ui/Button';
@@ -31,22 +31,18 @@ export function JobDetails() {
   const { jobId } = useParams<{ jobId: string }>();
   const { data: job, isLoading, isError, error, refetch } = useJob(jobId || null);
   const cancelJob = useCancelJob();
-  const [parseError, setParseError] = useState<string | null>(null);
 
-  const parsedOutput = useMemo(() => {
+  const { parsedOutput, parseError } = useMemo(() => {
     if (!job?.output) {
-      setParseError(null);
-      return null;
+      return { parsedOutput: null, parseError: null };
     }
 
     try {
-      setParseError(null);
-      return parseJobOutput(job.output);
+      return { parsedOutput: parseJobOutput(job.output), parseError: null };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to parse job output';
-      setParseError(message);
       console.error('Job output parsing error:', err);
-      return null;
+      return { parsedOutput: null, parseError: message };
     }
   }, [job?.output]);
 
