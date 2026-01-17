@@ -40,10 +40,14 @@ function safeString(value: unknown, fallback: string = ''): string {
 }
 
 /**
- * Safely gets a boolean value from an unknown object property
+ * Safely gets a boolean value from an unknown object property.
+ * Handles boolean type, string "true"/"false", and fallback for other values.
  */
 function safeBoolean(value: unknown, fallback: boolean = false): boolean {
-  return typeof value === 'boolean' ? value : fallback;
+  if (typeof value === 'boolean') return value;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return fallback;
 }
 
 /**
@@ -268,8 +272,8 @@ export function parseJobOutput(output: unknown): JobOutput | null {
   return {
     jobId: typeof obj.jobId === 'string' ? obj.jobId : '',
     score: typeof obj.score === 'number' ? obj.score : 0,
-    isValid: Boolean(obj.isValid),
-    isAccessible: Boolean(obj.isAccessible),
+    isValid: safeBoolean(obj.isValid),
+    isAccessible: safeBoolean(obj.isAccessible),
     fileName: typeof obj.fileName === 'string' ? obj.fileName : 'Unknown',
     epubVersion: typeof obj.epubVersion === 'string' ? obj.epubVersion : '',
     auditedAt: typeof obj.auditedAt === 'string' ? obj.auditedAt : '',
