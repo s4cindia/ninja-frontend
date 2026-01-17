@@ -11,6 +11,35 @@ interface JobActionsProps {
   disabled?: boolean;
 }
 
+interface TooltipButtonProps {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  tooltip?: string;
+  leftIcon?: React.ReactNode;
+}
+
+function TooltipButton({ children, onClick, disabled, tooltip, leftIcon }: TooltipButtonProps) {
+  return (
+    <div className="relative group">
+      <Button
+        onClick={onClick}
+        disabled={disabled}
+        variant="outline"
+        leftIcon={leftIcon}
+      >
+        {children}
+      </Button>
+      {tooltip && (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+          {tooltip}
+          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function JobActions({
   jobId,
   onDownloadReport,
@@ -30,47 +59,29 @@ export function JobActions({
       <Button
         onClick={handleStartRemediation}
         disabled={isDisabled}
-        className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        variant="primary"
+        leftIcon={<Play className="w-4 h-4" />}
       >
-        <Play className="w-4 h-4" />
         Start Remediation
       </Button>
 
-      <div className="relative group">
-        <Button
-          onClick={onDownloadReport}
-          disabled={isDisabled || !onDownloadReport}
-          variant="outline"
-          className="flex items-center justify-center gap-2 w-full px-4 py-2 border border-gray-300 rounded-md font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Download className="w-4 h-4" />
-          Download Report
-        </Button>
-        {!onDownloadReport && (
-          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-            Coming soon
-            <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
-          </div>
-        )}
-      </div>
+      <TooltipButton
+        onClick={onDownloadReport}
+        disabled={isDisabled || !onDownloadReport}
+        tooltip={!onDownloadReport ? 'Coming soon' : undefined}
+        leftIcon={<Download className="w-4 h-4" />}
+      >
+        Download Report
+      </TooltipButton>
 
-      <div className="relative group">
-        <Button
-          onClick={onReAudit}
-          disabled={isDisabled || !onReAudit}
-          variant="outline"
-          className="flex items-center justify-center gap-2 w-full px-4 py-2 border border-gray-300 rounded-md font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Re-Audit
-        </Button>
-        {!onReAudit && (
-          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-            Coming soon
-            <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
-          </div>
-        )}
-      </div>
+      <TooltipButton
+        onClick={onReAudit}
+        disabled={isDisabled || !onReAudit}
+        tooltip={!onReAudit ? 'Coming soon' : undefined}
+        leftIcon={<RefreshCw className="w-4 h-4" />}
+      >
+        Re-Audit
+      </TooltipButton>
     </div>
   );
 }
