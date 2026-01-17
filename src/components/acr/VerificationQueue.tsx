@@ -68,10 +68,15 @@ function convertCriteriaToVerificationItems(
 
       const issues: VerificationIssue[] | undefined = c.relatedIssues?.map((issue) => ({
         id: issue.issueId,
+        issueId: issue.issueId,
+        ruleId: issue.ruleId,
+        impact: issue.impact,
         message: issue.message,
         severity: issue.impact as Severity | undefined,
-        location: issue.location || issue.filePath,
+        location: issue.location,
+        filePath: issue.filePath,
         html: issue.htmlSnippet,
+        htmlSnippet: issue.htmlSnippet,
         suggestedFix: issue.suggestedFix,
       }));
 

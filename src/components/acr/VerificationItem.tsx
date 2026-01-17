@@ -8,7 +8,6 @@ import {
   AlertTriangle, 
   History, 
   FileText,
-  MapPin,
   AlertCircle,
   Code,
   Eye,
@@ -250,95 +249,115 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
 
                 {showIssues && (
                   <div className="mt-4 space-y-4">
-                    {item.issues.map((issue, idx) => (
-                      <div
-                        key={issue.id || idx}
-                        className="p-4 bg-orange-50 border border-orange-200 rounded-lg"
-                      >
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-gray-900">
-                              Issue {idx + 1} of {item.issues!.length}
-                            </span>
-                            {issue.severity && (
-                              <span className={cn(
-                                'text-xs px-2 py-0.5 rounded',
-                                issue.severity === 'critical' && 'bg-red-100 text-red-700',
-                                issue.severity === 'serious' && 'bg-orange-100 text-orange-700',
-                                issue.severity === 'moderate' && 'bg-yellow-100 text-yellow-700',
-                                issue.severity === 'minor' && 'bg-blue-100 text-blue-700'
-                              )}>
-                                {issue.severity}
+                    {item.issues.map((issue, idx) => {
+                      const htmlContent = issue.html || issue.htmlSnippet;
+                      const impactLabel = issue.impact || issue.severity;
+                      
+                      return (
+                        <div
+                          key={issue.id || issue.issueId || idx}
+                          className="p-4 bg-white border border-orange-200 rounded-lg"
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-semibold text-gray-900">
+                                Issue {idx + 1} of {item.issues!.length}
                               </span>
-                            )}
+                              {impactLabel && (
+                                <span className={cn(
+                                  'text-xs px-2 py-0.5 rounded font-medium uppercase',
+                                  (impactLabel === 'critical') && 'bg-red-100 text-red-700',
+                                  (impactLabel === 'serious') && 'bg-orange-100 text-orange-700',
+                                  (impactLabel === 'moderate') && 'bg-yellow-100 text-yellow-700',
+                                  (impactLabel === 'minor') && 'bg-blue-100 text-blue-700'
+                                )}>
+                                  {impactLabel}
+                                </span>
+                              )}
+                              {issue.ruleId && (
+                                <span className="text-xs text-gray-500 font-mono">
+                                  {issue.ruleId}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                        </div>
 
-                        {issue.location && (
-                          <div className="mb-2 flex items-center gap-2 text-sm text-gray-600">
-                            <MapPin className="h-4 w-4" />
-                            <span className="font-mono text-xs">{issue.location}</span>
-                          </div>
-                        )}
-
-                        <div className="mb-3">
-                          <div className="flex items-center gap-2 mb-1">
-                            <AlertCircle className="h-4 w-4 text-orange-600" />
-                            <span className="text-xs font-semibold text-gray-700">Problem:</span>
-                          </div>
-                          <p className="text-sm text-gray-900">{issue.message}</p>
-                        </div>
-
-                        {issue.html && (
                           <div className="mb-3">
                             <div className="flex items-center gap-2 mb-1">
-                              <Code className="h-4 w-4 text-gray-600" />
-                              <span className="text-xs font-semibold text-gray-700">Current HTML:</span>
+                              <AlertCircle className="h-4 w-4 text-orange-600" />
+                              <span className="text-xs font-semibold text-gray-700">Problem:</span>
                             </div>
-                            <pre className="text-xs bg-gray-900 text-gray-100 p-3 rounded overflow-x-auto">
-                              <code>{issue.html}</code>
-                            </pre>
+                            <p className="text-sm text-gray-900">{issue.message}</p>
                           </div>
-                        )}
 
-                        {issue.suggestedFix && (
-                          <div className="mb-3">
-                            <div className="flex items-center gap-2 mb-1">
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                              <span className="text-xs font-semibold text-gray-700">Suggested Fix:</span>
+                          {issue.location && (
+                            <div className="mb-3">
+                              <p className="text-xs font-medium text-gray-700 mb-1">Location:</p>
+                              <p className="text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded font-mono">
+                                {issue.location}
+                              </p>
                             </div>
-                            <pre className="text-xs bg-green-50 text-gray-900 p-3 rounded border border-green-200 overflow-x-auto">
-                              <code>{issue.suggestedFix}</code>
-                            </pre>
-                          </div>
-                        )}
+                          )}
 
-                        <div className="flex gap-2 mt-3">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              console.log('View in EPUB:', issue.location);
-                            }}
-                            className="text-xs"
-                          >
-                            <Eye className="h-3 w-3 mr-1" />
-                            View in EPUB
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              navigator.clipboard.writeText(issue.html || '');
-                            }}
-                            className="text-xs"
-                          >
-                            <Copy className="h-3 w-3 mr-1" />
-                            Copy HTML
-                          </Button>
+                          {htmlContent && (
+                            <div className="mb-3">
+                              <div className="flex items-center justify-between mb-1">
+                                <div className="flex items-center gap-2">
+                                  <Code className="h-4 w-4 text-gray-600" />
+                                  <span className="text-xs font-semibold text-gray-700">Current HTML:</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => navigator.clipboard.writeText(htmlContent)}
+                                  className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                                >
+                                  <Copy className="h-3 w-3" />
+                                  Copy
+                                </button>
+                              </div>
+                              <pre className="text-xs text-gray-800 bg-gray-50 p-2 rounded overflow-x-auto border">
+                                <code>{htmlContent}</code>
+                              </pre>
+                            </div>
+                          )}
+
+                          {issue.suggestedFix && (
+                            <div className="mb-3">
+                              <div className="flex items-center gap-2 mb-1">
+                                <CheckCircle className="h-4 w-4 text-green-600" />
+                                <span className="text-xs font-semibold text-gray-700">Suggested Fix:</span>
+                              </div>
+                              <pre className="text-xs text-green-800 bg-green-50 p-2 rounded border border-green-200 overflow-x-auto">
+                                <code>{issue.suggestedFix}</code>
+                              </pre>
+                            </div>
+                          )}
+
+                          {issue.filePath && (
+                            <div className="mb-3">
+                              <p className="text-xs font-medium text-gray-700 mb-1">File:</p>
+                              <p className="text-xs text-gray-600 font-mono">
+                                {issue.filePath}
+                              </p>
+                            </div>
+                          )}
+
+                          <div className="flex gap-2 mt-3">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                console.log('View in EPUB:', issue.location || issue.filePath);
+                              }}
+                              className="text-xs"
+                            >
+                              <Eye className="h-3 w-3 mr-1" />
+                              View in EPUB
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

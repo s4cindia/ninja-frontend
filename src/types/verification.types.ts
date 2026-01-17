@@ -14,10 +14,15 @@ export interface VerificationHistoryEntry {
 
 export interface VerificationIssue {
   id?: string;
+  issueId?: string;
+  ruleId?: string;
+  impact?: string;
   message: string;
   severity?: Severity;
   location?: string;
+  filePath?: string;
   html?: string;
+  htmlSnippet?: string;
   suggestedFix?: string;
 }
 
