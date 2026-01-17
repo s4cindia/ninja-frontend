@@ -83,9 +83,13 @@ function VirtualizedRowComponent({ index, style, data, ariaAttributes }: {
   );
 }
 
+interface SortState {
+  field: SortField;
+  order: SortOrder;
+}
+
 export const IssuesTable = React.memo(function IssuesTable({ issues }: IssuesTableProps) {
-  const [sortField, setSortField] = useState<SortField>('severity');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  const [sortState, setSortState] = useState<SortState>({ field: 'severity', order: 'asc' });
   const [filterSeverity, setFilterSeverity] = useState<FilterSeverity>('all');
 
   const filteredIssues = useMemo(() => {
@@ -97,34 +101,36 @@ export const IssuesTable = React.memo(function IssuesTable({ issues }: IssuesTab
     const sorted = [...filteredIssues].sort((a, b) => {
       let comparison = 0;
 
-      if (sortField === 'severity') {
+      if (sortState.field === 'severity') {
         comparison = SEVERITY_CONFIG[a.severity].order - SEVERITY_CONFIG[b.severity].order;
-      } else if (sortField === 'description') {
+      } else if (sortState.field === 'description') {
         comparison = a.description.localeCompare(b.description);
-      } else if (sortField === 'location') {
+      } else if (sortState.field === 'location') {
         comparison = a.location.localeCompare(b.location);
       }
 
-      return sortOrder === 'asc' ? comparison : -comparison;
+      return sortState.order === 'asc' ? comparison : -comparison;
     });
 
     return sorted;
-  }, [filteredIssues, sortField, sortOrder]);
+  }, [filteredIssues, sortState]);
 
   const useVirtualization = sortedIssues.length > VIRTUALIZATION_THRESHOLD;
 
   const handleSort = useCallback((field: SortField) => {
-    setSortOrder(prev => sortField === field && prev === 'asc' ? 'desc' : 'asc');
-    setSortField(field);
-  }, [sortField]);
+    setSortState(prev => ({
+      field,
+      order: prev.field === field && prev.order === 'asc' ? 'desc' : 'asc'
+    }));
+  }, []);
 
   const handleFilterChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     setFilterSeverity(e.target.value as FilterSeverity);
   }, []);
 
   const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return null;
-    return sortOrder === 'asc' ? (
+    if (sortState.field !== field) return null;
+    return sortState.order === 'asc' ? (
       <ChevronUp className="w-4 h-4 inline ml-1" />
     ) : (
       <ChevronDown className="w-4 h-4 inline ml-1" />
@@ -202,7 +208,7 @@ export const IssuesTable = React.memo(function IssuesTable({ issues }: IssuesTab
             <tr>
               <th
                 className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                aria-sort={getAriaSortValue(sortField, 'severity', sortOrder)}
+                aria-sort={getAriaSortValue(sortState.field, 'severity', sortState.order)}
               >
                 <button
                   type="button"
@@ -215,7 +221,7 @@ export const IssuesTable = React.memo(function IssuesTable({ issues }: IssuesTab
               </th>
               <th
                 className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                aria-sort={getAriaSortValue(sortField, 'description', sortOrder)}
+                aria-sort={getAriaSortValue(sortState.field, 'description', sortState.order)}
               >
                 <button
                   type="button"
@@ -228,7 +234,7 @@ export const IssuesTable = React.memo(function IssuesTable({ issues }: IssuesTab
               </th>
               <th
                 className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                aria-sort={getAriaSortValue(sortField, 'location', sortOrder)}
+                aria-sort={getAriaSortValue(sortState.field, 'location', sortState.order)}
               >
                 <button
                   type="button"
