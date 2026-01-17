@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Play, Download, RefreshCw } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { ROUTES } from '../../constants/routes';
 
 interface JobActionsProps {
   jobId: string;
@@ -21,7 +22,7 @@ export function JobActions({
   const isDisabled = loading || disabled;
 
   const handleStartRemediation = () => {
-    navigate(`/remediation/${jobId}`);
+    navigate(ROUTES.REMEDIATION(jobId));
   };
 
   return (
