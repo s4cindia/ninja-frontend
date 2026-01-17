@@ -193,6 +193,19 @@ export function isValidJobOutput(output: unknown): output is JobOutput {
   return hasValidScore && hasValidAccessible && hasValidSummary && hasValidIssues;
 }
 
+/**
+ * Safely extracts downloadUrl from job output with proper type checking
+ */
+export function extractDownloadUrl(output: unknown): string | undefined {
+  if (typeof output !== 'object' || output === null) {
+    return undefined;
+  }
+  if ('downloadUrl' in output && typeof (output as Record<string, unknown>).downloadUrl === 'string') {
+    return (output as Record<string, unknown>).downloadUrl as string;
+  }
+  return undefined;
+}
+
 export function parseJobOutput(output: unknown): JobOutput | null {
   if (!output || typeof output !== 'object') return null;
 

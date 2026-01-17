@@ -19,7 +19,7 @@ import {
   RawDataToggle,
   JobDetailSkeleton
 } from '@/components/jobs';
-import { parseJobOutput } from '@/types/job-output.types';
+import { parseJobOutput, extractDownloadUrl } from '@/types/job-output.types';
 import { 
   AlertCircle,
   ArrowLeft,
@@ -98,7 +98,7 @@ export function JobDetails() {
 
   const fileName = extractFileNameFromJob(job);
   const canCancel = job.status === 'QUEUED' || job.status === 'PROCESSING';
-  const outputUrl = (job.output as Record<string, unknown>)?.downloadUrl as string | undefined;
+  const outputUrl = extractDownloadUrl(job.output);
 
   return (
     <div>
