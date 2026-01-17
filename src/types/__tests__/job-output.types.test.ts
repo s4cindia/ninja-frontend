@@ -6,6 +6,7 @@ import {
   getSeverityConfig,
   getScoreColor,
   getScoreLabel,
+  extractDownloadUrl,
 } from '../job-output.types';
 
 describe('job-output.types', () => {
@@ -244,6 +245,81 @@ describe('job-output.types', () => {
     it('returns Poor for score < 50', () => {
       expect(getScoreLabel(49)).toBe('Poor');
       expect(getScoreLabel(0)).toBe('Poor');
+    });
+  });
+
+  describe('extractDownloadUrl', () => {
+    it('returns undefined for null input', () => {
+      expect(extractDownloadUrl(null)).toBeUndefined();
+    });
+
+    it('returns undefined for undefined input', () => {
+      expect(extractDownloadUrl(undefined)).toBeUndefined();
+    });
+
+    it('returns undefined for non-object input', () => {
+      expect(extractDownloadUrl('string')).toBeUndefined();
+      expect(extractDownloadUrl(123)).toBeUndefined();
+    });
+
+    it('returns undefined when downloadUrl field is missing', () => {
+      expect(extractDownloadUrl({})).toBeUndefined();
+      expect(extractDownloadUrl({ otherField: 'value' })).toBeUndefined();
+    });
+
+    it('returns undefined when downloadUrl is not a string', () => {
+      expect(extractDownloadUrl({ downloadUrl: 123 })).toBeUndefined();
+      expect(extractDownloadUrl({ downloadUrl: null })).toBeUndefined();
+    });
+
+    it('accepts valid https URLs', () => {
+      expect(extractDownloadUrl({ downloadUrl: 'https://example.com/file.pdf' }))
+        .toBe('https://example.com/file.pdf');
+    });
+
+    it('accepts valid http URLs', () => {
+      expect(extractDownloadUrl({ downloadUrl: 'http://example.com/file.pdf' }))
+        .toBe('http://example.com/file.pdf');
+    });
+
+    it('accepts relative paths starting with /', () => {
+      expect(extractDownloadUrl({ downloadUrl: '/downloads/file.pdf' }))
+        .toBe('/downloads/file.pdf');
+    });
+
+    it('accepts relative paths starting with ./', () => {
+      expect(extractDownloadUrl({ downloadUrl: './downloads/file.pdf' }))
+        .toBe('./downloads/file.pdf');
+    });
+
+    it('accepts relative paths starting with ../', () => {
+      expect(extractDownloadUrl({ downloadUrl: '../downloads/file.pdf' }))
+        .toBe('../downloads/file.pdf');
+    });
+
+    it('rejects javascript: protocol URLs', () => {
+      expect(extractDownloadUrl({ downloadUrl: 'javascript:alert(1)' })).toBeUndefined();
+    });
+
+    it('rejects data: protocol URLs', () => {
+      expect(extractDownloadUrl({ downloadUrl: 'data:text/html,<script>alert(1)</script>' })).toBeUndefined();
+    });
+
+    it('rejects vbscript: protocol URLs', () => {
+      expect(extractDownloadUrl({ downloadUrl: 'vbscript:msgbox(1)' })).toBeUndefined();
+    });
+
+    it('rejects file: protocol URLs', () => {
+      expect(extractDownloadUrl({ downloadUrl: 'file:///etc/passwd' })).toBeUndefined();
+    });
+
+    it('rejects ftp: protocol URLs', () => {
+      expect(extractDownloadUrl({ downloadUrl: 'ftp://example.com/file.pdf' })).toBeUndefined();
+    });
+
+    it('rejects malformed URLs that are not relative paths', () => {
+      expect(extractDownloadUrl({ downloadUrl: 'not-a-valid-url' })).toBeUndefined();
+      expect(extractDownloadUrl({ downloadUrl: 'example.com/file.pdf' })).toBeUndefined();
     });
   });
 });

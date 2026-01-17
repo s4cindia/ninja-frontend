@@ -214,17 +214,49 @@ export function isValidJobOutput(output: unknown): output is JobOutput {
   return hasValidScore && hasValidAccessible && hasValidSummary && hasValidIssues;
 }
 
+const SAFE_URL_PROTOCOLS = ['http:', 'https:'];
+const SAFE_RELATIVE_PREFIXES = ['/', './', '../'];
+
 /**
- * Safely extracts downloadUrl from job output with proper type checking
+ * Validates a URL string for safe protocols and patterns
+ */
+function isUrlSafe(url: string): boolean {
+  const trimmed = url.trim();
+  
+  if (SAFE_RELATIVE_PREFIXES.some(prefix => trimmed.startsWith(prefix))) {
+    return true;
+  }
+  
+  try {
+    const parsed = new URL(trimmed);
+    return SAFE_URL_PROTOCOLS.includes(parsed.protocol);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Safely extracts downloadUrl from job output with proper type and security validation.
+ * Rejects unsafe protocols (javascript:, data:, vbscript:, etc.) and malformed URLs.
  */
 export function extractDownloadUrl(output: unknown): string | undefined {
   if (typeof output !== 'object' || output === null) {
     return undefined;
   }
-  if ('downloadUrl' in output && typeof (output as Record<string, unknown>).downloadUrl === 'string') {
-    return (output as Record<string, unknown>).downloadUrl as string;
+  
+  const obj = output as Record<string, unknown>;
+  
+  if (!('downloadUrl' in obj) || typeof obj.downloadUrl !== 'string') {
+    return undefined;
   }
-  return undefined;
+  
+  const url = obj.downloadUrl;
+  
+  if (!isUrlSafe(url)) {
+    return undefined;
+  }
+  
+  return url;
 }
 
 export function parseJobOutput(output: unknown): JobOutput | null {
