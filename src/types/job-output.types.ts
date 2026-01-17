@@ -144,16 +144,23 @@ export const SEVERITY_CONFIG: Record<SeverityLevel, {
   },
 } as const;
 
+// Score thresholds for color coding and labels
+export const SCORE_THRESHOLDS = {
+  EXCELLENT: 90,
+  GOOD: 70,
+  NEEDS_WORK: 50,
+} as const;
+
 export function getScoreColor(score: number): string {
-  if (score >= 90) return '#22c55e';
-  if (score >= 70) return '#eab308';
-  return '#ef4444';
+  if (score >= SCORE_THRESHOLDS.EXCELLENT) return '#22c55e'; // green
+  if (score >= SCORE_THRESHOLDS.GOOD) return '#eab308'; // yellow
+  return '#ef4444'; // red
 }
 
 export function getScoreLabel(score: number): string {
-  if (score >= 90) return 'Excellent';
-  if (score >= 70) return 'Good';
-  if (score >= 50) return 'Needs Work';
+  if (score >= SCORE_THRESHOLDS.EXCELLENT) return 'Excellent';
+  if (score >= SCORE_THRESHOLDS.GOOD) return 'Good';
+  if (score >= SCORE_THRESHOLDS.NEEDS_WORK) return 'Needs Work';
   return 'Poor';
 }
 

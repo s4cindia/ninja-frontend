@@ -7,18 +7,27 @@ interface ComplianceScoreProps {
   size?: 'sm' | 'md' | 'lg';
 }
 
+// Score range constants
+const MIN_SCORE = 0;
+const MAX_SCORE = 100;
+
+// SVG dimensions by size
 const SIZE_CONFIG = {
   sm: { width: 80, strokeWidth: 6, fontSize: 'text-lg', labelSize: 'text-xs' },
   md: { width: 120, strokeWidth: 8, fontSize: 'text-2xl', labelSize: 'text-sm' },
   lg: { width: 160, strokeWidth: 10, fontSize: 'text-4xl', labelSize: 'text-base' },
-};
+} as const;
 
 export function ComplianceScore({ score, isAccessible, size = 'lg' }: ComplianceScoreProps) {
-  const config = SIZE_CONFIG[size];
-  const radius = (config.width - config.strokeWidth) / 2;
+  const { width, strokeWidth, fontSize, labelSize } = SIZE_CONFIG[size];
+
+  // Normalize score to valid range
+  const normalizedScore = Math.min(Math.max(score, MIN_SCORE), MAX_SCORE);
+
+  // Calculate SVG values
+  const radius = (width - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const normalizedScore = Math.min(Math.max(score, 0), 100);
-  const strokeDashoffset = circumference - (normalizedScore / 100) * circumference;
+  const strokeDashoffset = circumference - (normalizedScore / MAX_SCORE) * circumference;
   const scoreColor = getScoreColor(normalizedScore);
 
   return (
@@ -27,30 +36,30 @@ export function ComplianceScore({ score, isAccessible, size = 'lg' }: Compliance
         className="relative"
         role="progressbar"
         aria-valuenow={normalizedScore}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label={`Compliance score: ${normalizedScore} out of 100`}
+        aria-valuemin={MIN_SCORE}
+        aria-valuemax={MAX_SCORE}
+        aria-label={`Compliance score: ${normalizedScore} out of ${MAX_SCORE}`}
       >
         <svg
-          width={config.width}
-          height={config.width}
+          width={width}
+          height={width}
           className="transform -rotate-90"
         >
           <circle
-            cx={config.width / 2}
-            cy={config.width / 2}
+            cx={width / 2}
+            cy={width / 2}
             r={radius}
             fill="none"
             stroke="#e5e7eb"
-            strokeWidth={config.strokeWidth}
+            strokeWidth={strokeWidth}
           />
           <circle
-            cx={config.width / 2}
-            cy={config.width / 2}
+            cx={width / 2}
+            cy={width / 2}
             r={radius}
             fill="none"
             stroke={scoreColor}
-            strokeWidth={config.strokeWidth}
+            strokeWidth={strokeWidth}
             strokeLinecap="round"
             strokeDasharray={circumference}
             strokeDashoffset={strokeDashoffset}
@@ -58,10 +67,10 @@ export function ComplianceScore({ score, isAccessible, size = 'lg' }: Compliance
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={`font-bold text-gray-900 ${config.fontSize}`}>
+          <span className={`font-bold text-gray-900 ${fontSize}`}>
             {Math.round(normalizedScore)}
           </span>
-          <span className={`text-gray-500 ${config.labelSize}`}>Score</span>
+          <span className={`text-gray-500 ${labelSize}`}>Score</span>
         </div>
       </div>
 
