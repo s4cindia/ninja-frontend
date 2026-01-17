@@ -160,24 +160,45 @@ export function getSeverityConfig(severity: string): SeverityConfig {
   return SEVERITY_CONFIG[normalized] || SEVERITY_CONFIG.minor;
 }
 
+// Score range constants
+export const MIN_SCORE = 0;
+export const MAX_SCORE = 100;
+
 // Score thresholds for color coding and labels
 export const SCORE_THRESHOLDS = {
   EXCELLENT: 90,
   GOOD: 70,
-  NEEDS_WORK: 50,
+  FAIR: 50,
 } as const;
 
+// Unified score color configuration
+export interface ScoreColorConfig {
+  stroke: string;
+  bg: string;
+  text: string;
+  label: string;
+}
+
+export const SCORE_COLORS: Record<'EXCELLENT' | 'GOOD' | 'FAIR' | 'POOR', ScoreColorConfig> = {
+  EXCELLENT: { stroke: '#22c55e', bg: 'bg-green-50', text: 'text-green-700', label: 'Excellent' },
+  GOOD: { stroke: '#3b82f6', bg: 'bg-blue-50', text: 'text-blue-700', label: 'Good' },
+  FAIR: { stroke: '#eab308', bg: 'bg-yellow-50', text: 'text-yellow-700', label: 'Needs Work' },
+  POOR: { stroke: '#ef4444', bg: 'bg-red-50', text: 'text-red-700', label: 'Poor' },
+} as const;
+
+export function getScoreColorConfig(score: number): ScoreColorConfig {
+  if (score >= SCORE_THRESHOLDS.EXCELLENT) return SCORE_COLORS.EXCELLENT;
+  if (score >= SCORE_THRESHOLDS.GOOD) return SCORE_COLORS.GOOD;
+  if (score >= SCORE_THRESHOLDS.FAIR) return SCORE_COLORS.FAIR;
+  return SCORE_COLORS.POOR;
+}
+
 export function getScoreColor(score: number): string {
-  if (score >= SCORE_THRESHOLDS.EXCELLENT) return '#22c55e'; // green
-  if (score >= SCORE_THRESHOLDS.GOOD) return '#eab308'; // yellow
-  return '#ef4444'; // red
+  return getScoreColorConfig(score).stroke;
 }
 
 export function getScoreLabel(score: number): string {
-  if (score >= SCORE_THRESHOLDS.EXCELLENT) return 'Excellent';
-  if (score >= SCORE_THRESHOLDS.GOOD) return 'Good';
-  if (score >= SCORE_THRESHOLDS.NEEDS_WORK) return 'Needs Work';
-  return 'Poor';
+  return getScoreColorConfig(score).label;
 }
 
 export function isValidJobOutput(output: unknown): output is JobOutput {

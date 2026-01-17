@@ -1,5 +1,6 @@
 import React from 'react';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
+import { MIN_SCORE, MAX_SCORE, getScoreColorConfig } from '@/types/job-output.types';
 
 interface ComplianceScoreProps {
   score: number;
@@ -7,38 +8,12 @@ interface ComplianceScoreProps {
   size?: 'sm' | 'md' | 'lg';
 }
 
-// Score range constants
-const MIN_SCORE = 0;
-const MAX_SCORE = 100;
-
-// Score thresholds for color coding
-const SCORE_THRESHOLDS = {
-  EXCELLENT: 90,
-  GOOD: 70,
-  FAIR: 50,
-} as const;
-
-// Score colors for different ranges
-const SCORE_COLORS = {
-  EXCELLENT: { stroke: '#22c55e', bg: 'bg-green-50', text: 'text-green-700' },
-  GOOD: { stroke: '#3b82f6', bg: 'bg-blue-50', text: 'text-blue-700' },
-  FAIR: { stroke: '#eab308', bg: 'bg-yellow-50', text: 'text-yellow-700' },
-  POOR: { stroke: '#ef4444', bg: 'bg-red-50', text: 'text-red-700' },
-} as const;
-
 // SVG dimensions by size
 const SIZE_CONFIG = {
   sm: { width: 80, strokeWidth: 6, fontSize: 'text-lg', labelSize: 'text-xs' },
   md: { width: 120, strokeWidth: 8, fontSize: 'text-2xl', labelSize: 'text-sm' },
   lg: { width: 160, strokeWidth: 10, fontSize: 'text-4xl', labelSize: 'text-base' },
 } as const;
-
-function getScoreColors(score: number) {
-  if (score >= SCORE_THRESHOLDS.EXCELLENT) return SCORE_COLORS.EXCELLENT;
-  if (score >= SCORE_THRESHOLDS.GOOD) return SCORE_COLORS.GOOD;
-  if (score >= SCORE_THRESHOLDS.FAIR) return SCORE_COLORS.FAIR;
-  return SCORE_COLORS.POOR;
-}
 
 export const ComplianceScore = React.memo(function ComplianceScore({ score, isAccessible, size = 'lg' }: ComplianceScoreProps) {
   const { width, strokeWidth, fontSize, labelSize } = SIZE_CONFIG[size];
@@ -52,7 +27,7 @@ export const ComplianceScore = React.memo(function ComplianceScore({ score, isAc
   const radius = (width - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (normalizedScore / MAX_SCORE) * circumference;
-  const colors = getScoreColors(normalizedScore);
+  const colors = getScoreColorConfig(normalizedScore);
 
   return (
     <div className="flex flex-col items-center gap-3">

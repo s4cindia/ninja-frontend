@@ -200,21 +200,27 @@ describe('job-output.types', () => {
   });
 
   describe('getScoreColor', () => {
-    it('returns green hex for score >= 90', () => {
+    it('returns green hex for score >= 90 (Excellent)', () => {
       expect(getScoreColor(90)).toBe('#22c55e');
       expect(getScoreColor(95)).toBe('#22c55e');
       expect(getScoreColor(100)).toBe('#22c55e');
     });
 
-    it('returns yellow hex for score >= 70 and < 90', () => {
-      expect(getScoreColor(70)).toBe('#eab308');
-      expect(getScoreColor(85)).toBe('#eab308');
-      expect(getScoreColor(89)).toBe('#eab308');
+    it('returns blue hex for score >= 70 and < 90 (Good)', () => {
+      expect(getScoreColor(70)).toBe('#3b82f6');
+      expect(getScoreColor(85)).toBe('#3b82f6');
+      expect(getScoreColor(89)).toBe('#3b82f6');
     });
 
-    it('returns red hex for score < 70', () => {
-      expect(getScoreColor(69)).toBe('#ef4444');
-      expect(getScoreColor(50)).toBe('#ef4444');
+    it('returns yellow hex for score >= 50 and < 70 (Fair)', () => {
+      expect(getScoreColor(50)).toBe('#eab308');
+      expect(getScoreColor(60)).toBe('#eab308');
+      expect(getScoreColor(69)).toBe('#eab308');
+    });
+
+    it('returns red hex for score < 50 (Poor)', () => {
+      expect(getScoreColor(49)).toBe('#ef4444');
+      expect(getScoreColor(25)).toBe('#ef4444');
       expect(getScoreColor(0)).toBe('#ef4444');
     });
   });
