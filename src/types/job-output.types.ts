@@ -15,6 +15,7 @@ export interface DisplayIssue {
   element?: string;
   autoFixable: boolean;
   fixCode?: string;
+  /** WCAG criteria - normalized to comma-separated string from array */
   wcagCriteria?: string;
   suggestion?: string;
 }

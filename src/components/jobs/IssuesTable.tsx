@@ -177,9 +177,7 @@ export function IssuesTable({ issues }: IssuesTableProps) {
                     <div className="text-sm text-gray-900">{issue.description}</div>
                     {issue.wcagCriteria && (
                       <div className="text-xs text-gray-500 mt-1">
-                        WCAG: {Array.isArray(issue.wcagCriteria)
-                          ? issue.wcagCriteria.join(', ')
-                          : issue.wcagCriteria}
+                        WCAG: {issue.wcagCriteria}
                       </div>
                     )}
                   </td>
