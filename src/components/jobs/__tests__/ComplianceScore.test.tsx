@@ -27,4 +27,38 @@ describe('ComplianceScore', () => {
     render(<ComplianceScore score={100} isAccessible={true} />);
     expect(screen.getByText('100')).toBeInTheDocument();
   });
+
+  it('normalizes NaN to 0', () => {
+    render(<ComplianceScore score={NaN} isAccessible={false} />);
+    expect(screen.getByText('0')).toBeInTheDocument();
+  });
+
+  it('normalizes Infinity to 0', () => {
+    render(<ComplianceScore score={Infinity} isAccessible={false} />);
+    expect(screen.getByText('0')).toBeInTheDocument();
+  });
+
+  it('applies correct color tier at boundary 90 (Excellent - green)', () => {
+    const { container } = render(<ComplianceScore score={90} isAccessible={true} />);
+    const circle = container.querySelectorAll('circle')[1];
+    expect(circle).toHaveAttribute('stroke', '#22c55e');
+  });
+
+  it('applies correct color tier at boundary 89 (Good - blue)', () => {
+    const { container } = render(<ComplianceScore score={89} isAccessible={true} />);
+    const circle = container.querySelectorAll('circle')[1];
+    expect(circle).toHaveAttribute('stroke', '#3b82f6');
+  });
+
+  it('applies correct color tier at boundary 70 (Good - blue)', () => {
+    const { container } = render(<ComplianceScore score={70} isAccessible={false} />);
+    const circle = container.querySelectorAll('circle')[1];
+    expect(circle).toHaveAttribute('stroke', '#3b82f6');
+  });
+
+  it('applies correct color tier at boundary 69 (Needs Work - yellow)', () => {
+    const { container } = render(<ComplianceScore score={69} isAccessible={false} />);
+    const circle = container.querySelectorAll('circle')[1];
+    expect(circle).toHaveAttribute('stroke', '#eab308');
+  });
 });

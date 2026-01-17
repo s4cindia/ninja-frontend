@@ -50,4 +50,22 @@ describe('IssuesTable', () => {
       expect(screen.queryByText('Heading skip')).not.toBeInTheDocument();
     });
   });
+
+  it('uses standard table below virtualization threshold', () => {
+    const fewIssues = Array(10).fill(null).map((_, i) => ({
+      ...mockIssues[0],
+      id: String(i),
+    }));
+    const { container } = render(<IssuesTable issues={fewIssues} />);
+    expect(container.querySelector('table')).toBeInTheDocument();
+  });
+
+  it('switches to virtualized list above threshold (50+ items)', () => {
+    const manyIssues = Array(51).fill(null).map((_, i) => ({
+      ...mockIssues[0],
+      id: String(i),
+    }));
+    const { container } = render(<IssuesTable issues={manyIssues} />);
+    expect(container.querySelector('table')).not.toBeInTheDocument();
+  });
 });
