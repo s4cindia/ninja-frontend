@@ -17,3 +17,15 @@ export function sanitizeText(dirty: string): string {
   }
   return DOMPurify.sanitize(dirty, { ALLOWED_TAGS: [] });
 }
+
+export function sanitizeFilePath(dirty: string): string {
+  if (!dirty || typeof dirty !== 'string') {
+    return '';
+  }
+  const sanitized = DOMPurify.sanitize(dirty, { ALLOWED_TAGS: [] });
+  return sanitized
+    .replace(/\.\.\//g, '')
+    .replace(/\.\.\\/g, '')
+    .replace(/[<>:"|?*]/g, '')
+    .trim();
+}

@@ -4,7 +4,7 @@ import { CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 // Note: react-window v2 uses rowCount/rowHeight/rowComponent/rowProps API
 // This differs from v1 which used itemCount/itemSize/children pattern
 import { DisplayIssue, SEVERITY_CONFIG, SeverityLevel } from '../../types/job-output.types';
-import { sanitizeText } from '@/utils/sanitize';
+import { sanitizeText, sanitizeFilePath } from '@/utils/sanitize';
 
 const ROW_HEIGHT = 64;
 const VISIBLE_ROWS = 10;
@@ -61,7 +61,7 @@ function VirtualizedRowComponent({ index, style, data, ariaAttributes }: {
       </div>
       <div className="w-32 px-4 py-2 flex-shrink-0">
         <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono text-gray-700 truncate block">
-          {issue.location}
+          {sanitizeFilePath(issue.location)}
         </code>
       </div>
       <div className="w-20 px-4 py-2 flex-shrink-0 flex justify-center">
@@ -274,7 +274,7 @@ export const IssuesTable = React.memo(function IssuesTable({ issues }: IssuesTab
                   </td>
                   <td className="px-4 py-3">
                     <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono text-gray-700">
-                      {issue.location}
+                      {sanitizeFilePath(issue.location)}
                     </code>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
