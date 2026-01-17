@@ -1,16 +1,13 @@
 import { useState, useEffect } from 'react';
 import { 
   ChevronDown, 
-  ChevronUp, 
+  ChevronRight,
   Clock, 
   CheckCircle, 
   XCircle, 
   AlertTriangle, 
   History, 
   FileText,
-  AlertCircle,
-  Code,
-  Eye,
   Copy
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
@@ -226,135 +223,86 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
               <p className="text-sm text-gray-600">{item.automatedNotes}</p>
             </div>
 
-            {/* Expandable Issues Section */}
-            {item.issues && item.issues.length > 0 && (
+            {/* SECTION 1: Fixed Issues (Reference Only) */}
+            {item.fixedIssues && item.fixedIssues.length > 0 && (
               <div className="mt-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowIssues(!showIssues)}
-                  className="w-full sm:w-auto"
+                <button
+                  type="button"
+                  onClick={() => setShowFixedIssues(!showFixedIssues)}
+                  className="flex items-center gap-2 text-sm font-medium text-green-600 hover:text-green-700"
                 >
-                  {showIssues ? (
-                    <>
-                      <ChevronUp className="h-4 w-4 mr-2" />
-                      Hide {item.issues.length} Issue{item.issues.length > 1 ? 's' : ''}
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="h-4 w-4 mr-2" />
-                      Show {item.issues.length} Issue{item.issues.length > 1 ? 's' : ''} Requiring Review
-                    </>
-                  )}
-                </Button>
+                  <ChevronRight className={cn(
+                    'h-4 w-4 transition-transform',
+                    showFixedIssues && 'rotate-90'
+                  )} />
+                  {showFixedIssues ? 'Hide' : 'Show'} {item.fixedIssues.length} Fixed Issue{item.fixedIssues.length !== 1 ? 's' : ''} (Reference)
+                </button>
 
-                {showIssues && (
-                  <div className="mt-4 space-y-4">
-                    {item.issues.map((issue, idx) => {
-                      const htmlContent = issue.html || issue.htmlSnippet;
-                      const impactLabel = issue.impact || issue.severity;
+                {showFixedIssues && (
+                  <div className="mt-3 space-y-3">
+                    <p className="text-xs text-green-700 bg-green-50 px-3 py-2 rounded border border-green-200">
+                      These issues were automatically fixed during remediation. Expand to verify fixes were applied correctly.
+                    </p>
+
+                    {item.fixedIssues.map((issue, idx) => {
+                      const impactLabel = issue.impact || issue.severity || 'unknown';
                       
                       return (
-                        <div
-                          key={issue.id || issue.issueId || idx}
-                          className="p-4 bg-white border border-orange-200 rounded-lg"
-                        >
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm font-semibold text-gray-900">
-                                Issue {idx + 1} of {item.issues!.length}
-                              </span>
-                              {impactLabel && (
-                                <span className={cn(
-                                  'text-xs px-2 py-0.5 rounded font-medium uppercase',
-                                  (impactLabel === 'critical') && 'bg-red-100 text-red-700',
-                                  (impactLabel === 'serious') && 'bg-orange-100 text-orange-700',
-                                  (impactLabel === 'moderate') && 'bg-yellow-100 text-yellow-700',
-                                  (impactLabel === 'minor') && 'bg-blue-100 text-blue-700'
-                                )}>
-                                  {impactLabel}
+                        <div key={issue.id || issue.issueId || idx} className="bg-green-50 border border-green-200 rounded-lg p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <CheckCircle className="h-4 w-4 text-green-600" />
+                                <span className="text-xs font-medium text-green-700 bg-green-100 px-2 py-0.5 rounded">
+                                  FIXED - {String(impactLabel).toUpperCase()}
                                 </span>
-                              )}
-                              {issue.ruleId && (
-                                <span className="text-xs text-gray-500 font-mono">
-                                  {issue.ruleId}
-                                </span>
-                              )}
+                                {issue.ruleId && (
+                                  <span className="text-xs text-gray-600 font-mono">
+                                    {issue.ruleId}
+                                  </span>
+                                )}
+                                {issue.fixMethod && (
+                                  <span className="text-xs text-green-600">
+                                    ({issue.fixMethod === 'automated' ? 'Auto-fixed' : 'Manually fixed'})
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-900 mt-2 font-medium">
+                                {issue.message}
+                              </p>
                             </div>
-                          </div>
-
-                          <div className="mb-3">
-                            <div className="flex items-center gap-2 mb-1">
-                              <AlertCircle className="h-4 w-4 text-orange-600" />
-                              <span className="text-xs font-semibold text-gray-700">Problem:</span>
-                            </div>
-                            <p className="text-sm text-gray-900">{issue.message}</p>
                           </div>
 
                           {issue.location && (
-                            <div className="mb-3">
-                              <p className="text-xs font-medium text-gray-700 mb-1">Location:</p>
-                              <p className="text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded font-mono">
+                            <div className="mt-3">
+                              <p className="text-xs font-medium text-gray-700 mb-1">Original Location:</p>
+                              <p className="text-xs text-gray-600 bg-white px-2 py-1 rounded border">
+                                {issue.filePath && <span className="font-mono">{issue.filePath} - </span>}
                                 {issue.location}
                               </p>
                             </div>
                           )}
 
-                          {htmlContent && (
-                            <div className="mb-3">
-                              <div className="flex items-center justify-between mb-1">
-                                <div className="flex items-center gap-2">
-                                  <Code className="h-4 w-4 text-gray-600" />
-                                  <span className="text-xs font-semibold text-gray-700">Current HTML:</span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => navigator.clipboard.writeText(htmlContent)}
-                                  className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                                >
-                                  <Copy className="h-3 w-3" />
-                                  Copy
-                                </button>
-                              </div>
-                              <pre className="text-xs text-gray-800 bg-gray-50 p-2 rounded overflow-x-auto border">
-                                <code>{htmlContent}</code>
+                          {(issue.html || issue.htmlSnippet) && (
+                            <div className="mt-3">
+                              <p className="text-xs font-medium text-gray-700 mb-1">Original HTML (Before Fix):</p>
+                              <pre className="text-xs text-gray-800 bg-white p-2 rounded overflow-x-auto border">
+                                <code>{issue.html || issue.htmlSnippet}</code>
                               </pre>
                             </div>
                           )}
 
                           {issue.suggestedFix && (
-                            <div className="mb-3">
-                              <div className="flex items-center gap-2 mb-1">
-                                <CheckCircle className="h-4 w-4 text-green-600" />
-                                <span className="text-xs font-semibold text-gray-700">Suggested Fix:</span>
-                              </div>
-                              <pre className="text-xs text-green-800 bg-green-50 p-2 rounded border border-green-200 overflow-x-auto">
+                            <div className="mt-3">
+                              <p className="text-xs font-medium text-gray-700 mb-1">Applied Fix:</p>
+                              <pre className="text-xs text-green-800 bg-white p-2 rounded overflow-x-auto border border-green-200">
                                 <code>{issue.suggestedFix}</code>
                               </pre>
                             </div>
                           )}
 
-                          {issue.filePath && (
-                            <div className="mb-3">
-                              <p className="text-xs font-medium text-gray-700 mb-1">File:</p>
-                              <p className="text-xs text-gray-600 font-mono">
-                                {issue.filePath}
-                              </p>
-                            </div>
-                          )}
-
-                          <div className="flex gap-2 mt-3">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                console.log('View in EPUB:', issue.location || issue.filePath);
-                              }}
-                              className="text-xs"
-                            >
-                              <Eye className="h-3 w-3 mr-1" />
-                              View in EPUB
-                            </Button>
+                          <div className="mt-3 text-xs text-green-700">
+                            Verify this fix was applied correctly by checking the remediated EPUB at the location above.
                           </div>
                         </div>
                       );
@@ -364,114 +312,96 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
               </div>
             )}
 
-            {/* Fixed Issues Section */}
-            {item.fixedIssues && item.fixedIssues.length > 0 && (
+            {/* SECTION 2: Remaining Issues (Requires Attention) */}
+            {item.issues && item.issues.length > 0 && (
               <div className="mt-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowFixedIssues(!showFixedIssues)}
-                  className="w-full sm:w-auto border-green-300 text-green-700 hover:bg-green-50"
+                <button
+                  type="button"
+                  onClick={() => setShowIssues(!showIssues)}
+                  className="flex items-center gap-2 text-sm font-medium text-orange-600 hover:text-orange-700"
                 >
-                  {showFixedIssues ? (
-                    <>
-                      <ChevronUp className="h-4 w-4 mr-2" />
-                      Hide {item.fixedIssues.length} Fixed Issue{item.fixedIssues.length > 1 ? 's' : ''}
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="h-4 w-4 mr-2" />
-                      Show {item.fixedIssues.length} Fixed Issue{item.fixedIssues.length > 1 ? 's' : ''} (Audit Trail)
-                    </>
-                  )}
-                </Button>
+                  <ChevronRight className={cn(
+                    'h-4 w-4 transition-transform',
+                    showIssues && 'rotate-90'
+                  )} />
+                  {showIssues ? 'Hide' : 'Show'} {item.issues.length} Issue{item.issues.length !== 1 ? 's' : ''} Requiring Review
+                </button>
 
-                {showFixedIssues && (
-                  <div className="mt-4 space-y-4">
-                    {item.fixedIssues.map((issue, idx) => {
-                      const htmlContent = issue.html || issue.htmlSnippet;
-                      const impactLabel = issue.impact || issue.severity;
+                {showIssues && (
+                  <div className="mt-3 space-y-3">
+                    <p className="text-xs text-orange-700 bg-orange-50 px-3 py-2 rounded border border-orange-200">
+                      These issues were NOT fixed during automated remediation and require manual attention.
+                    </p>
+
+                    {item.issues.map((issue, idx) => {
+                      const impactLabel = issue.impact || issue.severity || 'unknown';
                       
                       return (
-                        <div
-                          key={issue.id || issue.issueId || idx}
-                          className="p-4 bg-green-50 border border-green-200 rounded-lg"
-                        >
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                              <span className="text-sm font-semibold text-gray-900">
-                                Fixed Issue {idx + 1} of {item.fixedIssues!.length}
-                              </span>
-                              {impactLabel && (
-                                <span className={cn(
-                                  'text-xs px-2 py-0.5 rounded font-medium uppercase line-through opacity-60',
-                                  (impactLabel === 'critical') && 'bg-red-100 text-red-700',
-                                  (impactLabel === 'serious') && 'bg-orange-100 text-orange-700',
-                                  (impactLabel === 'moderate') && 'bg-yellow-100 text-yellow-700',
-                                  (impactLabel === 'minor') && 'bg-blue-100 text-blue-700'
-                                )}>
-                                  {impactLabel}
+                        <div key={issue.id || issue.issueId || idx} className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-medium text-orange-700 bg-orange-100 px-2 py-0.5 rounded">
+                                  {String(impactLabel).toUpperCase()}
                                 </span>
-                              )}
-                              {issue.ruleId && (
-                                <span className="text-xs text-gray-500 font-mono">
-                                  {issue.ruleId}
-                                </span>
-                              )}
-                            </div>
-                            {issue.fixMethod && (
-                              <span className={cn(
-                                'text-xs px-2 py-0.5 rounded',
-                                issue.fixMethod === 'automated' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
-                              )}>
-                                {issue.fixMethod === 'automated' ? 'Auto-fixed' : 'Manually fixed'}
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="mb-3">
-                            <p className="text-sm text-gray-700 line-through opacity-70">{issue.message}</p>
-                          </div>
-
-                          {issue.fixedAt && (
-                            <div className="mb-2">
-                              <p className="text-xs text-gray-500">
-                                Fixed: {new Date(issue.fixedAt).toLocaleString()}
+                                {issue.ruleId && (
+                                  <span className="text-xs text-gray-600 font-mono">
+                                    {issue.ruleId}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-900 mt-2 font-medium">
+                                {issue.message}
                               </p>
                             </div>
-                          )}
+                          </div>
 
                           {issue.location && (
-                            <div className="mb-3">
+                            <div className="mt-3">
                               <p className="text-xs font-medium text-gray-700 mb-1">Location:</p>
-                              <p className="text-xs text-gray-600 bg-white px-2 py-1 rounded font-mono border">
+                              <p className="text-xs text-gray-600 bg-white px-2 py-1 rounded border">
+                                {issue.filePath && <span className="font-mono">{issue.filePath} - </span>}
                                 {issue.location}
                               </p>
                             </div>
                           )}
 
-                          {htmlContent && (
-                            <div className="mb-3">
-                              <div className="flex items-center gap-2 mb-1">
-                                <Code className="h-4 w-4 text-gray-600" />
-                                <span className="text-xs font-semibold text-gray-700">Original HTML (now fixed):</span>
+                          {(issue.html || issue.htmlSnippet) && (
+                            <div className="mt-3">
+                              <div className="flex items-center justify-between mb-1">
+                                <p className="text-xs font-medium text-gray-700">Current HTML:</p>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(issue.html || issue.htmlSnippet || '');
+                                  }}
+                                  className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                                >
+                                  <Copy className="h-3 w-3" />
+                                  Copy
+                                </button>
                               </div>
-                              <pre className="text-xs text-gray-600 bg-white p-2 rounded overflow-x-auto border opacity-70">
-                                <code>{htmlContent}</code>
+                              <pre className="text-xs text-gray-800 bg-white p-2 rounded overflow-x-auto border">
+                                <code>{issue.html || issue.htmlSnippet}</code>
                               </pre>
                             </div>
                           )}
 
                           {issue.suggestedFix && (
-                            <div className="mb-3">
-                              <div className="flex items-center gap-2 mb-1">
-                                <CheckCircle className="h-4 w-4 text-green-600" />
-                                <span className="text-xs font-semibold text-gray-700">Applied Fix:</span>
-                              </div>
-                              <pre className="text-xs text-green-800 bg-white p-2 rounded border border-green-200 overflow-x-auto">
+                            <div className="mt-3">
+                              <p className="text-xs font-medium text-gray-700 mb-1">Suggested Fix:</p>
+                              <pre className="text-xs text-green-800 bg-green-50 p-2 rounded overflow-x-auto border border-green-200">
                                 <code>{issue.suggestedFix}</code>
                               </pre>
+                            </div>
+                          )}
+
+                          {issue.filePath && !issue.location && (
+                            <div className="mt-3">
+                              <p className="text-xs font-medium text-gray-700 mb-1">File:</p>
+                              <p className="text-xs text-gray-600 font-mono">
+                                {issue.filePath}
+                              </p>
                             </div>
                           )}
                         </div>
@@ -479,6 +409,14 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
                     })}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Show message if no issues at all */}
+            {(!item.issues || item.issues.length === 0) &&
+             (!item.fixedIssues || item.fixedIssues.length === 0) && (
+              <div className="mt-4 text-sm text-gray-500 italic">
+                No specific issues detected for this criterion. Manual verification still required.
               </div>
             )}
 
