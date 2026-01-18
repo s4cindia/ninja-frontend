@@ -221,7 +221,7 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
 
   // Defensive data access with fallbacks
   const jobId = result?.jobId ?? '';
-  const issues = result?.issues ?? [];
+  const issues = useMemo(() => result?.issues ?? [], [result?.issues]);
   const isValid = result?.isValid ?? false;
   const epubVersion = result?.epubVersion ?? 'Unknown';
   

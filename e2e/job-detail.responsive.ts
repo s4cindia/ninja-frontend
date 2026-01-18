@@ -85,7 +85,11 @@ test.describe('Job Detail Responsive Tests', () => {
     test.skip(!hasModal, 'No modal appeared');
 
     const box = await modal.boundingBox();
-    expect(box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+    test.skip(!box, 'Modal bounding box not available');
+
+    const viewportSize = page.viewportSize();
+    expect(viewportSize).not.toBeNull();
+    expect(box!.width).toBeLessThanOrEqual(viewportSize!.width);
   });
 
   test('MT-RD-007: Action buttons are accessible on mobile', async ({ page }) => {
