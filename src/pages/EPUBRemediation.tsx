@@ -96,6 +96,9 @@ interface RawAceAssertion {
   wcagCriteria?: string[];
   source?: string;
   html?: string;
+  element?: string;
+  context?: string;
+  snippet?: string;
   remediation?:
     | string
     | {
@@ -845,6 +848,9 @@ function normalizeAceTask(
     wcagCriteria: wcagCriteria.length > 0 ? wcagCriteria : undefined,
     source,
     html: raw.html,
+    element: raw.element,
+    context: raw.context,
+    snippet: raw.snippet,
     remediation,
   };
 }
