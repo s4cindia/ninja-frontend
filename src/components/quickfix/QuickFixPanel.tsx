@@ -574,6 +574,8 @@ export function QuickFixPanel({
               html: issue.html,
               element: issue.element,
               context: issue.context,
+              snippet: issue.snippet,
+              imagePath: (issue as { imagePath?: string }).imagePath,
               severity: 'critical',
             }}
             jobId={jobId}

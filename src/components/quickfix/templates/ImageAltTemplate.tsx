@@ -12,6 +12,8 @@ interface QuickFixIssue {
   element?: string;
   context?: string;
   severity: string;
+  imagePath?: string;
+  snippet?: string;
 }
 
 interface ImageAltTemplateProps {
@@ -45,16 +47,22 @@ const VARIANT_CLASSES: Record<string, string> = {
 };
 
 function extractImagePath(issue: QuickFixIssue): string {
-  const elementSource = issue.html || issue.element || issue.context || '';
+  // Check if imagePath is provided directly
+  if (issue.imagePath) {
+    return issue.imagePath;
+  }
+  
+  // Try to extract from all possible text sources
+  const elementSource = issue.html || issue.element || issue.context || issue.snippet || issue.message || '';
   
   // Try to extract src from img tag
   const srcMatch = elementSource.match(/src=["']([^"']+)["']/);
   let src = srcMatch?.[1] || '';
   
-  // If no src found, try to find image filename patterns
+  // If no src found, try to find image filename patterns anywhere in the text
   if (!src) {
-    const imgFileMatch = elementSource.match(/[\w-]+\.(png|jpg|jpeg|gif|svg|webp)/i);
-    src = imgFileMatch?.[0] || '';
+    const imgFileMatch = elementSource.match(/([\w\-./]+\.(png|jpg|jpeg|gif|svg|webp))/i);
+    src = imgFileMatch?.[1] || '';
   }
   
   if (!src) {
@@ -190,26 +198,27 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
 
   return (
     <div className="space-y-4">
-      {imagePath && (
-        <div className="border rounded-lg p-4 bg-gray-50">
-          <p className="text-sm font-medium text-gray-600 mb-2">Image: {imagePath}</p>
-          <div className="flex items-center justify-center min-h-[8rem] bg-gray-200 rounded overflow-hidden">
-            {imagePreviewUrl && !imageLoadError ? (
-              <img
-                src={imagePreviewUrl}
-                alt="Preview of the image needing alt text"
-                className="max-h-48 max-w-full object-contain"
-                onError={() => setImageLoadError(true)}
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center h-32 text-gray-500 text-sm">
-                <ImageIcon className="h-8 w-8 mb-2 opacity-50" />
-                <span>Image preview not available</span>
-              </div>
-            )}
-          </div>
+      <div className="border rounded-lg p-4 bg-gray-50">
+        <p className="text-sm font-medium text-gray-600 mb-2">
+          Image: {imagePath || issue.location || 'Location unknown'}
+        </p>
+        <div className="flex items-center justify-center min-h-[8rem] bg-gray-200 rounded overflow-hidden">
+          {imagePreviewUrl && !imageLoadError ? (
+            <img
+              src={imagePreviewUrl}
+              alt="Preview of the image needing alt text"
+              className="max-h-48 max-w-full object-contain"
+              onError={() => setImageLoadError(true)}
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-32 text-gray-500 text-sm">
+              <ImageIcon className="h-8 w-8 mb-2 opacity-50" />
+              <span>{imagePath ? 'Image preview not available' : 'Image path could not be detected'}</span>
+              <span className="text-xs text-gray-400 mt-1">Use "Generate with AI" to analyze the image</span>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium text-gray-700">
