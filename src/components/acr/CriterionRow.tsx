@@ -32,6 +32,9 @@ const CONFORMANCE_OPTIONS: ConformanceLevel[] = [
   'not_applicable',
 ];
 
+const DEFAULT_CONFORMANCE_CONFIG = { label: 'Unknown', className: 'bg-gray-100 text-gray-600 border-gray-200' };
+const DEFAULT_ATTRIBUTION_CONFIG = { label: '', className: 'text-gray-600' };
+
 export function CriterionRow({
   criterion,
   onUpdateConformance,
@@ -40,8 +43,8 @@ export function CriterionRow({
   isGeneratingRemarks,
   disabled = false,
 }: CriterionRowProps) {
-  const conformanceConfig = CONFORMANCE_CONFIG[criterion.conformanceLevel];
-  const attributionConfig = ATTRIBUTION_CONFIG[criterion.attribution];
+  const conformanceConfig = CONFORMANCE_CONFIG[criterion.conformanceLevel] || DEFAULT_CONFORMANCE_CONFIG;
+  const attributionConfig = ATTRIBUTION_CONFIG[criterion.attribution] || DEFAULT_ATTRIBUTION_CONFIG;
 
   return (
     <tr className={cn(
