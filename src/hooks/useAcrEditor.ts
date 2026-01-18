@@ -65,22 +65,23 @@ export function useFinalizeDocument(jobId: string) {
 }
 
 export function validateRemarks(
-  remarks: string, 
+  remarks: string | null | undefined, 
   conformanceLevel: ConformanceLevel
 ): { isValid: boolean; warnings: string[]; characterCount: number } {
   const warnings: string[] = [];
-  const characterCount = remarks.length;
+  const safeRemarks = remarks ?? '';
+  const characterCount = safeRemarks.length;
   const minLength = conformanceLevel === 'does_not_support' ? 50 : 20;
   
   if (characterCount < minLength) {
     warnings.push(`Remarks should be at least ${minLength} characters (currently ${characterCount})`);
   }
   
-  if (conformanceLevel === 'does_not_support' && !remarks.toLowerCase().includes('issue')) {
+  if (conformanceLevel === 'does_not_support' && !safeRemarks.toLowerCase().includes('issue')) {
     warnings.push('Consider describing the specific accessibility issue');
   }
   
-  if (conformanceLevel === 'partially_supports' && !remarks.toLowerCase().includes('except')) {
+  if (conformanceLevel === 'partially_supports' && !safeRemarks.toLowerCase().includes('except')) {
     warnings.push('Consider using "except" to clarify partial support limitations');
   }
   
