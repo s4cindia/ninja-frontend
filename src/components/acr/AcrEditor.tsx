@@ -371,11 +371,11 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
             )}
             <span className={cn(
               'px-2 py-1 rounded text-xs font-medium',
-              document?.status === 'draft' && 'bg-gray-100 text-gray-600',
+              (!document?.status || document.status === 'draft') && 'bg-gray-100 text-gray-600',
               document?.status === 'review' && 'bg-yellow-100 text-yellow-700',
               document?.status === 'final' && 'bg-green-100 text-green-700'
             )}>
-              {document?.status ? document.status.charAt(0).toUpperCase() + document.status.slice(1) : 'Unknown'}
+              {document?.status ? document.status.charAt(0).toUpperCase() + document.status.slice(1) : 'Draft'}
             </span>
           </div>
         </div>
