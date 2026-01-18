@@ -6,6 +6,7 @@ import {
   CheckCircle, 
   XCircle, 
   AlertTriangle, 
+  AlertCircle,
   History, 
   FileText,
   Copy
@@ -163,6 +164,18 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
             <span className="text-xs text-gray-500">
               Auto: {item.automatedResult}
             </span>
+            {(item.issues && item.issues.length > 0) && (
+              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">
+                <AlertCircle className="h-3 w-3" aria-hidden="true" />
+                {item.issues.length} issue{item.issues.length !== 1 ? 's' : ''}
+              </span>
+            )}
+            {(item.fixedIssues && item.fixedIssues.length > 0) && (
+              <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
+                <CheckCircle className="h-3 w-3" aria-hidden="true" />
+                {item.fixedIssues.length} fixed
+              </span>
+            )}
           </div>
         </div>
 
