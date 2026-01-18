@@ -90,9 +90,9 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
 
   const imagePath = extractImagePath(issue);
   
-  // Build image URL for preview - assumes backend serves EPUB images
+  // Build image URL for preview - backend serves EPUB images at this endpoint
   const imagePreviewUrl = imagePath 
-    ? `/api/v1/epub/job/${jobId}/image/${encodeURIComponent(imagePath)}`
+    ? `/api/v1/epub/job/${jobId}/image/${imagePath}`
     : '';
   const prevValidRef = useRef<boolean | null>(null);
 
