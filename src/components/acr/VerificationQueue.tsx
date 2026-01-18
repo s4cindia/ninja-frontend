@@ -468,7 +468,8 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
     method: VerificationMethod, 
     notes: string
   ) => {
-    if (useMockData) {
+    // Update local items when using mock data OR when using criteria from analysis
+    if (useMockData || useLocalItems) {
       setLocalItems(prev => prev.map(item => 
         item.id === itemId 
           ? { 
@@ -495,7 +496,8 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
     if (!canBulkSubmit) return;
     
     const itemIds = Array.from(selectedItems);
-    if (useMockData) {
+    // Update local items when using mock data OR when using criteria from analysis
+    if (useMockData || useLocalItems) {
       setLocalItems(prev => prev.map(item => 
         selectedItems.has(item.id)
           ? { 
