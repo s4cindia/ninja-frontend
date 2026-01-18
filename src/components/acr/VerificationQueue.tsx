@@ -330,14 +330,18 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
 
   const [useLocalItems, setUseLocalItems] = useState(hasCriteriaFromAnalysis);
 
+  // Track if we've done initial conversion to avoid resetting verified items
+  const [hasInitialized, setHasInitialized] = useState(false);
+  
   useEffect(() => {
     if (criteriaFromAnalysis && criteriaFromAnalysis.length > 0) {
       const converted = convertCriteriaToVerificationItems(criteriaFromAnalysis, savedVerifications);
       
       // Merge issues from API data if available
+      let mergedItems = converted;
       if (apiData?.items && apiData.items.length > 0) {
         const apiItemMap = new Map(apiData.items.map(item => [item.criterionId, item]));
-        const mergedItems = converted.map(item => {
+        mergedItems = converted.map(item => {
           const apiItem = apiItemMap.get(item.criterionId);
           if (apiItem) {
             return {
@@ -350,13 +354,32 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
           }
           return item;
         });
-        setLocalItems(mergedItems);
+      }
+      
+      // If already initialized, preserve existing verification status
+      if (hasInitialized) {
+        setLocalItems(prev => {
+          const existingMap = new Map(prev.map(item => [item.id, item]));
+          return mergedItems.map(item => {
+            const existing = existingMap.get(item.id);
+            if (existing && existing.status !== 'pending') {
+              // Preserve verified status and history from local state
+              return {
+                ...item,
+                status: existing.status,
+                history: existing.history,
+              };
+            }
+            return item;
+          });
+        });
       } else {
-        setLocalItems(converted);
+        setLocalItems(mergedItems);
+        setHasInitialized(true);
       }
       setUseLocalItems(true);
     }
-  }, [criteriaFromAnalysis, savedVerifications, apiData]);
+  }, [criteriaFromAnalysis, savedVerifications, apiData, hasInitialized]);
 
   useEffect(() => {
     if (hasCriteriaFromAnalysis || useLocalItems) return;
