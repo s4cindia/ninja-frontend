@@ -24,6 +24,10 @@ interface QuickFixPanelProps {
     location?: string;
     filePath?: string;
     currentContent?: string;
+    html?: string;
+    element?: string;
+    context?: string;
+    snippet?: string;
     lineNumber?: number;
   };
   jobId?: string;
@@ -65,17 +69,21 @@ export function QuickFixPanel({
   const [toast, setToast] = useState<ToastState>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Extract actual element content from available fields
+  // Priority: currentContent > html > element > context > snippet
+  const actualElementContent = issue.currentContent || issue.html || issue.element || issue.context || issue.snippet;
+  
   const context: QuickFixContext = useMemo(() => ({
     issueId: issue.id,
     issueCode: issue.code,
-    currentContent: issue.currentContent,
+    currentContent: actualElementContent,
     filePath: issue.filePath,
     lineNumber: issue.lineNumber,
     elementContext: issue.location,
     jobId,
     issueMessage: issue.message,
     ...asyncData,
-  }), [issue, jobId, asyncData]);
+  }), [issue, jobId, asyncData, actualElementContent]);
 
   useEffect(() => {
     async function loadTemplateData() {
@@ -99,10 +107,11 @@ export function QuickFixPanel({
         setLoadError(null);
         
         try {
+          const elementContent = issue.currentContent || issue.html || issue.element || issue.context || issue.snippet;
           const data = await tpl.loadAsyncData({
             issueId: issue.id,
             issueCode: issue.code,
-            currentContent: issue.currentContent,
+            currentContent: elementContent,
             filePath: issue.filePath,
             lineNumber: issue.lineNumber,
             elementContext: issue.location,
@@ -191,6 +200,7 @@ export function QuickFixPanel({
         ...fix,
         taskId: issue.id,
         jobId,
+        actualElementContent: actualElementContent || '(none - will use template fallback)',
       });
       
       await onApplyFix(fix);
