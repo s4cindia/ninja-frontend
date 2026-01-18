@@ -5,5 +5,6 @@ export type { SourceSummary, SummaryBySourceData } from './SummaryBySource';
 export { EpubViewer } from './EpubViewer';
 export { ViewInContextButton } from './ViewInContextButton';
 export { RemediationGuidance } from './RemediationGuidance';
-export { ScoreTooltip, calculateScoreBreakdown } from './ScoreTooltip';
-export type { ScoreBreakdown } from './ScoreTooltip';
+export { ScoreTooltip } from './ScoreTooltip';
+export { calculateScoreBreakdown } from '@/utils/scoreCalculation';
+export type { ScoreBreakdown } from '@/utils/scoreCalculation';
