@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Sparkles, RefreshCw, AlertTriangle, CheckCircle, Info, Image as ImageIcon } from 'lucide-react';
-import { useQuickFixAltText } from '@/hooks/useQuickFixAltText';
-import type { AltTextFlag } from '@/types/alt-text.types';
+import { altTextService } from '@/services/alt-text.service';
+import type { AltTextFlag, QuickFixImageType, QuickFixAltTextResponse } from '@/types/alt-text.types';
 
 interface QuickFixIssue {
   id: string;
@@ -9,6 +9,8 @@ interface QuickFixIssue {
   message: string;
   location?: string;
   html?: string;
+  element?: string;
+  context?: string;
   severity: string;
 }
 
@@ -42,6 +44,19 @@ const VARIANT_CLASSES: Record<string, string> = {
   info: 'bg-blue-100 text-blue-700',
 };
 
+function extractImagePath(issue: QuickFixIssue): string {
+  const elementSource = issue.html || issue.element || issue.context || '';
+  const match = elementSource.match(/src=["']([^"']+)["']/);
+  const src = match?.[1] || '';
+  
+  if (src.startsWith('OEBPS/') || src.startsWith('/')) {
+    return src;
+  }
+  
+  const fileDir = issue.location?.replace(/[^/]+$/, '') || '';
+  return fileDir + src;
+}
+
 export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
   issue,
   jobId,
@@ -49,67 +64,101 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
   onChange,
   onValidate,
 }) => {
-  const [isDecorative, setIsDecorative] = useState<string>(
-    (values.isDecorative as string) || 'no'
+  const [imageType, setImageType] = useState<QuickFixImageType>(
+    (values.imageType as QuickFixImageType) || 'informative'
   );
   const [altText, setAltText] = useState<string>((values.altText as string) || '');
-  const [aiUsed, setAiUsed] = useState(false);
+  const [longDesc, setLongDesc] = useState<string>((values.longDescription as string) || '');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [aiResult, setAiResult] = useState<QuickFixAltTextResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const imagePath = issue.location || issue.html?.match(/src=["']([^"']+)["']/)?.[1] || '';
-  const imageId = issue.id || `img-${imagePath.replace(/[^a-z0-9]/gi, '-')}`;
-
-  const { isGenerating, result, error, generateAltText, reset } = useQuickFixAltText({
-    jobId,
-    imageId,
-    imagePath,
-    onSuccess: (data) => {
-      setAltText(data.shortAlt);
-      setAiUsed(true);
-      onChange({
-        altText: data.shortAlt,
-        isDecorative,
-        aiGenerated: true,
-        aiConfidence: data.confidence,
-        extendedAlt: data.extendedAlt,
-      });
-    },
-  });
-
+  const imagePath = extractImagePath(issue);
   const prevValidRef = useRef<boolean | null>(null);
 
   useEffect(() => {
-    const isValid = isDecorative === 'yes' || (altText.trim().length > 0 && altText.length <= 125);
+    let isValid = false;
+    if (imageType === 'decorative') {
+      isValid = true;
+    } else if (imageType === 'complex') {
+      isValid = altText.trim().length > 0 && altText.length <= 125 && longDesc.trim().length > 0;
+    } else {
+      isValid = altText.trim().length > 0 && altText.length <= 125;
+    }
+    
     if (prevValidRef.current !== isValid) {
       prevValidRef.current = isValid;
       onValidate(isValid);
     }
-  }, [isDecorative, altText, onValidate]);
+  }, [imageType, altText, longDesc, onValidate]);
 
-  const handleDecorativeChange = useCallback((value: string) => {
-    setIsDecorative(value);
-    if (value === 'yes') {
+  const handleImageTypeChange = useCallback((type: QuickFixImageType) => {
+    setImageType(type);
+    if (type === 'decorative') {
       setAltText('');
-      setAiUsed(false);
-      reset();
+      setLongDesc('');
+      setAiResult(null);
+      setError(null);
     }
-    onChange({ altText: value === 'yes' ? '' : altText, isDecorative: value });
-  }, [altText, onChange, reset]);
+    onChange({ 
+      imageType: type, 
+      altText: type === 'decorative' ? '' : altText,
+      longDescription: type === 'complex' ? longDesc : undefined,
+    });
+  }, [altText, longDesc, onChange]);
 
   const handleAltTextChange = useCallback((value: string) => {
     setAltText(value);
     onChange({
       altText: value,
-      isDecorative,
-      aiGenerated: aiUsed,
-      aiConfidence: result?.confidence,
+      imageType,
+      longDescription: imageType === 'complex' ? longDesc : undefined,
+      aiGenerated: !!aiResult,
+      aiConfidence: aiResult?.confidence,
     });
-  }, [isDecorative, aiUsed, result?.confidence, onChange]);
+  }, [imageType, longDesc, aiResult, onChange]);
+
+  const handleLongDescChange = useCallback((value: string) => {
+    setLongDesc(value);
+    onChange({
+      altText,
+      imageType,
+      longDescription: value,
+      aiGenerated: !!aiResult,
+      aiConfidence: aiResult?.confidence,
+    });
+  }, [altText, imageType, aiResult, onChange]);
 
   const handleGenerateClick = async () => {
+    if (imageType === 'decorative') {
+      setAltText('');
+      return;
+    }
+
+    setIsGenerating(true);
+    setError(null);
+
     try {
-      await generateAltText();
-    } catch {
-      // Error is already set in hook
+      const result = await altTextService.generateForQuickFix(jobId, imagePath, imageType);
+      setAiResult(result);
+      setAltText(result.shortAlt);
+      
+      if (imageType === 'complex' && result.longDescription) {
+        setLongDesc(result.longDescription);
+      }
+
+      onChange({
+        altText: result.shortAlt,
+        imageType,
+        longDescription: imageType === 'complex' ? result.longDescription : undefined,
+        aiGenerated: true,
+        aiConfidence: result.confidence,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to generate alt text';
+      setError(message);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -133,46 +182,80 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
 
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium text-gray-700">
-          Is this image decorative (no informational content)?
+          What type of image is this?
         </legend>
         <div className="space-y-2">
           <label className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
             <input
               type="radio"
-              name="isDecorative"
-              value="yes"
-              checked={isDecorative === 'yes'}
-              onChange={() => handleDecorativeChange('yes')}
+              name="imageType"
+              value="decorative"
+              checked={imageType === 'decorative'}
+              onChange={() => handleImageTypeChange('decorative')}
               className="mt-0.5"
             />
             <div>
-              <span className="font-medium text-gray-900">Yes, decorative only</span>
-              <p className="text-sm text-gray-500">Will use alt="" (empty alt attribute)</p>
+              <span className="font-medium text-gray-900">Decorative Image</span>
+              <p className="text-sm text-gray-500">No informational content - will use alt="" (empty)</p>
             </div>
           </label>
           <label className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
             <input
               type="radio"
-              name="isDecorative"
-              value="no"
-              checked={isDecorative === 'no'}
-              onChange={() => handleDecorativeChange('no')}
+              name="imageType"
+              value="informative"
+              checked={imageType === 'informative'}
+              onChange={() => handleImageTypeChange('informative')}
               className="mt-0.5"
             />
             <div>
-              <span className="font-medium text-gray-900">No, it conveys information</span>
-              <p className="text-sm text-gray-500">Requires descriptive alt text</p>
+              <span className="font-medium text-gray-900">Informative Image</span>
+              <p className="text-sm text-gray-500">Conveys information - requires short alt text</p>
+            </div>
+          </label>
+          <label className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+            <input
+              type="radio"
+              name="imageType"
+              value="complex"
+              checked={imageType === 'complex'}
+              onChange={() => handleImageTypeChange('complex')}
+              className="mt-0.5"
+            />
+            <div>
+              <span className="font-medium text-gray-900">Complex Image</span>
+              <p className="text-sm text-gray-500">Charts, diagrams, infographics - needs both alt text and long description</p>
             </div>
           </label>
         </div>
       </fieldset>
 
-      {isDecorative === 'no' && (
+      {imageType !== 'decorative' && (
         <div className="space-y-3">
           <div>
-            <label htmlFor="altText" className="block text-sm font-medium text-gray-700 mb-1">
-              Enter alt text
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="altText" className="block text-sm font-medium text-gray-700">
+                Alternative Text
+              </label>
+              <button
+                type="button"
+                onClick={handleGenerateClick}
+                disabled={isGenerating}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isGenerating ? (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Generate with AI
+                  </>
+                )}
+              </button>
+            </div>
             <textarea
               id="altText"
               value={altText}
@@ -184,7 +267,7 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
             />
             <div className="flex justify-between mt-1">
               <p className="text-xs text-gray-500">
-                Keep it concise (125 chars max). Describe what the image shows and why it's important.
+                Keep it concise (125 chars max). Describe what the image shows.
               </p>
               <span className={`text-xs ${altText.length > 125 ? 'text-red-500' : 'text-gray-400'}`}>
                 {altText.length}/125
@@ -192,40 +275,17 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleGenerateClick}
-              disabled={isGenerating}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isGenerating ? (
-                <>
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4" />
-                  Generate with AI
-                </>
-              )}
-            </button>
-
-            {result && (
-              <div className="flex items-center gap-2">
-                <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${VARIANT_CLASSES[getConfidenceBadge(result.confidence).variant]}`}>
-                  {getConfidenceBadge(result.confidence).text} confidence
-                </span>
-                {aiUsed && (
-                  <span className="text-xs text-gray-500 flex items-center gap-1">
-                    <CheckCircle className="h-3 w-3 text-green-500" />
-                    AI suggestion applied
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
+          {aiResult && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${VARIANT_CLASSES[getConfidenceBadge(aiResult.confidence).variant]}`}>
+                AI Confidence: {getConfidenceBadge(aiResult.confidence).text}
+              </span>
+              <span className="text-xs text-gray-500 flex items-center gap-1">
+                <CheckCircle className="h-3 w-3 text-green-500" />
+                AI suggestion applied
+              </span>
+            </div>
+          )}
 
           {error && (
             <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
@@ -234,9 +294,9 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
             </div>
           )}
 
-          {result && result.flags.length > 0 && (
+          {aiResult && aiResult.flags.length > 0 && (
             <div className="flex flex-wrap gap-2">
-              {result.flags.map((flag) => {
+              {aiResult.flags.map((flag) => {
                 const config = FLAG_LABELS[flag];
                 return (
                   <span
@@ -250,31 +310,35 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
             </div>
           )}
 
-          {result?.extendedAlt && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <div className="flex items-start gap-2">
-                <Info className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-blue-800">Extended description available</p>
-                  <p className="text-xs text-blue-600 mt-1">{result.extendedAlt}</p>
-                  <p className="text-xs text-blue-500 mt-2">
-                    Consider using this for complex images that need detailed description.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {result?.needsReview && (
+          {aiResult?.needsReview && (
             <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700">
               <AlertTriangle className="h-4 w-4 flex-shrink-0" />
               AI suggests this image needs human review. Please verify the description is accurate.
             </div>
           )}
+
+          {imageType === 'complex' && (
+            <div>
+              <label htmlFor="longDesc" className="block text-sm font-medium text-gray-700 mb-1">
+                Long Description
+              </label>
+              <textarea
+                id="longDesc"
+                value={longDesc}
+                onChange={(e) => handleLongDescChange(e.target.value)}
+                placeholder="Provide a detailed description of the complex image content, data points, trends, or key information..."
+                rows={6}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                For charts and diagrams, describe the data, relationships, and key takeaways.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
-      {isDecorative === 'yes' && (
+      {imageType === 'decorative' && (
         <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
           <Info className="h-4 w-4 flex-shrink-0" />
           <span>
