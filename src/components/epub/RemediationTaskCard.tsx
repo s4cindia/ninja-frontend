@@ -77,6 +77,9 @@ export interface RemediationTask {
   wcagCriteria?: string[];
   source?: string;
   html?: string;
+  element?: string;
+  context?: string;
+  snippet?: string;
   remediation?:
     | string
     | {
@@ -508,6 +511,10 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
                 location: task.location,
                 filePath: task.filePath,
                 currentContent: task.html,
+                html: task.html,
+                element: task.element,
+                context: task.context,
+                snippet: task.snippet,
               }}
               jobId={jobId}
               onApplyFix={handleQuickFixApply}

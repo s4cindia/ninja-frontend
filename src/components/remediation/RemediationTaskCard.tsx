@@ -260,6 +260,10 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
                   filePath: issue.filePath,
                   currentContent: issue.currentContent,
                   lineNumber: issue.lineNumber,
+                  html: issue.html,
+                  element: issue.element,
+                  context: issue.context,
+                  snippet: issue.snippet,
                 }}
                 jobId={jobId}
                 onApplyFix={handleApplyFix}
