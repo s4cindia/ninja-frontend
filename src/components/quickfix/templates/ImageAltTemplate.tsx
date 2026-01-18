@@ -46,13 +46,27 @@ const VARIANT_CLASSES: Record<string, string> = {
 
 function extractImagePath(issue: QuickFixIssue): string {
   const elementSource = issue.html || issue.element || issue.context || '';
-  const match = elementSource.match(/src=["']([^"']+)["']/);
-  const src = match?.[1] || '';
   
-  if (src.startsWith('OEBPS/') || src.startsWith('/')) {
+  // Try to extract src from img tag
+  const srcMatch = elementSource.match(/src=["']([^"']+)["']/);
+  let src = srcMatch?.[1] || '';
+  
+  // If no src found, try to find image filename patterns
+  if (!src) {
+    const imgFileMatch = elementSource.match(/[\w-]+\.(png|jpg|jpeg|gif|svg|webp)/i);
+    src = imgFileMatch?.[0] || '';
+  }
+  
+  if (!src) {
+    return '';
+  }
+  
+  // If already absolute path, return as-is
+  if (src.startsWith('OEBPS/') || src.startsWith('/') || src.startsWith('http')) {
     return src;
   }
   
+  // Combine with location directory
   const fileDir = issue.location?.replace(/[^/]+$/, '') || '';
   return fileDir + src;
 }
@@ -72,8 +86,14 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiResult, setAiResult] = useState<QuickFixAltTextResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [imageLoadError, setImageLoadError] = useState(false);
 
   const imagePath = extractImagePath(issue);
+  
+  // Build image URL for preview - assumes backend serves EPUB images
+  const imagePreviewUrl = imagePath 
+    ? `/api/v1/epub/job/${jobId}/image/${encodeURIComponent(imagePath)}`
+    : '';
   const prevValidRef = useRef<boolean | null>(null);
 
   useEffect(() => {
@@ -173,9 +193,20 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
       {imagePath && (
         <div className="border rounded-lg p-4 bg-gray-50">
           <p className="text-sm font-medium text-gray-600 mb-2">Image: {imagePath}</p>
-          <div className="flex items-center justify-center h-32 bg-gray-200 rounded text-gray-500 text-sm">
-            <ImageIcon className="h-8 w-8 mr-2 opacity-50" />
-            [Image Preview]
+          <div className="flex items-center justify-center min-h-[8rem] bg-gray-200 rounded overflow-hidden">
+            {imagePreviewUrl && !imageLoadError ? (
+              <img
+                src={imagePreviewUrl}
+                alt="Preview of the image needing alt text"
+                className="max-h-48 max-w-full object-contain"
+                onError={() => setImageLoadError(true)}
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-32 text-gray-500 text-sm">
+                <ImageIcon className="h-8 w-8 mb-2 opacity-50" />
+                <span>Image preview not available</span>
+              </div>
+            )}
           </div>
         </div>
       )}
