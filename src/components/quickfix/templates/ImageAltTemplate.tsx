@@ -183,13 +183,24 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
 
     // Debug logging for backend troubleshooting
     console.log('[ImageAltTemplate] Generate clicked');
-    console.log('[ImageAltTemplate] Issue data:', {
-      id: issue.id,
-      code: issue.code,
-      context: issue.context,
-      element: issue.element,
-      location: issue.location,
-    });
+    console.log('[ImageAltTemplate] Full issue object:', JSON.stringify(issue, null, 2));
+    console.log('[ImageAltTemplate] issue.context type:', typeof issue.context);
+    console.log('[ImageAltTemplate] issue.context value:', issue.context);
+    console.log('[ImageAltTemplate] issue.element value:', issue.element);
+    
+    // Try parsing context to debug
+    if (issue.context) {
+      try {
+        const parsed = JSON.parse(issue.context);
+        console.log('[ImageAltTemplate] Parsed context:', parsed);
+        console.log('[ImageAltTemplate] Images array:', parsed.images);
+      } catch (e) {
+        console.log('[ImageAltTemplate] Context is not valid JSON:', e);
+      }
+    } else {
+      console.log('[ImageAltTemplate] No context field on issue');
+    }
+    
     console.log('[ImageAltTemplate] Extracted imagePath:', imagePath);
     console.log('[ImageAltTemplate] Request params:', { jobId, imagePath, imageType });
 
