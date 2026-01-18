@@ -333,10 +333,30 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
   useEffect(() => {
     if (criteriaFromAnalysis && criteriaFromAnalysis.length > 0) {
       const converted = convertCriteriaToVerificationItems(criteriaFromAnalysis, savedVerifications);
-      setLocalItems(converted);
+      
+      // Merge issues from API data if available
+      if (apiData?.items && apiData.items.length > 0) {
+        const apiItemMap = new Map(apiData.items.map(item => [item.criterionId, item]));
+        const mergedItems = converted.map(item => {
+          const apiItem = apiItemMap.get(item.criterionId);
+          if (apiItem) {
+            return {
+              ...item,
+              issues: apiItem.issues || item.issues,
+              fixedIssues: apiItem.fixedIssues || item.fixedIssues,
+              remainingCount: apiItem.remainingCount ?? item.remainingCount,
+              fixedCount: apiItem.fixedCount ?? item.fixedCount,
+            };
+          }
+          return item;
+        });
+        setLocalItems(mergedItems);
+      } else {
+        setLocalItems(converted);
+      }
       setUseLocalItems(true);
     }
-  }, [criteriaFromAnalysis, savedVerifications]);
+  }, [criteriaFromAnalysis, savedVerifications, apiData]);
 
   useEffect(() => {
     if (hasCriteriaFromAnalysis || useLocalItems) return;
