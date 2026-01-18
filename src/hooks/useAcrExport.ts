@@ -244,6 +244,17 @@ This Accessibility Conformance Report is provided for informational purposes onl
   return new Blob([content], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 }
 
+function triggerDownload(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 100);
+}
+
 export function useMockExport() {
   const [isExporting, setIsExporting] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
@@ -277,11 +288,12 @@ export function useMockExport() {
         blob = generatePdfDocument(options);
     }
 
-    const url = URL.createObjectURL(blob);
     const generatedFilename = `ACR_Report_${new Date().toISOString().split('T')[0]}${formatExtensions[options.format]}`;
+    
+    triggerDownload(blob, generatedFilename);
 
     const result: ExportResult = {
-      downloadUrl: url,
+      downloadUrl: '#downloaded',
       filename: generatedFilename,
       format: options.format,
       generatedAt: new Date().toISOString(),
@@ -295,13 +307,10 @@ export function useMockExport() {
   };
 
   const reset = useCallback(() => {
-    if (downloadUrl) {
-      URL.revokeObjectURL(downloadUrl);
-    }
     setDownloadUrl(null);
     setFilename(null);
     setIsExporting(false);
-  }, [downloadUrl]);
+  }, []);
 
   return {
     exportAcr,
