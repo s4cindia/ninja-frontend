@@ -9,6 +9,7 @@ import { ComparisonSummaryCard } from './ComparisonSummaryCard';
 import { ModificationList } from './ModificationList';
 import { Modification } from './ComparisonDiff';
 import { api } from '@/services/api';
+import { normalizeCriteria } from '@/utils/wcag';
 
 interface FileComparison {
   filePath: string;
@@ -221,7 +222,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
   }
 
   const displayModifications = criterionId
-    ? comparison.modifications.filter(m => m.wcagCriteria === criterionId)
+    ? comparison.modifications.filter(m => m.wcagCriteria && normalizeCriteria(m.wcagCriteria) === normalizeCriteria(criterionId))
     : comparison.modifications;
 
   const filteredChangeCount = displayModifications.length;

@@ -53,7 +53,7 @@ export const TransferToAcrButton: React.FC<TransferToAcrButtonProps> = ({
   const handleGoToAcr = () => {
     const params = new URLSearchParams();
     if (fileName) {
-      params.set('fileName', encodeURIComponent(fileName));
+      params.set('fileName', fileName);
     }
     const queryString = params.toString();
     

@@ -16,6 +16,14 @@ interface ApiIssue {
   fixMethod?: string;
 }
 
+interface ApiHistoryEntry {
+  status: string;
+  method: string;
+  notes: string;
+  verifiedBy: string;
+  verifiedAt: string;
+}
+
 interface ApiQueueItem {
   id: string;
   criterionId: string;
@@ -29,6 +37,7 @@ interface ApiQueueItem {
   automatedNotes?: string;
   relatedIssues?: ApiIssue[];
   fixedIssues?: ApiIssue[];
+  history?: ApiHistoryEntry[];
 }
 
 interface ApiQueueResponse {
@@ -107,7 +116,14 @@ export const verificationService = {
         automatedResult: (item.automatedResult?.toLowerCase() || 'warning') as 'pass' | 'fail' | 'warning' | 'not_tested',
         automatedNotes: item.automatedNotes || (hasIssues ? `${item.relatedIssues?.length} issue(s) detected` : ''),
         status: normalizeStatus(item.status),
-        history: [],
+        history: (item.history || []).map((h, idx) => ({
+          id: `${item.id}-history-${idx}`,
+          status: normalizeStatus(h.status) as 'verified_pass' | 'verified_fail' | 'verified_partial' | 'deferred',
+          method: (h.method || 'Manual Review') as 'NVDA 2024.1' | 'JAWS 2024' | 'VoiceOver' | 'Manual Review' | 'Keyboard Only' | 'Axe DevTools' | 'WAVE',
+          notes: h.notes || '',
+          verifiedBy: h.verifiedBy || 'Unknown',
+          verifiedAt: h.verifiedAt || new Date().toISOString(),
+        })),
         issues: item.relatedIssues?.map(issue => ({
           id: issue.code,
           issueId: issue.code,
