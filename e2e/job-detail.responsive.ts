@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login } from './fixtures/test-base';
+import { login, MIN_TOUCH_TARGET_SIZE } from './fixtures/test-base';
 
 test.describe('Job Detail Responsive Tests', () => {
   test.beforeEach(async ({ page }) => {
@@ -53,9 +53,9 @@ test.describe('Job Detail Responsive Tests', () => {
     const box = await firstButton.boundingBox();
 
     expect(box).not.toBeNull();
-    // Allow some tolerance for borders/padding
-    expect(box!.width).toBeGreaterThanOrEqual(40);
-    expect(box!.height).toBeGreaterThanOrEqual(40);
+    // WCAG 2.1 AA: 44px minimum with 4px tolerance for borders/padding
+    expect(box!.width).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_SIZE);
+    expect(box!.height).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_SIZE);
   });
 
   test('MT-RD-005: Text remains readable without horizontal scroll', async ({ page }) => {
