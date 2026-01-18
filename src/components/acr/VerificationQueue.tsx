@@ -469,7 +469,7 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
     notes: string
   ) => {
     // Update local items when using mock data OR when using criteria from analysis
-    if (useMockData || useLocalItems) {
+    if (useMockData || useLocalItems || hasCriteriaFromAnalysis) {
       setLocalItems(prev => prev.map(item => 
         item.id === itemId 
           ? { 
@@ -497,7 +497,7 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
     
     const itemIds = Array.from(selectedItems);
     // Update local items when using mock data OR when using criteria from analysis
-    if (useMockData || useLocalItems) {
+    if (useMockData || useLocalItems || hasCriteriaFromAnalysis) {
       setLocalItems(prev => prev.map(item => 
         selectedItems.has(item.id)
           ? { 
