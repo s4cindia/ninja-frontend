@@ -25,6 +25,7 @@ export interface CriterionConfidenceWithIssues {
   remarks: string;
   relatedIssues?: IssueMapping[];
   issueCount?: number;
+  hasIssues?: boolean;
 }
 
 export interface ConfidenceSummary {
@@ -35,6 +36,7 @@ export interface ConfidenceSummary {
   notApplicableCriteria: number;
   totalIssues: number;
   averageConfidence: number;
+  criteriaWithIssuesCount?: number;
 }
 
 export interface ConfidenceWithIssuesResponse {

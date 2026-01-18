@@ -6,7 +6,7 @@ import { validateRemarks } from '@/hooks/useAcrEditor';
 import type { ConformanceLevel } from '@/types/acr.types';
 
 interface RemarksEditorProps {
-  remarks: string;
+  remarks: string | null | undefined;
   conformanceLevel: ConformanceLevel;
   onSave: (remarks: string) => void;
   onGenerateAI: () => void;
@@ -27,20 +27,21 @@ export function RemarksEditor({
   isGenerating,
   disabled = false,
 }: RemarksEditorProps) {
+  const safeRemarks = remarks ?? '';
   const [isEditing, setIsEditing] = useState(false);
-  const [editValue, setEditValue] = useState(remarks);
+  const [editValue, setEditValue] = useState(safeRemarks);
   
   useEffect(() => {
     if (!isEditing) {
-      setEditValue(remarks);
+      setEditValue(safeRemarks);
     }
-  }, [remarks, isEditing]);
+  }, [safeRemarks, isEditing]);
   
-  const validation = validateRemarks(isEditing ? editValue : remarks, conformanceLevel);
+  const validation = validateRemarks(isEditing ? editValue : safeRemarks, conformanceLevel);
   const minLength = getMinLength(conformanceLevel);
   
   const handleStartEdit = () => {
-    setEditValue(remarks);
+    setEditValue(safeRemarks);
     setIsEditing(true);
   };
   
@@ -50,7 +51,7 @@ export function RemarksEditor({
   };
   
   const handleCancel = () => {
-    setEditValue(remarks);
+    setEditValue(safeRemarks);
     setIsEditing(false);
   };
   

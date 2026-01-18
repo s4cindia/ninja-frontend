@@ -150,6 +150,22 @@ export interface CriterionCheck {
   passed: boolean;
 }
 
+export interface CriterionIssue {
+  issueId?: string;
+  ruleId?: string;
+  impact?: string;
+  message: string;
+  filePath?: string;
+  location?: string;
+  htmlSnippet?: string;
+  suggestedFix?: string;
+}
+
+export interface FixedIssue extends CriterionIssue {
+  fixedAt?: string;
+  fixMethod?: 'automated' | 'manual';
+}
+
 export interface CriterionConfidence {
   id: string;
   criterionId: string;
@@ -161,6 +177,12 @@ export interface CriterionConfidence {
   remarks?: string;
   automatedChecks: CriterionCheck[];
   manualChecks: string[];
+  relatedIssues?: CriterionIssue[];
+  issueCount?: number;
+  fixedIssues?: FixedIssue[];
+  fixedCount?: number;
+  remainingCount?: number;
+  hasIssues?: boolean;
 }
 
 export interface AcrAnalysisResponse {
@@ -168,6 +190,21 @@ export interface AcrAnalysisResponse {
   criteria: CriterionConfidence[];
   overallConfidence: number;
   analyzedAt: string;
+  summary: {
+    supports: number;
+    partiallySupports: number;
+    doesNotSupport: number;
+    notApplicable: number;
+  };
+  otherIssues?: {
+    count: number;
+    issues: Array<{
+      code: string;
+      message: string;
+      severity: string;
+      location?: string;
+    }>;
+  };
 }
 
 export async function fetchAcrAnalysis(jobId: string): Promise<AcrAnalysisResponse> {

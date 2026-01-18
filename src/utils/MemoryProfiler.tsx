@@ -19,7 +19,7 @@ class MemoryMonitor {
     let jsHeapSizeLimit = 0;
     
     if (typeof performance !== 'undefined' && 'memory' in performance) {
-      const memory = (performance as any).memory;
+      const memory = (performance as { memory?: { usedJSHeapSize?: number; jsHeapSizeLimit?: number } }).memory;
       jsHeapSize = memory?.usedJSHeapSize || 0;
       jsHeapSizeLimit = memory?.jsHeapSizeLimit || 0;
     }
@@ -28,7 +28,7 @@ class MemoryMonitor {
     
     let queryCount = 0;
     try {
-      const queryCache = (window as any).__REACT_QUERY_DEVTOOLS_GLOBAL_HOOK__?.queryClient?.getQueryCache?.();
+      const queryCache = (window as { __REACT_QUERY_DEVTOOLS_GLOBAL_HOOK__?: { queryClient?: { getQueryCache?: () => { getAll?: () => unknown[] } } } }).__REACT_QUERY_DEVTOOLS_GLOBAL_HOOK__?.queryClient?.getQueryCache?.();
       queryCount = queryCache?.getAll?.()?.length || 0;
     } catch {
       queryCount = 0;

@@ -1,9 +1,10 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Filter, CheckSquare } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { VerificationItem } from './VerificationItem';
+import { CriterionDetailsModal } from './CriterionDetailsModal';
 import { useVerificationQueue, useSubmitVerification, useBulkVerification } from '@/hooks/useVerification';
 import type { CriterionConfidence } from '@/services/api';
 import type { 
@@ -12,7 +13,9 @@ import type {
   VerificationMethod,
   Severity,
   ConfidenceLevel,
-  VerificationFilters 
+  VerificationFilters,
+  VerificationIssue,
+  FixedVerificationIssue
 } from '@/types/verification.types';
 
 interface SavedVerification {
@@ -64,6 +67,54 @@ function convertCriteriaToVerificationItems(
         c.status === 'fail' ? 'fail' :
         c.status === 'not_tested' ? 'not_tested' : 'warning';
 
+      const issues: VerificationIssue[] | undefined = c.relatedIssues?.map((issue) => ({
+        id: issue.issueId,
+        issueId: issue.issueId,
+        ruleId: issue.ruleId,
+        impact: issue.impact,
+        message: issue.message,
+        severity: issue.impact as Severity | undefined,
+        location: issue.location,
+        filePath: issue.filePath,
+        html: issue.htmlSnippet,
+        htmlSnippet: issue.htmlSnippet,
+        suggestedFix: issue.suggestedFix,
+      }));
+
+      const fixedIssues: FixedVerificationIssue[] | undefined = c.fixedIssues?.map((issue) => ({
+        id: issue.issueId,
+        issueId: issue.issueId,
+        ruleId: issue.ruleId,
+        impact: issue.impact,
+        message: issue.message,
+        severity: issue.impact as Severity | undefined,
+        location: issue.location,
+        filePath: issue.filePath,
+        html: issue.htmlSnippet,
+        htmlSnippet: issue.htmlSnippet,
+        suggestedFix: issue.suggestedFix,
+        fixedAt: issue.fixedAt,
+        fixMethod: issue.fixMethod,
+      }));
+
+      const remainingCount = c.remainingCount ?? issues?.length ?? 0;
+      const fixedCount = c.fixedCount ?? fixedIssues?.length ?? 0;
+      const totalIssueCount = remainingCount + fixedCount;
+      
+      let automatedNotesWithIssues: string;
+      if (totalIssueCount > 0) {
+        const parts: string[] = [];
+        if (remainingCount > 0) {
+          parts.push(`${remainingCount} issue${remainingCount !== 1 ? 's' : ''} remaining`);
+        }
+        if (fixedCount > 0) {
+          parts.push(`${fixedCount} fixed`);
+        }
+        automatedNotesWithIssues = parts.join(', ') + '. ' + (c.remarks || '');
+      } else {
+        automatedNotesWithIssues = c.remarks || `Automated analysis flagged this criterion for human review. Confidence: ${score}%`;
+      }
+
       const baseItem: VerificationItemType = {
         id: c.id || `criterion-${index}`,
         criterionId: c.criterionId || `Unknown-${index}`,
@@ -73,9 +124,13 @@ function convertCriteriaToVerificationItems(
         confidenceLevel,
         confidenceScore: score,
         automatedResult,
-        automatedNotes: c.remarks || `Automated analysis flagged this criterion for human review. Confidence: ${score}%`,
+        automatedNotes: automatedNotesWithIssues,
         status: 'pending',
         history: [],
+        issues: issues && issues.length > 0 ? issues : undefined,
+        fixedIssues: fixedIssues && fixedIssues.length > 0 ? fixedIssues : undefined,
+        fixedCount,
+        remainingCount,
       };
 
       if (saved) {
@@ -237,6 +292,7 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
   const [bulkStatus, setBulkStatus] = useState<VerificationStatus>('verified_pass');
   const [bulkMethod, setBulkMethod] = useState<VerificationMethod>('Manual Review');
   const [bulkNotes, setBulkNotes] = useState('');
+  const [selectedCriterionForGuidance, setSelectedCriterionForGuidance] = useState<CriterionConfidence | null>(null);
   
   const hasCriteriaFromAnalysis = criteriaFromAnalysis && criteriaFromAnalysis.length > 0;
   
@@ -274,13 +330,56 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
 
   const [useLocalItems, setUseLocalItems] = useState(hasCriteriaFromAnalysis);
 
+  // Track if we've done initial conversion to avoid resetting verified items
+  const [hasInitialized, setHasInitialized] = useState(false);
+  
   useEffect(() => {
     if (criteriaFromAnalysis && criteriaFromAnalysis.length > 0) {
       const converted = convertCriteriaToVerificationItems(criteriaFromAnalysis, savedVerifications);
-      setLocalItems(converted);
+      
+      // Merge issues from API data if available
+      let mergedItems = converted;
+      if (apiData?.items && apiData.items.length > 0) {
+        const apiItemMap = new Map(apiData.items.map(item => [item.criterionId, item]));
+        mergedItems = converted.map(item => {
+          const apiItem = apiItemMap.get(item.criterionId);
+          if (apiItem) {
+            return {
+              ...item,
+              issues: apiItem.issues || item.issues,
+              fixedIssues: apiItem.fixedIssues || item.fixedIssues,
+              remainingCount: apiItem.remainingCount ?? item.remainingCount,
+              fixedCount: apiItem.fixedCount ?? item.fixedCount,
+            };
+          }
+          return item;
+        });
+      }
+      
+      // If already initialized, preserve existing verification status
+      if (hasInitialized) {
+        setLocalItems(prev => {
+          const existingMap = new Map(prev.map(item => [item.id, item]));
+          return mergedItems.map(item => {
+            const existing = existingMap.get(item.id);
+            if (existing && existing.status !== 'pending') {
+              // Preserve verified status and history from local state
+              return {
+                ...item,
+                status: existing.status,
+                history: existing.history,
+              };
+            }
+            return item;
+          });
+        });
+      } else {
+        setLocalItems(mergedItems);
+        setHasInitialized(true);
+      }
       setUseLocalItems(true);
     }
-  }, [criteriaFromAnalysis, savedVerifications]);
+  }, [criteriaFromAnalysis, savedVerifications, apiData, hasInitialized]);
 
   useEffect(() => {
     if (hasCriteriaFromAnalysis || useLocalItems) return;
@@ -293,7 +392,9 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
     }
   }, [apiData, error, hasCriteriaFromAnalysis, useLocalItems]);
 
-  const items = useLocalItems || useMockData ? localItems : (apiData?.items ?? []);
+  const items = useMemo(() => {
+    return useLocalItems || useMockData ? localItems : (apiData?.items ?? []);
+  }, [useLocalItems, useMockData, localItems, apiData?.items]);
   const isSubmitting = submitMutation.isPending || bulkMutation.isPending;
 
   const bulkRequiresNotes = bulkStatus === 'verified_fail' || bulkStatus === 'verified_partial';
@@ -323,11 +424,65 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
     });
   }, [items, filters, useMockData]);
 
-  const verifiedCount = apiData?.verifiedCount ?? items.filter(i => 
-    i.status === 'verified_pass' || i.status === 'verified_fail' || i.status === 'verified_partial'
-  ).length;
-  const totalCount = apiData?.totalCount ?? items.length;
+  // When using local items, always calculate from local state (not API data)
+  const verifiedCount = (useLocalItems || useMockData)
+    ? items.filter(i => 
+        i.status === 'verified_pass' || i.status === 'verified_fail' || i.status === 'verified_partial'
+      ).length
+    : (apiData?.verifiedCount ?? items.filter(i => 
+        i.status === 'verified_pass' || i.status === 'verified_fail' || i.status === 'verified_partial'
+      ).length);
+  const totalCount = (useLocalItems || useMockData) 
+    ? items.length 
+    : (apiData?.totalCount ?? items.length);
   const progressPercent = totalCount > 0 ? Math.round((verifiedCount / totalCount) * 100) : 0;
+
+  console.log('[VerificationQueue] Progress:', {
+    verifiedCount,
+    totalCount,
+    canComplete: verifiedCount === totalCount && totalCount > 0,
+    useLocalItems,
+    useMockData,
+    itemsLength: items.length,
+    itemStatuses: items.slice(0, 5).map(i => ({ id: i.id, status: i.status })),
+  });
+
+  const criteriaMap = useMemo(() => {
+    const map = new Map<string, CriterionConfidence>();
+    if (criteriaFromAnalysis) {
+      criteriaFromAnalysis.forEach((c) => {
+        map.set(c.id, c);
+      });
+    }
+    return map;
+  }, [criteriaFromAnalysis]);
+
+  const handleViewGuidance = useCallback((itemId: string) => {
+    let criterion = criteriaMap.get(itemId);
+    
+    if (!criterion) {
+      const item = items.find(i => i.id === itemId);
+      if (item) {
+        criterion = {
+          id: item.id,
+          criterionId: item.criterionId,
+          name: item.criterionName,
+          level: item.wcagLevel,
+          status: item.automatedResult === 'pass' ? 'pass' : 
+                  item.automatedResult === 'fail' ? 'fail' : 'not_tested',
+          confidenceScore: item.confidenceScore,
+          remarks: item.automatedNotes,
+          needsVerification: true,
+          automatedChecks: [],
+          manualChecks: [],
+        };
+      }
+    }
+    
+    if (criterion) {
+      setSelectedCriterionForGuidance(criterion);
+    }
+  }, [criteriaMap, items]);
 
   const handleSelectItem = (id: string, selected: boolean) => {
     setSelectedItems(prev => {
@@ -355,7 +510,8 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
     method: VerificationMethod, 
     notes: string
   ) => {
-    if (useMockData) {
+    // Update local items when using mock data OR when using criteria from analysis
+    if (useMockData || useLocalItems || hasCriteriaFromAnalysis) {
       setLocalItems(prev => prev.map(item => 
         item.id === itemId 
           ? { 
@@ -382,7 +538,8 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
     if (!canBulkSubmit) return;
     
     const itemIds = Array.from(selectedItems);
-    if (useMockData) {
+    // Update local items when using mock data OR when using criteria from analysis
+    if (useMockData || useLocalItems || hasCriteriaFromAnalysis) {
       setLocalItems(prev => prev.map(item => 
         selectedItems.has(item.id)
           ? { 
@@ -620,6 +777,7 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
                 onSelect={handleSelectItem}
                 onSubmit={handleSubmitVerification}
                 isSubmitting={isSubmitting}
+                onViewGuidance={handleViewGuidance}
               />
             ))
           )}
@@ -632,6 +790,16 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
             Complete Verification
           </Button>
         </div>
+      )}
+
+      {/* Criterion Guidance Modal */}
+      {selectedCriterionForGuidance && (
+        <CriterionDetailsModal
+          criterion={selectedCriterionForGuidance}
+          isOpen={!!selectedCriterionForGuidance}
+          onClose={() => setSelectedCriterionForGuidance(null)}
+          jobId={jobId}
+        />
       )}
     </div>
   );

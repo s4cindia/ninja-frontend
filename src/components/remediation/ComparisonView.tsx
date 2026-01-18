@@ -9,6 +9,7 @@ import { ComparisonSummaryCard } from './ComparisonSummaryCard';
 import { ModificationList } from './ModificationList';
 import { Modification } from './ComparisonDiff';
 import { api } from '@/services/api';
+import { normalizeCriteria } from '@/utils/wcag';
 
 interface FileComparison {
   filePath: string;
@@ -38,6 +39,7 @@ interface ComparisonData {
 interface ComparisonViewProps {
   jobId: string;
   contentType: 'pdf' | 'epub';
+  criterionId?: string;
   onBack?: () => void;
   className?: string;
 }
@@ -165,6 +167,7 @@ const mapComparisonResponse = (data: Record<string, unknown>, jobId: string): Co
 export const ComparisonView: React.FC<ComparisonViewProps> = ({
   jobId,
   contentType,
+  criterionId,
   onBack,
   className = '',
 }) => {
@@ -217,6 +220,12 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
       </Alert>
     );
   }
+
+  const displayModifications = criterionId
+    ? comparison.modifications.filter(m => m.wcagCriteria && normalizeCriteria(m.wcagCriteria) === normalizeCriteria(criterionId))
+    : comparison.modifications;
+
+  const filteredChangeCount = displayModifications.length;
 
   return (
     <div className={className}>
@@ -309,11 +318,35 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CheckCircle className="h-5 w-5" aria-hidden="true" />
-            All Modifications ({comparison.modifications.length})
+            {criterionId ? `Modifications for ${criterionId}` : 'All Modifications'} ({filteredChangeCount})
           </CardTitle>
         </CardHeader>
+        {criterionId && (
+          <div className="px-6 py-3 bg-blue-50 border-b border-blue-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Badge variant="info">Filtered</Badge>
+                <span className="text-sm text-gray-700">
+                  Showing only changes related to <strong>WCAG {normalizeCriteria(criterionId)}</strong>
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const url = new URL(window.location.href);
+                  url.searchParams.delete('criterion');
+                  window.history.pushState({}, '', url.toString());
+                  window.location.reload();
+                }}
+              >
+                Show All
+              </Button>
+            </div>
+          </div>
+        )}
         <CardContent>
-          <ModificationList modifications={comparison.modifications} />
+          <ModificationList modifications={displayModifications} />
         </CardContent>
       </Card>
     </div>

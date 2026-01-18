@@ -96,6 +96,9 @@ interface RawAceAssertion {
   wcagCriteria?: string[];
   source?: string;
   html?: string;
+  element?: string;
+  context?: string;
+  snippet?: string;
   remediation?:
     | string
     | {
@@ -845,6 +848,9 @@ function normalizeAceTask(
     wcagCriteria: wcagCriteria.length > 0 ? wcagCriteria : undefined,
     source,
     html: raw.html,
+    element: raw.element,
+    context: raw.context,
+    snippet: raw.snippet,
     remediation,
   };
 }
@@ -958,7 +964,7 @@ export const EPUBRemediation: React.FC = () => {
         firstElement?.focus();
       }
     }
-  }, []);
+  }, [handleBatchFixCancel]);
 
   useEffect(() => {
     if (showBatchPanel) {
@@ -1671,7 +1677,7 @@ export const EPUBRemediation: React.FC = () => {
     }));
   };
 
-  if (pageState === "loading") {
+  if (pageState === "loading" || (pageState === "complete" && !plan)) {
     return (
       <div className="p-6 max-w-4xl mx-auto">
         <div className="flex items-center justify-center py-12">
@@ -1839,6 +1845,10 @@ export const EPUBRemediation: React.FC = () => {
                   <Eye className="h-4 w-4 mr-2" />
                   View Comparison
                 </Button>
+                <Button onClick={() => navigate(`/remediation/${jobId}/comparison`)} variant="outline">
+                  <Eye className="h-4 w-4 mr-2" />
+                  Review Changes
+                </Button>
                 <Button onClick={() => navigate("/epub")} variant="ghost">
                   <RotateCcw className="h-4 w-4 mr-2" />
                   Start New Audit
@@ -1949,6 +1959,7 @@ export const EPUBRemediation: React.FC = () => {
             jobId={jobId || "demo"}
             pendingCount={pendingManualCount}
             isDemo={isDemo}
+            fileName={fileName !== "Loading..." ? fileName : undefined}
           />
         </>
       )}
@@ -1973,6 +1984,7 @@ export const EPUBRemediation: React.FC = () => {
               jobId={jobId || ''}
               fixType={selectedBatch.fixType}
               fixName={selectedBatch.fixName}
+              epubFileName={fileName}
               issues={selectedBatch.issues}
               onComplete={handleBatchFixComplete}
               onCancel={handleBatchFixCancel}

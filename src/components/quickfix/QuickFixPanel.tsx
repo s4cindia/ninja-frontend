@@ -15,6 +15,12 @@ import { QuickFixCheckboxGroup } from './QuickFixCheckboxGroup';
 import { QuickFixRadioGroup } from './QuickFixRadioGroup';
 import { QuickFixTextInput } from './QuickFixTextInput';
 import { QuickFixColorPicker } from './QuickFixColorPicker';
+import { ImageAltTemplate } from './templates/ImageAltTemplate';
+
+const IMAGE_ALT_ISSUE_CODES = [
+  'EPUB-IMG-001', 'IMG-001', 'IMG-ALT', 'IMG-ALT-MISSING', 'IMG-ALT-EMPTY',
+  'IMAGE-ALT', 'IMAGE-ALT-MISSING', 'ACE-IMG-001', 'EPUB-IMG-ALT'
+];
 
 interface QuickFixPanelProps {
   issue: {
@@ -24,6 +30,10 @@ interface QuickFixPanelProps {
     location?: string;
     filePath?: string;
     currentContent?: string;
+    html?: string;
+    element?: string;
+    context?: string;
+    snippet?: string;
     lineNumber?: number;
   };
   jobId?: string;
@@ -64,18 +74,27 @@ export function QuickFixPanel({
   const [isApplying, setIsApplying] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [imageAltValid, setImageAltValid] = useState(false);
+  
+  const isImageAltIssue = IMAGE_ALT_ISSUE_CODES.some(
+    code => issue.code.toUpperCase().replace(/_/g, '-') === code
+  );
 
+  // Extract actual element content from available fields
+  // Priority: currentContent > html > element > context > snippet
+  const actualElementContent = issue.currentContent || issue.html || issue.element || issue.context || issue.snippet;
+  
   const context: QuickFixContext = useMemo(() => ({
     issueId: issue.id,
     issueCode: issue.code,
-    currentContent: issue.currentContent,
+    currentContent: actualElementContent,
     filePath: issue.filePath,
     lineNumber: issue.lineNumber,
     elementContext: issue.location,
     jobId,
     issueMessage: issue.message,
     ...asyncData,
-  }), [issue, jobId, asyncData]);
+  }), [issue, jobId, asyncData, actualElementContent]);
 
   useEffect(() => {
     async function loadTemplateData() {
@@ -99,10 +118,11 @@ export function QuickFixPanel({
         setLoadError(null);
         
         try {
+          const elementContent = issue.currentContent || issue.html || issue.element || issue.context || issue.snippet;
           const data = await tpl.loadAsyncData({
             issueId: issue.id,
             issueCode: issue.code,
-            currentContent: issue.currentContent,
+            currentContent: elementContent,
             filePath: issue.filePath,
             lineNumber: issue.lineNumber,
             elementContext: issue.location,
@@ -121,7 +141,7 @@ export function QuickFixPanel({
     }
     
     loadTemplateData();
-  }, [issue.code, issue.id, issue.filePath, issue.currentContent, issue.lineNumber, issue.location, issue.message, jobId]);
+  }, [issue.code, issue.id, issue.filePath, issue.currentContent, issue.lineNumber, issue.location, issue.message, issue.context, issue.element, issue.html, issue.snippet, jobId]);
 
   useEffect(() => {
     return () => {
@@ -191,6 +211,7 @@ export function QuickFixPanel({
         ...fix,
         taskId: issue.id,
         jobId,
+        actualElementContent: actualElementContent || '(none - will use template fallback)',
       });
       
       await onApplyFix(fix);
@@ -543,11 +564,30 @@ export function QuickFixPanel({
           )}
         </div>
 
-        {inputFields.length > 0 && (
+        {isImageAltIssue && jobId ? (
+          <ImageAltTemplate
+            issue={{
+              id: issue.id,
+              code: issue.code,
+              message: issue.message,
+              location: issue.location,
+              html: issue.html,
+              element: issue.element,
+              context: issue.context,
+              snippet: issue.snippet,
+              imagePath: (issue as { imagePath?: string }).imagePath,
+              severity: 'critical',
+            }}
+            jobId={jobId}
+            values={inputValues}
+            onChange={(newValues) => setInputValues(prev => ({ ...prev, ...newValues }))}
+            onValidate={setImageAltValid}
+          />
+        ) : inputFields.length > 0 ? (
           <div className="space-y-4">
             {inputFields.map(renderInput)}
           </div>
-        )}
+        ) : null}
 
         <button
           onClick={() => setShowPreview(!showPreview)}
@@ -595,7 +635,7 @@ export function QuickFixPanel({
       <div className="flex items-center gap-2 p-4 border-t border-gray-200 bg-gray-50">
         <button
           onClick={handleApplyFix}
-          disabled={isApplying}
+          disabled={isApplying || (isImageAltIssue && !imageAltValid)}
           className={cn(
             'flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors',
             'bg-primary-600 text-white hover:bg-primary-700',

@@ -14,8 +14,7 @@ import {
   Loader2,
   X,
   File,
-  RotateCcw,
-  BookOpen
+  RotateCcw
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
@@ -197,6 +196,7 @@ export function AcrWorkflowPage() {
   const [isLoadingJobs, setIsLoadingJobs] = useState(false);
   const [jobsError, setJobsError] = useState<string | null>(null);
   const [analysisResults, setAnalysisResults] = useState<CriterionConfidence[]>([]);
+  const [documentTitle, setDocumentTitle] = useState<string>('Untitled Document');
 
   const handleCriteriaLoaded = useCallback((criteria: CriterionConfidence[]) => {
     setAnalysisResults(criteria);
@@ -278,6 +278,35 @@ export function AcrWorkflowPage() {
     };
     fetchJobs();
   }, []);
+
+  useEffect(() => {
+    const fetchJobTitle = async () => {
+      if (!state.jobId) {
+        setDocumentTitle('Untitled Document');
+        return;
+      }
+
+      try {
+        const response = await api.get(`/epub/job/${state.jobId}`);
+        const job = response.data.data || response.data;
+
+        // Try multiple possible locations for the filename
+        const title = job.originalFile?.name ||
+                      job.file?.name ||
+                      job.input?.fileName ||
+                      job.output?.fileName ||
+                      job.output?.epubTitle ||
+                      'Untitled Document';
+
+        setDocumentTitle(title);
+      } catch (error) {
+        console.error('Failed to fetch job title:', error);
+        setDocumentTitle('Untitled Document');
+      }
+    };
+
+    fetchJobTitle();
+  }, [state.jobId]);
 
   useEffect(() => {
     if (state.jobId) {
@@ -463,7 +492,7 @@ export function AcrWorkflowPage() {
 
       case 2: {
         const getJobDisplayName = (job: AuditJob) => {
-          return job.input?.fileName || job.output?.fileName || 'Untitled Document';
+          return job.input?.fileName || job.output?.fileName || (job.output as { epubTitle?: string })?.epubTitle || 'Untitled Document';
         };
 
         return (
@@ -806,6 +835,19 @@ export function AcrWorkflowPage() {
         </p>
       </div>
 
+      {/* Document Title Display */}
+      {state.jobId && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-blue-600" />
+            <span className="text-sm text-gray-600">Title:</span>
+            <span className="text-sm font-semibold text-gray-900">
+              {state.fileName && state.fileName !== 'Untitled Document' ? state.fileName : documentTitle}
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="mb-8">
         <ProgressBar currentStep={state.currentStep} totalSteps={WORKFLOW_STEPS.length} />
       </div>
@@ -852,18 +894,6 @@ export function AcrWorkflowPage() {
           </span>
         </div>
       </div>
-
-      {state.fileName && (
-        <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-blue-600 flex-shrink-0" />
-            <span className="text-sm font-medium text-gray-600">Title:</span>
-            <span className="text-sm font-semibold text-gray-900 truncate" title={state.fileName}>
-              {state.fileName.length > 60 ? `${state.fileName.substring(0, 57)}...` : state.fileName}
-            </span>
-          </div>
-        </div>
-      )}
 
       <div className="bg-white rounded-lg border p-6 min-h-[400px]">
         {renderStepContent()}

@@ -39,7 +39,7 @@ export const ComparisonPage: React.FC = () => {
   useMemoryMonitor(currentIndex);
 
   useEffect(() => {
-    (window as any).printMemorySummary = () => memoryMonitor.printSummary();
+    (window as { printMemorySummary?: () => void }).printMemorySummary = () => memoryMonitor.printSummary();
   }, []);
 
   const currentChange = data?.changes[currentIndex];
@@ -133,7 +133,7 @@ export const ComparisonPage: React.FC = () => {
   }, [isNavigating, data?.changes]);
 
   const handleBack = () => {
-    navigate(`/remediation/${jobId}`);
+    navigate(`/epub/remediate/${jobId}?status=completed`);
   };
 
   if (!jobId) {

@@ -1,8 +1,10 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { X, ExternalLink, CheckCircle, AlertCircle, Book, Wrench, FileText } from 'lucide-react';
-import { useState } from 'react';
+import { X, ExternalLink, CheckCircle, AlertCircle, Book, Wrench, FileText, BookOpen } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { api } from '@/services/api';
 import { cn } from '@/lib/utils';
 import { wcagDocumentationService } from '@/services/wcag-documentation.service';
 import type { CriterionConfidence } from '@/services/api';
@@ -11,6 +13,7 @@ import type { IssueMapping } from '@/types/confidence.types';
 interface CriterionDetailsModalProps {
   criterion: CriterionConfidence;
   relatedIssues?: IssueMapping[];
+  jobId?: string;
   isOpen: boolean;
   onClose: () => void;
   onVerifyClick?: (criterionId: string) => void;
@@ -20,13 +23,39 @@ interface CriterionDetailsModalProps {
 export function CriterionDetailsModal({
   criterion,
   relatedIssues,
+  jobId,
   isOpen,
   onClose,
   onVerifyClick,
   mode = 'interactive'
 }: CriterionDetailsModalProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'issues' | 'testing' | 'remediation' | 'wcag'>('overview');
+  const [epubTitle, setEpubTitle] = useState<string>('');
+  const [hasRemediationData, setHasRemediationData] = useState<boolean>(false);
+  const navigate = useNavigate();
   const wcagDocs = wcagDocumentationService.getDocumentation(criterion.criterionId);
+
+  useEffect(() => {
+    const fetchJobData = async () => {
+      if (!jobId) return;
+      try {
+        const response = await api.get(`/jobs/${jobId}`);
+        const job = response.data.data || response.data;
+        const fileName = job.originalFile?.name || job.file?.name || '';
+        setEpubTitle(fileName);
+
+        // Check if the job has remediation data (remediated file exists)
+        const hasRemediated = Boolean(job.remediatedFile);
+        setHasRemediationData(hasRemediated);
+
+        console.log('[CriterionDetailsModal] Has remediation:', hasRemediated);
+      } catch (error) {
+        console.error('Failed to fetch job data:', error);
+      }
+    };
+
+    fetchJobData();
+  }, [jobId]);
 
   const getLevelBadgeClass = (level: string) => {
     switch (level) {
@@ -68,12 +97,23 @@ export function CriterionDetailsModal({
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className="h-8 w-8 p-0 flex-shrink-0"
+              className="h-10 w-10 p-0 flex-shrink-0 rounded-full hover:bg-gray-100"
+              aria-label="Close dialog"
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5 text-gray-500" />
             </Button>
           </div>
         </DialogHeader>
+
+        {epubTitle && (
+          <div className="px-6 py-3 bg-blue-50 border-b border-blue-200">
+            <div className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4 text-blue-600" />
+              <span className="text-sm text-gray-600">EPUB:</span>
+              <span className="text-sm font-medium text-gray-900">{epubTitle}</span>
+            </div>
+          </div>
+        )}
 
         <Tabs defaultValue="overview" value={activeTab} onValueChange={(v) => setActiveTab(v as 'overview' | 'issues' | 'testing' | 'remediation' | 'wcag')} className="flex-1 flex flex-col overflow-hidden">
           <TabsList className="grid w-full grid-cols-5">
@@ -271,6 +311,41 @@ export function CriterionDetailsModal({
                       </div>
                     ))}
                   </div>
+
+                  {/* View Remediation Changes CTA - Only show if remediation completed */}
+                  {jobId && (hasRemediationData ? (
+                    <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <FileText className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-blue-900 mb-1">View Remediation Changes</h4>
+                          <p className="text-sm text-blue-800 mb-3">
+                            See the actual before/after code changes made during EPUB remediation for issues related to this criterion.
+                          </p>
+                          <Button
+                            variant="outline"
+                            onClick={() => navigate(`/epub/compare/${jobId}?criterion=${criterion.criterionId}`)}
+                            className="w-full sm:w-auto"
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            View All Remediation Changes
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-yellow-900 mb-1">Remediation Pending</h4>
+                          <p className="text-sm text-yellow-800">
+                            These issues have not been remediated yet. Complete the EPUB remediation workflow first to see before/after code changes.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </>
               ) : (
                 <div className="text-center py-12 text-gray-500">

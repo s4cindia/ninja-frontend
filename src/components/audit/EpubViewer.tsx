@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { api } from '@/services/api';
@@ -42,13 +42,7 @@ export function EpubViewer({ isOpen, onClose, jobId, filePath, issueCode, cssSel
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (isOpen && filePath) {
-      loadContent();
-    }
-  }, [isOpen, filePath, jobId]);
-
-  const loadContent = async () => {
+  const loadContent = useCallback(async (): Promise<void> => {
     setLoading(true);
     setError(null);
     try {
@@ -134,7 +128,13 @@ export function EpubViewer({ isOpen, onClose, jobId, filePath, issueCode, cssSel
     } finally {
       setLoading(false);
     }
-  };
+  }, [jobId, filePath, cssSelector, issueCode]);
+
+  useEffect(() => {
+    if (isOpen && filePath) {
+      loadContent();
+    }
+  }, [isOpen, filePath, loadContent]);
 
   if (!isOpen) return null;
 
