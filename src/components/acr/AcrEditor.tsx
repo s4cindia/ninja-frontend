@@ -126,11 +126,15 @@ const MOCK_FINALIZATION: FinalizationStatus = {
   missingRemarksCount: 1,
 };
 
-const STORAGE_KEY = 'acr-editor-demo-data';
+const STORAGE_KEY_PREFIX = 'acr-editor-';
 
-function loadFromStorage(): AcrDocument | null {
+function getStorageKey(jobId: string): string {
+  return `${STORAGE_KEY_PREFIX}${jobId}`;
+}
+
+function loadFromStorage(jobId: string): AcrDocument | null {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(getStorageKey(jobId));
     if (stored) {
       return JSON.parse(stored);
     }
@@ -140,9 +144,9 @@ function loadFromStorage(): AcrDocument | null {
   return null;
 }
 
-function saveToStorage(doc: AcrDocument): void {
+function saveToStorage(jobId: string, doc: AcrDocument): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(doc));
+    localStorage.setItem(getStorageKey(jobId), JSON.stringify(doc));
   } catch {
     // Ignore storage errors
   }
@@ -151,9 +155,10 @@ function saveToStorage(doc: AcrDocument): void {
 export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
-  const [localDocument, setLocalDocument] = useState<AcrDocument>(() => loadFromStorage() ?? MOCK_DOCUMENT);
+  const [localDocument, setLocalDocument] = useState<AcrDocument>(MOCK_DOCUMENT);
   const [localCredibility, setLocalCredibility] = useState<CredibilityValidation>(MOCK_CREDIBILITY);
   const [localFinalization, setLocalFinalization] = useState<FinalizationStatus>(MOCK_FINALIZATION);
+  const [initializedForJob, setInitializedForJob] = useState<string | null>(null);
   
   const { data: apiDocument, isLoading: isLoadingDoc, error: docError } = useAcrDocument(jobId);
   const { data: apiCredibility } = useCredibilityValidation(jobId);
@@ -171,16 +176,36 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
   const criteria = document?.criteria ?? [];
   const blockers = finalization?.blockers ?? [];
   
-  // Sync API document to local state when first loaded
+  // Initialize local state from storage or API when jobId changes
   useEffect(() => {
-    if (apiDocument && apiDocument.criteria) {
-      // Only initialize from API if local storage is empty/default
-      const stored = loadFromStorage();
-      if (!stored || stored.criteria.length === 0) {
+    if (jobId && jobId !== initializedForJob) {
+      // Try loading from localStorage first for this job
+      const stored = loadFromStorage(jobId);
+      if (stored && stored.criteria && stored.criteria.length > 0) {
+        setLocalDocument(stored);
+        setInitializedForJob(jobId);
+      } else if (apiDocument && apiDocument.criteria && apiDocument.criteria.length > 0) {
+        // Use API document if available
         setLocalDocument(apiDocument);
+        setInitializedForJob(jobId);
+      } else if (!isLoadingDoc) {
+        // No stored data and no API data - use mock for demo mode
+        setLocalDocument(MOCK_DOCUMENT);
+        setInitializedForJob(jobId);
       }
     }
-  }, [apiDocument]);
+  }, [jobId, apiDocument, isLoadingDoc, initializedForJob]);
+  
+  // Sync API document to local state when first loaded (only if not already initialized)
+  useEffect(() => {
+    if (apiDocument && apiDocument.criteria && apiDocument.criteria.length > 0 && initializedForJob !== jobId) {
+      const stored = loadFromStorage(jobId);
+      if (!stored || stored.criteria.length === 0) {
+        setLocalDocument(apiDocument);
+        setInitializedForJob(jobId);
+      }
+    }
+  }, [apiDocument, jobId, initializedForJob]);
 
   useEffect(() => {
     if (useMockData) {
@@ -231,9 +256,11 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
   }, [localDocument, useMockData]);
 
   useEffect(() => {
-    // Always save to localStorage for persistence across sessions
-    saveToStorage(localDocument);
-  }, [localDocument]);
+    // Always save to localStorage for persistence across sessions (only if initialized)
+    if (initializedForJob === jobId) {
+      saveToStorage(jobId, localDocument);
+    }
+  }, [localDocument, jobId, initializedForJob]);
 
   const handleUpdateConformance = (criterionId: string, level: ConformanceLevel) => {
     // Always update local state for immediate feedback
