@@ -15,7 +15,15 @@ test.describe('Job Detail Accessibility Tests', () => {
       .withTags(['wcag2a', 'wcag2aa'])
       .analyze();
 
-    expect(results.violations.filter(v => v.impact === 'critical')).toHaveLength(0);
+    const criticalAndSerious = results.violations.filter(
+      v => v.impact === 'critical' || v.impact === 'serious'
+    );
+    expect(criticalAndSerious).toHaveLength(0);
+
+    const moderate = results.violations.filter(v => v.impact === 'moderate');
+    if (moderate.length > 0) {
+      console.warn(`Found ${moderate.length} moderate accessibility issues:`, moderate);
+    }
   });
 
   test('MT-A11Y-002: Job detail page has no critical accessibility violations', async ({ page }) => {
@@ -32,7 +40,15 @@ test.describe('Job Detail Accessibility Tests', () => {
       .withTags(['wcag2a', 'wcag2aa'])
       .analyze();
 
-    expect(results.violations.filter(v => v.impact === 'critical')).toHaveLength(0);
+    const criticalAndSerious = results.violations.filter(
+      v => v.impact === 'critical' || v.impact === 'serious'
+    );
+    expect(criticalAndSerious).toHaveLength(0);
+
+    const moderate = results.violations.filter(v => v.impact === 'moderate');
+    if (moderate.length > 0) {
+      console.warn(`Found ${moderate.length} moderate accessibility issues:`, moderate);
+    }
   });
 
   test('MT-A11Y-004: All interactive elements are keyboard accessible', async ({ page }) => {

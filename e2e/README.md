@@ -11,14 +11,26 @@ Create a `.env.test` file or set these environment variables:
 
 ```bash
 # Test user credentials (required for authenticated tests)
-TEST_USER_EMAIL=test@example.com
-TEST_USER_PASSWORD=testpassword123
+TEST_USER_EMAIL=your-test-user@example.com
+TEST_USER_PASSWORD=your-secure-password-here
 
 # Base URL (optional, defaults to http://localhost:5000)
 PLAYWRIGHT_BASE_URL=http://localhost:5000
+```
 
-Running Tests
+**IMPORTANT**: Never use real user credentials or commit `.env.test` to git!
 
+## Security Guidelines
+
+- Use dedicated test accounts with minimal permissions
+- Never commit `.env.test` files to version control (already in `.gitignore`)
+- Rotate test credentials regularly
+- Test accounts should only exist in development/staging environments
+- Do not use production credentials for testing
+
+## Running Tests
+
+```bash
 # Run all E2E tests
 npm run test:e2e
 
@@ -36,19 +48,27 @@ npm run test:responsive
 
 # Debug mode
 npm run test:e2e:debug
+```
 
-Test Structure
+## Test Structure
 
-- e2e/fixtures/test-base.ts - Authentication fixture
-- e2e/job-detail.e2e.ts - Functional tests
-- e2e/job-detail.a11y.ts - Accessibility tests (axe-core)
-- e2e/job-detail.responsive.ts - Responsive design tests
+- `e2e/fixtures/test-base.ts` - Authentication fixture
+- `e2e/job-detail.e2e.ts` - Functional tests
+- `e2e/job-detail.a11y.ts` - Accessibility tests (axe-core)
+- `e2e/job-detail.responsive.ts` - Responsive design tests
 
-CI/CD
+## CI/CD
 
-Tests run automatically on PR via GitHub Actions. See .github/workflows/pr-checks.yml.
+Tests run automatically on PR via GitHub Actions. See `.github/workflows/pr-checks.yml`.
 
-Test Data
+Required GitHub Secrets:
+- `TEST_USER_EMAIL` - Test user email address
+- `TEST_USER_PASSWORD` - Test user password
+
+Required GitHub Variables:
+- `PLAYWRIGHT_BASE_URL` - Base URL for the application (e.g., staging URL)
+
+## Test Data
 
 Tests expect:
 - A running backend at the configured URL

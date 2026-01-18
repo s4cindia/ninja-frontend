@@ -111,11 +111,11 @@ export function JobDetails() {
     <div>
       <Breadcrumbs items={[{ label: 'Jobs', path: '/jobs' }, { label: fileName }]} />
       
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6" data-testid="job-detail-header">
         <h1 className="text-2xl font-bold text-gray-900">{fileName}</h1>
         <div className="flex gap-2">
           <Link to="/jobs">
-            <Button variant="outline">
+            <Button variant="outline" data-testid="back-button">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
             </Button>
@@ -147,7 +147,7 @@ export function JobDetails() {
             <div className="flex justify-between">
               <dt className="text-sm text-gray-500">Status</dt>
               <dd>
-                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-sm font-medium ${getStatusBadgeClass(job.status)}`}>
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-sm font-medium ${getStatusBadgeClass(job.status)}`} data-testid="job-status">
                   {getStatusIcon(job.status, 'md')}
                   {job.status}
                 </span>
@@ -155,14 +155,14 @@ export function JobDetails() {
             </div>
             <div className="flex justify-between">
               <dt className="text-sm text-gray-500">Type</dt>
-              <dd className="text-sm text-gray-900">{getJobTypeLabel(job.type)}</dd>
+              <dd className="text-sm text-gray-900" data-testid="job-type">{getJobTypeLabel(job.type)}</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-sm text-gray-500">Job ID</dt>
               <dd className="text-sm text-gray-900 font-mono">{job.id}</dd>
             </div>
             {job.status === 'PROCESSING' && (
-              <div>
+              <div data-testid="job-progress">
                 <dt className="text-sm text-gray-500 mb-2">Progress</dt>
                 <dd>
                   <div className="flex items-center gap-2">
@@ -187,7 +187,7 @@ export function JobDetails() {
           <dl className="space-y-4">
             <div className="flex justify-between">
               <dt className="text-sm text-gray-500">Created</dt>
-              <dd className="text-sm text-gray-900">{formatDateTime(job.createdAt)}</dd>
+              <dd className="text-sm text-gray-900" data-testid="job-created-date">{formatDateTime(job.createdAt)}</dd>
             </div>
             {job.startedAt && (
               <div className="flex justify-between">
@@ -213,7 +213,7 @@ export function JobDetails() {
         </div>
 
         {job.error && (
-          <div className="bg-white rounded-lg shadow p-6 lg:col-span-2">
+          <div className="bg-white rounded-lg shadow p-6 lg:col-span-2" data-testid="job-error">
             <h2 className="text-lg font-semibold text-red-600 mb-4">Error</h2>
             <div className="bg-red-50 border border-red-200 rounded-md p-4">
               <p className="text-sm text-red-800 font-mono whitespace-pre-wrap">
@@ -251,7 +251,7 @@ export function JobDetails() {
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-6">Audit Results</h2>
               
-              <div className="space-y-6">
+              <div className="space-y-6" data-testid="job-results">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div className="lg:col-span-1 flex justify-center">
                     <ComplianceScore
@@ -290,7 +290,9 @@ export function JobDetails() {
 
                 <IssuesTable issues={parsedOutput.combinedIssues} />
 
-                <JobActions jobId={job.id} />
+                <div data-testid="job-actions">
+                  <JobActions jobId={job.id} />
+                </div>
 
                 <RawDataToggle data={parsedOutput} />
               </div>

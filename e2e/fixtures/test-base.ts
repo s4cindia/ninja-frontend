@@ -1,9 +1,9 @@
 import { test as base, Page, expect } from '@playwright/test';
 
 const WCAG_MINIMUM_TOUCH_TARGET = 44;
-const TOUCH_TARGET_TOLERANCE = 4;
+const TOUCH_TARGET_RENDERING_TOLERANCE = 2;
 
-export const MIN_TOUCH_TARGET_SIZE = WCAG_MINIMUM_TOUCH_TARGET - TOUCH_TARGET_TOLERANCE;
+export const MIN_TOUCH_TARGET_SIZE = WCAG_MINIMUM_TOUCH_TARGET - TOUCH_TARGET_RENDERING_TOLERANCE;
 
 const email = process.env.TEST_USER_EMAIL;
 const password = process.env.TEST_USER_PASSWORD;
