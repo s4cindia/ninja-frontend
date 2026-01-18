@@ -46,14 +46,32 @@ const VARIANT_CLASSES: Record<string, string> = {
   info: 'bg-blue-100 text-blue-700',
 };
 
+interface ImageData {
+  src: string;
+  fullPath: string;
+  html: string;
+}
+
 function extractImagePath(issue: QuickFixIssue): string {
   // Check if imagePath is provided directly
   if (issue.imagePath) {
     return issue.imagePath;
   }
   
-  // Try to extract from all possible text sources
-  const elementSource = issue.html || issue.element || issue.context || issue.snippet || issue.message || '';
+  // Try parsing context JSON first (recommended by backend)
+  if (issue.context) {
+    try {
+      const ctx = JSON.parse(issue.context) as { images?: ImageData[] };
+      if (ctx.images && ctx.images.length > 0) {
+        return ctx.images[0].fullPath;
+      }
+    } catch {
+      // Context is not JSON, continue to fallback
+    }
+  }
+  
+  // Fallback: extract from element or html
+  const elementSource = issue.html || issue.element || issue.snippet || issue.message || '';
   
   // Try to extract src from img tag
   const srcMatch = elementSource.match(/src=["']([^"']+)["']/);
