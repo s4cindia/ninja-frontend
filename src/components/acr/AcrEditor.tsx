@@ -207,53 +207,54 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
     }
   }, [apiDocument, jobId, initializedForJob]);
 
+  // Always recalculate credibility and finalization from local document
   useEffect(() => {
-    if (useMockData) {
-      const supportsCount = localDocument.criteria.filter(c => c.conformanceLevel === 'supports').length;
-      const supportsPercentage = Math.round((supportsCount / localDocument.criteria.length) * 100);
+    if (!localDocument.criteria || localDocument.criteria.length === 0) return;
+    
+    const supportsCount = localDocument.criteria.filter(c => c.conformanceLevel === 'supports').length;
+    const supportsPercentage = Math.round((supportsCount / localDocument.criteria.length) * 100);
+    
+    setLocalCredibility({
+      isCredible: supportsPercentage <= 95,
+      supportsPercentage,
+      warnings: supportsPercentage > 95 ? ['High percentage of "Supports" determinations may need review'] : [],
+      suspiciousCriteria: localDocument.criteria.filter(c => c.isSuspicious).map(c => c.criterionId),
+    });
+    
+    const blockers: string[] = [];
+    
+    localDocument.criteria.forEach(c => {
+      if (!c.remarks || !c.remarks.trim()) {
+        blockers.push(`${c.criterionId} ${c.criterionName || ''} - remarks required`);
+      } else if (c.remarks.trim().length < 20) {
+        blockers.push(`${c.criterionId} ${c.criterionName || ''} - remarks too short (min 20 characters)`);
+      }
       
-      setLocalCredibility({
-        isCredible: supportsPercentage <= 95,
-        supportsPercentage,
-        warnings: supportsPercentage > 95 ? ['High percentage of "Supports" determinations may need review'] : [],
-        suspiciousCriteria: localDocument.criteria.filter(c => c.isSuspicious).map(c => c.criterionId),
-      });
+      if (c.conformanceLevel === 'does_not_support' && (!c.remarks || c.remarks.trim().length < 50)) {
+        blockers.push(`${c.criterionId} ${c.criterionName || ''} - "Does Not Support" requires detailed explanation (50+ characters)`);
+      }
       
-      const blockers: string[] = [];
-      
-      localDocument.criteria.forEach(c => {
-        if (!c.remarks.trim()) {
-          blockers.push(`${c.criterionId} ${c.criterionName} - remarks required`);
-        } else if (c.remarks.trim().length < 20) {
-          blockers.push(`${c.criterionId} ${c.criterionName} - remarks too short (min 20 characters)`);
+      if (c.conformanceLevel === 'partially_supports') {
+        const lower = (c.remarks || '').toLowerCase();
+        if (!lower.includes('except') && !lower.includes('partial') && !lower.includes('some') && !lower.includes('most')) {
+          blockers.push(`${c.criterionId} ${c.criterionName || ''} - "Partially Supports" missing context keywords`);
         }
-        
-        if (c.conformanceLevel === 'does_not_support' && c.remarks.trim().length < 50) {
-          blockers.push(`${c.criterionId} ${c.criterionName} - "Does Not Support" requires detailed explanation (50+ characters)`);
-        }
-        
-        if (c.conformanceLevel === 'partially_supports') {
-          const lower = c.remarks.toLowerCase();
-          if (!lower.includes('except') && !lower.includes('partial') && !lower.includes('some') && !lower.includes('most')) {
-            blockers.push(`${c.criterionId} ${c.criterionName} - "Partially Supports" missing context keywords`);
-          }
-        }
-        
-        if (c.isSuspicious) {
-          blockers.push(`${c.criterionId} ${c.criterionName} - flagged as suspicious, requires review`);
-        }
-      });
+      }
       
-      const missingRemarksCount = localDocument.criteria.filter(c => !c.remarks.trim()).length;
-      
-      setLocalFinalization({
-        canFinalize: blockers.length === 0,
-        blockers,
-        pendingCount: 0,
-        missingRemarksCount,
-      });
-    }
-  }, [localDocument, useMockData]);
+      if (c.isSuspicious) {
+        blockers.push(`${c.criterionId} ${c.criterionName || ''} - flagged as suspicious, requires review`);
+      }
+    });
+    
+    const missingRemarksCount = localDocument.criteria.filter(c => !c.remarks || !c.remarks.trim()).length;
+    
+    setLocalFinalization({
+      canFinalize: blockers.length === 0,
+      blockers,
+      pendingCount: 0,
+      missingRemarksCount,
+    });
+  }, [localDocument]);
 
   useEffect(() => {
     // Always save to localStorage for persistence across sessions (only if initialized)
@@ -361,8 +362,8 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
       <div className="bg-white rounded-lg border p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">{document?.productName ?? 'Loading...'}</h2>
-            <p className="text-sm text-gray-500">{document?.editionName ?? ''} - {criteria.length} criteria</p>
+            <h2 className="text-lg font-semibold text-gray-900">{document?.productName || 'ACR Document'}</h2>
+            <p className="text-sm text-gray-500">{document?.editionName || 'VPAT 2.5'} - {criteria.length} criteria</p>
           </div>
           <div className="flex items-center gap-2">
             {useMockData && (
