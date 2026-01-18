@@ -218,39 +218,50 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
   }, [localDocument, useMockData]);
 
   useEffect(() => {
-    if (useMockData) {
-      saveToStorage(localDocument);
-    }
-  }, [localDocument, useMockData]);
+    // Always save to localStorage for persistence across sessions
+    saveToStorage(localDocument);
+  }, [localDocument]);
 
   const handleUpdateConformance = (criterionId: string, level: ConformanceLevel) => {
-    if (useMockData) {
-      setLocalDocument(prev => ({
-        ...prev,
-        criteria: prev.criteria.map(c =>
-          c.id === criterionId ? { ...c, conformanceLevel: level, attribution: 'HUMAN-VERIFIED' as const, isSuspicious: false } : c
-        ),
-      }));
-    } else {
+    // Always update local state for immediate feedback
+    setLocalDocument(prev => ({
+      ...prev,
+      criteria: prev.criteria.map(c =>
+        c.id === criterionId ? { ...c, conformanceLevel: level, attribution: 'HUMAN-VERIFIED' as const, isSuspicious: false } : c
+      ),
+    }));
+    
+    // Also try API if not in mock mode
+    if (!useMockData) {
       updateMutation.mutate({
         criterionId,
         data: { conformanceLevel: level, attribution: 'HUMAN-VERIFIED' },
+      }, {
+        onError: (error) => {
+          console.warn('API update failed, using local state:', error);
+        }
       });
     }
   };
 
   const handleUpdateRemarks = (criterionId: string, remarks: string) => {
-    if (useMockData) {
-      setLocalDocument(prev => ({
-        ...prev,
-        criteria: prev.criteria.map(c =>
-          c.id === criterionId ? { ...c, remarks, attribution: 'HUMAN-VERIFIED' as const, isSuspicious: false } : c
-        ),
-      }));
-    } else {
+    // Always update local state for immediate feedback
+    setLocalDocument(prev => ({
+      ...prev,
+      criteria: prev.criteria.map(c =>
+        c.id === criterionId ? { ...c, remarks, attribution: 'HUMAN-VERIFIED' as const, isSuspicious: false } : c
+      ),
+    }));
+    
+    // Also try API if not in mock mode
+    if (!useMockData) {
       updateMutation.mutate({
         criterionId,
         data: { remarks, attribution: 'HUMAN-VERIFIED' },
+      }, {
+        onError: (error) => {
+          console.warn('API update failed, using local state:', error);
+        }
       });
     }
   };
