@@ -125,12 +125,14 @@ export const RemediationHistory: React.FC<RemediationHistoryProps> = ({
       // Filter to only show relevant job types (accessibility jobs, not batch processing)
       const RELEVANT_JOB_TYPES = ['EPUB_ACCESSIBILITY', 'PDF_ACCESSIBILITY', 'ACCESSIBILITY_AUDIT', 'REMEDIATION'];
       
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const isRelevantJob = (job: any): boolean => {
         const jobType = String(job.type || job.jobType || '').toUpperCase();
         return RELEVANT_JOB_TYPES.some(t => jobType.includes(t));
       };
       
       // Derive content type from job type
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const getContentType = (job: any): ContentType => {
         const jobType = String(job.type || job.jobType || '').toUpperCase();
         if (jobType.includes('PDF')) return 'pdf';
@@ -138,6 +140,7 @@ export const RemediationHistory: React.FC<RemediationHistoryProps> = ({
       };
       
       // Get display name for the job
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const getJobDisplayName = (job: any): string => {
         // Try direct file name fields
         if (job.fileName) return job.fileName;

@@ -83,7 +83,7 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
   onToggleExpand,
 }) => {
   const [mode, setMode] = useState<RemediationMode>('quickfix');
-  const [_isApplying, setIsApplying] = useState(false);
+  const [, setIsApplying] = useState(false);
   const [previewContent] = useState<string | null>(null);
 
   const { issue, status } = task;

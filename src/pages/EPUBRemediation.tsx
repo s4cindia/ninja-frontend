@@ -958,7 +958,7 @@ export const EPUBRemediation: React.FC = () => {
         firstElement?.focus();
       }
     }
-  }, []);
+  }, [handleBatchFixCancel]);
 
   useEffect(() => {
     if (showBatchPanel) {
