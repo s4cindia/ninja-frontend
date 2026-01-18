@@ -422,11 +422,28 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
     });
   }, [items, filters, useMockData]);
 
-  const verifiedCount = apiData?.verifiedCount ?? items.filter(i => 
-    i.status === 'verified_pass' || i.status === 'verified_fail' || i.status === 'verified_partial'
-  ).length;
-  const totalCount = apiData?.totalCount ?? items.length;
+  // When using local items, always calculate from local state (not API data)
+  const verifiedCount = (useLocalItems || useMockData)
+    ? items.filter(i => 
+        i.status === 'verified_pass' || i.status === 'verified_fail' || i.status === 'verified_partial'
+      ).length
+    : (apiData?.verifiedCount ?? items.filter(i => 
+        i.status === 'verified_pass' || i.status === 'verified_fail' || i.status === 'verified_partial'
+      ).length);
+  const totalCount = (useLocalItems || useMockData) 
+    ? items.length 
+    : (apiData?.totalCount ?? items.length);
   const progressPercent = totalCount > 0 ? Math.round((verifiedCount / totalCount) * 100) : 0;
+
+  console.log('[VerificationQueue] Progress:', {
+    verifiedCount,
+    totalCount,
+    canComplete: verifiedCount === totalCount && totalCount > 0,
+    useLocalItems,
+    useMockData,
+    itemsLength: items.length,
+    itemStatuses: items.slice(0, 5).map(i => ({ id: i.id, status: i.status })),
+  });
 
   const criteriaMap = useMemo(() => {
     const map = new Map<string, CriterionConfidence>();
