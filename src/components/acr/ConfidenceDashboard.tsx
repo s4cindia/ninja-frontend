@@ -726,6 +726,10 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   // Filter criteria based on showOnlyWithIssues
   const filteredCriteria = showOnlyWithIssues
     ? criteria.filter(c => {
+        // Check hasIssues flag from backend first
+        if (c.hasIssues === true) return true;
+        if (c.hasIssues === false) return false;
+        // Fallback to issueCount, remainingCount, or status-based detection
         const hasIssueCount = (c.issueCount || 0) > 0 || (c.remainingCount || 0) > 0;
         const hasFailingStatus = c.status === 'fail' || c.needsVerification;
         const issueInfo = issuesByCriterion.get(c.criterionId);
@@ -981,14 +985,19 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
         <div className="flex items-center gap-3">
           <h3 className="font-semibold text-gray-900">Accessibility Criteria Analysis</h3>
           {(() => {
-            // Count criteria with issues using issueCount, remainingCount, or status-based detection
-            const criteriaWithIssuesCount = criteria.filter(c => {
-              const hasIssueCount = (c.issueCount || 0) > 0 || (c.remainingCount || 0) > 0;
-              const hasFailingStatus = c.status === 'fail' || c.needsVerification;
-              const issueInfo = issuesByCriterion.get(c.criterionId);
-              const hasRelatedIssues = issueInfo && issueInfo.count > 0;
-              return hasIssueCount || hasFailingStatus || hasRelatedIssues;
-            }).length;
+            // Use summary.criteriaWithIssuesCount from API if available, otherwise calculate
+            const criteriaWithIssuesCount = confidenceData?.summary?.criteriaWithIssuesCount ?? 
+              criteria.filter(c => {
+                // Check hasIssues flag from backend first
+                if (c.hasIssues === true) return true;
+                if (c.hasIssues === false) return false;
+                // Fallback to issueCount, remainingCount, or status-based detection
+                const hasIssueCount = (c.issueCount || 0) > 0 || (c.remainingCount || 0) > 0;
+                const hasFailingStatus = c.status === 'fail' || c.needsVerification;
+                const issueInfo = issuesByCriterion.get(c.criterionId);
+                const hasRelatedIssues = issueInfo && issueInfo.count > 0;
+                return hasIssueCount || hasFailingStatus || hasRelatedIssues;
+              }).length;
 
             return (
               <button

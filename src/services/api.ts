@@ -182,6 +182,7 @@ export interface CriterionConfidence {
   fixedIssues?: FixedIssue[];
   fixedCount?: number;
   remainingCount?: number;
+  hasIssues?: boolean;
 }
 
 export interface AcrAnalysisResponse {
