@@ -181,6 +181,18 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
       return;
     }
 
+    // Debug logging for backend troubleshooting
+    console.log('[ImageAltTemplate] Generate clicked');
+    console.log('[ImageAltTemplate] Issue data:', {
+      id: issue.id,
+      code: issue.code,
+      context: issue.context,
+      element: issue.element,
+      location: issue.location,
+    });
+    console.log('[ImageAltTemplate] Extracted imagePath:', imagePath);
+    console.log('[ImageAltTemplate] Request params:', { jobId, imagePath, imageType });
+
     setIsGenerating(true);
     setError(null);
 

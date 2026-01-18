@@ -81,14 +81,23 @@ export const altTextService = {
     imagePath: string, 
     imageType: QuickFixImageType
   ): Promise<QuickFixAltTextResponse> {
+    // Debug logging
+    console.log('[alt-text.service] generateForQuickFix called with:', {
+      jobId,
+      imagePath,
+      imageType,
+      endpoint: `/epub/job/${jobId}/generate-alt-text`
+    });
+    
     try {
       const response = await api.post<ApiResponse<QuickFixAltTextResponse>>(
         `/epub/job/${jobId}/generate-alt-text`,
         { imagePath, imageType }
       );
+      console.log('[alt-text.service] API response:', response.data);
       return response.data.data;
     } catch (error) {
-      console.warn('Quick fix alt text API unavailable, using demo mode:', error);
+      console.warn('[alt-text.service] API error, using demo mode:', error);
       await new Promise(resolve => setTimeout(resolve, 2000));
       return generateMockQuickFixResult(imagePath, imageType);
     }
