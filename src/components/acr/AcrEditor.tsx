@@ -157,17 +157,30 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
   
   const { data: apiDocument, isLoading: isLoadingDoc, error: docError } = useAcrDocument(jobId);
   const { data: apiCredibility } = useCredibilityValidation(jobId);
-  const { data: apiFinalization } = useCanFinalize(jobId);
+  // Note: apiFinalization not used - we use localFinalization for real-time updates
+  useCanFinalize(jobId);
   const updateMutation = useUpdateCriterion(jobId);
   const generateMutation = useGenerateRemarks();
   const finalizeMutation = useFinalizeDocument(jobId);
 
   const useMockData = !apiDocument && (!!docError || !isLoadingDoc);
-  const document = apiDocument ?? localDocument;
+  // Always use localDocument for display since it has the latest user edits
+  const document = localDocument;
   const credibility = apiCredibility ?? localCredibility;
-  const finalization = apiFinalization ?? localFinalization;
+  const finalization = localFinalization; // Use local finalization for real-time blocker updates
   const criteria = document?.criteria ?? [];
   const blockers = finalization?.blockers ?? [];
+  
+  // Sync API document to local state when first loaded
+  useEffect(() => {
+    if (apiDocument && apiDocument.criteria) {
+      // Only initialize from API if local storage is empty/default
+      const stored = loadFromStorage();
+      if (!stored || stored.criteria.length === 0) {
+        setLocalDocument(apiDocument);
+      }
+    }
+  }, [apiDocument]);
 
   useEffect(() => {
     if (useMockData) {
