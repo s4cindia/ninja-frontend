@@ -158,6 +158,7 @@ export const EPUBComparison: React.FC = () => {
     };
 
     loadComparison();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
 
   if (loading) {

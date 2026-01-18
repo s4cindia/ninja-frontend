@@ -194,13 +194,15 @@ export function VisualComparisonPanel({
       );
     }
 
+    const capturedMountTime = mountTime.current;
+    const capturedRenderCount = renderCount.current;
     return () => {
       if (import.meta.env.DEV) {
-        const lifetime = Date.now() - mountTime.current;
+        const lifetime = Date.now() - capturedMountTime;
         console.log(
           `%c[VisualComparisonPanel] UNMOUNTED`,
           'background: #f44336; color: white; padding: 2px 5px;',
-          { changeId, lifetime: `${lifetime}ms`, renders: renderCount.current }
+          { changeId, lifetime: `${lifetime}ms`, renders: capturedRenderCount }
         );
       }
     };
@@ -365,7 +367,7 @@ export function VisualComparisonPanel({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFullscreen, canNavigatePrevious, canNavigateNext, onNavigatePrevious, onNavigateNext]);
+  }, [isFullscreen, canNavigatePrevious, canNavigateNext, onNavigatePrevious, onNavigateNext, handleCloseFullscreen]);
 
   const handleSyncScroll = useCallback((source: 'before' | 'after') => (e: React.UIEvent<HTMLDivElement>) => {
     if (isScrollingRef.current) return;

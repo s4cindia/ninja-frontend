@@ -197,7 +197,7 @@ const EPUBRendererComponent = function EPUBRenderer({
       iframeRef.current = null;
       isInitialized.current = false;
     };
-  }, []);
+  }, [version]);
 
   useEffect(() => {
     if (!iframeRef.current) {

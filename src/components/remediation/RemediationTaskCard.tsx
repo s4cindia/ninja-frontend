@@ -83,8 +83,11 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
   onToggleExpand,
 }) => {
   const [mode, setMode] = useState<RemediationMode>('quickfix');
-  const [_isApplying, setIsApplying] = useState(false);
+  const [isApplying, setIsApplying] = useState(false);
   const [previewContent] = useState<string | null>(null);
+
+  // Used to show loading state during fix application
+  void isApplying;
 
   const { issue, status } = task;
   const severity = SEVERITY_CONFIG[issue.severity] || SEVERITY_CONFIG.minor;

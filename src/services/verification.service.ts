@@ -58,12 +58,39 @@ const VALID_SEVERITIES = ['critical', 'serious', 'moderate', 'minor'] as const;
 
 function normalizeStatus(status: string): typeof VALID_STATUSES[number] {
   const lower = status?.toLowerCase();
-  if (lower === 'pending' || lower === 'PENDING') return 'pending';
+  if (lower === 'pending') return 'pending';
   if (lower === 'verified_pass' || lower === 'verified' || lower === 'pass') return 'verified_pass';
   if (lower === 'verified_fail' || lower === 'fail') return 'verified_fail';
   if (lower === 'verified_partial' || lower === 'partial') return 'verified_partial';
   if (lower === 'deferred') return 'deferred';
   return 'pending';
+}
+
+const VALID_AUTOMATED_RESULTS = ['pass', 'fail', 'warning', 'not_tested'] as const;
+
+function normalizeAutomatedResult(result: string | undefined): typeof VALID_AUTOMATED_RESULTS[number] {
+  const lower = result?.toLowerCase();
+  if (lower === 'pass') return 'pass';
+  if (lower === 'fail') return 'fail';
+  if (lower === 'warning') return 'warning';
+  if (lower === 'not_tested') return 'not_tested';
+  return 'warning';
+}
+
+const VALID_VERIFICATION_METHODS = ['NVDA 2024.1', 'JAWS 2024', 'VoiceOver', 'Manual Review', 'Keyboard Only', 'Axe DevTools', 'WAVE'] as const;
+
+function normalizeVerificationMethod(method: string | undefined): typeof VALID_VERIFICATION_METHODS[number] {
+  if (!method) return 'Manual Review';
+  if (VALID_VERIFICATION_METHODS.includes(method as typeof VALID_VERIFICATION_METHODS[number])) {
+    return method as typeof VALID_VERIFICATION_METHODS[number];
+  }
+  return 'Manual Review';
+}
+
+function normalizeHistoryStatus(status: string): 'verified_pass' | 'verified_fail' | 'verified_partial' | 'deferred' {
+  const normalized = normalizeStatus(status);
+  if (normalized === 'pending') return 'verified_pass';
+  return normalized as 'verified_pass' | 'verified_fail' | 'verified_partial' | 'deferred';
 }
 
 function normalizeConfidenceLevel(level: string | undefined): typeof VALID_CONFIDENCE_LEVELS[number] {
@@ -113,13 +140,13 @@ export const verificationService = {
         severity: normalizeSeverity(item.severity || (hasIssues ? item.relatedIssues?.[0]?.severity : undefined)),
         confidenceLevel: normalizeConfidenceLevel(item.confidenceLevel),
         confidenceScore: item.confidenceScore ?? 50,
-        automatedResult: (item.automatedResult?.toLowerCase() || 'warning') as 'pass' | 'fail' | 'warning' | 'not_tested',
+        automatedResult: normalizeAutomatedResult(item.automatedResult),
         automatedNotes: item.automatedNotes || (hasIssues ? `${item.relatedIssues?.length} issue(s) detected` : ''),
         status: normalizeStatus(item.status),
         history: (item.history || []).map((h, idx) => ({
           id: `${item.id}-history-${idx}`,
-          status: normalizeStatus(h.status) as 'verified_pass' | 'verified_fail' | 'verified_partial' | 'deferred',
-          method: (h.method || 'Manual Review') as 'NVDA 2024.1' | 'JAWS 2024' | 'VoiceOver' | 'Manual Review' | 'Keyboard Only' | 'Axe DevTools' | 'WAVE',
+          status: normalizeHistoryStatus(h.status),
+          method: normalizeVerificationMethod(h.method),
           notes: h.notes || '',
           verifiedBy: h.verifiedBy || 'Unknown',
           verifiedAt: h.verifiedAt || new Date().toISOString(),
@@ -149,14 +176,16 @@ export const verificationService = {
       };
     });
 
-    const summary = apiData.summary || { total: items.length, pending: items.length, verified: 0 };
+    const summary = apiData.summary || { total: items.length, pending: items.length, verified: 0, deferred: 0 };
+    const deferredCount = (summary as { deferred?: number }).deferred ?? 
+      items.filter(item => item.status === 'deferred').length;
     
     return {
       items,
       totalCount: summary.total,
       pendingCount: summary.pending,
       verifiedCount: summary.verified,
-      deferredCount: 0,
+      deferredCount,
     };
   },
 

@@ -327,7 +327,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
               <div className="flex items-center gap-2">
                 <Badge variant="info">Filtered</Badge>
                 <span className="text-sm text-gray-700">
-                  Showing only changes related to <strong>WCAG {criterionId}</strong>
+                  Showing only changes related to <strong>WCAG {normalizeCriteria(criterionId)}</strong>
                 </span>
               </div>
               <Button

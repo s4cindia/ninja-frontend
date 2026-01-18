@@ -141,7 +141,7 @@ export function QuickFixPanel({
     }
     
     loadTemplateData();
-  }, [issue.code, issue.id, issue.filePath, issue.currentContent, issue.lineNumber, issue.location, issue.message, jobId]);
+  }, [issue.code, issue.id, issue.filePath, issue.currentContent, issue.lineNumber, issue.location, issue.message, issue.context, issue.element, issue.html, issue.snippet, jobId]);
 
   useEffect(() => {
     return () => {

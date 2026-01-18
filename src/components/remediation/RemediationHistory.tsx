@@ -108,8 +108,44 @@ export const RemediationHistory: React.FC<RemediationHistoryProps> = ({
     const fetchJobs = async () => {
       setIsLoading(true);
       
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const parseJobsList = (responseData: any): any[] => {
+      interface RawJob {
+        type?: string;
+        jobType?: string;
+        fileName?: string;
+        filename?: string;
+        name?: string;
+        originalName?: string;
+        file?: { name?: string; fileName?: string; originalName?: string };
+        input?: { fileName?: string; name?: string };
+        metadata?: { fileName?: string; name?: string };
+        product?: { name?: string; fileName?: string };
+        issuesFixed?: number;
+        fixedCount?: number;
+        fixed?: number;
+        totalIssues?: number;
+        issuesTotal?: number;
+        issueCount?: number;
+        total?: number;
+        status?: string;
+        createdAt?: string;
+        created_at?: string;
+        uploadedAt?: string;
+        created?: string;
+        completedAt?: string;
+        id?: string;
+        _id?: string;
+        jobId?: string;
+        items?: RawJob[];
+        jobs?: RawJob[];
+        data?: RawJob[];
+        result?: { fixed?: number; issuesFixed?: number; total?: number; issuesTotal?: number; totalIssues?: number };
+        stats?: { fixed?: number; total?: number };
+        remediation?: { fixed?: number };
+        audit?: { total?: number; issueCount?: number };
+        output?: { fixed?: number; issuesFixed?: number; total?: number; issuesTotal?: number; issueCount?: number };
+      }
+
+      const parseJobsList = (responseData: RawJob | RawJob[]): RawJob[] => {
         if (Array.isArray(responseData)) {
           return responseData;
         } else if (responseData?.items && Array.isArray(responseData.items)) {
@@ -125,20 +161,20 @@ export const RemediationHistory: React.FC<RemediationHistoryProps> = ({
       // Filter to only show relevant job types (accessibility jobs, not batch processing)
       const RELEVANT_JOB_TYPES = ['EPUB_ACCESSIBILITY', 'PDF_ACCESSIBILITY', 'ACCESSIBILITY_AUDIT', 'REMEDIATION'];
       
-      const isRelevantJob = (job: any): boolean => {
+      const isRelevantJob = (job: RawJob): boolean => {
         const jobType = String(job.type || job.jobType || '').toUpperCase();
         return RELEVANT_JOB_TYPES.some(t => jobType.includes(t));
       };
       
       // Derive content type from job type
-      const getContentType = (job: any): ContentType => {
+      const getContentType = (job: RawJob): ContentType => {
         const jobType = String(job.type || job.jobType || '').toUpperCase();
         if (jobType.includes('PDF')) return 'pdf';
         return 'epub';
       };
       
       // Get display name for the job
-      const getJobDisplayName = (job: any): string => {
+      const getJobDisplayName = (job: RawJob): string => {
         // Try direct file name fields
         if (job.fileName) return job.fileName;
         if (job.filename) return job.filename;
@@ -168,8 +204,7 @@ export const RemediationHistory: React.FC<RemediationHistoryProps> = ({
         return `${jobType} - ${date}`;
       };
       
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mapToRemediationJob = (job: any): RemediationJob => {
+      const mapToRemediationJob = (job: RawJob): RemediationJob => {
         // Try multiple field paths for issues
         const issuesFixed = job.issuesFixed || job.fixedCount || job.fixed || 
                            job.result?.fixed || job.result?.issuesFixed || 
