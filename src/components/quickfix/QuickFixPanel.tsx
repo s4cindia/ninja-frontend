@@ -15,6 +15,12 @@ import { QuickFixCheckboxGroup } from './QuickFixCheckboxGroup';
 import { QuickFixRadioGroup } from './QuickFixRadioGroup';
 import { QuickFixTextInput } from './QuickFixTextInput';
 import { QuickFixColorPicker } from './QuickFixColorPicker';
+import { ImageAltTemplate } from './templates/ImageAltTemplate';
+
+const IMAGE_ALT_ISSUE_CODES = [
+  'EPUB-IMG-001', 'IMG-001', 'IMG-ALT', 'IMG-ALT-MISSING', 'IMG-ALT-EMPTY',
+  'IMAGE-ALT', 'IMAGE-ALT-MISSING', 'ACE-IMG-001', 'EPUB-IMG-ALT'
+];
 
 interface QuickFixPanelProps {
   issue: {
@@ -68,6 +74,11 @@ export function QuickFixPanel({
   const [isApplying, setIsApplying] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [imageAltValid, setImageAltValid] = useState(false);
+  
+  const isImageAltIssue = IMAGE_ALT_ISSUE_CODES.some(
+    code => issue.code.toUpperCase().replace(/_/g, '-') === code
+  );
 
   // Extract actual element content from available fields
   // Priority: currentContent > html > element > context > snippet
@@ -553,11 +564,28 @@ export function QuickFixPanel({
           )}
         </div>
 
-        {inputFields.length > 0 && (
+        {isImageAltIssue && jobId ? (
+          <ImageAltTemplate
+            issue={{
+              id: issue.id,
+              code: issue.code,
+              message: issue.message,
+              location: issue.location,
+              html: issue.html,
+              element: issue.element,
+              context: issue.context,
+              severity: 'critical',
+            }}
+            jobId={jobId}
+            values={inputValues}
+            onChange={(newValues) => setInputValues(prev => ({ ...prev, ...newValues }))}
+            onValidate={setImageAltValid}
+          />
+        ) : inputFields.length > 0 ? (
           <div className="space-y-4">
             {inputFields.map(renderInput)}
           </div>
-        )}
+        ) : null}
 
         <button
           onClick={() => setShowPreview(!showPreview)}
@@ -605,7 +633,7 @@ export function QuickFixPanel({
       <div className="flex items-center gap-2 p-4 border-t border-gray-200 bg-gray-50">
         <button
           onClick={handleApplyFix}
-          disabled={isApplying}
+          disabled={isApplying || (isImageAltIssue && !imageAltValid)}
           className={cn(
             'flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors',
             'bg-primary-600 text-white hover:bg-primary-700',
