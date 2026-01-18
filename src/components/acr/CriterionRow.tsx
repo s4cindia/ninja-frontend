@@ -78,7 +78,7 @@ export function CriterionRow({
       
       <td className="px-4 py-3">
         <select
-          value={criterion.conformanceLevel}
+          value={criterion.conformanceLevel ?? 'not_applicable'}
           onChange={(e) => onUpdateConformance(e.target.value as ConformanceLevel)}
           disabled={disabled}
           className={cn(
