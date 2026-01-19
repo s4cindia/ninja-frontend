@@ -191,8 +191,18 @@ export const EPUBExportOptions: React.FC<EPUBExportOptionsProps> = ({
     setSuccess(null);
 
     try {
-      const response = await api.get(`/epub/job/${jobId}/comparison/summary`);
-      const data = response.data.data || response.data;
+      let data;
+      try {
+        const response = await api.get(`/epub/job/${jobId}/comparison/summary`);
+        data = response.data.data || response.data;
+      } catch (err: unknown) {
+        const axiosError = err as { response?: { status?: number } };
+        if (axiosError.response?.status === 404) {
+          data = generateDemoComparisonReport();
+        } else {
+          throw err;
+        }
+      }
 
       if (reportFormat === 'json') {
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });

@@ -56,6 +56,10 @@ export function ExportDialog({ acrId, isOpen, onClose }: ExportDialogProps) {
     }
   }, [isOpen, reset]);
 
+  useEffect(() => {
+    reset();
+  }, [format, reset]);
+
   if (!isOpen) return null;
 
   const handleExport = async () => {
