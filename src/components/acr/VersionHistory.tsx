@@ -3,7 +3,7 @@ import { History, Clock, User, ChevronRight, RotateCcw, ArrowLeftRight, Loader2,
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { MOCK_VERSIONS, useMockVersionDetails } from '@/hooks/useAcrVersions';
+import { useVersionHistory, useVersionDetails } from '@/hooks/useAcrVersions';
 import type { VersionEntry, VersionChange } from '@/types/version.types';
 
 interface VersionHistoryProps {
@@ -168,19 +168,19 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
   const [isCompareMode, setIsCompareMode] = useState(false);
   const [compareVersions, setCompareVersions] = useState<number[]>([]);
-  const [versions, setVersions] = useState<VersionEntry[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [localVersions, setLocalVersions] = useState<VersionEntry[]>([]);
   const [toast, setToast] = useState<ToastState>({ show: false, message: '' });
 
-  const { data: versionDetails, isLoading: isLoadingDetails } = useMockVersionDetails(acrId, selectedVersion);
+  const { versions: apiVersions, isLoading } = useVersionHistory(acrId);
+  const { data: versionDetails, isLoading: isLoadingDetails } = useVersionDetails(acrId, selectedVersion);
+
+  const versions = localVersions.length > 0 ? localVersions : apiVersions;
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setVersions([...MOCK_VERSIONS]);
-      setIsLoading(false);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [acrId]);
+    if (apiVersions.length > 0) {
+      setLocalVersions([]);
+    }
+  }, [apiVersions]);
 
   const showToast = (message: string) => {
     setToast({ show: true, message });
@@ -221,7 +221,7 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
         changeCount: 0,
       };
       
-      setVersions(prev => [newVersion, ...prev]);
+      setLocalVersions(prev => prev.length > 0 ? [newVersion, ...prev] : [newVersion, ...apiVersions]);
       setSelectedVersion(null);
       showToast(`Restored to Version ${version}. New Version ${newVersion.version} created.`);
       onRestore(version);
@@ -329,7 +329,7 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
                 </div>
               ) : versionDetails?.changes && versionDetails.changes.length > 0 ? (
                 <div className="space-y-3">
-                  {versionDetails.changes.map((change, idx) => (
+                  {versionDetails.changes.map((change: VersionChange, idx: number) => (
                     <ChangeItem key={idx} change={change} />
                   ))}
                 </div>
