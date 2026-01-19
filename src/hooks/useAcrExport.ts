@@ -11,6 +11,12 @@ interface ApiResponse {
   error?: string;
 }
 
+interface WorkerMessage {
+  success: boolean;
+  data?: Uint8Array;
+  error?: string;
+}
+
 async function exportAcr(acrId: string, options: ExportOptions): Promise<ExportResult> {
   const cleanId = acrId.replace(/^acr-/, '');
   const response = await api.post<ApiResponse>(`/acr/${cleanId}/export`, {
@@ -64,12 +70,12 @@ function decodeBase64InWorker(content: string): Promise<Uint8Array> {
     const worker = new Worker(objectUrl);
     URL.revokeObjectURL(objectUrl);
     
-    worker.onmessage = (e) => {
+    worker.onmessage = (e: MessageEvent<WorkerMessage>) => {
       worker.terminate();
-      if (e.data.success) {
+      if (e.data.success && e.data.data) {
         resolve(e.data.data);
       } else {
-        reject(new Error(e.data.error));
+        reject(new Error(e.data.error || 'Worker decoding failed'));
       }
     };
     
@@ -104,7 +110,7 @@ async function triggerBase64Download(content: string, filename: string, format: 
       docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       html: 'text/html',
     };
-    const blob = new Blob([byteArray.buffer as ArrayBuffer], { type: mimeTypes[format] || 'application/octet-stream' });
+    const blob = new Blob([new Uint8Array(byteArray)], { type: mimeTypes[format] || 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -145,13 +151,12 @@ export function useExportAcr() {
     return mutation.mutateAsync({ acrId, options });
   };
 
-  const reset = useCallback(() => {
+  const reset = () => {
     setDownloadUrl(null);
     setFilename(null);
     setDownloadError(null);
     mutation.reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  };
 
   const combinedError = mutation.error || downloadError;
 
