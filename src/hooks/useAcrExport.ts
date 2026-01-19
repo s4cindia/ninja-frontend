@@ -30,7 +30,8 @@ export function useExportAcr() {
     setDownloadUrl(null);
     setFilename(null);
     mutation.reset();
-  }, [mutation]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return {
     exportAcr: doExport,
