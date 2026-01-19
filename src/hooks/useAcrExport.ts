@@ -6,7 +6,13 @@ import type { ExportOptions, ExportResult, ExportFormat } from '@/types/acr.type
 
 async function exportAcr(acrId: string, options: ExportOptions): Promise<ExportResult> {
   const cleanId = acrId.replace(/^acr-/, '');
-  const response = await api.post<ExportResult>(`/acr/${cleanId}/export`, options);
+  const response = await api.post<ExportResult>(`/acr/${cleanId}/export`, {
+    options: {
+      format: options.format,
+      includeMethodology: options.includeMethodology,
+      includeAttribution: options.includeAttributionTags,
+    },
+  });
   return response.data;
 }
 
