@@ -60,7 +60,9 @@ function decodeBase64InWorker(content: string): Promise<Uint8Array> {
       };
     `;
     const blob = new Blob([workerCode], { type: 'application/javascript' });
-    const worker = new Worker(URL.createObjectURL(blob));
+    const objectUrl = URL.createObjectURL(blob);
+    const worker = new Worker(objectUrl);
+    URL.revokeObjectURL(objectUrl);
     
     worker.onmessage = (e) => {
       worker.terminate();
