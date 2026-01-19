@@ -3,7 +3,7 @@ import { X, FileText, FileType, Globe, Check, Loader2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { useMockExport } from '@/hooks/useAcrExport';
+import { useExportAcr } from '@/hooks/useAcrExport';
 import type { ExportFormat, ExportOptions } from '@/types/acr.types';
 
 interface ExportDialogProps {
@@ -48,7 +48,7 @@ export function ExportDialog({ acrId, isOpen, onClose }: ExportDialogProps) {
   const [footerText, setFooterText] = useState('');
   const [showBranding, setShowBranding] = useState(false);
 
-  const { exportAcr, isExporting, downloadUrl, filename, reset } = useMockExport();
+  const { exportAcr, isExporting, downloadUrl, filename, reset } = useExportAcr();
 
   useEffect(() => {
     if (!isOpen) {
