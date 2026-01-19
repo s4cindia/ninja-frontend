@@ -4,21 +4,158 @@ import { jsPDF } from 'jspdf';
 import { api } from '@/services/api';
 import type { ExportOptions, ExportResult, ExportFormat } from '@/types/acr.types';
 
+type ApiResponse =
+  | { success: true; data: ExportResult }
+  | { success: false; message: string; error?: string };
+
+interface WorkerMessage {
+  success: boolean;
+  data?: Uint8Array;
+  error?: string;
+}
+
 async function exportAcr(acrId: string, options: ExportOptions): Promise<ExportResult> {
-  const response = await api.post<ExportResult>(`/acr/${acrId}/export`, options);
-  return response.data;
+  const cleanId = acrId.replace(/^acr-/, '');
+  const response = await api.post<ApiResponse>(`/acr/${cleanId}/export`, {
+    options: {
+      format: options.format,
+      includeMethodology: options.includeMethodology,
+      includeAttribution: options.includeAttributionTags,
+    },
+  });
+
+  if (!response.data.success) {
+    const errorMessage = response.data.message || response.data.error || 'Export failed';
+    throw new Error(errorMessage);
+  }
+
+  if (!response.data.data) {
+    throw new Error('Export succeeded but no data was returned');
+  }
+
+  return response.data.data;
+}
+
+const BASE64_REGEX = /^[A-Za-z0-9+/]*={0,2}$/;
+const LARGE_FILE_THRESHOLD = 5 * 1024 * 1024;
+const BLOB_URL_CLEANUP_DELAY_MS = 100;
+const VALID_EXPORT_FORMATS = ['pdf', 'docx', 'html'] as const;
+
+function isValidBase64(str: string): boolean {
+  if (!str || str.length === 0) return false;
+  if (str.length % 4 !== 0) return false;
+  return BASE64_REGEX.test(str);
+}
+
+function decodeBase64InWorker(content: string): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    const workerCode = `
+      self.onmessage = function(e) {
+        try {
+          const content = e.data;
+          const binaryString = atob(content);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          self.postMessage({ success: true, data: bytes });
+        } catch (err) {
+          self.postMessage({ success: false, error: err.message });
+        }
+      };
+    `;
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    const objectUrl = URL.createObjectURL(blob);
+    const worker = new Worker(objectUrl);
+    URL.revokeObjectURL(objectUrl);
+    
+    worker.onmessage = (e: MessageEvent<WorkerMessage>) => {
+      worker.terminate();
+      if (e.data.success && e.data.data) {
+        resolve(e.data.data);
+      } else {
+        reject(new Error(e.data.error || 'Worker decoding failed'));
+      }
+    };
+    
+    worker.onerror = (err) => {
+      worker.terminate();
+      reject(new Error('Worker failed: ' + err.message));
+    };
+    
+    worker.postMessage(content);
+  });
+}
+
+/**
+ * Decodes base64 content and triggers a file download.
+ * Uses Web Worker for large files (>5MB) to avoid blocking the UI.
+ * 
+ * @param content - Base64-encoded file content from the backend
+ * @param filename - The filename to use for the download
+ * @param format - File format ('pdf', 'docx', or 'html')
+ * @throws Error if content is invalid base64 or decoding fails
+ */
+async function triggerBase64Download(content: string, filename: string, format: string): Promise<void> {
+  if (!isValidBase64(content)) {
+    throw new Error('Invalid file content received');
+  }
+
+  if (!VALID_EXPORT_FORMATS.includes(format as typeof VALID_EXPORT_FORMATS[number])) {
+    throw new Error('Unsupported export format');
+  }
+
+  const estimatedSize = (content.length * 3) / 4;
+  const isLargeFile = estimatedSize > LARGE_FILE_THRESHOLD;
+
+  try {
+    let byteArray: Uint8Array;
+    
+    if (isLargeFile && typeof Worker !== 'undefined') {
+      byteArray = await decodeBase64InWorker(content);
+    } else {
+      byteArray = Uint8Array.from(atob(content), c => c.charCodeAt(0));
+    }
+
+    const mimeTypes: Record<string, string> = {
+      pdf: 'application/pdf',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      html: 'text/html',
+    };
+    const blob = new Blob([new Uint8Array(byteArray)], { type: mimeTypes[format] });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), BLOB_URL_CLEANUP_DELAY_MS);
+  } catch (error) {
+    console.error('Failed to decode and download file:', error);
+    throw new Error('Failed to process the exported file');
+  }
 }
 
 export function useExportAcr() {
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [filename, setFilename] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<Error | null>(null);
 
   const mutation = useMutation({
     mutationFn: ({ acrId, options }: { acrId: string; options: ExportOptions }) =>
       exportAcr(acrId, options),
-    onSuccess: (data) => {
-      setDownloadUrl(data.downloadUrl);
-      setFilename(data.filename);
+    onSuccess: async (data) => {
+      setDownloadError(null);
+      try {
+        await triggerBase64Download(data.content, data.filename, data.format);
+        setDownloadUrl(data.downloadUrl);
+        setFilename(data.filename);
+      } catch (error) {
+        setDownloadUrl(null);
+        setFilename(null);
+        setDownloadError(error instanceof Error ? error : new Error('Download failed'));
+      }
     },
   });
 
@@ -26,18 +163,21 @@ export function useExportAcr() {
     return mutation.mutateAsync({ acrId, options });
   };
 
-  const reset = useCallback(() => {
+  const reset = () => {
     setDownloadUrl(null);
     setFilename(null);
+    setDownloadError(null);
     mutation.reset();
-  }, [mutation]);
+  };
+
+  const combinedError = mutation.error || downloadError;
 
   return {
     exportAcr: doExport,
     isExporting: mutation.isPending,
     downloadUrl,
     filename,
-    error: mutation.error,
+    error: combinedError,
     reset,
   };
 }
@@ -296,7 +436,8 @@ export function useMockExport() {
       downloadUrl: '#downloaded',
       filename: generatedFilename,
       format: options.format,
-      generatedAt: new Date().toISOString(),
+      size: blob.size,
+      content: '',
     };
 
     setDownloadUrl(result.downloadUrl);

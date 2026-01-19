@@ -116,5 +116,7 @@ export interface ExportResult {
   downloadUrl: string;
   filename: string;
   format: ExportFormat;
-  generatedAt: string;
+  size: number;
+  content: string;
+  expiresAt?: string;
 }
