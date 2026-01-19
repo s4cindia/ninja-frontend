@@ -120,5 +120,35 @@ describe('score-utils', () => {
 
       expect(result.weights).toEqual(SCORE_WEIGHTS);
     });
+
+    it('should clamp score at 0 for excessive deductions', () => {
+      const result = calculateScoreBreakdown({
+        critical: 10,
+        serious: 0,
+        moderate: 0,
+        minor: 0,
+      });
+      expect(result.finalScore).toBe(0);
+      expect(result.totalDeduction).toBe(250);
+    });
+
+    it('should handle mixed issue types correctly', () => {
+      const result = calculateScoreBreakdown({
+        critical: 1,
+        serious: 2,
+        moderate: 3,
+        minor: 4,
+      });
+      expect(result.finalScore).toBe(100 - 25 - 20 - 15 - 4);
+    });
+
+    it('should throw error for negative issue counts', () => {
+      expect(() => calculateScoreBreakdown({
+        critical: -1,
+        serious: 0,
+        moderate: 0,
+        minor: 0,
+      })).toThrow('Issue counts must be non-negative finite numbers');
+    });
   });
 });

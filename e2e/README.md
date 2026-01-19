@@ -27,6 +27,7 @@ PLAYWRIGHT_BASE_URL=http://localhost:5000
 - Rotate test credentials regularly
 - Test accounts should only exist in development/staging environments
 - Do not use production credentials for testing
+- If credentials are accidentally committed, contact the security team immediately and rotate credentials
 
 ## Running Tests
 

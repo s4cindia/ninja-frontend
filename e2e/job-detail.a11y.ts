@@ -2,6 +2,11 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { login } from './fixtures/test-base';
 
+/**
+ * Accessibility Tests for Job Detail View
+ * Test ID Format: MT-A11Y-XXX (Manual Test - Accessibility - Sequential Number)
+ */
+
 test.describe('Job Detail Accessibility Tests', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
@@ -22,8 +27,10 @@ test.describe('Job Detail Accessibility Tests', () => {
 
     const moderate = results.violations.filter(v => v.impact === 'moderate');
     if (moderate.length > 0) {
-      console.warn(`Found ${moderate.length} moderate accessibility issues:`, moderate);
+      console.log(`Found ${moderate.length} moderate accessibility issues:`, moderate);
     }
+    // Fail if too many moderate violations accumulate
+    expect(moderate.length).toBeLessThanOrEqual(5);
   });
 
   test('MT-A11Y-002: Job detail page has no critical accessibility violations', async ({ page }) => {
@@ -47,8 +54,10 @@ test.describe('Job Detail Accessibility Tests', () => {
 
     const moderate = results.violations.filter(v => v.impact === 'moderate');
     if (moderate.length > 0) {
-      console.warn(`Found ${moderate.length} moderate accessibility issues:`, moderate);
+      console.log(`Found ${moderate.length} moderate accessibility issues:`, moderate);
     }
+    // Fail if too many moderate violations accumulate
+    expect(moderate.length).toBeLessThanOrEqual(5);
   });
 
   test('MT-A11Y-004: All interactive elements are keyboard accessible', async ({ page }) => {

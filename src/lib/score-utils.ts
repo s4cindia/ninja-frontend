@@ -23,6 +23,12 @@ export function calculateScoreBreakdown(issuesSummary: {
   moderate: number;
   minor: number;
 }): ScoreBreakdown {
+  // Validate inputs
+  const counts = Object.values(issuesSummary);
+  if (counts.some(count => count < 0 || !Number.isFinite(count))) {
+    throw new Error('Issue counts must be non-negative finite numbers');
+  }
+
   const deductions = {
     critical: { count: issuesSummary.critical, points: issuesSummary.critical * SCORE_WEIGHTS.critical },
     serious: { count: issuesSummary.serious, points: issuesSummary.serious * SCORE_WEIGHTS.serious },

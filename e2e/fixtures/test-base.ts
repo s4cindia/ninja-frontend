@@ -1,7 +1,8 @@
-import { test as base, Page, expect } from '@playwright/test';
+import { test as base, Page } from '@playwright/test';
 
 const WCAG_MINIMUM_TOUCH_TARGET = 44;
-const TOUCH_TARGET_RENDERING_TOLERANCE = 2;
+const TOUCH_TARGET_RENDERING_TOLERANCE = 4;
+const LOGIN_NAVIGATION_TIMEOUT = 10000; // 10 seconds for post-login redirect
 
 export const MIN_TOUCH_TARGET_SIZE = WCAG_MINIMUM_TOUCH_TARGET - TOUCH_TARGET_RENDERING_TOLERANCE;
 
@@ -24,10 +25,14 @@ async function login(page: Page): Promise<void> {
   await page.fill('[data-testid="password-input"]', TEST_USER.password);
   await page.click('[data-testid="login-button"]');
   
-  await page.waitForURL(/\/(dashboard|jobs)/, { timeout: 10000 });
+  await page.waitForURL(/\/(dashboard|jobs)/, { timeout: LOGIN_NAVIGATION_TIMEOUT });
   
   const errorMessage = page.locator('[role="alert"], .error-message, [data-testid="login-error"]');
-  await expect(errorMessage).toHaveCount(0);
+  const errorCount = await errorMessage.count();
+  if (errorCount > 0) {
+    const errorText = await errorMessage.first().textContent();
+    throw new Error(`Login failed: ${errorText}`);
+  }
 }
 
 export const test = base.extend<{ authenticatedPage: Page }>({

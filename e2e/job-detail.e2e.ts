@@ -1,6 +1,12 @@
 import { test, expect } from '@playwright/test';
 import { login } from './fixtures/test-base';
 
+/**
+ * E2E Tests for Job Detail View
+ * Test ID Format: MT-E2E-XXX (Manual Test - E2E - Sequential Number)
+ * MT = Manual Test tracking prefix for test management
+ */
+
 test.describe('Job Detail View E2E Tests', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);

@@ -1,6 +1,13 @@
 import { test, expect } from '@playwright/test';
 import { login, MIN_TOUCH_TARGET_SIZE } from './fixtures/test-base';
 
+/**
+ * Responsive Design Tests for Job Detail View
+ * Test ID Format: MT-RD-XXX (Manual Test - Responsive Design - Sequential Number)
+ */
+
+const SCROLL_WIDTH_TOLERANCE = 5; // Allow 5px for sub-pixel rounding in browsers
+
 test.describe('Job Detail Responsive Tests', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
@@ -64,7 +71,7 @@ test.describe('Job Detail Responsive Tests', () => {
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
     const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
 
-    expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 5); // 5px tolerance
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth + SCROLL_WIDTH_TOLERANCE);
   });
 
   test('MT-RD-006: Modal dialogs fit mobile viewport', async ({ page }) => {

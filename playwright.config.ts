@@ -23,8 +23,8 @@ export default defineConfig({
   // Retry failed tests (2 times in CI, 0 locally)
   retries: process.env.CI ? 2 : 0,
 
-  // Single worker in CI for stability
-  workers: process.env.CI ? 1 : undefined,
+  // Two workers in CI for faster execution
+  workers: process.env.CI ? 2 : undefined,
 
   // Test timeout (30 seconds)
   timeout: 30000,
@@ -108,6 +108,6 @@ export default defineConfig({
     command: 'npm run dev',
     url: 'http://localhost:5000',
     reuseExistingServer: !process.env.CI,
-    timeout: 120000,
+    timeout: 60000, // 60 seconds should be sufficient
   },
 });
