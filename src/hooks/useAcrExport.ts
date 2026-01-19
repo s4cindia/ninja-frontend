@@ -21,13 +21,17 @@ async function exportAcr(acrId: string, options: ExportOptions): Promise<ExportR
   return response.data.data;
 }
 
-function triggerUrlDownload(url: string, filename: string): void {
+async function triggerUrlDownload(url: string, filename: string): Promise<void> {
+  const response = await api.get(url, { responseType: 'blob' });
+  const blob = new Blob([response.data]);
+  const blobUrl = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.href = url;
+  link.href = blobUrl;
   link.download = filename;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
 }
 
 export function useExportAcr() {
