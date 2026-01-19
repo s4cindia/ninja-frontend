@@ -4,16 +4,30 @@ import { jsPDF } from 'jspdf';
 import { api } from '@/services/api';
 import type { ExportOptions, ExportResult, ExportFormat } from '@/types/acr.types';
 
+interface ApiResponse {
+  success: boolean;
+  data: ExportResult;
+}
+
 async function exportAcr(acrId: string, options: ExportOptions): Promise<ExportResult> {
   const cleanId = acrId.replace(/^acr-/, '');
-  const response = await api.post<ExportResult>(`/acr/${cleanId}/export`, {
+  const response = await api.post<ApiResponse>(`/acr/${cleanId}/export`, {
     options: {
       format: options.format,
       includeMethodology: options.includeMethodology,
       includeAttribution: options.includeAttributionTags,
     },
   });
-  return response.data;
+  return response.data.data;
+}
+
+function triggerUrlDownload(url: string, filename: string): void {
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
 export function useExportAcr() {
@@ -26,6 +40,7 @@ export function useExportAcr() {
     onSuccess: (data) => {
       setDownloadUrl(data.downloadUrl);
       setFilename(data.filename);
+      triggerUrlDownload(data.downloadUrl, data.filename);
     },
   });
 
