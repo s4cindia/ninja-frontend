@@ -1,4 +1,5 @@
 import { test as base, Page } from '@playwright/test';
+import { setupApiMocks } from '../mocks/api-mocks';
 
 const WCAG_MINIMUM_TOUCH_TARGET = 44;
 const TOUCH_TARGET_RENDERING_TOLERANCE = 4;
@@ -6,8 +7,10 @@ const LOGIN_NAVIGATION_TIMEOUT = 10000; // 10 seconds for post-login redirect
 
 export const MIN_TOUCH_TARGET_SIZE = WCAG_MINIMUM_TOUCH_TARGET - TOUCH_TARGET_RENDERING_TOLERANCE;
 
-const email = process.env.TEST_USER_EMAIL;
-const password = process.env.TEST_USER_PASSWORD;
+const USE_MOCK_API = process.env.MOCK_API === 'true';
+
+const email = process.env.TEST_USER_EMAIL || (USE_MOCK_API ? 'test@example.com' : '');
+const password = process.env.TEST_USER_PASSWORD || (USE_MOCK_API ? 'password123' : '');
 
 if (!email || !password) {
   throw new Error(
@@ -19,6 +22,10 @@ if (!email || !password) {
 const TEST_USER = { email, password };
 
 async function login(page: Page): Promise<void> {
+  if (USE_MOCK_API) {
+    await setupApiMocks(page);
+  }
+
   await page.goto('/login');
   
   await page.fill('[data-testid="email-input"]', TEST_USER.email);

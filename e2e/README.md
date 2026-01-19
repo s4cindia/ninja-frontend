@@ -5,18 +5,34 @@
 - Node.js 20+
 - Playwright browsers installed: `npx playwright install`
 
-## Environment Variables
+## Testing Modes
 
-Create a `.env.test` file or set these environment variables:
+### Mock API Mode (Default for CI)
+
+For testing without a backend, use mock API mode:
 
 ```bash
-# Test user credentials (required for authenticated tests)
-TEST_USER_EMAIL=your-test-user@example.com
-TEST_USER_PASSWORD=your-secure-password-here
-
-# Base URL (optional, defaults to http://localhost:5000)
-PLAYWRIGHT_BASE_URL=http://localhost:5000
+MOCK_API=true npm run test:e2e
 ```
+
+This uses Playwright route interception to mock all API responses. No backend required.
+
+### Real Backend Mode
+
+For testing against a real backend:
+
+```bash
+TEST_USER_EMAIL=your@email.com TEST_USER_PASSWORD=password npm run test:e2e
+```
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `MOCK_API` | No | Set to `true` to use mocked API responses |
+| `TEST_USER_EMAIL` | If not mock mode | Test user email address |
+| `TEST_USER_PASSWORD` | If not mock mode | Test user password |
+| `PLAYWRIGHT_BASE_URL` | No | Base URL (defaults to `http://localhost:5000`) |
 
 **IMPORTANT**: Never use real user credentials or commit `.env.test` to git!
 
@@ -32,8 +48,8 @@ PLAYWRIGHT_BASE_URL=http://localhost:5000
 ## Running Tests
 
 ```bash
-# Run all E2E tests
-npm run test:e2e
+# Run all E2E tests with mock API
+MOCK_API=true npm run test:e2e
 
 # Run specific test file
 npx playwright test e2e/job-detail.e2e.ts
@@ -53,7 +69,8 @@ npm run test:e2e:debug
 
 ## Test Structure
 
-- `e2e/fixtures/test-base.ts` - Authentication fixture
+- `e2e/fixtures/test-base.ts` - Authentication fixture with mock API support
+- `e2e/mocks/api-mocks.ts` - Playwright route handlers for API mocking
 - `e2e/job-detail.e2e.ts` - Functional tests
 - `e2e/job-detail.a11y.ts` - Accessibility tests (axe-core)
 - `e2e/job-detail.responsive.ts` - Responsive design tests
@@ -62,16 +79,43 @@ npm run test:e2e:debug
 
 Tests run automatically on PR via GitHub Actions. See `.github/workflows/pr-checks.yml`.
 
-Required GitHub Secrets:
-- `TEST_USER_EMAIL` - Test user email address
-- `TEST_USER_PASSWORD` - Test user password
+### Default CI Configuration
 
-Required GitHub Variables:
-- `PLAYWRIGHT_BASE_URL` - Base URL for the application (e.g., staging URL)
+- **e2e-tests**: Runs with `MOCK_API=true` (no backend required)
+- **accessibility-tests**: Runs with `MOCK_API=true`
+- **e2e-tests-staging**: Runs against real staging (only if `PLAYWRIGHT_BASE_URL` is set)
 
-## Test Data
+### Optional GitHub Configuration for Staging Tests
 
-Tests expect:
-- A running backend at the configured URL
-- At least one job in the database
-- Valid test user credentials
+To run tests against a real staging environment:
+
+- Variables:
+  - `PLAYWRIGHT_BASE_URL` - Staging URL (e.g., `https://staging.example.com`)
+  - `TEST_USER_EMAIL` - Test user email
+- Secrets:
+  - `TEST_USER_PASSWORD` - Test user password
+
+## Mock Data
+
+When using `MOCK_API=true`, the following mock jobs are available:
+
+| Job ID | Type | Status | Description |
+|--------|------|--------|-------------|
+| `job-001` | epub_audit | completed | Has results with score 85 |
+| `job-002` | pdf_remediation | processing | Progress at 45% |
+| `job-003` | epub_audit | failed | Has error message |
+| `job-004` | pdf_audit | pending | Waiting to start |
+
+## Troubleshooting
+
+### Tests timeout on login
+
+1. Check if `MOCK_API=true` is set (for CI without backend)
+2. Verify backend is running (for real backend mode)
+3. Check login page has `data-testid` attributes
+
+### Tests fail with "credentials not set"
+
+Set either:
+- `MOCK_API=true` for mock mode, OR
+- `TEST_USER_EMAIL` and `TEST_USER_PASSWORD` for real backend
