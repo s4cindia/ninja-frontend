@@ -22,8 +22,11 @@ async function exportAcr(acrId: string, options: ExportOptions): Promise<ExportR
 }
 
 async function triggerUrlDownload(url: string, filename: string): Promise<void> {
-  const response = await api.get(url, { responseType: 'blob' });
-  const blob = new Blob([response.data]);
+  const response = await fetch(url, { credentials: 'include' });
+  if (!response.ok) {
+    throw new Error(`Download failed: ${response.status}`);
+  }
+  const blob = await response.blob();
   const blobUrl = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = blobUrl;
