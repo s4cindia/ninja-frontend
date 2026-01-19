@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { History, Clock, User, ChevronRight, RotateCcw, ArrowLeftRight, Loader2, CheckCircle } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
@@ -168,19 +168,18 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
   const [isCompareMode, setIsCompareMode] = useState(false);
   const [compareVersions, setCompareVersions] = useState<number[]>([]);
-  const [localVersions, setLocalVersions] = useState<VersionEntry[]>([]);
   const [toast, setToast] = useState<ToastState>({ show: false, message: '' });
 
-  const { versions: apiVersions, isLoading } = useVersionHistory(acrId);
+  const { versions, isLoading, error } = useVersionHistory(acrId);
   const { data: versionDetails, isLoading: isLoadingDetails } = useVersionDetails(acrId, selectedVersion);
 
-  const versions = localVersions.length > 0 ? localVersions : apiVersions;
-
-  useEffect(() => {
-    if (apiVersions.length > 0) {
-      setLocalVersions([]);
-    }
-  }, [apiVersions]);
+  if (error) {
+    return (
+      <div className="flex items-center justify-center py-12 text-red-600">
+        <p>Error loading version history: {error.message}</p>
+      </div>
+    );
+  }
 
   const showToast = (message: string) => {
     setToast({ show: true, message });
@@ -212,18 +211,8 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
 
   const handleRestore = (version: number) => {
     if (confirm(`Restore to Version ${version}? This will create a new draft.`)) {
-      const maxVersion = Math.max(...versions.map(v => v.version));
-      const newVersion: VersionEntry = {
-        version: maxVersion + 1,
-        createdAt: new Date().toISOString(),
-        createdBy: 'Current User',
-        changeSummary: `Restored from Version ${version}`,
-        changeCount: 0,
-      };
-      
-      setLocalVersions(prev => prev.length > 0 ? [newVersion, ...prev] : [newVersion, ...apiVersions]);
       setSelectedVersion(null);
-      showToast(`Restored to Version ${version}. New Version ${newVersion.version} created.`);
+      showToast(`Restoring to Version ${version}...`);
       onRestore(version);
     }
   };
