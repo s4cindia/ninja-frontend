@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, FileText, FileType, Globe, Check, Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
@@ -50,15 +50,18 @@ export function ExportDialog({ acrId, isOpen, onClose }: ExportDialogProps) {
 
   const { exportAcr, isExporting, downloadUrl, filename, reset, error } = useExportAcr();
 
-  useEffect(() => {
-    if (!isOpen) {
-      reset();
-    }
-  }, [isOpen, reset]);
+  const resetRef = useRef(reset);
+  resetRef.current = reset;
 
   useEffect(() => {
-    reset();
-  }, [format, reset]);
+    if (!isOpen) {
+      resetRef.current();
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    resetRef.current();
+  }, [format]);
 
   if (!isOpen) return null;
 
