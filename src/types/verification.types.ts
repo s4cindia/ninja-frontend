@@ -12,6 +12,25 @@ export interface VerificationHistoryEntry {
   verifiedAt: string;
 }
 
+export interface VerificationIssue {
+  id?: string;
+  issueId?: string;
+  ruleId?: string;
+  impact?: string;
+  message: string;
+  severity?: Severity;
+  location?: string;
+  filePath?: string;
+  html?: string;
+  htmlSnippet?: string;
+  suggestedFix?: string;
+}
+
+export interface FixedVerificationIssue extends VerificationIssue {
+  fixedAt?: string;
+  fixMethod?: 'automated' | 'manual';
+}
+
 export interface VerificationItem {
   id: string;
   criterionId: string;
@@ -24,6 +43,10 @@ export interface VerificationItem {
   automatedNotes: string;
   status: VerificationStatus;
   history: VerificationHistoryEntry[];
+  issues?: VerificationIssue[];
+  fixedIssues?: FixedVerificationIssue[];
+  fixedCount?: number;
+  remainingCount?: number;
 }
 
 export interface VerificationQueueData {

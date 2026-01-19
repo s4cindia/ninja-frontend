@@ -27,6 +27,9 @@ export interface AccessibilityIssue {
   lineNumber?: number;
   columnNumber?: number;
   html?: string;
+  element?: string;
+  context?: string;
+  snippet?: string;
   currentContent?: string;
   wcagCriteria?: string[];
   remediation?: string;

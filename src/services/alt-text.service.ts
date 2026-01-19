@@ -4,7 +4,9 @@ import type {
   ImageType, 
   DocumentContext,
   AltTextFlag,
-  GeneratedAltText
+  GeneratedAltText,
+  QuickFixImageType,
+  QuickFixAltTextResponse
 } from '@/types/alt-text.types';
 
 function generateMockResult(imageId: string, fileName?: string): AltTextGenerationResult {
@@ -57,7 +59,50 @@ function generateMockContext(): DocumentContext {
   };
 }
 
+function generateMockQuickFixResult(_imagePath: string, imageType: QuickFixImageType): QuickFixAltTextResponse {
+  const baseShortAlt = '[Demo Mode] Please connect the backend API for AI-powered alt text generation';
+  const baseLongDesc = 'This is a placeholder long description. The actual backend service will analyze the image content and generate a detailed 300-500 word description suitable for complex images that require more context than a simple alt text can provide.';
+  
+  return {
+    shortAlt: imageType === 'decorative' ? '' : baseShortAlt,
+    longDescription: imageType === 'complex' ? baseLongDesc : undefined,
+    confidence: 65,
+    flags: ['NEEDS_MANUAL_REVIEW'] as AltTextFlag[],
+    imageType,
+    needsReview: true,
+    generatedAt: new Date().toISOString(),
+    model: 'demo-mode',
+  };
+}
+
 export const altTextService = {
+  async generateForQuickFix(
+    jobId: string, 
+    imagePath: string, 
+    imageType: QuickFixImageType
+  ): Promise<QuickFixAltTextResponse> {
+    // Debug logging
+    console.log('[alt-text.service] generateForQuickFix called with:', {
+      jobId,
+      imagePath,
+      imageType,
+      endpoint: `/epub/job/${jobId}/generate-alt-text`
+    });
+    
+    try {
+      const response = await api.post<ApiResponse<QuickFixAltTextResponse>>(
+        `/epub/job/${jobId}/generate-alt-text`,
+        { imagePath, imageType }
+      );
+      console.log('[alt-text.service] API response:', response.data);
+      return response.data.data;
+    } catch (error) {
+      console.warn('[alt-text.service] API error, using demo mode:', error);
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      return generateMockQuickFixResult(imagePath, imageType);
+    }
+  },
+
   async generate(imageId: string, jobId: string): Promise<AltTextGenerationResult> {
     try {
       const response = await api.post<ApiResponse<AltTextGenerationResult>>('/alt-text/generate', {

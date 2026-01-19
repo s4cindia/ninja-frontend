@@ -134,7 +134,7 @@ export const ComparisonPage: React.FC = () => {
   }, [isNavigating, data?.changes]);
 
   const handleBack = () => {
-    navigate(`/remediation/${jobId}`);
+    navigate(`/epub/remediate/${jobId}?status=completed`);
   };
 
   if (!jobId) {

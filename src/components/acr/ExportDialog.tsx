@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, FileText, FileType, Globe, Download, Check, Loader2 } from 'lucide-react';
+import { X, FileText, FileType, Globe, Check, Loader2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -55,6 +55,10 @@ export function ExportDialog({ acrId, isOpen, onClose }: ExportDialogProps) {
       reset();
     }
   }, [isOpen, reset]);
+
+  useEffect(() => {
+    reset();
+  }, [format, reset]);
 
   if (!isOpen) return null;
 
@@ -242,15 +246,8 @@ export function ExportDialog({ acrId, isOpen, onClose }: ExportDialogProps) {
                 <div className="flex-1">
                   <p className="text-sm font-medium text-green-800">Export Complete!</p>
                   <p className="text-sm text-green-700">{filename}</p>
+                  <p className="text-xs text-green-600 mt-1">File downloaded automatically. Check your downloads folder.</p>
                 </div>
-                <a
-                  href={downloadUrl}
-                  download={filename ?? 'export'}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition-colors"
-                >
-                  <Download className="h-4 w-4" />
-                  Download
-                </a>
               </div>
             </div>
           )}

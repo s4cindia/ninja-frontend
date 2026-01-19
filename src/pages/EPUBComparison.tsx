@@ -17,6 +17,7 @@ interface ComparisonChange {
   location?: string;
   before?: string;
   after?: string;
+  wcagCriteria?: string;
 }
 
 interface ComparisonData {
@@ -65,6 +66,9 @@ export const EPUBComparison: React.FC = () => {
   const [isDemo, setIsDemo] = useState(false);
   const [expandedChange, setExpandedChange] = useState<string | null>(null);
 
+  const searchParams = new URLSearchParams(location.search);
+  const criterionFilter = searchParams.get('criterion');
+
   useEffect(() => {
     const loadComparison = async () => {
       if (!jobId) {
@@ -73,27 +77,27 @@ export const EPUBComparison: React.FC = () => {
         return;
       }
 
-      const stateFileName = locationState?.epubFileName || 'uploaded-file.epub';
-      const stateFixedCount = locationState?.fixedCount ?? 0;
-      const stateFailedCount = locationState?.failedCount ?? 0;
-      const stateSkippedCount = locationState?.skippedCount ?? 0;
-      const stateBeforeScore = locationState?.beforeScore ?? 45;
-      const stateAfterScore = locationState?.afterScore ?? 85;
-
       try {
-        const response = await api.get(`/epub/job/${jobId}/comparison/summary`);
-        const data = response.data.data || response.data;
+        // Fetch job data to get the actual EPUB filename
+        const jobResponse = await api.get(`/jobs/${jobId}`);
+        const jobData = jobResponse.data.data || jobResponse.data;
+        const actualFileName = jobData.originalFile?.name || jobData.file?.name || 'uploaded-file.epub';
+
+        // Fetch comparison data
+        const comparisonResponse = await api.get(`/epub/job/${jobId}/comparison/summary`);
+        const data = comparisonResponse.data.data || comparisonResponse.data;
+
         setComparison({
           jobId: data.jobId || jobId,
-          epubFileName: data.epubFileName || stateFileName,
-          fixedCount: data.fixedCount ?? stateFixedCount,
-          failedCount: data.failedCount ?? stateFailedCount,
-          skippedCount: data.skippedCount ?? stateSkippedCount,
-          beforeScore: data.beforeScore ?? stateBeforeScore,
-          afterScore: data.afterScore ?? stateAfterScore,
-          filesModified: data.filesModified ?? stateFixedCount,
+          epubFileName: data.epubFileName || actualFileName,
+          fixedCount: data.fixedCount ?? locationState?.fixedCount ?? 0,
+          failedCount: data.failedCount ?? locationState?.failedCount ?? 0,
+          skippedCount: data.skippedCount ?? locationState?.skippedCount ?? 0,
+          beforeScore: data.beforeScore ?? locationState?.beforeScore ?? 0,
+          afterScore: data.afterScore ?? locationState?.afterScore ?? 100,
+          filesModified: data.filesModified ?? data.fixedCount ?? 0,
           modificationsByCategory: data.modificationsByCategory || {
-            metadata: stateFixedCount,
+            metadata: data.fixedCount ?? 0,
             accessibility: 0,
             structure: 0,
             content: 0,
@@ -101,25 +105,53 @@ export const EPUBComparison: React.FC = () => {
           changes: data.changes || [],
         });
         setIsDemo(false);
-      } catch {
-        setComparison({
-          jobId,
-          epubFileName: stateFileName,
-          fixedCount: stateFixedCount,
-          failedCount: stateFailedCount,
-          skippedCount: stateSkippedCount,
-          beforeScore: stateBeforeScore,
-          afterScore: stateAfterScore,
-          filesModified: stateFixedCount,
-          modificationsByCategory: {
-            metadata: stateFixedCount,
-            accessibility: 0,
-            structure: 0,
-            content: 0,
-          },
-          changes: [],
-        });
-        setIsDemo(false);
+      } catch (error) {
+        console.error('[EPUBComparison] Failed to load data:', error);
+
+        // Try to at least get the job filename for the fallback
+        try {
+          const jobResponse = await api.get(`/jobs/${jobId}`);
+          const jobData = jobResponse.data.data || jobResponse.data;
+          const actualFileName = jobData.originalFile?.name || jobData.file?.name || 'uploaded-file.epub';
+
+          setComparison({
+            jobId,
+            epubFileName: actualFileName,
+            fixedCount: locationState?.fixedCount ?? 0,
+            failedCount: locationState?.failedCount ?? 0,
+            skippedCount: locationState?.skippedCount ?? 0,
+            beforeScore: locationState?.beforeScore ?? 0,
+            afterScore: locationState?.afterScore ?? 100,
+            filesModified: locationState?.fixedCount ?? 0,
+            modificationsByCategory: {
+              metadata: locationState?.fixedCount ?? 0,
+              accessibility: 0,
+              structure: 0,
+              content: 0,
+            },
+            changes: [],
+          });
+        } catch {
+          // Complete fallback
+          setComparison({
+            jobId,
+            epubFileName: locationState?.epubFileName || 'uploaded-file.epub',
+            fixedCount: locationState?.fixedCount ?? 0,
+            failedCount: locationState?.failedCount ?? 0,
+            skippedCount: locationState?.skippedCount ?? 0,
+            beforeScore: locationState?.beforeScore ?? 0,
+            afterScore: locationState?.afterScore ?? 100,
+            filesModified: locationState?.fixedCount ?? 0,
+            modificationsByCategory: {
+              metadata: locationState?.fixedCount ?? 0,
+              accessibility: 0,
+              structure: 0,
+              content: 0,
+            },
+            changes: [],
+          });
+        }
+        setIsDemo(true);
       } finally {
         setLoading(false);
       }
@@ -172,6 +204,11 @@ export const EPUBComparison: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <BookOpen className="h-7 w-7 text-primary-600" />
             Remediation Comparison
+            {criterionFilter && (
+              <Badge variant="info" className="ml-2">
+                WCAG {criterionFilter}
+              </Badge>
+            )}
           </h1>
           <p className="text-gray-600 mt-1">
             Review the changes made to your EPUB file
@@ -261,65 +298,98 @@ export const EPUBComparison: React.FC = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Detailed Changes ({comparison.changes.length})</CardTitle>
+          <CardTitle>
+            {criterionFilter 
+              ? `Detailed Changes for WCAG ${criterionFilter}` 
+              : `Detailed Changes (${comparison.changes.length})`
+            }
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {comparison.changes.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <AlertCircle className="h-12 w-12 mx-auto mb-3" />
-                <p>No detailed changes available</p>
-              </div>
-            ) : (
-              comparison.changes.map((change) => {
-                const config = categoryConfig[change.category];
-                const Icon = config.icon;
-                const isExpanded = expandedChange === change.id;
+            {(() => {
+              const displayChanges = criterionFilter
+                ? comparison.changes.filter(c => c.wcagCriteria === criterionFilter)
+                : comparison.changes;
 
-                return (
-                  <div key={change.id} className="border rounded-lg overflow-hidden">
-                    <button
-                      onClick={() => setExpandedChange(isExpanded ? null : change.id)}
-                      className={`w-full p-4 flex items-start gap-3 text-left ${config.bg} hover:opacity-90 transition-opacity`}
+              return displayChanges.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <AlertCircle className="h-12 w-12 mx-auto mb-3" />
+                  <p>
+                    {criterionFilter
+                      ? `No changes found for WCAG ${criterionFilter}`
+                      : 'No detailed changes available'
+                    }
+                  </p>
+                  {criterionFilter && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        const url = new URL(window.location.href);
+                        url.searchParams.delete('criterion');
+                        window.history.pushState({}, '', url.toString());
+                        window.location.reload();
+                      }}
+                      className="mt-2"
                     >
-                      <Icon className={`h-5 w-5 mt-0.5 ${config.color}`} />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="default" size="sm">{change.type}</Badge>
-                          <Badge variant="info" size="sm">{config.label}</Badge>
+                      Show all changes
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                displayChanges.map((change) => {
+                  const config = categoryConfig[change.category];
+                  const Icon = config.icon;
+                  const isExpanded = expandedChange === change.id;
+
+                  return (
+                    <div key={change.id} className="border rounded-lg overflow-hidden">
+                      <button
+                        onClick={() => setExpandedChange(isExpanded ? null : change.id)}
+                        className={`w-full p-4 flex items-start gap-3 text-left ${config.bg} hover:opacity-90 transition-opacity`}
+                      >
+                        <Icon className={`h-5 w-5 mt-0.5 ${config.color}`} />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant="default" size="sm">{change.type}</Badge>
+                            <Badge variant="info" size="sm">{config.label}</Badge>
+                            {change.wcagCriteria && (
+                              <Badge variant="info" size="sm">{change.wcagCriteria}</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-800">{change.description}</p>
+                          {change.location && (
+                            <p className="text-xs text-gray-500 mt-1 font-mono">{change.location}</p>
+                          )}
                         </div>
-                        <p className="text-sm text-gray-800">{change.description}</p>
-                        {change.location && (
-                          <p className="text-xs text-gray-500 mt-1 font-mono">{change.location}</p>
-                        )}
-                      </div>
-                      <Code className="h-4 w-4 text-gray-400" />
-                    </button>
-                    
-                    {isExpanded && (change.before || change.after) && (
-                      <div className="p-4 bg-gray-50 border-t space-y-3">
-                        {change.before && (
-                          <div>
-                            <p className="text-xs font-medium text-red-600 mb-1">Before:</p>
-                            <pre className="text-xs bg-red-50 p-2 rounded border border-red-200 overflow-x-auto">
-                              <code>{change.before}</code>
-                            </pre>
-                          </div>
-                        )}
-                        {change.after && (
-                          <div>
-                            <p className="text-xs font-medium text-green-600 mb-1">After:</p>
-                            <pre className="text-xs bg-green-50 p-2 rounded border border-green-200 overflow-x-auto">
-                              <code>{change.after}</code>
-                            </pre>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
+                        <Code className="h-4 w-4 text-gray-400" />
+                      </button>
+                      
+                      {isExpanded && (change.before || change.after) && (
+                        <div className="p-4 bg-gray-50 border-t space-y-3">
+                          {change.before && (
+                            <div>
+                              <p className="text-xs font-medium text-red-600 mb-1">Before:</p>
+                              <pre className="text-xs bg-red-50 p-2 rounded border border-red-200 overflow-x-auto">
+                                <code>{change.before}</code>
+                              </pre>
+                            </div>
+                          )}
+                          {change.after && (
+                            <div>
+                              <p className="text-xs font-medium text-green-600 mb-1">After:</p>
+                              <pre className="text-xs bg-green-50 p-2 rounded border border-green-200 overflow-x-auto">
+                                <code>{change.after}</code>
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              );
+            })()}
           </div>
         </CardContent>
       </Card>

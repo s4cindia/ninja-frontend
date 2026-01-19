@@ -624,6 +624,16 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   const [docsCriterion, setDocsCriterion] = useState<{ id: string; name: string } | null>(null);
   const [detailsCriterion, setDetailsCriterion] = useState<CriterionConfidence | null>(null);
   const [showOnlyWithIssues, setShowOnlyWithIssues] = useState(false);
+  const [showOtherIssues, setShowOtherIssues] = useState(false);
+  const [otherIssues, setOtherIssues] = useState<{
+    count: number;
+    issues: Array<{
+      code: string;
+      message: string;
+      severity: string;
+      location?: string;
+    }>;
+  } | null>(null);
 
   const { data: confidenceData } = useConfidenceWithIssues(jobId, undefined, { enabled: !isDemoJob(jobId) });
 
@@ -677,6 +687,9 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
           console.log('[ACR Step 3] Analysis data from API:', response);
           const normalizedCriteria = (response.criteria || []).map((c, i) => normalizeCriterion(c, i));
           setCriteria(normalizedCriteria);
+          if (response.otherIssues) {
+            setOtherIssues(response.otherIssues);
+          }
           setIsLoading(false);
         }
       })
@@ -713,8 +726,15 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   // Filter criteria based on showOnlyWithIssues
   const filteredCriteria = showOnlyWithIssues
     ? criteria.filter(c => {
+        // Check hasIssues flag from backend first
+        if (c.hasIssues === true) return true;
+        if (c.hasIssues === false) return false;
+        // Fallback to issueCount, remainingCount, or status-based detection
+        const hasIssueCount = (c.issueCount || 0) > 0 || (c.remainingCount || 0) > 0;
+        const hasFailingStatus = c.status === 'fail' || c.needsVerification;
         const issueInfo = issuesByCriterion.get(c.criterionId);
-        return issueInfo && issueInfo.count > 0;
+        const hasRelatedIssues = issueInfo && issueInfo.count > 0;
+        return hasIssueCount || hasFailingStatus || hasRelatedIssues;
       })
     : criteria;
 
@@ -964,23 +984,65 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">
           <h3 className="font-semibold text-gray-900">Accessibility Criteria Analysis</h3>
-          <button
-            className={cn(
-              'px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center',
-              showOnlyWithIssues
-                ? 'bg-red-100 text-red-800 border-2 border-red-500'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            )}
-            onClick={() => setShowOnlyWithIssues(!showOnlyWithIssues)}
-          >
-            <AlertCircle className="mr-1 h-4 w-4" />
-            Has Issues
-            {showOnlyWithIssues && confidenceData && (
-              <span className="ml-2 px-1.5 py-0.5 bg-red-200 rounded-full text-xs">
-                {confidenceData.criteria.filter(c => (c.issueCount || 0) > 0).length}
+          {(() => {
+            // Use summary.criteriaWithIssuesCount from API if available, otherwise calculate
+            const criteriaWithIssuesCount = confidenceData?.summary?.criteriaWithIssuesCount ?? 
+              criteria.filter(c => {
+                // Check hasIssues flag from backend first
+                if (c.hasIssues === true) return true;
+                if (c.hasIssues === false) return false;
+                // Fallback to issueCount, remainingCount, or status-based detection
+                const hasIssueCount = (c.issueCount || 0) > 0 || (c.remainingCount || 0) > 0;
+                const hasFailingStatus = c.status === 'fail' || c.needsVerification;
+                const issueInfo = issuesByCriterion.get(c.criterionId);
+                const hasRelatedIssues = issueInfo && issueInfo.count > 0;
+                return hasIssueCount || hasFailingStatus || hasRelatedIssues;
+              }).length;
+
+            return (
+              <button
+                className={cn(
+                  'px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center',
+                  showOnlyWithIssues
+                    ? 'bg-red-100 text-red-800 border-2 border-red-500'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                )}
+                onClick={() => setShowOnlyWithIssues(!showOnlyWithIssues)}
+                aria-pressed={showOnlyWithIssues}
+              >
+                <AlertCircle className="mr-1 h-4 w-4" />
+                Has Issues
+                {criteriaWithIssuesCount > 0 && (
+                  <span className={cn(
+                    'ml-2 px-1.5 py-0.5 rounded-full text-xs',
+                    showOnlyWithIssues ? 'bg-red-200' : 'bg-red-100'
+                  )}>
+                    {criteriaWithIssuesCount}
+                  </span>
+                )}
+              </button>
+            );
+          })()}
+          {otherIssues && otherIssues.count > 0 && (
+            <button
+              className={cn(
+                'px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center',
+                showOtherIssues
+                  ? 'bg-orange-100 text-orange-800 border-2 border-orange-500'
+                  : 'bg-gray-100 text-orange-600 hover:bg-orange-50'
+              )}
+              onClick={() => {
+                setShowOtherIssues(!showOtherIssues);
+                if (!showOtherIssues) setShowOnlyWithIssues(false);
+              }}
+            >
+              <AlertTriangle className="mr-1 h-4 w-4" />
+              Other Issues
+              <span className="ml-2 px-1.5 py-0.5 bg-orange-200 rounded-full text-xs">
+                {otherIssues.count}
               </span>
-            )}
-          </button>
+            </button>
+          )}
         </div>
         <div className="flex gap-1 bg-gray-100 p-1 rounded-lg" role="group" aria-label="View mode">
           <button
@@ -1156,6 +1218,54 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
         </div>
       )}
 
+      {/* Display other issues when filtered */}
+      {showOtherIssues && otherIssues && otherIssues.count > 0 && (
+        <div className="mt-6 space-y-4">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle className="h-5 w-5 text-orange-600" />
+            <h3 className="text-lg font-semibold text-gray-900">
+              Other Quality Issues (Non-WCAG)
+            </h3>
+            <span className="text-sm text-gray-500">
+              These are structural or validation issues that don't map to specific WCAG criteria
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {otherIssues.issues.map((issue, idx) => (
+              <div
+                key={idx}
+                className="p-4 bg-orange-50 border border-orange-200 rounded-lg"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-sm font-mono text-orange-700 bg-orange-100 px-2 py-0.5 rounded">
+                        {issue.code}
+                      </span>
+                      <span className={cn(
+                        'text-xs px-2 py-0.5 rounded',
+                        issue.severity === 'serious' && 'bg-red-100 text-red-700',
+                        issue.severity === 'moderate' && 'bg-yellow-100 text-yellow-700',
+                        issue.severity === 'minor' && 'bg-blue-100 text-blue-700'
+                      )}>
+                        {issue.severity}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-900 mb-2">{issue.message}</p>
+                    {issue.location && (
+                      <p className="text-xs text-gray-500 font-mono">
+                        Location: {issue.location}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {selectedCriterion && (
         <CriterionDetailModal
           criterion={selectedCriterion}
@@ -1176,6 +1286,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
         <CriterionDetailsModal
           criterion={detailsCriterion}
           relatedIssues={issuesByCriterion.get(detailsCriterion.criterionId)?.issues}
+          jobId={jobId}
           isOpen={!!detailsCriterion}
           onClose={() => setDetailsCriterion(null)}
           onVerifyClick={onVerifyClick}

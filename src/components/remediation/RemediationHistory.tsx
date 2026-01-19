@@ -108,8 +108,44 @@ export const RemediationHistory: React.FC<RemediationHistoryProps> = ({
     const fetchJobs = async () => {
       setIsLoading(true);
       
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const parseJobsList = (responseData: any): any[] => {
+      interface RawJob {
+        type?: string;
+        jobType?: string;
+        fileName?: string;
+        filename?: string;
+        name?: string;
+        originalName?: string;
+        file?: { name?: string; fileName?: string; originalName?: string };
+        input?: { fileName?: string; name?: string };
+        metadata?: { fileName?: string; name?: string };
+        product?: { name?: string; fileName?: string };
+        issuesFixed?: number;
+        fixedCount?: number;
+        fixed?: number;
+        totalIssues?: number;
+        issuesTotal?: number;
+        issueCount?: number;
+        total?: number;
+        status?: string;
+        createdAt?: string;
+        created_at?: string;
+        uploadedAt?: string;
+        created?: string;
+        completedAt?: string;
+        id?: string;
+        _id?: string;
+        jobId?: string;
+        items?: RawJob[];
+        jobs?: RawJob[];
+        data?: RawJob[];
+        result?: { fixed?: number; issuesFixed?: number; total?: number; issuesTotal?: number; totalIssues?: number };
+        stats?: { fixed?: number; total?: number };
+        remediation?: { fixed?: number };
+        audit?: { total?: number; issueCount?: number };
+        output?: { fixed?: number; issuesFixed?: number; total?: number; issuesTotal?: number; issueCount?: number };
+      }
+
+      const parseJobsList = (responseData: RawJob | RawJob[]): RawJob[] => {
         if (Array.isArray(responseData)) {
           return responseData;
         } else if (responseData?.items && Array.isArray(responseData.items)) {
@@ -171,8 +207,7 @@ export const RemediationHistory: React.FC<RemediationHistoryProps> = ({
         return `${jobType} - ${date}`;
       };
       
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mapToRemediationJob = (job: any): RemediationJob => {
+      const mapToRemediationJob = (job: RawJob): RemediationJob => {
         // Try multiple field paths for issues
         const issuesFixed = job.issuesFixed || job.fixedCount || job.fixed || 
                            job.result?.fixed || job.result?.issuesFixed || 

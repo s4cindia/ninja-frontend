@@ -11,6 +11,24 @@ export type AltTextFlag =
   | 'DATA_EXTRACTED'
   | 'COMPLEX_IMAGE';
 
+export type QuickFixImageType = 'decorative' | 'informative' | 'complex';
+
+export interface QuickFixAltTextRequest {
+  imagePath: string;
+  imageType: QuickFixImageType;
+}
+
+export interface QuickFixAltTextResponse {
+  shortAlt: string;
+  longDescription?: string;
+  confidence: number;
+  flags: AltTextFlag[];
+  imageType: QuickFixImageType;
+  needsReview: boolean;
+  generatedAt: string;
+  model: string;
+}
+
 export type AltTextStatus = 'pending' | 'needs_review' | 'approved' | 'edited' | 'rejected';
 
 export type ImageType = 

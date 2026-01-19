@@ -86,6 +86,9 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
   const [, setIsApplying] = useState(false);
   const [previewContent] = useState<string | null>(null);
 
+  // Used to show loading state during fix application
+  void isApplying;
+
   const { issue, status } = task;
   const severity = SEVERITY_CONFIG[issue.severity] || SEVERITY_CONFIG.minor;
   const statusConfig = STATUS_CONFIG[status];
@@ -260,6 +263,10 @@ export const RemediationTaskCard: React.FC<RemediationTaskCardProps> = ({
                   filePath: issue.filePath,
                   currentContent: issue.currentContent,
                   lineNumber: issue.lineNumber,
+                  html: issue.html,
+                  element: issue.element,
+                  context: issue.context,
+                  snippet: issue.snippet,
                 }}
                 jobId={jobId}
                 onApplyFix={handleApplyFix}
