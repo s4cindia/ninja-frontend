@@ -21,20 +21,27 @@ async function exportAcr(acrId: string, options: ExportOptions): Promise<ExportR
   return response.data.data;
 }
 
-async function triggerUrlDownload(url: string, filename: string): Promise<void> {
-  const response = await fetch(url, { credentials: 'include' });
-  if (!response.ok) {
-    throw new Error(`Download failed: ${response.status}`);
+function triggerBase64Download(content: string, filename: string, format: string): void {
+  const byteCharacters = atob(content);
+  const byteNumbers = new Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
   }
-  const blob = await response.blob();
-  const blobUrl = URL.createObjectURL(blob);
+  const byteArray = new Uint8Array(byteNumbers);
+  const mimeTypes: Record<string, string> = {
+    pdf: 'application/pdf',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    html: 'text/html',
+  };
+  const blob = new Blob([byteArray], { type: mimeTypes[format] || 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.href = blobUrl;
+  link.href = url;
   link.download = filename;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+  setTimeout(() => URL.revokeObjectURL(url), 100);
 }
 
 export function useExportAcr() {
@@ -47,7 +54,7 @@ export function useExportAcr() {
     onSuccess: (data) => {
       setDownloadUrl(data.downloadUrl);
       setFilename(data.filename);
-      triggerUrlDownload(data.downloadUrl, data.filename);
+      triggerBase64Download(data.content, data.filename, data.format);
     },
   });
 
@@ -326,7 +333,8 @@ export function useMockExport() {
       downloadUrl: '#downloaded',
       filename: generatedFilename,
       format: options.format,
-      generatedAt: new Date().toISOString(),
+      size: blob.size,
+      content: '',
     };
 
     setDownloadUrl(result.downloadUrl);
