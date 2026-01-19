@@ -5,7 +5,8 @@ import { api } from '@/services/api';
 import type { ExportOptions, ExportResult, ExportFormat } from '@/types/acr.types';
 
 async function exportAcr(acrId: string, options: ExportOptions): Promise<ExportResult> {
-  const response = await api.post<ExportResult>(`/acr/${acrId}/export`, options);
+  const cleanId = acrId.replace(/^acr-/, '');
+  const response = await api.post<ExportResult>(`/acr/${cleanId}/export`, options);
   return response.data;
 }
 
