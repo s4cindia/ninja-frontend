@@ -4,12 +4,9 @@ import { jsPDF } from 'jspdf';
 import { api } from '@/services/api';
 import type { ExportOptions, ExportResult, ExportFormat } from '@/types/acr.types';
 
-interface ApiResponse {
-  success: boolean;
-  data?: ExportResult;
-  message?: string;
-  error?: string;
-}
+type ApiResponse =
+  | { success: true; data: ExportResult }
+  | { success: false; message: string; error?: string };
 
 interface WorkerMessage {
   success: boolean;
@@ -41,6 +38,8 @@ async function exportAcr(acrId: string, options: ExportOptions): Promise<ExportR
 
 const BASE64_REGEX = /^[A-Za-z0-9+/]*={0,2}$/;
 const LARGE_FILE_THRESHOLD = 5 * 1024 * 1024;
+const BLOB_URL_CLEANUP_DELAY_MS = 100;
+const VALID_EXPORT_FORMATS = ['pdf', 'docx', 'html'] as const;
 
 function isValidBase64(str: string): boolean {
   if (!str || str.length === 0) return false;
@@ -88,9 +87,22 @@ function decodeBase64InWorker(content: string): Promise<Uint8Array> {
   });
 }
 
+/**
+ * Decodes base64 content and triggers a file download.
+ * Uses Web Worker for large files (>5MB) to avoid blocking the UI.
+ * 
+ * @param content - Base64-encoded file content from the backend
+ * @param filename - The filename to use for the download
+ * @param format - File format ('pdf', 'docx', or 'html')
+ * @throws Error if content is invalid base64 or decoding fails
+ */
 async function triggerBase64Download(content: string, filename: string, format: string): Promise<void> {
   if (!isValidBase64(content)) {
-    throw new Error('Invalid base64 content received from server');
+    throw new Error('Invalid file content received');
+  }
+
+  if (!VALID_EXPORT_FORMATS.includes(format as typeof VALID_EXPORT_FORMATS[number])) {
+    throw new Error('Unsupported export format');
   }
 
   const estimatedSize = (content.length * 3) / 4;
@@ -110,7 +122,7 @@ async function triggerBase64Download(content: string, filename: string, format: 
       docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       html: 'text/html',
     };
-    const blob = new Blob([new Uint8Array(byteArray)], { type: mimeTypes[format] || 'application/octet-stream' });
+    const blob = new Blob([new Uint8Array(byteArray)], { type: mimeTypes[format] });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -118,10 +130,10 @@ async function triggerBase64Download(content: string, filename: string, format: 
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    setTimeout(() => URL.revokeObjectURL(url), 100);
+    setTimeout(() => URL.revokeObjectURL(url), BLOB_URL_CLEANUP_DELAY_MS);
   } catch (error) {
     console.error('Failed to decode and download file:', error);
-    throw new Error('Failed to process the exported file. The file content may be corrupted.');
+    throw new Error('Failed to process the exported file');
   }
 }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, FileText, FileType, Globe, Check, Loader2 } from 'lucide-react';
+import { X, FileText, FileType, Globe, Check, Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -253,10 +253,10 @@ export function ExportDialog({ acrId, isOpen, onClose }: ExportDialogProps) {
           )}
 
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4" role="alert">
               <div className="flex items-center gap-3">
                 <div className="flex-shrink-0">
-                  <X className="h-6 w-6 text-red-600" />
+                  <AlertCircle className="h-6 w-6 text-red-600" aria-hidden="true" />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-red-800">Export Failed</p>
