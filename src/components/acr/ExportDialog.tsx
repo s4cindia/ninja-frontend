@@ -48,7 +48,7 @@ export function ExportDialog({ acrId, isOpen, onClose }: ExportDialogProps) {
   const [footerText, setFooterText] = useState('');
   const [showBranding, setShowBranding] = useState(false);
 
-  const { exportAcr, isExporting, downloadUrl, filename, reset } = useExportAcr();
+  const { exportAcr, isExporting, downloadUrl, filename, reset, error } = useExportAcr();
 
   useEffect(() => {
     if (!isOpen) {
@@ -247,6 +247,22 @@ export function ExportDialog({ acrId, isOpen, onClose }: ExportDialogProps) {
                   <p className="text-sm font-medium text-green-800">Export Complete!</p>
                   <p className="text-sm text-green-700">{filename}</p>
                   <p className="text-xs text-green-600 mt-1">File downloaded automatically. Check your downloads folder.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0">
+                  <X className="h-6 w-6 text-red-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-red-800">Export Failed</p>
+                  <p className="text-sm text-red-700">
+                    {error instanceof Error ? error.message : 'An unexpected error occurred'}
+                  </p>
                 </div>
               </div>
             </div>

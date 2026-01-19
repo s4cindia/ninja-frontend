@@ -22,39 +22,47 @@ async function exportAcr(acrId: string, options: ExportOptions): Promise<ExportR
 }
 
 function triggerBase64Download(content: string, filename: string, format: string): void {
-  const byteCharacters = atob(content);
-  const byteNumbers = new Array(byteCharacters.length);
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i);
+  try {
+    const byteArray = Uint8Array.from(atob(content), c => c.charCodeAt(0));
+    const mimeTypes: Record<string, string> = {
+      pdf: 'application/pdf',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      html: 'text/html',
+    };
+    const blob = new Blob([byteArray], { type: mimeTypes[format] || 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+  } catch (error) {
+    console.error('Failed to decode and download file:', error);
+    throw new Error('Failed to process the exported file. The file content may be corrupted.');
   }
-  const byteArray = new Uint8Array(byteNumbers);
-  const mimeTypes: Record<string, string> = {
-    pdf: 'application/pdf',
-    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    html: 'text/html',
-  };
-  const blob = new Blob([byteArray], { type: mimeTypes[format] || 'application/octet-stream' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  setTimeout(() => URL.revokeObjectURL(url), 100);
 }
 
 export function useExportAcr() {
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [filename, setFilename] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<Error | null>(null);
 
   const mutation = useMutation({
     mutationFn: ({ acrId, options }: { acrId: string; options: ExportOptions }) =>
       exportAcr(acrId, options),
     onSuccess: (data) => {
-      setDownloadUrl(data.downloadUrl);
-      setFilename(data.filename);
-      triggerBase64Download(data.content, data.filename, data.format);
+      setDownloadError(null);
+      try {
+        triggerBase64Download(data.content, data.filename, data.format);
+        setDownloadUrl(data.downloadUrl);
+        setFilename(data.filename);
+      } catch (error) {
+        setDownloadUrl(null);
+        setFilename(null);
+        setDownloadError(error instanceof Error ? error : new Error('Download failed'));
+      }
     },
   });
 
@@ -65,16 +73,19 @@ export function useExportAcr() {
   const reset = useCallback(() => {
     setDownloadUrl(null);
     setFilename(null);
+    setDownloadError(null);
     mutation.reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const combinedError = mutation.error || downloadError;
 
   return {
     exportAcr: doExport,
     isExporting: mutation.isPending,
     downloadUrl,
     filename,
-    error: mutation.error,
+    error: combinedError,
     reset,
   };
 }
