@@ -195,8 +195,13 @@ export const EPUBExportOptions: React.FC<EPUBExportOptionsProps> = ({
       try {
         const response = await api.get(`/epub/job/${jobId}/comparison/summary`);
         data = response.data.data || response.data;
-      } catch {
-        data = generateDemoComparisonReport();
+      } catch (err: unknown) {
+        const axiosError = err as { response?: { status?: number } };
+        if (axiosError.response?.status === 404) {
+          data = generateDemoComparisonReport();
+        } else {
+          throw err;
+        }
       }
 
       if (reportFormat === 'json') {
