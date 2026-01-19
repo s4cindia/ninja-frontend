@@ -6,7 +6,9 @@ import type { ExportOptions, ExportResult, ExportFormat } from '@/types/acr.type
 
 interface ApiResponse {
   success: boolean;
-  data: ExportResult;
+  data?: ExportResult;
+  message?: string;
+  error?: string;
 }
 
 async function exportAcr(acrId: string, options: ExportOptions): Promise<ExportResult> {
@@ -18,6 +20,16 @@ async function exportAcr(acrId: string, options: ExportOptions): Promise<ExportR
       includeAttribution: options.includeAttributionTags,
     },
   });
+
+  if (!response.data.success) {
+    const errorMessage = response.data.message || response.data.error || 'Export failed';
+    throw new Error(errorMessage);
+  }
+
+  if (!response.data.data) {
+    throw new Error('Export succeeded but no data was returned');
+  }
+
   return response.data.data;
 }
 
