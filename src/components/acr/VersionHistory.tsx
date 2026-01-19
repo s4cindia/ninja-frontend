@@ -181,6 +181,18 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
     );
   }
 
+  if (!isLoading && versions.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+        <History className="h-12 w-12 mb-4 text-gray-300" />
+        <p className="text-lg font-medium">No version history yet</p>
+        <p className="text-sm mt-2">
+          Versions will be created automatically when you update criteria or complete AI analysis.
+        </p>
+      </div>
+    );
+  }
+
   const showToast = (message: string) => {
     setToast({ show: true, message });
     setTimeout(() => setToast({ show: false, message: '' }), 3000);
