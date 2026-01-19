@@ -33,15 +33,76 @@ async function exportAcr(acrId: string, options: ExportOptions): Promise<ExportR
   return response.data.data;
 }
 
-function triggerBase64Download(content: string, filename: string, format: string): void {
+const BASE64_REGEX = /^[A-Za-z0-9+/]*={0,2}$/;
+const LARGE_FILE_THRESHOLD = 5 * 1024 * 1024;
+
+function isValidBase64(str: string): boolean {
+  if (!str || str.length === 0) return false;
+  if (str.length % 4 !== 0) return false;
+  return BASE64_REGEX.test(str);
+}
+
+function decodeBase64InWorker(content: string): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    const workerCode = `
+      self.onmessage = function(e) {
+        try {
+          const content = e.data;
+          const binaryString = atob(content);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          self.postMessage({ success: true, data: bytes });
+        } catch (err) {
+          self.postMessage({ success: false, error: err.message });
+        }
+      };
+    `;
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    const worker = new Worker(URL.createObjectURL(blob));
+    
+    worker.onmessage = (e) => {
+      worker.terminate();
+      if (e.data.success) {
+        resolve(e.data.data);
+      } else {
+        reject(new Error(e.data.error));
+      }
+    };
+    
+    worker.onerror = (err) => {
+      worker.terminate();
+      reject(new Error('Worker failed: ' + err.message));
+    };
+    
+    worker.postMessage(content);
+  });
+}
+
+async function triggerBase64Download(content: string, filename: string, format: string): Promise<void> {
+  if (!isValidBase64(content)) {
+    throw new Error('Invalid base64 content received from server');
+  }
+
+  const estimatedSize = (content.length * 3) / 4;
+  const isLargeFile = estimatedSize > LARGE_FILE_THRESHOLD;
+
   try {
-    const byteArray = Uint8Array.from(atob(content), c => c.charCodeAt(0));
+    let byteArray: Uint8Array;
+    
+    if (isLargeFile && typeof Worker !== 'undefined') {
+      byteArray = await decodeBase64InWorker(content);
+    } else {
+      byteArray = Uint8Array.from(atob(content), c => c.charCodeAt(0));
+    }
+
     const mimeTypes: Record<string, string> = {
       pdf: 'application/pdf',
       docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       html: 'text/html',
     };
-    const blob = new Blob([byteArray], { type: mimeTypes[format] || 'application/octet-stream' });
+    const blob = new Blob([byteArray.buffer as ArrayBuffer], { type: mimeTypes[format] || 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -64,10 +125,10 @@ export function useExportAcr() {
   const mutation = useMutation({
     mutationFn: ({ acrId, options }: { acrId: string; options: ExportOptions }) =>
       exportAcr(acrId, options),
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       setDownloadError(null);
       try {
-        triggerBase64Download(data.content, data.filename, data.format);
+        await triggerBase64Download(data.content, data.filename, data.format);
         setDownloadUrl(data.downloadUrl);
         setFilename(data.filename);
       } catch (error) {
