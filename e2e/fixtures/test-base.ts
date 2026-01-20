@@ -12,10 +12,11 @@ const USE_MOCK_API = process.env.MOCK_API === 'true';
 const email = process.env.TEST_USER_EMAIL || (USE_MOCK_API ? 'test@example.com' : '');
 const password = process.env.TEST_USER_PASSWORD || (USE_MOCK_API ? 'password123' : '');
 
-if (!email || !password) {
+// Only throw error when NOT in mock mode and credentials are missing
+if (!USE_MOCK_API && (!email || !password)) {
   throw new Error(
-    'TEST_USER_EMAIL and TEST_USER_PASSWORD environment variables must be set. ' +
-    'See e2e/README.md for setup instructions.'
+    'TEST_USER_EMAIL and TEST_USER_PASSWORD environment variables must be set when MOCK_API is not enabled. ' +
+    'Set MOCK_API=true to use default test credentials, or see e2e/README.md for setup instructions.'
   );
 }
 
