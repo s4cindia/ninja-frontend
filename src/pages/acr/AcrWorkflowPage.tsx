@@ -328,6 +328,7 @@ export function AcrWorkflowPage() {
     if (state.currentStep < WORKFLOW_STEPS.length) {
       // If moving from Step 3 (AI Analysis) to Step 4, create ACR document
       if (state.currentStep === 3 && state.jobId && state.selectedEdition) {
+        console.log('[ACR Workflow] Creating ACR document with jobId:', state.jobId);
         try {
           // Create ACR analysis document
           const response = await createAcrAnalysis({
@@ -335,15 +336,21 @@ export function AcrWorkflowPage() {
             edition: state.selectedEdition.code,
             documentTitle: state.fileName || documentTitle || 'Untitled Document'
           });
-          console.log('[ACR Workflow] ACR document created successfully:', response);
+          console.log('[ACR Workflow] ACR document created, response:', JSON.stringify(response));
           
           // Update state with the real job ID and ACR ID from backend
-          if (response?.data?.jobId) {
+          // Handle both { data: { jobId } } and { jobId } response formats
+          const newJobId = response?.data?.jobId || response?.jobId;
+          const newAcrId = response?.data?.acrId || response?.acrId || newJobId;
+          
+          if (newJobId) {
+            console.log('[ACR Workflow] Updating state with jobId:', newJobId, 'acrId:', newAcrId);
             updateState({
-              jobId: response.data.jobId,
-              acrId: response.data.acrId || response.data.jobId,
+              jobId: newJobId,
+              acrId: newAcrId,
             });
-            console.log('[ACR Workflow] Updated job ID to:', response.data.jobId);
+          } else {
+            console.warn('[ACR Workflow] No jobId in response, keeping current:', state.jobId);
           }
         } catch (error) {
           console.error('[ACR Workflow] Failed to create ACR document:', error);
