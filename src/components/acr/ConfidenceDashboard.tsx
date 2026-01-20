@@ -625,6 +625,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   const [detailsCriterion, setDetailsCriterion] = useState<CriterionConfidence | null>(null);
   const [showOnlyWithIssues, setShowOnlyWithIssues] = useState(false);
   const [showOtherIssues, setShowOtherIssues] = useState(false);
+  const otherIssuesRef = useRef<HTMLDivElement>(null);
   const [otherIssues, setOtherIssues] = useState<{
     count: number;
     issues: Array<{
@@ -1040,8 +1041,15 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                   : 'bg-gray-100 text-orange-600 hover:bg-orange-50'
               )}
               onClick={() => {
-                setShowOtherIssues(!showOtherIssues);
-                if (!showOtherIssues) setShowOnlyWithIssues(false);
+                const newShowOtherIssues = !showOtherIssues;
+                setShowOtherIssues(newShowOtherIssues);
+                if (newShowOtherIssues) {
+                  setShowOnlyWithIssues(false);
+                  // Auto-scroll to Other Issues section after state update
+                  setTimeout(() => {
+                    otherIssuesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }, 100);
+                }
               }}
             >
               <AlertTriangle className="mr-1 h-4 w-4" />
@@ -1228,7 +1236,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
 
       {/* Display other issues when filtered */}
       {showOtherIssues && otherIssues && otherIssues.count > 0 && (
-        <div className="mt-6 space-y-4">
+        <div ref={otherIssuesRef} className="mt-6 space-y-4">
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle className="h-5 w-5 text-orange-600" />
             <h3 className="text-lg font-semibold text-gray-900">
