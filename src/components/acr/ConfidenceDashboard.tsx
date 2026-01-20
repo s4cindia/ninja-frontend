@@ -726,15 +726,23 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   // Filter criteria based on showOnlyWithIssues
   const filteredCriteria = showOnlyWithIssues
     ? criteria.filter(c => {
-        // Check hasIssues flag from backend first
-        if (c.hasIssues === true) return true;
-        if (c.hasIssues === false) return false;
-        // Fallback to issueCount, remainingCount, or status-based detection
-        const hasIssueCount = (c.issueCount || 0) > 0 || (c.remainingCount || 0) > 0;
-        const hasFailingStatus = c.status === 'fail' || c.needsVerification;
+        // Check for issues from issuesByCriterion first (most reliable source)
         const issueInfo = issuesByCriterion.get(c.criterionId);
         const hasRelatedIssues = issueInfo && issueInfo.count > 0;
-        return hasIssueCount || hasFailingStatus || hasRelatedIssues;
+        if (hasRelatedIssues) return true;
+        
+        // Check issueCount, remainingCount from the criterion itself
+        const hasIssueCount = (c.issueCount || 0) > 0 || (c.remainingCount || 0) > 0;
+        if (hasIssueCount) return true;
+        
+        // Check hasIssues flag from backend
+        if (c.hasIssues === true) return true;
+        
+        // Check for failing status
+        const hasFailingStatus = c.status === 'fail';
+        if (hasFailingStatus) return true;
+        
+        return false;
       })
     : criteria;
 
