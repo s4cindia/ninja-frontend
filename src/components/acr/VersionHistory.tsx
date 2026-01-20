@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { History, Clock, User, ChevronRight, RotateCcw, ArrowLeftRight, Loader2, CheckCircle } from 'lucide-react';
+import { History, Clock, User, ChevronRight, RotateCcw, ArrowLeftRight, Loader2, CheckCircle, FileText } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -183,11 +183,13 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
 
   if (!isLoading && versions.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-        <History className="h-12 w-12 mb-4 text-gray-300" />
-        <p className="text-lg font-medium">No version history yet</p>
-        <p className="text-sm mt-2">
-          Versions will be created automatically when you update criteria or complete AI analysis.
+      <div className="text-center py-8">
+        <FileText className="h-12 w-12 mx-auto text-gray-400 mb-3" />
+        <p className="text-sm text-gray-600 font-medium mb-1">
+          No version history available yet
+        </p>
+        <p className="text-xs text-gray-500">
+          Versions will be created automatically after AI analysis completes.
         </p>
       </div>
     );
