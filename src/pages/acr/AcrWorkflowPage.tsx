@@ -397,6 +397,7 @@ export function AcrWorkflowPage() {
         uploadedFile,
         jobId: newJobId,
         acrId: `acr-${newJobId}`,
+        fileName: file.name,
       });
     }
   };
@@ -416,6 +417,7 @@ export function AcrWorkflowPage() {
         uploadedFile,
         jobId: newJobId,
         acrId: `acr-${newJobId}`,
+        fileName: file.name,
       });
     }
   };
