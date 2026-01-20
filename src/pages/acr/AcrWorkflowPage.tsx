@@ -626,7 +626,7 @@ export function AcrWorkflowPage() {
               </p>
             </div>
 
-            {effectiveJobId && (
+            {effectiveJobId && state.jobId === effectiveJobId && (
               <Alert variant="success">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4" />
