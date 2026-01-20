@@ -726,9 +726,12 @@ export function AcrWorkflowPage() {
                                 {getJobDisplayName(job)}
                               </p>
                               <p className="text-xs text-gray-500">
-                                {new Date(job.createdAt).toLocaleDateString()}
-                                {job.output?.accessibilityScore !== undefined && 
-                                  ` - Score: ${job.output.accessibilityScore}%`}
+                                {new Date(job.createdAt).toLocaleString()}
+                                {(job.output?.score !== undefined || job.output?.accessibilityScore !== undefined) && 
+                                  ` - Score: ${job.output?.score ?? job.output?.accessibilityScore}%`}
+                              </p>
+                              <p className="text-xs text-gray-400 font-mono truncate" title={job.id}>
+                                ID: {job.id.slice(0, 8)}...
                               </p>
                             </div>
                           </div>
