@@ -175,7 +175,11 @@ function ProgressBar({ currentStep, totalSteps }: { currentStep: number; totalSt
 interface AuditJob {
   id: string;
   input?: { fileName?: string };
-  output?: { fileName?: string; accessibilityScore?: number };
+  output?: {
+    fileName?: string;
+    accessibilityScore?: number;
+    score?: number;  // EPUB audit uses 'score'
+  };
   createdAt: string;
 }
 
@@ -267,9 +271,11 @@ export function AcrWorkflowPage() {
         const response = await api.get('/jobs');
         const jobs = response.data.data || response.data;
         const jobsWithAudit = Array.isArray(jobs) 
-          ? jobs.filter((job: AuditJob) => 
-              job.output?.accessibilityScore !== undefined
-            )
+          ? jobs.filter((job: AuditJob) => {
+              // Check for either 'score' (EPUB audit) or 'accessibilityScore'
+              const output = job.output;
+              return output?.score !== undefined || output?.accessibilityScore !== undefined;
+            })
           : [];
         setAvailableJobs(jobsWithAudit);
       } catch (error) {
