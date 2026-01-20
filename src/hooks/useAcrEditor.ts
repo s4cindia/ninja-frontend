@@ -9,11 +9,23 @@ import type {
   ConformanceLevel,
 } from '@/types/acr.types';
 
+// Validate that a jobId is a valid UUID (not a demo/placeholder ID)
+function isValidJobId(jobId: string | undefined | null): boolean {
+  if (!jobId) return false;
+  // Reject demo/placeholder IDs
+  if (jobId === 'demo' || jobId === 'new' || jobId.startsWith('upload-') || jobId.startsWith('demo-')) {
+    return false;
+  }
+  // Validate UUID format (standard 8-4-4-4-12 format)
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(jobId);
+}
+
 export function useAcrDocument(jobId: string) {
   return useQuery<AcrDocument>({
     queryKey: ['acr-document', jobId],
     queryFn: () => acrService.getDocument(jobId),
-    enabled: !!jobId,
+    enabled: isValidJobId(jobId),
   });
 }
 
@@ -41,7 +53,7 @@ export function useCredibilityValidation(jobId: string) {
   return useQuery<CredibilityValidation>({
     queryKey: ['credibility', jobId],
     queryFn: () => acrService.validateCredibility(jobId),
-    enabled: !!jobId,
+    enabled: isValidJobId(jobId),
   });
 }
 
@@ -49,7 +61,7 @@ export function useCanFinalize(jobId: string) {
   return useQuery<FinalizationStatus>({
     queryKey: ['finalization', jobId],
     queryFn: () => acrService.getFinalizationStatus(jobId),
-    enabled: !!jobId,
+    enabled: isValidJobId(jobId),
   });
 }
 
