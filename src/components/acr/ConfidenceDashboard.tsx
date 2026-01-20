@@ -724,27 +724,32 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
 
   const { tableRows, transformed } = analysisData;
 
-  // Filter criteria based on showOnlyWithIssues
+  /**
+   * Filter criteria for "Has Issues" view.
+   * Priority order (first match wins):
+   * 1. issuesByCriterion - Most reliable, derived from audit issue mapping
+   * 2. issueCount/remainingCount - Direct counts from criterion data
+   * 3. hasIssues flag - Backend-provided flag
+   * 4. needsVerification - Items requiring human verification
+   * 5. status === 'fail' - Failing criteria status
+   */
   const filteredCriteria = showOnlyWithIssues
     ? criteria.filter(c => {
-        // Check for issues from issuesByCriterion first (most reliable source)
+        // Priority 1: Check issuesByCriterion (most reliable source)
         const issueInfo = issuesByCriterion.get(c.criterionId);
-        const hasRelatedIssues = issueInfo && issueInfo.count > 0;
-        if (hasRelatedIssues) return true;
+        if (issueInfo && issueInfo.count > 0) return true;
         
-        // Check issueCount, remainingCount from the criterion itself
-        const hasIssueCount = (c.issueCount || 0) > 0 || (c.remainingCount || 0) > 0;
-        if (hasIssueCount) return true;
+        // Priority 2: Check issueCount/remainingCount from criterion
+        if ((c.issueCount || 0) > 0 || (c.remainingCount || 0) > 0) return true;
         
-        // Check hasIssues flag from backend
+        // Priority 3: Check hasIssues flag from backend
         if (c.hasIssues === true) return true;
         
-        // Check for needsVerification - items needing verification should be included
+        // Priority 4: Include items needing verification
         if (c.needsVerification === true) return true;
         
-        // Check for failing status
-        const hasFailingStatus = c.status === 'fail';
-        if (hasFailingStatus) return true;
+        // Priority 5: Check for failing status
+        if (c.status === 'fail') return true;
         
         return false;
       })

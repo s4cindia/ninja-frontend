@@ -278,7 +278,6 @@ export function AcrWorkflowPage() {
         // Handle different response formats: { data: { jobs: [...] } } or { data: [...] }
         const responseData = response.data?.data;
         const jobs = responseData?.jobs || (Array.isArray(responseData) ? responseData : []);
-        console.log('[ACR] Fetched jobs response:', JSON.stringify(jobs?.slice?.(0, 3) || jobs));
         const jobsWithAudit = Array.isArray(jobs) 
           ? jobs.filter((job: AuditJob) => {
               // Check for either 'score' (EPUB audit) or 'accessibilityScore'
@@ -287,7 +286,6 @@ export function AcrWorkflowPage() {
               return hasScore;
             })
           : [];
-        console.log('[ACR] Filtered jobs with audit:', jobsWithAudit.length);
         setAvailableJobs(jobsWithAudit);
       } catch (error) {
         console.warn('[ACR] Failed to fetch jobs:', error);
@@ -356,10 +354,16 @@ export function AcrWorkflowPage() {
       // If moving from Step 3 (AI Analysis) to Step 4, upload file and create ACR document
       if (state.currentStep === 3 && state.selectedEdition) {
         const fileToUpload = uploadedFileRef.current;
+        const isUploadFlow = state.jobId?.startsWith('upload-');
+        
+        // Guard: Upload flow requires a file
+        if (isUploadFlow && !fileToUpload) {
+          setUploadError('No file selected. Please upload a file to continue.');
+          return;
+        }
         
         if (fileToUpload) {
           // New file upload flow - use combined endpoint
-          console.log('[ACR Workflow] Uploading file and creating ACR:', fileToUpload.name);
           setIsUploading(true);
           
           try {
@@ -371,62 +375,63 @@ export function AcrWorkflowPage() {
             // Let axios set Content-Type header with correct multipart boundary automatically
             const response = await api.post('/acr/analysis-with-upload', formData);
             
-            console.log('[ACR Workflow] Upload response:', JSON.stringify(response.data));
-            
             // Extract IDs and documentTitle from response
             const data = response.data?.data || response.data;
             const newJobId = data?.jobId;
             const newAcrId = data?.acrId || newJobId;
             const responseDocumentTitle = data?.documentTitle || data?.acrJob?.documentTitle;
             
-            if (newJobId) {
-              console.log('[ACR Workflow] Updating state with jobId:', newJobId, 'acrId:', newAcrId, 'documentTitle:', responseDocumentTitle);
-              updateState({
-                jobId: newJobId,
-                acrId: newAcrId,
-                // Update fileName from response if available (prevents unnecessary API call)
-                ...(responseDocumentTitle && { fileName: responseDocumentTitle }),
-              });
-              // Also update the local documentTitle state
-              if (responseDocumentTitle) {
-                setDocumentTitle(responseDocumentTitle);
-              }
-              // Clear the file ref since it's been uploaded
-              uploadedFileRef.current = null;
-            } else {
-              console.warn('[ACR Workflow] No jobId in response');
+            // Guard: Response must contain valid jobId
+            if (!newJobId) {
+              setUploadError('Upload failed: No job ID returned from server.');
+              return;
             }
+            
+            updateState({
+              jobId: newJobId,
+              acrId: newAcrId,
+              ...(responseDocumentTitle && { fileName: responseDocumentTitle }),
+            });
+            if (responseDocumentTitle) {
+              setDocumentTitle(responseDocumentTitle);
+            }
+            // Clear the file ref since it's been uploaded
+            uploadedFileRef.current = null;
           } catch (error: unknown) {
-            console.error('[ACR Workflow] Failed to upload and create ACR:', error);
             const errorMessage = error instanceof Error ? error.message : String(error);
             setUploadError(errorMessage);
-            // Do not advance workflow on failure - return early
+            // Do not advance workflow on failure
             return;
           } finally {
             setIsUploading(false);
           }
-        } else if (state.jobId && !state.jobId.startsWith('upload-')) {
+        } else if (state.jobId && !isUploadFlow) {
           // Existing job flow - use original endpoint
-          console.log('[ACR Workflow] Creating ACR for existing job:', state.jobId);
           try {
             const response = await createAcrAnalysis({
               jobId: state.jobId,
               edition: state.selectedEdition.code,
               documentTitle: state.fileName || documentTitle || 'Untitled Document'
             });
-            console.log('[ACR Workflow] ACR created, response:', JSON.stringify(response));
             
             const newJobId = response?.data?.jobId || response?.jobId;
             const newAcrId = response?.data?.acrId || response?.acrId || newJobId;
             
-            if (newJobId) {
-              updateState({
-                jobId: newJobId,
-                acrId: newAcrId,
-              });
+            // Guard: Response must contain valid jobId
+            if (!newJobId) {
+              setUploadError('Failed to create ACR: No job ID returned from server.');
+              return;
             }
-          } catch (error) {
-            console.error('[ACR Workflow] Failed to create ACR:', error);
+            
+            updateState({
+              jobId: newJobId,
+              acrId: newAcrId,
+            });
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            setUploadError(`Failed to create ACR: ${errorMessage}`);
+            // Do not advance workflow on failure
+            return;
           }
         }
       }
@@ -453,8 +458,8 @@ export function AcrWorkflowPage() {
     updateState({ isFinalized: true, currentStep: 6 });
   };
 
-  const handleRestore = (version: number) => {
-    console.log('Restoring to version:', version);
+  const handleRestore = (_version: number) => {
+    // TODO: Implement version restore functionality
   };
 
   const handleResetWorkflow = () => {
@@ -551,7 +556,6 @@ export function AcrWorkflowPage() {
       ? (selectedJob.input?.fileName || selectedJob.output?.fileName || (selectedJob.output as { epubTitle?: string })?.epubTitle || 'Untitled Document')
       : null;
     
-    console.log('[ACR] Selecting job:', jobId, 'fileName:', jobFileName);
     
     updateState({ 
       documentSource: 'existing',

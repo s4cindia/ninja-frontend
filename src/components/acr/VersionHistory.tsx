@@ -242,14 +242,6 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
-      </div>
-    );
-  }
-
   const currentVersion = versions.length > 0 ? versions[0].version : null;
 
   return (

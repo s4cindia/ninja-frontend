@@ -3,6 +3,7 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { getVisualComparison } from '@/services/comparison.service';
 import { EPUBRenderer } from '../epub/EPUBRenderer';
 import { Loader2, ZoomIn, ZoomOut, Info, Code, AlertTriangle, Columns, Rows, Maximize2, X } from 'lucide-react';
+import { sanitizeText } from '@/utils/sanitize';
 
 interface ChangeExplanation {
   title: string;
@@ -369,6 +370,18 @@ export function VisualComparisonPanel({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isFullscreen, canNavigatePrevious, canNavigateNext, onNavigatePrevious, onNavigateNext, handleCloseFullscreen]);
 
+  // Debounce timer ref for scroll sync
+  const scrollDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  // Cleanup scroll debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollDebounceRef.current) {
+        clearTimeout(scrollDebounceRef.current);
+      }
+    };
+  }, []);
+  
   const handleSyncScroll = useCallback((source: 'before' | 'after') => (e: React.UIEvent<HTMLDivElement>) => {
     if (isScrollingRef.current) return;
 
@@ -376,6 +389,11 @@ export function VisualComparisonPanel({
     const targetEl = source === 'before' ? afterScrollRef.current : beforeScrollRef.current;
 
     if (!targetEl) return;
+
+    // Clear any pending debounce
+    if (scrollDebounceRef.current) {
+      clearTimeout(scrollDebounceRef.current);
+    }
 
     isScrollingRef.current = true;
 
@@ -386,9 +404,11 @@ export function VisualComparisonPanel({
     const targetScrollableHeight = targetEl.scrollHeight - targetEl.clientHeight;
     targetEl.scrollTop = scrollPercentage * targetScrollableHeight;
 
-    requestAnimationFrame(() => {
+    // Use debounced timeout instead of requestAnimationFrame for reliable reset
+    scrollDebounceRef.current = setTimeout(() => {
       isScrollingRef.current = false;
-    });
+      scrollDebounceRef.current = null;
+    }, 50);
   }, []);
 
   if (isLoading && !displayData) {
@@ -780,7 +800,8 @@ export function VisualComparisonPanel({
                     </div>
                     <pre className="text-red-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all">
 {(() => {
-  const html = displayData.beforeContent?.html || '';
+  // Sanitize HTML content before display to prevent XSS
+  const html = sanitizeText(displayData.beforeContent?.html || '');
   if (!html) return 'No content available';
   const truncated = html.slice(0, 1000);
   const lastClosingTag = truncated.lastIndexOf('>');
@@ -795,8 +816,9 @@ export function VisualComparisonPanel({
                     </div>
                     <div className="text-green-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all font-mono">
 {(() => {
-  const beforeHtml = displayData.beforeContent?.html || '';
-  const afterHtml = displayData.afterContent?.html || '';
+  // Sanitize HTML content before display to prevent XSS
+  const beforeHtml = sanitizeText(displayData.beforeContent?.html || '');
+  const afterHtml = sanitizeText(displayData.afterContent?.html || '');
   if (!afterHtml) return <span>No content available</span>;
   
   const truncateHtml = (html: string) => {
