@@ -284,6 +284,12 @@ export function AcrWorkflowPage() {
   }, []);
 
   useEffect(() => {
+    // Skip API call if we already have a filename from the workflow state
+    if (state.fileName) {
+      setDocumentTitle(state.fileName);
+      return;
+    }
+
     const fetchJobTitle = async () => {
       if (!state.jobId) {
         setDocumentTitle('Untitled Document');
@@ -310,7 +316,7 @@ export function AcrWorkflowPage() {
     };
 
     fetchJobTitle();
-  }, [state.jobId]);
+  }, [state.jobId, state.fileName]);
 
   useEffect(() => {
     if (state.jobId) {
@@ -351,17 +357,24 @@ export function AcrWorkflowPage() {
             
             console.log('[ACR Workflow] Upload response:', JSON.stringify(response.data));
             
-            // Extract IDs from response
+            // Extract IDs and documentTitle from response
             const data = response.data?.data || response.data;
             const newJobId = data?.jobId;
             const newAcrId = data?.acrId || newJobId;
+            const responseDocumentTitle = data?.documentTitle || data?.acrJob?.documentTitle;
             
             if (newJobId) {
-              console.log('[ACR Workflow] Updating state with jobId:', newJobId, 'acrId:', newAcrId);
+              console.log('[ACR Workflow] Updating state with jobId:', newJobId, 'acrId:', newAcrId, 'documentTitle:', responseDocumentTitle);
               updateState({
                 jobId: newJobId,
                 acrId: newAcrId,
+                // Update fileName from response if available (prevents unnecessary API call)
+                ...(responseDocumentTitle && { fileName: responseDocumentTitle }),
               });
+              // Also update the local documentTitle state
+              if (responseDocumentTitle) {
+                setDocumentTitle(responseDocumentTitle);
+              }
               // Clear the file ref since it's been uploaded
               uploadedFileRef.current = null;
             } else {
