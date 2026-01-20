@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { api, CriterionConfidence } from '@/services/api';
+import { api, CriterionConfidence, createAcrAnalysis } from '@/services/api';
 import { 
   CheckCircle, 
   ChevronLeft, 
@@ -324,8 +324,24 @@ export function AcrWorkflowPage() {
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (state.currentStep < WORKFLOW_STEPS.length) {
+      // If moving from Step 3 (AI Analysis) to Step 4, create ACR document
+      if (state.currentStep === 3 && state.jobId && state.selectedEdition) {
+        try {
+          // Create ACR analysis document
+          await createAcrAnalysis({
+            jobId: state.jobId,
+            edition: state.selectedEdition.code,
+            documentTitle: state.fileName || documentTitle || 'Untitled Document'
+          });
+          console.log('[ACR Workflow] ACR document created successfully');
+        } catch (error) {
+          console.error('[ACR Workflow] Failed to create ACR document:', error);
+          // Continue anyway - user can retry later
+        }
+      }
+
       goToStep(state.currentStep + 1);
     }
   };
