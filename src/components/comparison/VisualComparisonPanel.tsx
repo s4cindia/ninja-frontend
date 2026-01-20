@@ -791,17 +791,38 @@ export function VisualComparisonPanel({
 
                   <div className="bg-green-50 border border-green-200 rounded overflow-hidden">
                     <div className="bg-green-100 px-3 py-1 text-green-800 font-semibold border-b border-green-200">
-                      After
+                      After (changes highlighted)
                     </div>
-                    <pre className="text-green-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all">
+                    <div className="text-green-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all font-mono">
 {(() => {
-  const html = displayData.afterContent?.html || '';
-  if (!html) return 'No content available';
-  const truncated = html.slice(0, 1000);
-  const lastClosingTag = truncated.lastIndexOf('>');
-  return lastClosingTag > 0 ? truncated.slice(0, lastClosingTag + 1) + (html.length > 1000 ? '...' : '') : truncated;
+  const beforeHtml = displayData.beforeContent?.html || '';
+  const afterHtml = displayData.afterContent?.html || '';
+  if (!afterHtml) return <span>No content available</span>;
+  
+  const truncateHtml = (html: string) => {
+    const truncated = html.slice(0, 1000);
+    const lastClosingTag = truncated.lastIndexOf('>');
+    return lastClosingTag > 0 ? truncated.slice(0, lastClosingTag + 1) + (html.length > 1000 ? '...' : '') : truncated;
+  };
+  
+  const beforeLines = truncateHtml(beforeHtml).split('\n');
+  const afterLines = truncateHtml(afterHtml).split('\n');
+  
+  return afterLines.map((line, idx) => {
+    const beforeLine = beforeLines[idx] || '';
+    const isNewLine = idx >= beforeLines.length;
+    const isChanged = line !== beforeLine;
+    
+    if (isNewLine) {
+      return <div key={idx} className="bg-green-200 text-green-900 px-1 -mx-1 rounded">{line || ' '}</div>;
+    }
+    if (isChanged) {
+      return <div key={idx} className="bg-yellow-200 text-yellow-900 px-1 -mx-1 rounded border-l-2 border-yellow-500">{line || ' '}</div>;
+    }
+    return <div key={idx}>{line || ' '}</div>;
+  });
 })()}
-                    </pre>
+                    </div>
                   </div>
                 </div>
               </div>
