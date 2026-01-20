@@ -33,13 +33,28 @@ interface VersionCompareResponse {
 }
 
 export function useVersionHistory(acrId: string): VersionHistoryData {
+  // Extract the jobId from the acrId if it follows the pattern "acr-{jobId}"
+  const jobId = acrId.startsWith('acr-') ? acrId.slice(4) : acrId;
+  
   const query = useQuery({
     queryKey: ['acr-versions', acrId],
     queryFn: async () => {
-      const response = await api.get<VersionHistoryResponse>(`/acr/${acrId}/versions`);
-      return response.data.data;
+      // Try the acrId first, then fall back to jobId-based endpoint
+      try {
+        const response = await api.get<VersionHistoryResponse>(`/acr/${acrId}/versions`);
+        return response.data.data;
+      } catch {
+        // If the acrId format doesn't work, try with the extracted jobId
+        if (jobId !== acrId) {
+          const fallbackResponse = await api.get<VersionHistoryResponse>(`/acr/${jobId}/versions`);
+          return fallbackResponse.data.data;
+        }
+        // Return empty array if no versions found
+        return [];
+      }
     },
-    enabled: !!acrId,
+    enabled: !!acrId && acrId !== 'demo',
+    retry: false, // Don't retry on failure to avoid unnecessary API calls
   });
 
   return {
