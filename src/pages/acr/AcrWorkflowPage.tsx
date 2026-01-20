@@ -269,14 +269,19 @@ export function AcrWorkflowPage() {
       setJobsError(null);
       try {
         const response = await api.get('/jobs');
-        const jobs = response.data.data || response.data;
+        // Handle different response formats: { data: { jobs: [...] } } or { data: [...] }
+        const responseData = response.data?.data;
+        const jobs = responseData?.jobs || (Array.isArray(responseData) ? responseData : []);
+        console.log('[ACR] Fetched jobs response:', JSON.stringify(jobs?.slice?.(0, 3) || jobs));
         const jobsWithAudit = Array.isArray(jobs) 
           ? jobs.filter((job: AuditJob) => {
               // Check for either 'score' (EPUB audit) or 'accessibilityScore'
               const output = job.output;
-              return output?.score !== undefined || output?.accessibilityScore !== undefined;
+              const hasScore = output?.score !== undefined || output?.accessibilityScore !== undefined;
+              return hasScore;
             })
           : [];
+        console.log('[ACR] Filtered jobs with audit:', jobsWithAudit.length);
         setAvailableJobs(jobsWithAudit);
       } catch (error) {
         console.warn('[ACR] Failed to fetch jobs:', error);
