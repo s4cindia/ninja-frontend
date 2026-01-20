@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, CriterionConfidence, createAcrAnalysis } from '@/services/api';
 import { 
@@ -197,6 +197,10 @@ export function AcrWorkflowPage() {
   const [jobsError, setJobsError] = useState<string | null>(null);
   const [analysisResults, setAnalysisResults] = useState<CriterionConfidence[]>([]);
   const [documentTitle, setDocumentTitle] = useState<string>('Untitled Document');
+  const [isUploading, setIsUploading] = useState(false);
+  
+  // Store actual File object for upload (not serializable to localStorage)
+  const uploadedFileRef = useRef<File | null>(null);
 
   const handleCriteriaLoaded = useCallback((criteria: CriterionConfidence[]) => {
     setAnalysisResults(criteria);
@@ -326,35 +330,72 @@ export function AcrWorkflowPage() {
 
   const handleNext = async () => {
     if (state.currentStep < WORKFLOW_STEPS.length) {
-      // If moving from Step 3 (AI Analysis) to Step 4, create ACR document
-      if (state.currentStep === 3 && state.jobId && state.selectedEdition) {
-        console.log('[ACR Workflow] Creating ACR document with jobId:', state.jobId);
-        try {
-          // Create ACR analysis document
-          const response = await createAcrAnalysis({
-            jobId: state.jobId,
-            edition: state.selectedEdition.code,
-            documentTitle: state.fileName || documentTitle || 'Untitled Document'
-          });
-          console.log('[ACR Workflow] ACR document created, response:', JSON.stringify(response));
+      // If moving from Step 3 (AI Analysis) to Step 4, upload file and create ACR document
+      if (state.currentStep === 3 && state.selectedEdition) {
+        const fileToUpload = uploadedFileRef.current;
+        
+        if (fileToUpload) {
+          // New file upload flow - use combined endpoint
+          console.log('[ACR Workflow] Uploading file and creating ACR:', fileToUpload.name);
+          setIsUploading(true);
           
-          // Update state with the real job ID and ACR ID from backend
-          // Handle both { data: { jobId } } and { jobId } response formats
-          const newJobId = response?.data?.jobId || response?.jobId;
-          const newAcrId = response?.data?.acrId || response?.acrId || newJobId;
-          
-          if (newJobId) {
-            console.log('[ACR Workflow] Updating state with jobId:', newJobId, 'acrId:', newAcrId);
-            updateState({
-              jobId: newJobId,
-              acrId: newAcrId,
+          try {
+            const formData = new FormData();
+            formData.append('file', fileToUpload);
+            formData.append('edition', state.selectedEdition.code);
+            formData.append('documentTitle', state.fileName || documentTitle || 'Untitled Document');
+            
+            const response = await api.post('/acr/analysis-with-upload', formData, {
+              headers: { 'Content-Type': 'multipart/form-data' }
             });
-          } else {
-            console.warn('[ACR Workflow] No jobId in response, keeping current:', state.jobId);
+            
+            console.log('[ACR Workflow] Upload response:', JSON.stringify(response.data));
+            
+            // Extract IDs from response
+            const data = response.data?.data || response.data;
+            const newJobId = data?.jobId;
+            const newAcrId = data?.acrId || newJobId;
+            
+            if (newJobId) {
+              console.log('[ACR Workflow] Updating state with jobId:', newJobId, 'acrId:', newAcrId);
+              updateState({
+                jobId: newJobId,
+                acrId: newAcrId,
+              });
+              // Clear the file ref since it's been uploaded
+              uploadedFileRef.current = null;
+            } else {
+              console.warn('[ACR Workflow] No jobId in response');
+            }
+          } catch (error) {
+            console.error('[ACR Workflow] Failed to upload and create ACR:', error);
+            // Show error but don't block
+          } finally {
+            setIsUploading(false);
           }
-        } catch (error) {
-          console.error('[ACR Workflow] Failed to create ACR document:', error);
-          // Continue anyway - user can retry later
+        } else if (state.jobId && !state.jobId.startsWith('upload-')) {
+          // Existing job flow - use original endpoint
+          console.log('[ACR Workflow] Creating ACR for existing job:', state.jobId);
+          try {
+            const response = await createAcrAnalysis({
+              jobId: state.jobId,
+              edition: state.selectedEdition.code,
+              documentTitle: state.fileName || documentTitle || 'Untitled Document'
+            });
+            console.log('[ACR Workflow] ACR created, response:', JSON.stringify(response));
+            
+            const newJobId = response?.data?.jobId || response?.jobId;
+            const newAcrId = response?.data?.acrId || response?.acrId || newJobId;
+            
+            if (newJobId) {
+              updateState({
+                jobId: newJobId,
+                acrId: newAcrId,
+              });
+            }
+          } catch (error) {
+            console.error('[ACR Workflow] Failed to create ACR:', error);
+          }
         }
       }
 
@@ -418,6 +459,8 @@ export function AcrWorkflowPage() {
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Store actual File object in ref for later upload
+      uploadedFileRef.current = file;
       const uploadedFile: UploadedFile = {
         name: file.name,
         size: file.size,
@@ -438,6 +481,8 @@ export function AcrWorkflowPage() {
     event.preventDefault();
     const file = event.dataTransfer.files?.[0];
     if (file) {
+      // Store actual File object in ref for later upload
+      uploadedFileRef.current = file;
       const uploadedFile: UploadedFile = {
         name: file.name,
         size: file.size,
@@ -951,10 +996,19 @@ export function AcrWorkflowPage() {
           ) : (
             <Button
               onClick={handleNext}
-              disabled={!canProceed()}
+              disabled={!canProceed() || isUploading}
             >
-              Next
-              <ChevronRight className="h-4 w-4 ml-1" />
+              {isUploading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </>
+              )}
             </Button>
           )}
         </div>
