@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
-import { History, Clock, User, ChevronRight, RotateCcw, ArrowLeftRight, Loader2, CheckCircle } from 'lucide-react';
+import { useState } from 'react';
+import { History, Clock, User, ChevronRight, RotateCcw, ArrowLeftRight, Loader2, CheckCircle, FileText } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { MOCK_VERSIONS, useMockVersionDetails } from '@/hooks/useAcrVersions';
+import { useVersionHistory, useVersionDetails } from '@/hooks/useAcrVersions';
 import type { VersionEntry, VersionChange } from '@/types/version.types';
 
 interface VersionHistoryProps {
@@ -168,19 +168,43 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
   const [isCompareMode, setIsCompareMode] = useState(false);
   const [compareVersions, setCompareVersions] = useState<number[]>([]);
-  const [versions, setVersions] = useState<VersionEntry[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState<ToastState>({ show: false, message: '' });
 
-  const { data: versionDetails, isLoading: isLoadingDetails } = useMockVersionDetails(acrId, selectedVersion);
+  const { versions, isLoading, error } = useVersionHistory(acrId);
+  const { data: versionDetails, isLoading: isLoadingDetails } = useVersionDetails(acrId, selectedVersion);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setVersions([...MOCK_VERSIONS]);
-      setIsLoading(false);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [acrId]);
+  // Show loading spinner first while data is being fetched
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+      </div>
+    );
+  }
+
+  // Show error only after loading completes
+  if (error) {
+    return (
+      <div className="flex items-center justify-center py-12 text-red-600">
+        <p>Error loading version history: {error.message}</p>
+      </div>
+    );
+  }
+
+  // Show empty state only when not loading and no versions exist
+  if (versions.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <FileText className="h-12 w-12 mx-auto text-gray-400 mb-3" />
+        <p className="text-sm text-gray-600 font-medium mb-1">
+          No version history available yet
+        </p>
+        <p className="text-xs text-gray-500">
+          Versions will be created automatically after AI analysis completes.
+        </p>
+      </div>
+    );
+  }
 
   const showToast = (message: string) => {
     setToast({ show: true, message });
@@ -212,29 +236,11 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
 
   const handleRestore = (version: number) => {
     if (confirm(`Restore to Version ${version}? This will create a new draft.`)) {
-      const maxVersion = Math.max(...versions.map(v => v.version));
-      const newVersion: VersionEntry = {
-        version: maxVersion + 1,
-        createdAt: new Date().toISOString(),
-        createdBy: 'Current User',
-        changeSummary: `Restored from Version ${version}`,
-        changeCount: 0,
-      };
-      
-      setVersions(prev => [newVersion, ...prev]);
       setSelectedVersion(null);
-      showToast(`Restored to Version ${version}. New Version ${newVersion.version} created.`);
+      showToast(`Restoring to Version ${version}...`);
       onRestore(version);
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
-      </div>
-    );
-  }
 
   const currentVersion = versions.length > 0 ? versions[0].version : null;
 
@@ -329,7 +335,7 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
                 </div>
               ) : versionDetails?.changes && versionDetails.changes.length > 0 ? (
                 <div className="space-y-3">
-                  {versionDetails.changes.map((change, idx) => (
+                  {versionDetails.changes.map((change: VersionChange, idx: number) => (
                     <ChangeItem key={idx} change={change} />
                   ))}
                 </div>

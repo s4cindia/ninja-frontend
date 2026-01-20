@@ -163,12 +163,12 @@ export function useExportAcr() {
     return mutation.mutateAsync({ acrId, options });
   };
 
-  const reset = () => {
+  const reset = useCallback(() => {
     setDownloadUrl(null);
     setFilename(null);
     setDownloadError(null);
     mutation.reset();
-  };
+  }, [mutation]);
 
   const combinedError = mutation.error || downloadError;
 

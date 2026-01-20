@@ -133,6 +133,12 @@ export interface ApiError {
   };
 }
 
+export interface CreateAcrAnalysisRequest {
+  jobId: string;
+  edition: string;
+  documentTitle?: string;
+}
+
 export function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const apiError = error.response?.data as ApiError;
@@ -210,4 +216,9 @@ export interface AcrAnalysisResponse {
 export async function fetchAcrAnalysis(jobId: string): Promise<AcrAnalysisResponse> {
   const response = await api.get<ApiResponse<AcrAnalysisResponse>>(`/acr/analysis/${jobId}`);
   return response.data.data;
+}
+
+export async function createAcrAnalysis(data: CreateAcrAnalysisRequest) {
+  const response = await api.post('/acr/analysis', data);
+  return response.data;
 }

@@ -625,6 +625,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   const [detailsCriterion, setDetailsCriterion] = useState<CriterionConfidence | null>(null);
   const [showOnlyWithIssues, setShowOnlyWithIssues] = useState(false);
   const [showOtherIssues, setShowOtherIssues] = useState(false);
+  const otherIssuesRef = useRef<HTMLDivElement>(null);
   const [otherIssues, setOtherIssues] = useState<{
     count: number;
     issues: Array<{
@@ -723,18 +724,34 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
 
   const { tableRows, transformed } = analysisData;
 
-  // Filter criteria based on showOnlyWithIssues
+  /**
+   * Filter criteria for "Has Issues" view.
+   * Priority order (first match wins):
+   * 1. issuesByCriterion - Most reliable, derived from audit issue mapping
+   * 2. issueCount/remainingCount - Direct counts from criterion data
+   * 3. hasIssues flag - Backend-provided flag
+   * 4. needsVerification - Items requiring human verification
+   * 5. status === 'fail' - Failing criteria status
+   */
   const filteredCriteria = showOnlyWithIssues
     ? criteria.filter(c => {
-        // Check hasIssues flag from backend first
-        if (c.hasIssues === true) return true;
-        if (c.hasIssues === false) return false;
-        // Fallback to issueCount, remainingCount, or status-based detection
-        const hasIssueCount = (c.issueCount || 0) > 0 || (c.remainingCount || 0) > 0;
-        const hasFailingStatus = c.status === 'fail' || c.needsVerification;
+        // Priority 1: Check issuesByCriterion (most reliable source)
         const issueInfo = issuesByCriterion.get(c.criterionId);
-        const hasRelatedIssues = issueInfo && issueInfo.count > 0;
-        return hasIssueCount || hasFailingStatus || hasRelatedIssues;
+        if (issueInfo && issueInfo.count > 0) return true;
+        
+        // Priority 2: Check issueCount/remainingCount from criterion
+        if ((c.issueCount || 0) > 0 || (c.remainingCount || 0) > 0) return true;
+        
+        // Priority 3: Check hasIssues flag from backend
+        if (c.hasIssues === true) return true;
+        
+        // Priority 4: Include items needing verification
+        if (c.needsVerification === true) return true;
+        
+        // Priority 5: Check for failing status
+        if (c.status === 'fail') return true;
+        
+        return false;
       })
     : criteria;
 
@@ -1032,8 +1049,15 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                   : 'bg-gray-100 text-orange-600 hover:bg-orange-50'
               )}
               onClick={() => {
-                setShowOtherIssues(!showOtherIssues);
-                if (!showOtherIssues) setShowOnlyWithIssues(false);
+                const newShowOtherIssues = !showOtherIssues;
+                setShowOtherIssues(newShowOtherIssues);
+                if (newShowOtherIssues) {
+                  setShowOnlyWithIssues(false);
+                  // Auto-scroll to Other Issues section after state update
+                  setTimeout(() => {
+                    otherIssuesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }, 100);
+                }
               }}
             >
               <AlertTriangle className="mr-1 h-4 w-4" />
@@ -1220,7 +1244,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
 
       {/* Display other issues when filtered */}
       {showOtherIssues && otherIssues && otherIssues.count > 0 && (
-        <div className="mt-6 space-y-4">
+        <div ref={otherIssuesRef} className="mt-6 space-y-4">
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle className="h-5 w-5 text-orange-600" />
             <h3 className="text-lg font-semibold text-gray-900">

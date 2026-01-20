@@ -4,6 +4,21 @@ import { getVisualComparison } from '@/services/comparison.service';
 import { EPUBRenderer } from '../epub/EPUBRenderer';
 import { Loader2, ZoomIn, ZoomOut, Info, Code, AlertTriangle, Columns, Rows, Maximize2, X } from 'lucide-react';
 
+/**
+ * Escapes HTML special characters to prevent XSS when displaying HTML source code as text.
+ * Unlike sanitizeText which strips tags, this preserves the markup for viewing in code preview.
+ */
+function escapeHtml(text: string): string {
+  const htmlEntities: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  };
+  return text.replace(/[&<>"']/g, char => htmlEntities[char] ?? char);
+}
+
 interface ChangeExplanation {
   title: string;
   what: string;
@@ -369,6 +384,18 @@ export function VisualComparisonPanel({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isFullscreen, canNavigatePrevious, canNavigateNext, onNavigatePrevious, onNavigateNext, handleCloseFullscreen]);
 
+  // Debounce timer ref for scroll sync
+  const scrollDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  // Cleanup scroll debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollDebounceRef.current) {
+        clearTimeout(scrollDebounceRef.current);
+      }
+    };
+  }, []);
+  
   const handleSyncScroll = useCallback((source: 'before' | 'after') => (e: React.UIEvent<HTMLDivElement>) => {
     if (isScrollingRef.current) return;
 
@@ -376,6 +403,11 @@ export function VisualComparisonPanel({
     const targetEl = source === 'before' ? afterScrollRef.current : beforeScrollRef.current;
 
     if (!targetEl) return;
+
+    // Clear any pending debounce
+    if (scrollDebounceRef.current) {
+      clearTimeout(scrollDebounceRef.current);
+    }
 
     isScrollingRef.current = true;
 
@@ -386,9 +418,16 @@ export function VisualComparisonPanel({
     const targetScrollableHeight = targetEl.scrollHeight - targetEl.clientHeight;
     targetEl.scrollTop = scrollPercentage * targetScrollableHeight;
 
-    requestAnimationFrame(() => {
-      isScrollingRef.current = false;
-    });
+    // Use debounced timeout instead of requestAnimationFrame for reliable reset
+    // Store ref locally to handle potential unmount during timeout
+    const timeoutId = setTimeout(() => {
+      // Guard against unmount: only update if ref still exists
+      if (scrollDebounceRef.current === timeoutId) {
+        isScrollingRef.current = false;
+        scrollDebounceRef.current = null;
+      }
+    }, 50);
+    scrollDebounceRef.current = timeoutId;
   }, []);
 
   if (isLoading && !displayData) {
@@ -771,7 +810,7 @@ export function VisualComparisonPanel({
             </div>
 
             {/* HTML Code Changes Section (Collapsible) */}
-            {showCodeChanges && isStructuralChange && (
+            {showCodeChanges && (
               <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div className="bg-red-50 border border-red-200 rounded overflow-hidden">
@@ -780,28 +819,54 @@ export function VisualComparisonPanel({
                     </div>
                     <pre className="text-red-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all">
 {(() => {
-  const html = displayData.beforeContent?.html || '';
-  if (!html) return 'No content available';
-  const truncated = html.slice(0, 1000);
+  // Escape HTML entities to show source code as text (XSS prevention)
+  const rawHtml = displayData.beforeContent?.html || '';
+  if (!rawHtml) return 'No content available';
+  const truncated = rawHtml.slice(0, 1000);
   const lastClosingTag = truncated.lastIndexOf('>');
-  return lastClosingTag > 0 ? truncated.slice(0, lastClosingTag + 1) + (html.length > 1000 ? '...' : '') : truncated;
+  const displayText = lastClosingTag > 0 ? truncated.slice(0, lastClosingTag + 1) + (rawHtml.length > 1000 ? '...' : '') : truncated;
+  return escapeHtml(displayText);
 })()}
                     </pre>
                   </div>
 
                   <div className="bg-green-50 border border-green-200 rounded overflow-hidden">
                     <div className="bg-green-100 px-3 py-1 text-green-800 font-semibold border-b border-green-200">
-                      After
+                      After (changes highlighted)
                     </div>
-                    <pre className="text-green-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all">
+                    <div className="text-green-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all font-mono">
 {(() => {
-  const html = displayData.afterContent?.html || '';
-  if (!html) return 'No content available';
-  const truncated = html.slice(0, 1000);
-  const lastClosingTag = truncated.lastIndexOf('>');
-  return lastClosingTag > 0 ? truncated.slice(0, lastClosingTag + 1) + (html.length > 1000 ? '...' : '') : truncated;
+  // Escape HTML entities to show source code as text (XSS prevention)
+  const beforeHtml = displayData.beforeContent?.html || '';
+  const afterHtml = displayData.afterContent?.html || '';
+  if (!afterHtml) return <span>No content available</span>;
+  
+  const truncateHtml = (html: string) => {
+    const truncated = html.slice(0, 1000);
+    const lastClosingTag = truncated.lastIndexOf('>');
+    return lastClosingTag > 0 ? truncated.slice(0, lastClosingTag + 1) + (html.length > 1000 ? '...' : '') : truncated;
+  };
+  
+  const beforeLines = truncateHtml(beforeHtml).split('\n');
+  const afterLines = truncateHtml(afterHtml).split('\n');
+  
+  return afterLines.map((line, idx) => {
+    const beforeLine = beforeLines[idx] || '';
+    const isNewLine = idx >= beforeLines.length;
+    const isChanged = line !== beforeLine;
+    // Escape each line for safe display
+    const escapedLine = escapeHtml(line) || ' ';
+    
+    if (isNewLine) {
+      return <div key={idx} className="bg-green-200 text-green-900 px-1 -mx-1 rounded">{escapedLine}</div>;
+    }
+    if (isChanged) {
+      return <div key={idx} className="bg-yellow-200 text-yellow-900 px-1 -mx-1 rounded border-l-2 border-yellow-500">{escapedLine}</div>;
+    }
+    return <div key={idx}>{escapedLine}</div>;
+  });
 })()}
-                    </pre>
+                    </div>
                   </div>
                 </div>
               </div>

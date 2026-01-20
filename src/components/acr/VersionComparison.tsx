@@ -2,7 +2,7 @@ import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { useMockCompareVersions } from '@/hooks/useAcrVersions';
+import { useCompareVersions } from '@/hooks/useAcrVersions';
 import type { VersionDifference } from '@/types/version.types';
 
 interface VersionComparisonProps {
@@ -93,7 +93,7 @@ function DifferenceRow({ diff, isRemarks }: { diff: VersionDifference; isRemarks
 }
 
 export function VersionComparison({ acrId, version1, version2, onBack }: VersionComparisonProps) {
-  const { data: comparison, isLoading } = useMockCompareVersions(acrId, version1, version2);
+  const { data: comparison, isLoading } = useCompareVersions(acrId, version1, version2);
 
   if (isLoading) {
     return (
@@ -111,9 +111,9 @@ export function VersionComparison({ acrId, version1, version2, onBack }: Version
     );
   }
 
-  const conformanceChanges = comparison.differences.filter(d => d.field === 'conformanceLevel');
-  const remarksChanges = comparison.differences.filter(d => d.field === 'remarks');
-  const otherChanges = comparison.differences.filter(d => 
+  const conformanceChanges = comparison.differences.filter((d: VersionDifference) => d.field === 'conformanceLevel');
+  const remarksChanges = comparison.differences.filter((d: VersionDifference) => d.field === 'remarks');
+  const otherChanges = comparison.differences.filter((d: VersionDifference) => 
     d.field !== 'conformanceLevel' && d.field !== 'remarks'
   );
 

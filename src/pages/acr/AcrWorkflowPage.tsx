@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { api, CriterionConfidence } from '@/services/api';
+import { api, CriterionConfidence, createAcrAnalysis } from '@/services/api';
 import { 
   CheckCircle, 
   ChevronLeft, 
@@ -175,7 +175,11 @@ function ProgressBar({ currentStep, totalSteps }: { currentStep: number; totalSt
 interface AuditJob {
   id: string;
   input?: { fileName?: string };
-  output?: { fileName?: string; accessibilityScore?: number };
+  output?: {
+    fileName?: string;
+    accessibilityScore?: number;
+    score?: number;  // EPUB audit uses 'score'
+  };
   createdAt: string;
 }
 
@@ -197,13 +201,23 @@ export function AcrWorkflowPage() {
   const [jobsError, setJobsError] = useState<string | null>(null);
   const [analysisResults, setAnalysisResults] = useState<CriterionConfidence[]>([]);
   const [documentTitle, setDocumentTitle] = useState<string>('Untitled Document');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  
+  // Store actual File object for upload (not serializable to localStorage)
+  const uploadedFileRef = useRef<File | null>(null);
 
   const handleCriteriaLoaded = useCallback((criteria: CriterionConfidence[]) => {
     setAnalysisResults(criteria);
   }, []);
 
+  // Track the last applied URL job to detect navigation between jobs
+  const lastAppliedJobRef = useRef<string | null>(null);
+  
   useEffect(() => {
-    if (effectiveJobId && effectiveJobId !== state.jobId) {
+    // Apply URL job when it changes (initial mount or navigation between jobs)
+    if (effectiveJobId && effectiveJobId !== lastAppliedJobRef.current) {
+      lastAppliedJobRef.current = effectiveJobId;
       const loadedState = loadWorkflowState(effectiveJobId);
       setState({
         ...loadedState,
@@ -213,7 +227,7 @@ export function AcrWorkflowPage() {
         fileName: fileNameFromQuery ? decodeURIComponent(fileNameFromQuery) : loadedState.fileName,
       });
     }
-  }, [effectiveJobId, state.jobId, fileNameFromQuery]);
+  }, [effectiveJobId, fileNameFromQuery]);
 
   useEffect(() => {
     if (fileNameFromQuery) {
@@ -261,11 +275,18 @@ export function AcrWorkflowPage() {
       setJobsError(null);
       try {
         const response = await api.get('/jobs');
-        const jobs = response.data.data || response.data;
+        // Handle different response formats: { data: { jobs: [...] } } or { data: [...] }
+        const responseData = response.data?.data;
+        const jobs = responseData?.jobs || (Array.isArray(responseData) ? responseData : []);
         const jobsWithAudit = Array.isArray(jobs) 
-          ? jobs.filter((job: AuditJob) => 
-              job.output?.accessibilityScore !== undefined
-            )
+          ? jobs.filter((job: AuditJob) => {
+              // Type guard: ensure job is a valid object before accessing properties
+              if (!job || typeof job !== 'object') return false;
+              // Check for either 'score' (EPUB audit) or 'accessibilityScore'
+              const output = job.output;
+              const hasScore = output?.score !== undefined || output?.accessibilityScore !== undefined;
+              return hasScore;
+            })
           : [];
         setAvailableJobs(jobsWithAudit);
       } catch (error) {
@@ -280,6 +301,12 @@ export function AcrWorkflowPage() {
   }, []);
 
   useEffect(() => {
+    // Skip API call if we already have a filename from the workflow state
+    if (state.fileName) {
+      setDocumentTitle(state.fileName);
+      return;
+    }
+
     const fetchJobTitle = async () => {
       if (!state.jobId) {
         setDocumentTitle('Untitled Document');
@@ -306,7 +333,7 @@ export function AcrWorkflowPage() {
     };
 
     fetchJobTitle();
-  }, [state.jobId]);
+  }, [state.jobId, state.fileName]);
 
   useEffect(() => {
     if (state.jobId) {
@@ -324,8 +351,93 @@ export function AcrWorkflowPage() {
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (state.currentStep < WORKFLOW_STEPS.length) {
+      // If moving from Step 3 (AI Analysis) to Step 4, upload file and create ACR document
+      if (state.currentStep === 3 && state.selectedEdition) {
+        const fileToUpload = uploadedFileRef.current;
+        const isUploadFlow = state.jobId?.startsWith('upload-');
+        
+        // Guard: Upload flow requires a file
+        if (isUploadFlow && !fileToUpload) {
+          setUploadError('No file selected. Please upload a file to continue.');
+          return;
+        }
+        
+        if (fileToUpload) {
+          // New file upload flow - use combined endpoint
+          setIsUploading(true);
+          
+          try {
+            const formData = new FormData();
+            formData.append('file', fileToUpload);
+            formData.append('edition', state.selectedEdition.code);
+            formData.append('documentTitle', state.fileName || documentTitle || 'Untitled Document');
+            
+            // Let axios set Content-Type header with correct multipart boundary automatically
+            const response = await api.post('/acr/analysis-with-upload', formData);
+            
+            // Extract IDs and documentTitle from response (use ?? for proper nullish coalescing)
+            const data = response.data?.data ?? response.data;
+            const newJobId = data?.jobId;
+            const newAcrId = data?.acrId ?? newJobId;
+            const responseDocumentTitle = data?.documentTitle ?? data?.acrJob?.documentTitle;
+            
+            // Guard: Response must contain valid jobId
+            if (!newJobId) {
+              setUploadError('Upload failed: No job ID returned from server.');
+              return;
+            }
+            
+            updateState({
+              jobId: newJobId,
+              acrId: newAcrId,
+              ...(responseDocumentTitle && { fileName: responseDocumentTitle }),
+            });
+            if (responseDocumentTitle) {
+              setDocumentTitle(responseDocumentTitle);
+            }
+            // Clear the file ref since it's been uploaded
+            uploadedFileRef.current = null;
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            setUploadError(errorMessage);
+            // Do not advance workflow on failure
+            return;
+          } finally {
+            setIsUploading(false);
+          }
+        } else if (state.jobId && !isUploadFlow) {
+          // Existing job flow - use original endpoint
+          try {
+            const response = await createAcrAnalysis({
+              jobId: state.jobId,
+              edition: state.selectedEdition.code,
+              documentTitle: state.fileName || documentTitle || 'Untitled Document'
+            });
+            
+            const newJobId = response?.data?.jobId || response?.jobId;
+            const newAcrId = response?.data?.acrId || response?.acrId || newJobId;
+            
+            // Guard: Response must contain valid jobId
+            if (!newJobId) {
+              setUploadError('Failed to create ACR: No job ID returned from server.');
+              return;
+            }
+            
+            updateState({
+              jobId: newJobId,
+              acrId: newAcrId,
+            });
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            setUploadError(`Failed to create ACR: ${errorMessage}`);
+            // Do not advance workflow on failure
+            return;
+          }
+        }
+      }
+
       goToStep(state.currentStep + 1);
     }
   };
@@ -348,8 +460,8 @@ export function AcrWorkflowPage() {
     updateState({ isFinalized: true, currentStep: 6 });
   };
 
-  const handleRestore = (version: number) => {
-    console.log('Restoring to version:', version);
+  const handleRestore = (_version: number) => {
+    // TODO: Implement version restore functionality
   };
 
   const handleResetWorkflow = () => {
@@ -386,6 +498,8 @@ export function AcrWorkflowPage() {
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Store actual File object in ref for later upload
+      uploadedFileRef.current = file;
       const uploadedFile: UploadedFile = {
         name: file.name,
         size: file.size,
@@ -397,6 +511,7 @@ export function AcrWorkflowPage() {
         uploadedFile,
         jobId: newJobId,
         acrId: `acr-${newJobId}`,
+        fileName: file.name,
       });
     }
   };
@@ -405,6 +520,8 @@ export function AcrWorkflowPage() {
     event.preventDefault();
     const file = event.dataTransfer.files?.[0];
     if (file) {
+      // Store actual File object in ref for later upload
+      uploadedFileRef.current = file;
       const uploadedFile: UploadedFile = {
         name: file.name,
         size: file.size,
@@ -416,6 +533,7 @@ export function AcrWorkflowPage() {
         uploadedFile,
         jobId: newJobId,
         acrId: `acr-${newJobId}`,
+        fileName: file.name,
       });
     }
   };
@@ -434,12 +552,25 @@ export function AcrWorkflowPage() {
   };
 
   const handleSelectExistingJob = (jobId: string) => {
+    // Find the job to get its display name
+    const selectedJob = availableJobs.find(job => job.id === jobId);
+    const jobFileName = selectedJob 
+      ? (selectedJob.input?.fileName || selectedJob.output?.fileName || (selectedJob.output as { epubTitle?: string })?.epubTitle || 'Untitled Document')
+      : null;
+    
+    
     updateState({ 
       documentSource: 'existing',
       uploadedFile: null,
       jobId, 
       acrId: `acr-${jobId}`,
+      fileName: jobFileName,
     });
+    
+    // Also update local documentTitle state
+    if (jobFileName) {
+      setDocumentTitle(jobFileName);
+    }
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -504,7 +635,7 @@ export function AcrWorkflowPage() {
               </p>
             </div>
 
-            {effectiveJobId && (
+            {effectiveJobId && state.jobId === effectiveJobId && (
               <Alert variant="success">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4" />
@@ -623,9 +754,12 @@ export function AcrWorkflowPage() {
                                 {getJobDisplayName(job)}
                               </p>
                               <p className="text-xs text-gray-500">
-                                {new Date(job.createdAt).toLocaleDateString()}
-                                {job.output?.accessibilityScore !== undefined && 
-                                  ` - Score: ${job.output.accessibilityScore}%`}
+                                {new Date(job.createdAt).toLocaleString()}
+                                {(job.output?.score !== undefined || job.output?.accessibilityScore !== undefined) && 
+                                  ` - Score: ${job.output?.score ?? job.output?.accessibilityScore}%`}
+                              </p>
+                              <p className="text-xs text-gray-400 font-mono truncate" title={job.id}>
+                                ID: {job.id.slice(0, 8)}...
                               </p>
                             </div>
                           </div>
@@ -724,6 +858,7 @@ export function AcrWorkflowPage() {
             ) : (
               <AcrEditor 
                 jobId={state.jobId || 'demo'}
+                documentTitle={state.fileName || documentTitle}
                 onFinalized={handleFinalize}
               />
             )}
@@ -813,6 +948,23 @@ export function AcrWorkflowPage() {
   return (
     <div className="max-w-6xl mx-auto p-6">
       <Breadcrumbs items={[{ label: 'ACR Workflow' }]} />
+      
+      {/* Upload Error Alert */}
+      {uploadError && (
+        <Alert variant="error" className="mb-4">
+          <div className="flex items-center justify-between">
+            <span>Upload failed: {uploadError}</span>
+            <button
+              onClick={() => setUploadError(null)}
+              className="ml-4 text-red-700 hover:text-red-900"
+              aria-label="Dismiss error"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </Alert>
+      )}
+      
       <div className="mb-8">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold text-gray-900">ACR Generation Workflow</h1>
@@ -917,10 +1069,19 @@ export function AcrWorkflowPage() {
           ) : (
             <Button
               onClick={handleNext}
-              disabled={!canProceed()}
+              disabled={!canProceed() || isUploading}
             >
-              Next
-              <ChevronRight className="h-4 w-4 ml-1" />
+              {isUploading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </>
+              )}
             </Button>
           )}
         </div>
