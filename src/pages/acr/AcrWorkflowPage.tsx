@@ -537,12 +537,26 @@ export function AcrWorkflowPage() {
   };
 
   const handleSelectExistingJob = (jobId: string) => {
+    // Find the job to get its display name
+    const selectedJob = availableJobs.find(job => job.id === jobId);
+    const jobFileName = selectedJob 
+      ? (selectedJob.input?.fileName || selectedJob.output?.fileName || (selectedJob.output as { epubTitle?: string })?.epubTitle || 'Untitled Document')
+      : null;
+    
+    console.log('[ACR] Selecting job:', jobId, 'fileName:', jobFileName);
+    
     updateState({ 
       documentSource: 'existing',
       uploadedFile: null,
       jobId, 
       acrId: `acr-${jobId}`,
+      fileName: jobFileName,
     });
+    
+    // Also update local documentTitle state
+    if (jobFileName) {
+      setDocumentTitle(jobFileName);
+    }
   };
 
   const formatFileSize = (bytes: number): string => {
