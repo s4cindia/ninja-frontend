@@ -1032,11 +1032,21 @@ export const EPUBRemediation: React.FC = () => {
 
   // Client-side fallback: group issues by code when API doesn't return data
   const similarIssues = useMemo(() => {
+    console.log('[Batch Fix] Checking for batchable issues...', {
+      apiData: similarIssuesFromApi?.hasBatchableIssues,
+      hasPlanTasks: !!plan?.tasks,
+      taskCount: plan?.tasks?.length
+    });
+    
     if (similarIssuesFromApi?.hasBatchableIssues) {
+      console.log('[Batch Fix] Using API data');
       return similarIssuesFromApi;
     }
 
-    if (!plan?.tasks) return null;
+    if (!plan?.tasks) {
+      console.log('[Batch Fix] No plan tasks available');
+      return null;
+    }
 
     // Use same logic as getEffectiveFixType to detect quickfix tasks
     const getEffectiveFixTypeLocal = (t: PlanViewPlan['tasks'][0]) =>
@@ -1045,6 +1055,9 @@ export const EPUBRemediation: React.FC = () => {
     const quickfixTasks = plan.tasks.filter(
       t => getEffectiveFixTypeLocal(t) === 'quickfix' && t.status === 'pending'
     );
+    
+    console.log('[Batch Fix] Quick fix pending tasks:', quickfixTasks.length, 
+      quickfixTasks.map(t => ({ code: t.code, status: t.status, fixType: getEffectiveFixTypeLocal(t) })));
 
     const groupedByCode: Record<string, typeof quickfixTasks> = {};
     quickfixTasks.forEach(task => {
@@ -1054,6 +1067,9 @@ export const EPUBRemediation: React.FC = () => {
       }
       groupedByCode[code].push(task);
     });
+
+    console.log('[Batch Fix] Grouped by code:', Object.keys(groupedByCode), 
+      Object.entries(groupedByCode).map(([code, tasks]) => ({ code, count: tasks.length })));
 
     const batchableGroups = Object.entries(groupedByCode)
       .filter(([, tasks]) => tasks.length >= 2)
@@ -1070,7 +1086,12 @@ export const EPUBRemediation: React.FC = () => {
         }))
       }));
 
-    if (batchableGroups.length === 0) return null;
+    console.log('[Batch Fix] Batchable groups:', batchableGroups.length, batchableGroups.map(g => ({ fixType: g.fixType, count: g.count })));
+
+    if (batchableGroups.length === 0) {
+      console.log('[Batch Fix] No batchable groups found');
+      return null;
+    }
 
     return {
       hasBatchableIssues: true,
