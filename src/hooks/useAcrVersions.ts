@@ -43,13 +43,19 @@ export function useVersionHistory(acrId: string): VersionHistoryData {
       try {
         const response = await api.get<VersionHistoryResponse>(`/acr/${acrId}/versions`);
         return response.data.data;
-      } catch {
+      } catch (error) {
         // If the acrId format doesn't work, try with the extracted jobId
         if (jobId !== acrId) {
-          const fallbackResponse = await api.get<VersionHistoryResponse>(`/acr/${jobId}/versions`);
-          return fallbackResponse.data.data;
+          try {
+            const fallbackResponse = await api.get<VersionHistoryResponse>(`/acr/${jobId}/versions`);
+            return fallbackResponse.data.data;
+          } catch (fallbackError) {
+            console.warn('[useVersionHistory] Fallback fetch failed:', fallbackError);
+            return [];
+          }
         }
-        // Return empty array if no versions found
+        // Log error for debugging, return empty array for graceful degradation
+        console.warn('[useVersionHistory] Failed to fetch versions:', error);
         return [];
       }
     },

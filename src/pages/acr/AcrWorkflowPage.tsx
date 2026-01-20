@@ -280,6 +280,8 @@ export function AcrWorkflowPage() {
         const jobs = responseData?.jobs || (Array.isArray(responseData) ? responseData : []);
         const jobsWithAudit = Array.isArray(jobs) 
           ? jobs.filter((job: AuditJob) => {
+              // Type guard: ensure job is a valid object before accessing properties
+              if (!job || typeof job !== 'object') return false;
               // Check for either 'score' (EPUB audit) or 'accessibilityScore'
               const output = job.output;
               const hasScore = output?.score !== undefined || output?.accessibilityScore !== undefined;
@@ -375,11 +377,11 @@ export function AcrWorkflowPage() {
             // Let axios set Content-Type header with correct multipart boundary automatically
             const response = await api.post('/acr/analysis-with-upload', formData);
             
-            // Extract IDs and documentTitle from response
-            const data = response.data?.data || response.data;
+            // Extract IDs and documentTitle from response (use ?? for proper nullish coalescing)
+            const data = response.data?.data ?? response.data;
             const newJobId = data?.jobId;
-            const newAcrId = data?.acrId || newJobId;
-            const responseDocumentTitle = data?.documentTitle || data?.acrJob?.documentTitle;
+            const newAcrId = data?.acrId ?? newJobId;
+            const responseDocumentTitle = data?.documentTitle ?? data?.acrJob?.documentTitle;
             
             // Guard: Response must contain valid jobId
             if (!newJobId) {

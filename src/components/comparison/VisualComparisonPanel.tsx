@@ -3,7 +3,21 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { getVisualComparison } from '@/services/comparison.service';
 import { EPUBRenderer } from '../epub/EPUBRenderer';
 import { Loader2, ZoomIn, ZoomOut, Info, Code, AlertTriangle, Columns, Rows, Maximize2, X } from 'lucide-react';
-import { sanitizeText } from '@/utils/sanitize';
+
+/**
+ * Escapes HTML special characters to prevent XSS when displaying HTML source code as text.
+ * Unlike sanitizeText which strips tags, this preserves the markup for viewing in code preview.
+ */
+function escapeHtml(text: string): string {
+  const htmlEntities: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  };
+  return text.replace(/[&<>"']/g, char => htmlEntities[char] ?? char);
+}
 
 interface ChangeExplanation {
   title: string;
@@ -405,10 +419,15 @@ export function VisualComparisonPanel({
     targetEl.scrollTop = scrollPercentage * targetScrollableHeight;
 
     // Use debounced timeout instead of requestAnimationFrame for reliable reset
-    scrollDebounceRef.current = setTimeout(() => {
-      isScrollingRef.current = false;
-      scrollDebounceRef.current = null;
+    // Store ref locally to handle potential unmount during timeout
+    const timeoutId = setTimeout(() => {
+      // Guard against unmount: only update if ref still exists
+      if (scrollDebounceRef.current === timeoutId) {
+        isScrollingRef.current = false;
+        scrollDebounceRef.current = null;
+      }
     }, 50);
+    scrollDebounceRef.current = timeoutId;
   }, []);
 
   if (isLoading && !displayData) {
@@ -800,12 +819,13 @@ export function VisualComparisonPanel({
                     </div>
                     <pre className="text-red-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all">
 {(() => {
-  // Sanitize HTML content before display to prevent XSS
-  const html = sanitizeText(displayData.beforeContent?.html || '');
-  if (!html) return 'No content available';
-  const truncated = html.slice(0, 1000);
+  // Escape HTML entities to show source code as text (XSS prevention)
+  const rawHtml = displayData.beforeContent?.html || '';
+  if (!rawHtml) return 'No content available';
+  const truncated = rawHtml.slice(0, 1000);
   const lastClosingTag = truncated.lastIndexOf('>');
-  return lastClosingTag > 0 ? truncated.slice(0, lastClosingTag + 1) + (html.length > 1000 ? '...' : '') : truncated;
+  const displayText = lastClosingTag > 0 ? truncated.slice(0, lastClosingTag + 1) + (rawHtml.length > 1000 ? '...' : '') : truncated;
+  return escapeHtml(displayText);
 })()}
                     </pre>
                   </div>
@@ -816,9 +836,9 @@ export function VisualComparisonPanel({
                     </div>
                     <div className="text-green-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all font-mono">
 {(() => {
-  // Sanitize HTML content before display to prevent XSS
-  const beforeHtml = sanitizeText(displayData.beforeContent?.html || '');
-  const afterHtml = sanitizeText(displayData.afterContent?.html || '');
+  // Escape HTML entities to show source code as text (XSS prevention)
+  const beforeHtml = displayData.beforeContent?.html || '';
+  const afterHtml = displayData.afterContent?.html || '';
   if (!afterHtml) return <span>No content available</span>;
   
   const truncateHtml = (html: string) => {
@@ -834,14 +854,16 @@ export function VisualComparisonPanel({
     const beforeLine = beforeLines[idx] || '';
     const isNewLine = idx >= beforeLines.length;
     const isChanged = line !== beforeLine;
+    // Escape each line for safe display
+    const escapedLine = escapeHtml(line) || ' ';
     
     if (isNewLine) {
-      return <div key={idx} className="bg-green-200 text-green-900 px-1 -mx-1 rounded">{line || ' '}</div>;
+      return <div key={idx} className="bg-green-200 text-green-900 px-1 -mx-1 rounded">{escapedLine}</div>;
     }
     if (isChanged) {
-      return <div key={idx} className="bg-yellow-200 text-yellow-900 px-1 -mx-1 rounded border-l-2 border-yellow-500">{line || ' '}</div>;
+      return <div key={idx} className="bg-yellow-200 text-yellow-900 px-1 -mx-1 rounded border-l-2 border-yellow-500">{escapedLine}</div>;
     }
-    return <div key={idx}>{line || ' '}</div>;
+    return <div key={idx}>{escapedLine}</div>;
   });
 })()}
                     </div>
