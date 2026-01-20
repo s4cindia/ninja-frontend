@@ -10,15 +10,7 @@
     "type-check": "tsc --noEmit",
     "generate-wcag": "tsx scripts/generate-wcag-data.ts",
     "test": "vitest run",
-    "test:watch": "vitest --watch",
-    "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed",
-    "test:e2e:debug": "playwright test --debug",
-    "test:e2e:chromium": "playwright test --project=chromium",
-    "test:a11y": "playwright test --project=accessibility",
-    "test:responsive": "playwright test --project=mobile-chrome --project=mobile-safari --project=tablet",
-    "test:all": "vitest run && playwright test",
-    "playwright:report": "playwright show-report"
+    "test:watch": "vitest --watch"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.8.0",
@@ -39,8 +31,6 @@
     "zustand": "^4.4.0"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.11.0",
-    "@playwright/test": "^1.57.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
     "@testing-library/user-event": "^14.6.1",
@@ -60,7 +50,6 @@
     "eslint-plugin-react-refresh": "^0.4.5",
     "jest-axe": "^10.0.0",
     "jsdom": "^27.4.0",
-    "msw": "^2.12.7",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.19",
     "tsx": "^4.19.2",

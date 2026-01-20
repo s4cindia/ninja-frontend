@@ -69,7 +69,6 @@ web_modules/
 .env
 .env.*
 !.env.example
-!.env.test.example
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -143,7 +142,3 @@ vite.config.ts.timestamp-*
 attached_assets/
 .replit
 
-# Playwright
-playwright-report/
-playwright/.cache/
-test-results/
