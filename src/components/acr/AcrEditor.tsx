@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { CheckCircle, FileCheck } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
@@ -23,6 +23,7 @@ import type {
 
 interface AcrEditorProps {
   jobId: string;
+  documentTitle?: string;
   onFinalized?: () => void;
 }
 
@@ -152,10 +153,17 @@ function saveToStorage(jobId: string, doc: AcrDocument): void {
   }
 }
 
-export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
+export function AcrEditor({ jobId, documentTitle, onFinalized }: AcrEditorProps) {
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
-  const [localDocument, setLocalDocument] = useState<AcrDocument>(MOCK_DOCUMENT);
+  
+  // Create demo document with custom title if provided
+  const demoDocument = useMemo(() => ({
+    ...MOCK_DOCUMENT,
+    productName: documentTitle || MOCK_DOCUMENT.productName,
+  }), [documentTitle]);
+  
+  const [localDocument, setLocalDocument] = useState<AcrDocument>(demoDocument);
   const [localCredibility, setLocalCredibility] = useState<CredibilityValidation>(MOCK_CREDIBILITY);
   const [localFinalization, setLocalFinalization] = useState<FinalizationStatus>(MOCK_FINALIZATION);
   const [initializedForJob, setInitializedForJob] = useState<string | null>(null);
@@ -189,12 +197,12 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
         setLocalDocument(apiDocument);
         setInitializedForJob(jobId);
       } else if (!isLoadingDoc) {
-        // No stored data and no API data - use mock for demo mode
-        setLocalDocument(MOCK_DOCUMENT);
+        // No stored data and no API data - use mock for demo mode with custom title
+        setLocalDocument(demoDocument);
         setInitializedForJob(jobId);
       }
     }
-  }, [jobId, apiDocument, isLoadingDoc, initializedForJob]);
+  }, [jobId, apiDocument, isLoadingDoc, initializedForJob, demoDocument]);
   
   // Sync API document to local state when first loaded (only if not already initialized)
   useEffect(() => {
@@ -206,6 +214,16 @@ export function AcrEditor({ jobId, onFinalized }: AcrEditorProps) {
       }
     }
   }, [apiDocument, jobId, initializedForJob]);
+
+  // Update productName when documentTitle prop changes
+  useEffect(() => {
+    if (documentTitle && localDocument.productName !== documentTitle) {
+      setLocalDocument(prev => ({
+        ...prev,
+        productName: documentTitle,
+      }));
+    }
+  }, [documentTitle, localDocument.productName]);
 
   // Always recalculate credibility and finalization from local document
   useEffect(() => {

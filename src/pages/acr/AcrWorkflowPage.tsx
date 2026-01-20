@@ -803,6 +803,7 @@ export function AcrWorkflowPage() {
             ) : (
               <AcrEditor 
                 jobId={state.jobId || 'demo'}
+                documentTitle={state.fileName || documentTitle}
                 onFinalized={handleFinalize}
               />
             )}
