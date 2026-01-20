@@ -210,8 +210,13 @@ export function AcrWorkflowPage() {
     setAnalysisResults(criteria);
   }, []);
 
+  // Track if initial URL-based job has been applied
+  const initialJobAppliedRef = useRef(false);
+  
   useEffect(() => {
-    if (effectiveJobId && effectiveJobId !== state.jobId) {
+    // Only apply URL job on initial mount, not when user selects a different job
+    if (effectiveJobId && !initialJobAppliedRef.current) {
+      initialJobAppliedRef.current = true;
       const loadedState = loadWorkflowState(effectiveJobId);
       setState({
         ...loadedState,
@@ -221,7 +226,7 @@ export function AcrWorkflowPage() {
         fileName: fileNameFromQuery ? decodeURIComponent(fileNameFromQuery) : loadedState.fileName,
       });
     }
-  }, [effectiveJobId, state.jobId, fileNameFromQuery]);
+  }, [effectiveJobId, fileNameFromQuery]);
 
   useEffect(() => {
     if (fileNameFromQuery) {
