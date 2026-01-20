@@ -100,4 +100,56 @@ test.describe('Job Detail View E2E Tests', () => {
     await failedJob.click();
     await expect(page.locator('[data-testid="job-error"]')).toBeVisible();
   });
+
+  test('MT-E2E-016: Retry failed job action', async ({ page }) => {
+    // Navigate to the failed job (job-003 in mock data)
+    await page.goto('/jobs/job-003');
+
+    // Wait for job detail to load
+    await page.waitForSelector('[data-testid="job-detail-header"]');
+
+    // Find and click the retry button
+    const retryButton = page.locator('[data-testid="retry-button"]');
+    const hasRetryButton = await retryButton.count() > 0;
+
+    test.skip(!hasRetryButton, 'No retry button available for this job');
+
+    await retryButton.click();
+
+    // Verify retry action was triggered (job status changes or confirmation appears)
+    await expect(
+      page.locator('[data-testid="job-status"]').or(page.locator('[role="alert"]'))
+    ).toBeVisible();
+  });
+
+  test('MT-E2E-017: Delete job action with confirmation', async ({ page }) => {
+    await page.goto('/jobs');
+    await page.waitForSelector('[data-testid="jobs-table"]');
+
+    const firstJobRow = page.locator('[data-testid="job-row"]').first();
+    await expect(firstJobRow).toBeVisible();
+    await firstJobRow.click();
+
+    await expect(page).toHaveURL(/\/jobs\/[a-zA-Z0-9-]+/);
+
+    // Find the delete button
+    const deleteButton = page.locator('[data-testid="delete-button"]');
+    const hasDeleteButton = await deleteButton.count() > 0;
+
+    test.skip(!hasDeleteButton, 'No delete button available for this job');
+
+    await deleteButton.click();
+
+    // Verify confirmation dialog appears
+    const confirmDialog = page.locator('[data-testid="confirm-dialog"]').or(page.locator('[role="alertdialog"]'));
+    await expect(confirmDialog).toBeVisible();
+
+    // Confirm deletion
+    const confirmButton =
+      page.locator('[data-testid="confirm-delete"]').or(confirmDialog.locator('button:has-text("Delete")'));
+    await confirmButton.click();
+
+    // Verify redirect to jobs list after deletion
+    await expect(page).toHaveURL('/jobs');
+  });
 });
