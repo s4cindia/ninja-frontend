@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Info } from 'lucide-react';
-import type { ScoreBreakdown } from '@/utils/scoreCalculation';
+import type { ScoreBreakdown } from '@/lib/score-utils';
 
 interface ScoreTooltipProps {
   breakdown: ScoreBreakdown;

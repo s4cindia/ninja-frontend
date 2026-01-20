@@ -189,7 +189,7 @@ export function Jobs() {
           <>
             {/* Jobs Table */}
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-gray-200" data-testid="jobs-table">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -214,13 +214,13 @@ export function Jobs() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {jobs.map((job: Job) => (
-                    <tr key={job.id} className="hover:bg-gray-50">
+                    <tr key={job.id} className="hover:bg-gray-50" data-testid="job-row">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900 truncate max-w-xs">
                           {extractFileNameFromJob(job)}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 whitespace-nowrap" data-testid="job-type">
                         <div className="text-sm text-gray-600">
                           {getJobTypeLabel(job.type)}
                         </div>
@@ -228,12 +228,13 @@ export function Jobs() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-sm font-medium ${getStatusBadgeClass(job.status)}`}
+                          data-testid="job-status"
                         >
                           {getStatusIcon(job.status)}
                           {job.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 whitespace-nowrap" data-testid="job-progress">
                         {job.status === 'PROCESSING' ? (
                           <div className="flex items-center gap-2">
                             <div className="w-24 bg-gray-200 rounded-full h-2">
@@ -252,7 +253,7 @@ export function Jobs() {
                           <span className="text-sm text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 whitespace-nowrap" data-testid="job-created-date">
                         <div className="text-sm text-gray-500">
                           {formatRelativeTime(job.createdAt)}
                         </div>

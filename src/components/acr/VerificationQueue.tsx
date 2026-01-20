@@ -392,9 +392,10 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
     }
   }, [apiData, error, hasCriteriaFromAnalysis, useLocalItems]);
 
-  const items = useMemo(() => {
-    return useLocalItems || useMockData ? localItems : (apiData?.items ?? []);
-  }, [useLocalItems, useMockData, localItems, apiData?.items]);
+  const items = useMemo(() => 
+    useLocalItems || useMockData ? localItems : (apiData?.items ?? []),
+    [useLocalItems, useMockData, localItems, apiData?.items]
+  );
   const isSubmitting = submitMutation.isPending || bulkMutation.isPending;
 
   const bulkRequiresNotes = bulkStatus === 'verified_fail' || bulkStatus === 'verified_partial';

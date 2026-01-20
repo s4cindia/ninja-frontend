@@ -29,6 +29,7 @@ export function Login() {
         onChange={(e) => setEmail(e.target.value)}
         required
         autoComplete="email"
+        data-testid="email-input"
       />
       
       <Input
@@ -38,12 +39,14 @@ export function Login() {
         onChange={(e) => setPassword(e.target.value)}
         required
         autoComplete="current-password"
+        data-testid="password-input"
       />
 
       <Button 
         type="submit" 
         className="w-full"
         isLoading={login.isPending}
+        data-testid="login-button"
       >
         Sign In
       </Button>

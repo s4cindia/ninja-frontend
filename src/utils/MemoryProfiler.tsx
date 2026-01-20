@@ -19,16 +19,17 @@ class MemoryMonitor {
     let jsHeapSizeLimit = 0;
     
     if (typeof performance !== 'undefined' && 'memory' in performance) {
-      const memory = (performance as { memory?: { usedJSHeapSize?: number; jsHeapSizeLimit?: number } }).memory;
-      jsHeapSize = memory?.usedJSHeapSize || 0;
-      jsHeapSizeLimit = memory?.jsHeapSizeLimit || 0;
+      const perf = performance as Performance & { memory?: { usedJSHeapSize: number; jsHeapSizeLimit: number } };
+      jsHeapSize = perf.memory?.usedJSHeapSize || 0;
+      jsHeapSizeLimit = perf.memory?.jsHeapSizeLimit || 0;
     }
 
     const iframeCount = document.querySelectorAll('iframe').length;
     
     let queryCount = 0;
     try {
-      const queryCache = (window as { __REACT_QUERY_DEVTOOLS_GLOBAL_HOOK__?: { queryClient?: { getQueryCache?: () => { getAll?: () => unknown[] } } } }).__REACT_QUERY_DEVTOOLS_GLOBAL_HOOK__?.queryClient?.getQueryCache?.();
+      const win = window as Window & { __REACT_QUERY_DEVTOOLS_GLOBAL_HOOK__?: { queryClient?: { getQueryCache?: () => { getAll?: () => unknown[] } } } };
+      const queryCache = win.__REACT_QUERY_DEVTOOLS_GLOBAL_HOOK__?.queryClient?.getQueryCache?.();
       queryCount = queryCache?.getAll?.()?.length || 0;
     } catch {
       queryCount = 0;

@@ -197,7 +197,8 @@ const EPUBRendererComponent = function EPUBRenderer({
       iframeRef.current = null;
       isInitialized.current = false;
     };
-  }, [version]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!iframeRef.current) {

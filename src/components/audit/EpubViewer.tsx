@@ -42,7 +42,7 @@ export function EpubViewer({ isOpen, onClose, jobId, filePath, issueCode, cssSel
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadContent = useCallback(async (): Promise<void> => {
+  const loadContent = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {

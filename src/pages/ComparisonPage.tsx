@@ -39,7 +39,8 @@ export const ComparisonPage: React.FC = () => {
   useMemoryMonitor(currentIndex);
 
   useEffect(() => {
-    (window as { printMemorySummary?: () => void }).printMemorySummary = () => memoryMonitor.printSummary();
+    const win = window as Window & { printMemorySummary?: () => void };
+    win.printMemorySummary = () => memoryMonitor.printSummary();
   }, []);
 
   const currentChange = data?.changes[currentIndex];

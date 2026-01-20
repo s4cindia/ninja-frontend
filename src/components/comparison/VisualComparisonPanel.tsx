@@ -194,15 +194,15 @@ export function VisualComparisonPanel({
       );
     }
 
-    const capturedMountTime = mountTime.current;
-    const capturedRenderCount = renderCount.current;
+    const currentMountTime = mountTime.current;
+    const currentRenderCount = renderCount.current;
     return () => {
       if (import.meta.env.DEV) {
-        const lifetime = Date.now() - capturedMountTime;
+        const lifetime = Date.now() - currentMountTime;
         console.log(
           `%c[VisualComparisonPanel] UNMOUNTED`,
           'background: #f44336; color: white; padding: 2px 5px;',
-          { changeId, lifetime: `${lifetime}ms`, renders: capturedRenderCount }
+          { changeId, lifetime: `${lifetime}ms`, renders: currentRenderCount }
         );
       }
     };

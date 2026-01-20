@@ -6,5 +6,5 @@ export { EpubViewer } from './EpubViewer';
 export { ViewInContextButton } from './ViewInContextButton';
 export { RemediationGuidance } from './RemediationGuidance';
 export { ScoreTooltip } from './ScoreTooltip';
-export { calculateScoreBreakdown } from '@/utils/scoreCalculation';
-export type { ScoreBreakdown } from '@/utils/scoreCalculation';
+export { calculateScoreBreakdown } from '@/lib/score-utils';
+export type { ScoreBreakdown } from '@/lib/score-utils';
