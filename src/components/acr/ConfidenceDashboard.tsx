@@ -739,6 +739,9 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
         // Check hasIssues flag from backend
         if (c.hasIssues === true) return true;
         
+        // Check for needsVerification - items needing verification should be included
+        if (c.needsVerification === true) return true;
+        
         // Check for failing status
         const hasFailingStatus = c.status === 'fail';
         if (hasFailingStatus) return true;

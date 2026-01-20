@@ -202,6 +202,7 @@ export function AcrWorkflowPage() {
   const [analysisResults, setAnalysisResults] = useState<CriterionConfidence[]>([]);
   const [documentTitle, setDocumentTitle] = useState<string>('Untitled Document');
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   
   // Store actual File object for upload (not serializable to localStorage)
   const uploadedFileRef = useRef<File | null>(null);
@@ -210,13 +211,13 @@ export function AcrWorkflowPage() {
     setAnalysisResults(criteria);
   }, []);
 
-  // Track if initial URL-based job has been applied
-  const initialJobAppliedRef = useRef(false);
+  // Track the last applied URL job to detect navigation between jobs
+  const lastAppliedJobRef = useRef<string | null>(null);
   
   useEffect(() => {
-    // Only apply URL job on initial mount, not when user selects a different job
-    if (effectiveJobId && !initialJobAppliedRef.current) {
-      initialJobAppliedRef.current = true;
+    // Apply URL job when it changes (initial mount or navigation between jobs)
+    if (effectiveJobId && effectiveJobId !== lastAppliedJobRef.current) {
+      lastAppliedJobRef.current = effectiveJobId;
       const loadedState = loadWorkflowState(effectiveJobId);
       setState({
         ...loadedState,
@@ -367,9 +368,8 @@ export function AcrWorkflowPage() {
             formData.append('edition', state.selectedEdition.code);
             formData.append('documentTitle', state.fileName || documentTitle || 'Untitled Document');
             
-            const response = await api.post('/acr/analysis-with-upload', formData, {
-              headers: { 'Content-Type': 'multipart/form-data' }
-            });
+            // Let axios set Content-Type header with correct multipart boundary automatically
+            const response = await api.post('/acr/analysis-with-upload', formData);
             
             console.log('[ACR Workflow] Upload response:', JSON.stringify(response.data));
             
@@ -396,9 +396,12 @@ export function AcrWorkflowPage() {
             } else {
               console.warn('[ACR Workflow] No jobId in response');
             }
-          } catch (error) {
+          } catch (error: unknown) {
             console.error('[ACR Workflow] Failed to upload and create ACR:', error);
-            // Show error but don't block
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            setUploadError(errorMessage);
+            // Do not advance workflow on failure - return early
+            return;
           } finally {
             setIsUploading(false);
           }
@@ -939,6 +942,23 @@ export function AcrWorkflowPage() {
   return (
     <div className="max-w-6xl mx-auto p-6">
       <Breadcrumbs items={[{ label: 'ACR Workflow' }]} />
+      
+      {/* Upload Error Alert */}
+      {uploadError && (
+        <Alert variant="error" className="mb-4">
+          <div className="flex items-center justify-between">
+            <span>Upload failed: {uploadError}</span>
+            <button
+              onClick={() => setUploadError(null)}
+              className="ml-4 text-red-700 hover:text-red-900"
+              aria-label="Dismiss error"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </Alert>
+      )}
+      
       <div className="mb-8">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold text-gray-900">ACR Generation Workflow</h1>

@@ -173,6 +173,16 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
   const { versions, isLoading, error } = useVersionHistory(acrId);
   const { data: versionDetails, isLoading: isLoadingDetails } = useVersionDetails(acrId, selectedVersion);
 
+  // Show loading spinner first while data is being fetched
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+      </div>
+    );
+  }
+
+  // Show error only after loading completes
   if (error) {
     return (
       <div className="flex items-center justify-center py-12 text-red-600">
@@ -181,7 +191,8 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
     );
   }
 
-  if (!isLoading && versions.length === 0) {
+  // Show empty state only when not loading and no versions exist
+  if (versions.length === 0) {
     return (
       <div className="text-center py-8">
         <FileText className="h-12 w-12 mx-auto text-gray-400 mb-3" />
