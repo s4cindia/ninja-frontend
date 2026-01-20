@@ -330,12 +330,21 @@ export function AcrWorkflowPage() {
       if (state.currentStep === 3 && state.jobId && state.selectedEdition) {
         try {
           // Create ACR analysis document
-          await createAcrAnalysis({
+          const response = await createAcrAnalysis({
             jobId: state.jobId,
             edition: state.selectedEdition.code,
             documentTitle: state.fileName || documentTitle || 'Untitled Document'
           });
-          console.log('[ACR Workflow] ACR document created successfully');
+          console.log('[ACR Workflow] ACR document created successfully:', response);
+          
+          // Update state with the real job ID and ACR ID from backend
+          if (response?.data?.jobId) {
+            updateState({
+              jobId: response.data.jobId,
+              acrId: response.data.acrId || response.data.jobId,
+            });
+            console.log('[ACR Workflow] Updated job ID to:', response.data.jobId);
+          }
         } catch (error) {
           console.error('[ACR Workflow] Failed to create ACR document:', error);
           // Continue anyway - user can retry later
