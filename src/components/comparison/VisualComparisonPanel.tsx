@@ -771,7 +771,7 @@ export function VisualComparisonPanel({
             </div>
 
             {/* HTML Code Changes Section (Collapsible) */}
-            {showCodeChanges && isStructuralChange && (
+            {showCodeChanges && (
               <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div className="bg-red-50 border border-red-200 rounded overflow-hidden">
