@@ -44,6 +44,7 @@ import BatchAcrListPage from '@/pages/BatchAcrListPage';
 import BatchCreationPage from '@/pages/BatchCreationPage';
 import BatchProcessingPage from '@/pages/BatchProcessingPage';
 import BatchResultsPage from '@/pages/BatchResultsPage';
+import BatchListPage from '@/pages/BatchListPage';
 import Settings from '@/pages/Settings';
 
 const queryClient = new QueryClient({
@@ -164,7 +165,8 @@ function AppRoutes() {
           <Route path="/batch/new" element={<BatchCreationPage />} />
           <Route path="/batch/:batchId" element={<BatchProcessingPage />} />
           <Route path="/batch/:batchId/results" element={<BatchResultsPage />} />
-          <Route path="/batches" element={<BatchCreationPage />} />
+          <Route path="/batches" element={<BatchListPage />} />
+          <Route path="/batches/new" element={<BatchCreationPage />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
 
