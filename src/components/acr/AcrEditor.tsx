@@ -167,6 +167,7 @@ export function AcrEditor({ jobId, documentTitle, onFinalized }: AcrEditorProps)
   const [localCredibility, setLocalCredibility] = useState<CredibilityValidation>(MOCK_CREDIBILITY);
   const [localFinalization, setLocalFinalization] = useState<FinalizationStatus>(MOCK_FINALIZATION);
   const [initializedForJob, setInitializedForJob] = useState<string | null>(null);
+  const [hasNotifiedFinalized, setHasNotifiedFinalized] = useState(false);
   
   const { data: apiDocument, isLoading: isLoadingDoc, error: docError } = useAcrDocument(jobId);
   const { data: apiCredibility } = useCredibilityValidation(jobId);
@@ -224,6 +225,14 @@ export function AcrEditor({ jobId, documentTitle, onFinalized }: AcrEditorProps)
       }));
     }
   }, [documentTitle, localDocument.productName]);
+
+  // Notify parent when document is already finalized (enables Next button)
+  useEffect(() => {
+    if (localDocument.status === 'final' && !hasNotifiedFinalized && onFinalized) {
+      setHasNotifiedFinalized(true);
+      onFinalized();
+    }
+  }, [localDocument.status, hasNotifiedFinalized, onFinalized]);
 
   // Always recalculate credibility and finalization from local document
   useEffect(() => {
@@ -468,8 +477,9 @@ export function AcrEditor({ jobId, documentTitle, onFinalized }: AcrEditorProps)
             onClick={handleFinalize}
             disabled={blockers.length > 0 || document?.status === 'final' || finalizeMutation.isPending}
             isLoading={finalizeMutation.isPending}
+            variant={document?.status === 'final' ? 'outline' : 'primary'}
           >
-            Mark as Final
+            {document?.status === 'final' ? 'Already Finalized' : 'Mark as Final'}
           </Button>
         </div>
         
