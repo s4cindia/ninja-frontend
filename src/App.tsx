@@ -42,6 +42,7 @@ import { ComparisonPage } from '@/pages/ComparisonPage';
 import BatchRemediationPage from '@/pages/BatchRemediation';
 import BatchAcrListPage from '@/pages/BatchAcrListPage';
 import BatchCreationPage from '@/pages/BatchCreationPage';
+import BatchProcessingPage from '@/pages/BatchProcessingPage';
 import Settings from '@/pages/Settings';
 
 const queryClient = new QueryClient({
@@ -160,6 +161,7 @@ function AppRoutes() {
           <Route path="/remediation/:jobId/comparison" element={<ComparisonPage />} />
           <Route path="/acr/batch/:batchId/list" element={<BatchAcrListPage />} />
           <Route path="/batch/new" element={<BatchCreationPage />} />
+          <Route path="/batch/:batchId" element={<BatchProcessingPage />} />
           <Route path="/batches" element={<BatchCreationPage />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
