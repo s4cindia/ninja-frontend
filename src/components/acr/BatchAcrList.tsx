@@ -74,7 +74,7 @@ export function BatchAcrList({
         <Button
           variant="outline"
           leftIcon={<ArrowLeft className="h-4 w-4" />}
-          onClick={() => navigate('/remediation/batch')}
+          onClick={() => navigate('/batches')}
         >
           Back to Batch
         </Button>

@@ -58,7 +58,7 @@ export function MainLayout() {
       title: 'Tools',
       items: [
         { to: '/remediation', icon: Wrench, label: 'Remediation' },
-        { to: '/remediation/batch', icon: Layers, label: 'Batch Processing' },
+        { to: '/batches', icon: Layers, label: 'Batch Processing' },
         { to: '/feedback', icon: MessageSquare, label: 'Feedback' },
       ],
     },
