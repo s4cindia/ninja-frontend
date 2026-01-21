@@ -23,12 +23,13 @@ export function useCreateBatch() {
   });
 }
 
-export function useUploadFiles(batchId: string) {
+export function useUploadFiles() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (files: File[]) => batchService.uploadFiles(batchId, files),
-    onSuccess: () => {
+    mutationFn: ({ batchId, files }: { batchId: string; files: File[] }) =>
+      batchService.uploadFiles(batchId, files),
+    onSuccess: (_, { batchId }) => {
       queryClient.invalidateQueries({ queryKey: ['batch', batchId] });
       toast.success('Files uploaded successfully');
     },

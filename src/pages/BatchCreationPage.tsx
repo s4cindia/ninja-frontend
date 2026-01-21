@@ -13,10 +13,9 @@ export default function BatchCreationPage() {
   const navigate = useNavigate();
   const [batchName, setBatchName] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [batchId, setBatchId] = useState<string | null>(null);
 
   const createBatchMutation = useCreateBatch();
-  const uploadFilesMutation = useUploadFiles(batchId ?? '');
+  const uploadFilesMutation = useUploadFiles();
 
   const handleFilesSelected = (files: File[]) => {
     setSelectedFiles((prev) => [...prev, ...files]);
@@ -37,9 +36,10 @@ export default function BatchCreationPage() {
         name: batchName || undefined,
       });
 
-      setBatchId(result.batchId);
-
-      await uploadFilesMutation.mutateAsync(selectedFiles);
+      await uploadFilesMutation.mutateAsync({
+        batchId: result.batchId,
+        files: selectedFiles,
+      });
 
       toast.success('Batch created successfully');
 
