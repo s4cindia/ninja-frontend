@@ -9,6 +9,13 @@ import type {
   GenerateRemarksResponse,
   UpdateCriterionRequest,
 } from '@/types/acr.types';
+import type {
+  BatchAcrGenerationRequest,
+  BatchAcrGenerationResult,
+  BatchAcrDocument,
+  BatchAcrHistory,
+  BatchAcrExportResult,
+} from '@/types/batch-acr.types';
 
 const EDITION_CODE_MAP: Record<string, string> = {
   'VPAT2.5-508': 'section508',
@@ -67,5 +74,41 @@ export const acrService = {
 
   async finalizeDocument(jobId: string): Promise<void> {
     await api.post<ApiResponse<void>>(`/acr/${jobId}/finalize`);
+  },
+
+  async generateBatchAcr(
+    request: BatchAcrGenerationRequest
+  ): Promise<BatchAcrGenerationResult> {
+    const response = await api.post<ApiResponse<BatchAcrGenerationResult>>(
+      '/acr/batch/generate',
+      request
+    );
+    return response.data.data;
+  },
+
+  async getBatchAcr(batchAcrId: string): Promise<BatchAcrDocument> {
+    const response = await api.get<ApiResponse<BatchAcrDocument>>(
+      `/acr/batch/${batchAcrId}`
+    );
+    return response.data.data;
+  },
+
+  async exportBatchAcr(
+    batchAcrId: string,
+    format: 'pdf' | 'docx' | 'html',
+    includeMethodology: boolean = true
+  ): Promise<BatchAcrExportResult> {
+    const response = await api.post<ApiResponse<BatchAcrExportResult>>(
+      `/acr/batch/${batchAcrId}/export`,
+      { format, includeMethodology }
+    );
+    return response.data.data;
+  },
+
+  async getBatchAcrHistory(batchId: string): Promise<BatchAcrHistory> {
+    const response = await api.get<ApiResponse<BatchAcrHistory>>(
+      `/acr/batch/${batchId}/history`
+    );
+    return response.data.data;
   },
 };
