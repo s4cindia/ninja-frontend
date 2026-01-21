@@ -91,6 +91,16 @@ export function FileStatusList({ files }: FileStatusListProps) {
                         Fixed: {file.issuesAutoFixed}
                       </span>
                     )}
+                    {file.remainingQuickFix !== undefined && file.remainingQuickFix > 0 && (
+                      <span className="text-xs text-amber-600">
+                        Quick Fix: {file.remainingQuickFix}
+                      </span>
+                    )}
+                    {file.remainingManual !== undefined && file.remainingManual > 0 && (
+                      <span className="text-xs text-gray-500">
+                        Manual: {file.remainingManual}
+                      </span>
+                    )}
                   </div>
                   {file.error && (
                     <p className="text-xs text-red-600 mt-1">Error: {file.error}</p>

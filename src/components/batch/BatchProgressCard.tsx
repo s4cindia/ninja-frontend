@@ -60,7 +60,7 @@ export function BatchProgressCard({ batch }: BatchProgressCardProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <div>
             <p className="text-sm text-gray-600">Remediated</p>
             <p className="text-2xl font-bold text-green-600">{batch.filesRemediated}</p>
@@ -75,7 +75,15 @@ export function BatchProgressCard({ batch }: BatchProgressCardProps) {
           </div>
           <div>
             <p className="text-sm text-gray-600">Auto-Fixed</p>
-            <p className="text-2xl font-bold text-sky-600">{batch.autoFixedIssues}</p>
+            <p className="text-2xl font-bold text-green-600">{batch.autoFixedIssues}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Quick Fix</p>
+            <p className="text-2xl font-bold text-amber-600">{batch.quickFixIssues}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Manual</p>
+            <p className="text-2xl font-bold text-gray-500">{batch.manualIssues}</p>
           </div>
         </div>
       </div>
