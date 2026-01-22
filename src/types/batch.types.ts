@@ -18,13 +18,16 @@ export type FileStatus =
   | 'SKIPPED';
 
 export interface BatchFileIssue {
+  id?: string;
+  code?: string;
   criterion: string;
   title?: string;
-  severity: 'critical' | 'major' | 'minor';
+  severity: 'critical' | 'serious' | 'major' | 'moderate' | 'minor';
   description: string;
   fixApplied?: string;
   suggestedFix?: string;
   guidance?: string;
+  location?: string;
 }
 
 export interface BatchFile {

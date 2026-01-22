@@ -35,6 +35,23 @@ function getStatusVariant(
   }
 }
 
+function getSeverityClass(severity: string): string {
+  switch (severity) {
+    case 'critical':
+      return 'bg-red-100 text-red-700';
+    case 'serious':
+      return 'bg-orange-100 text-orange-700';
+    case 'major':
+      return 'bg-orange-100 text-orange-700';
+    case 'moderate':
+      return 'bg-yellow-100 text-yellow-700';
+    case 'minor':
+      return 'bg-blue-100 text-blue-700';
+    default:
+      return 'bg-gray-100 text-gray-700';
+  }
+}
+
 function IssueItem({
   issue,
   variant,
@@ -51,39 +68,45 @@ function IssueItem({
 
   return (
     <div className={`p-4 rounded-lg border ${bgClass}`}>
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+      <div className="flex items-center gap-2 flex-wrap mb-2">
+        {issue.code && (
+          <span className="font-mono font-semibold text-gray-900 text-sm">
+            {issue.code}
+          </span>
+        )}
+        {issue.criterion && issue.criterion !== 'Unknown' && (
+          <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 rounded">
             {issue.criterion}
           </span>
-          {issue.title && (
-            <span className="font-medium text-gray-900">{issue.title}</span>
-          )}
-        </div>
-        <Badge
-          variant={
-            issue.severity === 'critical'
-              ? 'error'
-              : issue.severity === 'major'
-                ? 'warning'
-                : 'info'
-          }
-          size="sm"
-        >
+        )}
+        <span className={`px-2 py-0.5 text-xs font-medium rounded ${getSeverityClass(issue.severity)}`}>
           {issue.severity}
-        </Badge>
+        </span>
       </div>
-      <p className="text-sm text-gray-700 mb-2">{issue.description}</p>
+
+      {issue.title && (
+        <h4 className="font-medium text-gray-900 mb-1">{issue.title}</h4>
+      )}
+
+      <p className="text-sm text-gray-600 mb-2">{issue.description}</p>
+
       {issue.fixApplied && (
-        <p className="text-sm text-green-700 flex items-center gap-1">
-          <CheckCircle className="h-3 w-3" /> Fixed: {issue.fixApplied}
-        </p>
+        <div className="text-sm text-green-700 flex items-center gap-1">
+          <CheckCircle className="h-4 w-4" />
+          <span>Fixed: {issue.fixApplied}</span>
+        </div>
       )}
       {issue.suggestedFix && (
-        <p className="text-sm text-amber-700">Suggested fix: {issue.suggestedFix}</p>
+        <div className="text-sm text-orange-700 flex items-center gap-1">
+          <Wrench className="h-4 w-4" />
+          <span>Suggested fix: {issue.suggestedFix}</span>
+        </div>
       )}
       {issue.guidance && (
-        <p className="text-sm text-gray-600">Guidance: {issue.guidance}</p>
+        <div className="text-sm text-gray-700 flex items-center gap-1">
+          <AlertCircle className="h-4 w-4" />
+          <span>Guidance: {issue.guidance}</span>
+        </div>
       )}
     </div>
   );
