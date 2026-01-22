@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { useBatchFile } from '@/hooks/useBatch';
 import { batchService } from '@/services/batch.service';
 import { QuickFixPanel } from '@/components/quickfix/QuickFixPanel';
+import { BatchQuickFixModal } from '@/components/batch/BatchQuickFixModal';
 import {
   ArrowLeft,
   Download,
@@ -17,6 +18,7 @@ import {
   Edit3,
   FileText,
   Zap,
+  ListChecks,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { BatchFileIssue, FileStatus } from '@/types/batch.types';
@@ -123,6 +125,7 @@ export default function BatchFileDetailsPage() {
   const { data: file, isLoading, error } = useBatchFile(batchId, fileId);
   const [isDownloading, setIsDownloading] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<BatchFileIssue | null>(null);
+  const [batchFixMode, setBatchFixMode] = useState<'individual' | 'batch' | null>(null);
 
   const handleApplyFix = async (fix: QuickFix) => {
     if (!batchId || !fileId || !selectedIssue) return;
@@ -145,6 +148,23 @@ export default function BatchFileDetailsPage() {
 
   const handleClosePanel = () => {
     setSelectedIssue(null);
+  };
+
+  const handleBatchApplyFixes = async (
+    quickFixes: Array<{ issueCode: string; value: string }>
+  ) => {
+    if (!batchId || !fileId) return;
+
+    try {
+      const result = await batchService.applyFileQuickFixes(batchId, fileId, quickFixes);
+      queryClient.invalidateQueries({ queryKey: ['batch-file', batchId, fileId] });
+      toast.success(`Successfully applied ${result.appliedFixes} quick-fixes!`);
+      setBatchFixMode(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      toast.error(`Failed to apply fixes: ${message}`);
+      throw err;
+    }
   };
 
   const handleDownload = async () => {
@@ -317,10 +337,29 @@ export default function BatchFileDetailsPage() {
 
         {quickFixIssues.length > 0 && (
           <div className="mb-6">
-            <h3 className="flex items-center gap-2 text-md font-medium text-amber-700 mb-3">
-              <Wrench className="h-5 w-5" />
-              Quick-Fix Issues ({quickFixIssues.length})
-            </h3>
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <h3 className="flex items-center gap-2 text-md font-medium text-amber-700">
+                <Wrench className="h-5 w-5" />
+                Quick-Fix Issues ({quickFixIssues.length})
+              </h3>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setBatchFixMode('individual')}
+                  leftIcon={<ListChecks className="h-4 w-4" />}
+                >
+                  Apply Individually
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setBatchFixMode('batch')}
+                  leftIcon={<Zap className="h-4 w-4" />}
+                >
+                  Batch Apply All ({quickFixIssues.length})
+                </Button>
+              </div>
+            </div>
             <div className="space-y-3">
               {quickFixIssues.map((issue, idx) => (
                 <div key={idx} className="relative">
@@ -385,6 +424,15 @@ export default function BatchFileDetailsPage() {
             />
           </div>
         </div>
+      )}
+
+      {batchFixMode && quickFixIssues.length > 0 && (
+        <BatchQuickFixModal
+          issues={quickFixIssues}
+          mode={batchFixMode}
+          onApply={handleBatchApplyFixes}
+          onClose={() => setBatchFixMode(null)}
+        />
       )}
     </div>
   );
