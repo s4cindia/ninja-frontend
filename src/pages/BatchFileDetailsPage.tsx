@@ -52,7 +52,14 @@ function IssueItem({
   return (
     <div className={`p-4 rounded-lg border ${bgClass}`}>
       <div className="flex items-center justify-between mb-2">
-        <span className="font-medium text-gray-900">{issue.criterion}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+            {issue.criterion}
+          </span>
+          {issue.title && (
+            <span className="font-medium text-gray-900">{issue.title}</span>
+          )}
+        </div>
         <Badge
           variant={
             issue.severity === 'critical'

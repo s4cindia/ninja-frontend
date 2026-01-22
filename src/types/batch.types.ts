@@ -19,6 +19,7 @@ export type FileStatus =
 
 export interface BatchFileIssue {
   criterion: string;
+  title?: string;
   severity: 'critical' | 'major' | 'minor';
   description: string;
   fixApplied?: string;
