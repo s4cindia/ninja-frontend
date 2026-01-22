@@ -134,6 +134,20 @@ export function useExportBatch(batchId: string) {
   });
 }
 
+export function useApplyQuickFixes(batchId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => batchService.applyQuickFixes(batchId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['batch', batchId] });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to apply quick-fixes');
+    },
+  });
+}
+
 export function useBatchSSE(
   batchId: string | undefined,
   onEvent: (event: BatchSSEEvent) => void

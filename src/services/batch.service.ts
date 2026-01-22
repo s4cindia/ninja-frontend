@@ -93,6 +93,19 @@ export const batchService = {
     return response.data.data.downloadUrl;
   },
 
+  async applyQuickFixes(batchId: string): Promise<{
+    success: boolean;
+    filesProcessed: number;
+    issuesFixed: number;
+  }> {
+    const response = await api.post<ApiResponse<{
+      success: boolean;
+      filesProcessed: number;
+      issuesFixed: number;
+    }>>(`${BASE_URL}/${batchId}/quick-fixes/apply`);
+    return response.data.data;
+  },
+
   subscribeToBatch(
     batchId: string,
     onEvent: (event: unknown) => void

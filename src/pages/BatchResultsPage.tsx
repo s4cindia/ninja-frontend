@@ -6,19 +6,21 @@ import { Spinner } from '@/components/ui/Spinner';
 import { BatchSummary } from '@/components/batch/BatchSummary';
 import { FileResultsList } from '@/components/batch/FileResultsList';
 import { AcrGenerationModal } from '@/components/batch/AcrGenerationModal';
-import { useBatch, useGenerateAcr, useExportBatch } from '@/hooks/useBatch';
-import { Download, FileText, Edit } from 'lucide-react';
+import { useBatch, useGenerateAcr, useExportBatch, useApplyQuickFixes } from '@/hooks/useBatch';
+import { Download, FileText, Wrench, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function BatchResultsPage() {
   const { batchId } = useParams<{ batchId: string }>();
   const navigate = useNavigate();
 
-  const { data: batch, isLoading } = useBatch(batchId);
+  const { data: batch, isLoading, refetch: refetchBatch } = useBatch(batchId);
   const generateAcrMutation = useGenerateAcr(batchId ?? '');
   const exportBatchMutation = useExportBatch(batchId ?? '');
+  const applyQuickFixesMutation = useApplyQuickFixes(batchId ?? '');
 
   const [showAcrModal, setShowAcrModal] = useState(false);
+  const [isApplyingQuickFixes, setIsApplyingQuickFixes] = useState(false);
 
   const handleGenerateAcr = async (
     mode: 'individual' | 'aggregate',
@@ -66,8 +68,34 @@ export default function BatchResultsPage() {
     }
   };
 
-  const handleQuickFix = () => {
-    toast('Quick-fix feature coming soon', { icon: 'ℹ️' });
+  const handleApplyQuickFixes = async () => {
+    if (!batch || batch.quickFixIssues === 0) {
+      toast('No quick-fixes available to apply', { icon: 'ℹ️' });
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Apply quick-fixes to ${batch.quickFixIssues} issues across ${batch.filesRemediated} files?\n\n` +
+      `This will automatically fix the remaining quick-fix issues and update the remediated files.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setIsApplyingQuickFixes(true);
+      const result = await applyQuickFixesMutation.mutateAsync();
+
+      toast.success(
+        `Quick-fixes applied! ${result.issuesFixed} issues fixed across ${result.filesProcessed} files.`
+      );
+
+      refetchBatch();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Failed to apply quick-fixes: ${message}`);
+    } finally {
+      setIsApplyingQuickFixes(false);
+    }
   };
 
   if (isLoading) {
@@ -143,14 +171,22 @@ export default function BatchResultsPage() {
 
           <button
             type="button"
-            onClick={handleQuickFix}
-            disabled={batch.quickFixIssues === 0}
+            onClick={handleApplyQuickFixes}
+            disabled={batch.quickFixIssues === 0 || isApplyingQuickFixes}
             className="flex flex-col items-center justify-center p-6 border-2 border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Edit className="h-8 w-8 text-purple-600 mb-3" aria-hidden="true" />
+            {isApplyingQuickFixes ? (
+              <Loader2 className="h-8 w-8 text-purple-600 mb-3 animate-spin" aria-hidden="true" />
+            ) : (
+              <Wrench className="h-8 w-8 text-purple-600 mb-3" aria-hidden="true" />
+            )}
             <h3 className="font-medium text-gray-900 mb-1">Apply Quick-Fixes</h3>
             <p className="text-sm text-gray-600 text-center">
-              {batch.quickFixIssues} issues need quick-fixes
+              {isApplyingQuickFixes
+                ? 'Applying quick-fixes...'
+                : batch.quickFixIssues > 0
+                  ? `${batch.quickFixIssues} issues need quick-fixes`
+                  : 'No quick-fixes available'}
             </p>
           </button>
         </div>
