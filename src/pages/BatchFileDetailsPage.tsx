@@ -170,7 +170,7 @@ export default function BatchFileDetailsPage() {
           </Button>
         </div>
 
-        {file.status === 'REMEDIATED' && file.remediatedS3Key && (
+        {file.status === 'REMEDIATED' && (
           <Button
             onClick={handleDownload}
             isLoading={isDownloading}

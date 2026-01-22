@@ -133,7 +133,7 @@ export function FileResultsList({ batchId, files }: FileResultsListProps) {
               size="sm"
               variant="primary"
               onClick={() => handleDownloadFile(file)}
-              disabled={!file.remediatedS3Key || downloadingFileId === file.fileId}
+              disabled={downloadingFileId === file.fileId}
               isLoading={downloadingFileId === file.fileId}
               leftIcon={<Download className="h-3 w-3" />}
             >
