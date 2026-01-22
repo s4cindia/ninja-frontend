@@ -2,59 +2,12 @@ import { api, ApiResponse } from './api';
 import type {
   Batch,
   BatchFile,
-  BatchFileIssue,
   BatchListResponse,
   CreateBatchRequest,
   StartBatchRequest,
   GenerateAcrRequest,
   BatchExportResponse,
 } from '@/types/batch.types';
-
-function generateMockIssues(file: BatchFile): {
-  autoFixedIssues: BatchFileIssue[];
-  quickFixIssues: BatchFileIssue[];
-  manualIssues: BatchFileIssue[];
-} {
-  const autoFixedIssues: BatchFileIssue[] = [];
-  const quickFixIssues: BatchFileIssue[] = [];
-  const manualIssues: BatchFileIssue[] = [];
-
-  const autoFixCount = file.issuesAutoFixed ?? 0;
-  const quickFixCount = file.remainingQuickFix ?? 0;
-  const manualCount = file.remainingManual ?? 0;
-
-  for (let i = 0; i < Math.min(autoFixCount, 5); i++) {
-    autoFixedIssues.push({
-      criterion: `WCAG ${['1.1.1', '1.3.1', '2.4.2', '4.1.2', '1.4.3'][i % 5]}`,
-      title: ['Missing alt text', 'Document structure', 'Page title', 'ARIA labels', 'Color contrast'][i % 5],
-      severity: ['critical', 'major', 'minor'][i % 3] as 'critical' | 'major' | 'minor',
-      description: 'This issue was automatically fixed during remediation.',
-      fixApplied: ['Added descriptive alt text', 'Fixed heading structure', 'Added page title', 'Added ARIA label', 'Adjusted color contrast'][i % 5],
-    });
-  }
-
-  for (let i = 0; i < Math.min(quickFixCount, 5); i++) {
-    quickFixIssues.push({
-      criterion: `WCAG ${['1.1.1', '1.3.2', '2.1.1', '3.1.1', '4.1.1'][i % 5]}`,
-      title: ['Image alt text', 'Reading order', 'Keyboard access', 'Language', 'Valid markup'][i % 5],
-      severity: ['major', 'critical', 'minor'][i % 3] as 'critical' | 'major' | 'minor',
-      description: 'This issue can be quickly fixed with one-click action.',
-      suggestedFix: ['Generate alt text with AI', 'Reorder content blocks', 'Add keyboard handler', 'Set document language', 'Fix HTML validation errors'][i % 5],
-    });
-  }
-
-  for (let i = 0; i < Math.min(manualCount, 5); i++) {
-    manualIssues.push({
-      criterion: `WCAG ${['1.2.1', '1.2.5', '2.4.6', '3.3.2', '1.4.5'][i % 5]}`,
-      title: ['Audio description', 'Extended audio', 'Headings and labels', 'Form instructions', 'Images of text'][i % 5],
-      severity: ['major', 'minor', 'critical'][i % 3] as 'critical' | 'major' | 'minor',
-      description: 'This issue requires manual review and correction.',
-      guidance: ['Add audio description track', 'Provide extended audio description', 'Review heading structure', 'Add form field instructions', 'Replace image of text with actual text'][i % 5],
-    });
-  }
-
-  return { autoFixedIssues, quickFixIssues, manualIssues };
-}
 
 const BASE_URL = '/batch';
 
@@ -158,24 +111,7 @@ export const batchService = {
     const response = await api.get<ApiResponse<BatchFile>>(
       `${BASE_URL}/${batchId}/files/${fileId}`
     );
-    const file = response.data.data;
-
-    const hasIssueDetails = 
-      (file.autoFixedIssues && file.autoFixedIssues.length > 0) ||
-      (file.quickFixIssues && file.quickFixIssues.length > 0) ||
-      (file.manualIssues && file.manualIssues.length > 0);
-
-    if (!hasIssueDetails && (file.issuesFound ?? 0) > 0) {
-      const mockIssues = generateMockIssues(file);
-      return {
-        ...file,
-        autoFixedIssues: mockIssues.autoFixedIssues,
-        quickFixIssues: mockIssues.quickFixIssues,
-        manualIssues: mockIssues.manualIssues,
-      };
-    }
-
-    return file;
+    return response.data.data;
   },
 
   subscribeToBatch(
