@@ -1,43 +1,14 @@
-import { useState, useEffect } from 'react';
-import { X, Zap, Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import { X, Zap, Loader2, Code } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { AccessModeSelector } from './AccessModeSelector';
+import { AccessModeSufficientSelector } from './AccessModeSufficientSelector';
+import { AccessibilityHazardsSelector } from './AccessibilityHazardsSelector';
+import {
+  DEFAULT_METADATA_VALUES,
+  formatAccessMode,
+} from '@/constants/epubMetadata';
 import type { BatchFileIssue } from '@/types/batch.types';
-
-interface QuickFixField {
-  issueCode: string;
-  label: string;
-  value: string;
-  placeholder: string;
-  defaultValue: string;
-}
-
-const METADATA_DEFAULTS: Record<string, { label: string; placeholder: string; defaultValue: string }> = {
-  'METADATA-ACCESSMODE': {
-    label: 'Access Mode',
-    placeholder: 'e.g., textual, visual',
-    defaultValue: 'textual, visual',
-  },
-  'METADATA-ACCESSMODESUFFICIENT': {
-    label: 'Access Mode Sufficient',
-    placeholder: 'e.g., textual',
-    defaultValue: 'textual',
-  },
-  'METADATA-ACCESSIBILITYFEATURE': {
-    label: 'Accessibility Features',
-    placeholder: 'e.g., structuralNavigation, tableOfContents',
-    defaultValue: 'structuralNavigation, tableOfContents, readingOrder',
-  },
-  'METADATA-ACCESSIBILITYHAZARD': {
-    label: 'Accessibility Hazards',
-    placeholder: 'e.g., none',
-    defaultValue: 'none',
-  },
-  'METADATA-ACCESSIBILITYSUMMARY': {
-    label: 'Accessibility Summary',
-    placeholder: 'Description of accessibility features',
-    defaultValue: 'This publication meets WCAG 2.1 AA standards.',
-  },
-};
 
 interface BatchQuickFixModalProps {
   issues: BatchFileIssue[];
@@ -54,55 +25,124 @@ export function BatchQuickFixModal({
   onClose,
   isLoading = false,
 }: BatchQuickFixModalProps) {
-  const [fields, setFields] = useState<QuickFixField[]>([]);
+  const [accessMode, setAccessMode] = useState<string[]>(
+    mode === 'batch' ? [...DEFAULT_METADATA_VALUES.accessMode] : []
+  );
+  const [accessModeSufficient, setAccessModeSufficient] = useState<string>(
+    mode === 'batch' ? DEFAULT_METADATA_VALUES.accessModeSufficient : ''
+  );
+  const [accessibilityFeature, setAccessibilityFeature] = useState(
+    mode === 'batch' ? DEFAULT_METADATA_VALUES.accessibilityFeature : ''
+  );
+  const [accessibilityHazard, setAccessibilityHazard] = useState<string | string[]>(
+    mode === 'batch' ? DEFAULT_METADATA_VALUES.accessibilityHazard : 'none'
+  );
+  const [accessibilitySummary, setAccessibilitySummary] = useState(
+    mode === 'batch' ? DEFAULT_METADATA_VALUES.accessibilitySummary : ''
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
-  useEffect(() => {
-    const initialFields = issues.map((issue) => {
-      const code = issue.code?.toUpperCase() || '';
-      const defaults = METADATA_DEFAULTS[code] || {
-        label: issue.title || code,
-        placeholder: 'Enter value...',
-        defaultValue: '',
-      };
+  const issueCodes = issues.map(i => i.code?.toUpperCase() || '');
+  const hasAccessMode = issueCodes.some(c => c.includes('ACCESSMODE') && !c.includes('SUFFICIENT'));
+  const hasAccessModeSufficient = issueCodes.some(c => c.includes('ACCESSMODESUFFICIENT'));
+  const hasAccessibilityFeature = issueCodes.some(c => c.includes('ACCESSIBILITYFEATURE'));
+  const hasAccessibilityHazard = issueCodes.some(c => c.includes('ACCESSIBILITYHAZARD'));
+  const hasAccessibilitySummary = issueCodes.some(c => c.includes('ACCESSIBILITYSUMMARY'));
 
-      return {
-        issueCode: issue.code || '',
-        label: defaults.label,
-        value: mode === 'batch' ? defaults.defaultValue : '',
-        placeholder: defaults.placeholder,
-        defaultValue: defaults.defaultValue,
-      };
-    });
-    setFields(initialFields);
-  }, [issues, mode]);
-
-  const handleFieldChange = (index: number, value: string) => {
-    setFields((prev) => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], value };
-      return updated;
-    });
-  };
+  const isValid =
+    (!hasAccessMode || accessMode.length > 0) &&
+    (!hasAccessModeSufficient || accessModeSufficient) &&
+    (!hasAccessibilityFeature || accessibilityFeature.trim().length > 0) &&
+    (!hasAccessibilityHazard || (typeof accessibilityHazard === 'string' || accessibilityHazard.length > 0)) &&
+    (!hasAccessibilitySummary || accessibilitySummary.trim().length >= 20);
 
   const handleSubmit = async () => {
-    const validFixes = fields
-      .filter((f) => f.value.trim() !== '')
-      .map((f) => ({ issueCode: f.issueCode, value: f.value.trim() }));
+    const quickFixes: Array<{ issueCode: string; value: string }> = [];
 
-    if (validFixes.length === 0) {
-      return;
+    if (hasAccessMode && accessMode.length > 0) {
+      quickFixes.push({
+        issueCode: 'METADATA-ACCESSMODE',
+        value: formatAccessMode(accessMode),
+      });
     }
+
+    if (hasAccessModeSufficient && accessModeSufficient) {
+      quickFixes.push({
+        issueCode: 'METADATA-ACCESSMODESUFFICIENT',
+        value: accessModeSufficient,
+      });
+    }
+
+    if (hasAccessibilityFeature && accessibilityFeature.trim()) {
+      quickFixes.push({
+        issueCode: 'METADATA-ACCESSIBILITYFEATURE',
+        value: accessibilityFeature.trim(),
+      });
+    }
+
+    if (hasAccessibilityHazard) {
+      const hazardValue = Array.isArray(accessibilityHazard)
+        ? accessibilityHazard.join(', ')
+        : accessibilityHazard;
+      quickFixes.push({
+        issueCode: 'METADATA-ACCESSIBILITYHAZARD',
+        value: hazardValue,
+      });
+    }
+
+    if (hasAccessibilitySummary && accessibilitySummary.trim()) {
+      quickFixes.push({
+        issueCode: 'METADATA-ACCESSIBILITYSUMMARY',
+        value: accessibilitySummary.trim(),
+      });
+    }
+
+    if (quickFixes.length === 0) return;
 
     setIsSubmitting(true);
     try {
-      await onApply(validFixes);
+      await onApply(quickFixes);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const filledCount = fields.filter((f) => f.value.trim() !== '').length;
+  const previewXML = `<!-- Access Mode -->
+${accessMode.map(mode => `<meta property="schema:accessMode">${mode}</meta>`).join('\n')}
+
+<!-- Access Mode Sufficient -->
+<meta property="schema:accessModeSufficient">${accessModeSufficient}</meta>
+
+<!-- Accessibility Features -->
+${accessibilityFeature.split(',').map(feat =>
+  `<meta property="schema:accessibilityFeature">${feat.trim()}</meta>`
+).join('\n')}
+
+<!-- Accessibility Hazards -->
+${Array.isArray(accessibilityHazard)
+  ? accessibilityHazard.map(h => `<meta property="schema:accessibilityHazard">${h}</meta>`).join('\n')
+  : `<meta property="schema:accessibilityHazard">${accessibilityHazard}</meta>`
+}
+
+<!-- Accessibility Summary -->
+<meta property="schema:accessibilitySummary">${accessibilitySummary}</meta>`;
+
+  const filledCount = [
+    hasAccessMode && accessMode.length > 0,
+    hasAccessModeSufficient && accessModeSufficient,
+    hasAccessibilityFeature && accessibilityFeature.trim(),
+    hasAccessibilityHazard && (typeof accessibilityHazard === 'string' || accessibilityHazard.length > 0),
+    hasAccessibilitySummary && accessibilitySummary.trim(),
+  ].filter(Boolean).length;
+
+  const totalFields = [
+    hasAccessMode,
+    hasAccessModeSufficient,
+    hasAccessibilityFeature,
+    hasAccessibilityHazard,
+    hasAccessibilitySummary,
+  ].filter(Boolean).length;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -124,51 +164,110 @@ export function BatchQuickFixModal({
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
-          <p className="text-sm text-gray-600 mb-4">
+          <p className="text-sm text-gray-600 mb-6">
             {mode === 'batch'
               ? 'Review and edit the pre-filled values below, then apply all fixes at once.'
-              : 'Fill in the values for each metadata field below.'}
+              : 'Select values for each metadata field below.'}
           </p>
 
-          <div className="space-y-4">
-            {fields.map((field, index) => (
-              <div key={field.issueCode} className="border rounded-lg p-4 bg-gray-50">
-                <div className="flex items-center justify-between mb-2">
-                  <label
-                    htmlFor={`field-${index}`}
-                    className="font-medium text-gray-900"
-                  >
-                    {field.label}
+          <div className="space-y-6">
+            {hasAccessMode && (
+              <AccessModeSelector
+                value={accessMode}
+                onChange={setAccessMode}
+              />
+            )}
+
+            {hasAccessModeSufficient && (
+              <AccessModeSufficientSelector
+                value={accessModeSufficient}
+                onChange={setAccessModeSufficient}
+                accessModes={accessMode}
+              />
+            )}
+
+            {hasAccessibilityFeature && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-900">
+                    Accessibility Features
                   </label>
-                  <span className="text-xs font-mono text-gray-500 bg-gray-200 px-2 py-0.5 rounded">
-                    {field.issueCode}
+                  <span className="text-xs text-gray-500 font-mono bg-gray-100 px-2 py-0.5 rounded">
+                    METADATA-ACCESSIBILITYFEATURE
                   </span>
                 </div>
                 <input
-                  id={`field-${index}`}
                   type="text"
-                  value={field.value}
-                  onChange={(e) => handleFieldChange(index, e.target.value)}
-                  placeholder={field.placeholder}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                  value={accessibilityFeature}
+                  onChange={(e) => setAccessibilityFeature(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="structuralNavigation, tableOfContents, readingOrder"
                 />
-                {mode === 'individual' && field.defaultValue && (
-                  <button
-                    type="button"
-                    onClick={() => handleFieldChange(index, field.defaultValue)}
-                    className="mt-1 text-xs text-amber-600 hover:text-amber-700"
-                  >
-                    Use default: {field.defaultValue}
-                  </button>
-                )}
+                <p className="text-xs text-gray-500">
+                  Comma-separated list. Will be replaced with checkboxes in next update.
+                </p>
               </div>
-            ))}
+            )}
+
+            {hasAccessibilityHazard && (
+              <AccessibilityHazardsSelector
+                value={accessibilityHazard}
+                onChange={setAccessibilityHazard}
+              />
+            )}
+
+            {hasAccessibilitySummary && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-900">
+                    Accessibility Summary
+                  </label>
+                  <span className="text-xs text-gray-500 font-mono bg-gray-100 px-2 py-0.5 rounded">
+                    METADATA-ACCESSIBILITYSUMMARY
+                  </span>
+                </div>
+                <textarea
+                  value={accessibilitySummary}
+                  onChange={(e) => setAccessibilitySummary(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="This publication meets WCAG 2.1 AA standards..."
+                />
+                <p className="text-xs text-gray-500">
+                  {accessibilitySummary.length} / 500 characters
+                  {accessibilitySummary.length < 20 && accessibilitySummary.length > 0 && (
+                    <span className="text-orange-600 ml-2">
+                      (minimum 20 characters)
+                    </span>
+                  )}
+                </p>
+              </div>
+            )}
+
+            <div className="border-t pt-4">
+              <button
+                type="button"
+                onClick={() => setShowPreview(!showPreview)}
+                className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+              >
+                <Code className="h-4 w-4" />
+                {showPreview ? 'Hide XML Preview' : 'Show XML Preview'}
+              </button>
+
+              {showPreview && (
+                <div className="mt-3 p-3 bg-gray-900 rounded-lg overflow-x-auto">
+                  <pre className="text-xs text-gray-100 font-mono whitespace-pre">
+                    {previewXML}
+                  </pre>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         <div className="flex items-center justify-between p-4 border-t bg-gray-50">
           <span className="text-sm text-gray-600">
-            {filledCount} of {fields.length} fields filled
+            {filledCount} of {totalFields} fields filled
           </span>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose} disabled={isSubmitting || isLoading}>
@@ -176,7 +275,7 @@ export function BatchQuickFixModal({
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={filledCount === 0 || isSubmitting || isLoading}
+              disabled={!isValid || isSubmitting || isLoading}
               leftIcon={
                 isSubmitting || isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
