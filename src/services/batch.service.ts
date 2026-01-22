@@ -86,6 +86,13 @@ export const batchService = {
     return response.data.data;
   },
 
+  async getFileDownloadUrl(batchId: string, fileId: string): Promise<string> {
+    const response = await api.get<ApiResponse<{ downloadUrl: string }>>(
+      `${BASE_URL}/${batchId}/files/${fileId}/download`
+    );
+    return response.data.data.downloadUrl;
+  },
+
   subscribeToBatch(
     batchId: string,
     onEvent: (event: unknown) => void

@@ -70,10 +70,6 @@ export default function BatchResultsPage() {
     toast('Quick-fix feature coming soon', { icon: 'ℹ️' });
   };
 
-  const handleManualRemediation = (fileId: string) => {
-    navigate(`/remediation/${fileId}`);
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -162,8 +158,8 @@ export default function BatchResultsPage() {
 
       <div className="mt-6">
         <FileResultsList
+          batchId={batchId!}
           files={batch.files}
-          onManualRemediation={handleManualRemediation}
         />
       </div>
 

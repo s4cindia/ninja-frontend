@@ -31,6 +31,7 @@ export interface BatchFile {
   remainingManual?: number;
 
   error?: string;
+  remediatedS3Key?: string;
 
   uploadedAt: string;
   remediationCompletedAt?: string;

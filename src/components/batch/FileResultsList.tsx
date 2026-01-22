@@ -1,11 +1,15 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Check, X, Clock, FileText, Edit } from 'lucide-react';
+import { Check, X, Clock, FileText, Eye, Download } from 'lucide-react';
+import { batchService } from '@/services/batch.service';
+import toast from 'react-hot-toast';
 import type { BatchFile, FileStatus } from '@/types/batch.types';
 
 interface FileResultsListProps {
+  batchId: string;
   files: BatchFile[];
-  onManualRemediation: (fileId: string) => void;
 }
 
 function getStatusIcon(status: FileStatus) {
@@ -32,12 +36,40 @@ function getStatusVariant(
   }
 }
 
-export function FileResultsList({ files, onManualRemediation }: FileResultsListProps) {
+export function FileResultsList({ batchId, files }: FileResultsListProps) {
+  const navigate = useNavigate();
+  const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
+
   const remediatedFiles = files.filter((f) => f.status === 'REMEDIATED');
   const failedFiles = files.filter((f) => f.status === 'FAILED');
   const otherFiles = files.filter(
     (f) => f.status !== 'REMEDIATED' && f.status !== 'FAILED'
   );
+
+  const handleViewDetails = (fileId: string) => {
+    navigate(`/batch/${batchId}/file/${fileId}`);
+  };
+
+  const handleDownloadFile = async (file: BatchFile) => {
+    try {
+      setDownloadingFileId(file.fileId);
+      const downloadUrl = await batchService.getFileDownloadUrl(batchId, file.fileId);
+
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = file.originalName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.success(`Downloading ${file.originalName}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Failed to download file: ${message}`);
+    } finally {
+      setDownloadingFileId(null);
+    }
+  };
 
   const renderFileRow = (file: BatchFile) => (
     <li key={file.fileId} className="p-4 hover:bg-gray-50">
@@ -87,16 +119,28 @@ export function FileResultsList({ files, onManualRemediation }: FileResultsListP
           </div>
         </div>
 
-        {(file.remainingQuickFix ?? 0) > 0 || (file.remainingManual ?? 0) > 0 ? (
+        <div className="flex items-center gap-2">
           <Button
             size="sm"
             variant="outline"
-            onClick={() => onManualRemediation(file.fileId)}
-            leftIcon={<Edit className="h-3 w-3" />}
+            onClick={() => handleViewDetails(file.fileId)}
+            leftIcon={<Eye className="h-3 w-3" />}
           >
-            Continue
+            View Details
           </Button>
-        ) : null}
+          {file.status === 'REMEDIATED' && (
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => handleDownloadFile(file)}
+              disabled={!file.remediatedS3Key || downloadingFileId === file.fileId}
+              isLoading={downloadingFileId === file.fileId}
+              leftIcon={<Download className="h-3 w-3" />}
+            >
+              Download
+            </Button>
+          )}
+        </div>
       </div>
     </li>
   );
