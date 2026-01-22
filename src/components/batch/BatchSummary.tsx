@@ -1,4 +1,4 @@
-import { Check, X, AlertCircle, Zap, FileText, Wrench } from 'lucide-react';
+import { Check, X, AlertCircle, Zap, FileText, Wrench, Edit3 } from 'lucide-react';
 import type { Batch } from '@/types/batch.types';
 
 interface BatchSummaryProps {
@@ -36,6 +36,11 @@ export function BatchSummary({ batch }: BatchSummaryProps) {
       label: 'Remaining Quick-Fixes',
       value: batch.quickFixIssues,
       icon: <Wrench className="h-5 w-5 text-orange-600" aria-hidden="true" />,
+    },
+    {
+      label: 'Manual Fixes Needed',
+      value: batch.manualIssues,
+      icon: <Edit3 className="h-5 w-5 text-gray-500" aria-hidden="true" />,
     },
   ];
 

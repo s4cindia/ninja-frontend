@@ -62,7 +62,7 @@ export function BatchProgressCard({ batch }: BatchProgressCardProps) {
 
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <p className="text-sm text-gray-600">Remediated</p>
+            <p className="text-sm text-gray-600">Remediated Files</p>
             <p className="text-2xl font-bold text-green-600">{batch.filesRemediated}</p>
           </div>
           <div>

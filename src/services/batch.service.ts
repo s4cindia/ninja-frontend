@@ -1,6 +1,7 @@
 import { api, ApiResponse } from './api';
 import type {
   Batch,
+  BatchFile,
   BatchListResponse,
   CreateBatchRequest,
   StartBatchRequest,
@@ -103,6 +104,13 @@ export const batchService = {
       filesProcessed: number;
       issuesFixed: number;
     }>>(`${BASE_URL}/${batchId}/quick-fixes/apply`);
+    return response.data.data;
+  },
+
+  async getBatchFile(batchId: string, fileId: string): Promise<BatchFile> {
+    const response = await api.get<ApiResponse<BatchFile>>(
+      `${BASE_URL}/${batchId}/files/${fileId}`
+    );
     return response.data.data;
   },
 

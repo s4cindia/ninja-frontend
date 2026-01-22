@@ -148,6 +148,14 @@ export function useApplyQuickFixes(batchId: string) {
   });
 }
 
+export function useBatchFile(batchId: string | undefined, fileId: string | undefined) {
+  return useQuery({
+    queryKey: ['batch-file', batchId, fileId],
+    queryFn: () => batchService.getBatchFile(batchId!, fileId!),
+    enabled: !!batchId && !!fileId,
+  });
+}
+
 export function useBatchSSE(
   batchId: string | undefined,
   onEvent: (event: BatchSSEEvent) => void

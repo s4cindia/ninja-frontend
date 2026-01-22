@@ -17,6 +17,15 @@ export type FileStatus =
   | 'FAILED'
   | 'SKIPPED';
 
+export interface BatchFileIssue {
+  criterion: string;
+  severity: 'critical' | 'major' | 'minor';
+  description: string;
+  fixApplied?: string;
+  suggestedFix?: string;
+  guidance?: string;
+}
+
 export interface BatchFile {
   fileId: string;
   fileName: string;
@@ -35,6 +44,14 @@ export interface BatchFile {
 
   uploadedAt: string;
   remediationCompletedAt?: string;
+
+  auditJobId?: string;
+  planJobId?: string;
+  remediationJobId?: string;
+
+  autoFixedIssues?: BatchFileIssue[];
+  quickFixIssues?: BatchFileIssue[];
+  manualIssues?: BatchFileIssue[];
 }
 
 export interface Batch {
