@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { Badge } from '@/components/ui/Badge';
 import { useBatchFile } from '@/hooks/useBatch';
 import { batchService } from '@/services/batch.service';
+import { QuickFixPanel } from '@/components/quickfix/QuickFixPanel';
 import {
   ArrowLeft,
   Download,
@@ -14,9 +16,11 @@ import {
   Wrench,
   Edit3,
   FileText,
+  Zap,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { BatchFileIssue, FileStatus } from '@/types/batch.types';
+import type { QuickFix } from '@/types/quickfix.types';
 
 function getStatusVariant(
   status: FileStatus
@@ -115,8 +119,33 @@ function IssueItem({
 export default function BatchFileDetailsPage() {
   const { batchId, fileId } = useParams<{ batchId: string; fileId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data: file, isLoading, error } = useBatchFile(batchId, fileId);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [selectedIssue, setSelectedIssue] = useState<BatchFileIssue | null>(null);
+
+  const handleApplyFix = async (fix: QuickFix) => {
+    if (!batchId || !fileId || !selectedIssue) return;
+
+    try {
+      const fixValue = fix.changes?.[0]?.content || fix.summary || '';
+      await batchService.applyFileQuickFixes(batchId, fileId, [
+        { issueCode: selectedIssue.code || '', value: fixValue },
+      ]);
+
+      queryClient.invalidateQueries({ queryKey: ['batch-file', batchId, fileId] });
+      toast.success('Quick-fix applied successfully!');
+      setSelectedIssue(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      toast.error(`Failed to apply fix: ${message}`);
+      throw err;
+    }
+  };
+
+  const handleClosePanel = () => {
+    setSelectedIssue(null);
+  };
 
   const handleDownload = async () => {
     if (!batchId || !fileId || !file) return;
@@ -294,7 +323,18 @@ export default function BatchFileDetailsPage() {
             </h3>
             <div className="space-y-3">
               {quickFixIssues.map((issue, idx) => (
-                <IssueItem key={idx} issue={issue} variant="warning" />
+                <div key={idx} className="relative">
+                  <IssueItem issue={issue} variant="warning" />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="absolute top-4 right-4"
+                    onClick={() => setSelectedIssue(issue)}
+                    leftIcon={<Zap className="h-3 w-3" />}
+                  >
+                    Apply Fix
+                  </Button>
+                </div>
               ))}
             </div>
           </div>
@@ -325,6 +365,27 @@ export default function BatchFileDetailsPage() {
             </div>
           )}
       </div>
+
+      {selectedIssue && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <QuickFixPanel
+              issue={{
+                id: selectedIssue.id || `issue-${selectedIssue.code}`,
+                code: selectedIssue.code || 'UNKNOWN',
+                message: selectedIssue.description,
+                location: selectedIssue.location,
+              }}
+              onApplyFix={handleApplyFix}
+              onFixApplied={() => {
+                queryClient.invalidateQueries({ queryKey: ['batch-file', batchId, fileId] });
+                setSelectedIssue(null);
+              }}
+              onClose={handleClosePanel}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

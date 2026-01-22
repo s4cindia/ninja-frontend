@@ -138,4 +138,15 @@ export const batchService = {
 
     return eventSource;
   },
+
+  async applyFileQuickFixes(
+    batchId: string,
+    fileId: string,
+    quickFixes: Array<{ issueCode: string; value: string }>
+  ): Promise<{ success: boolean; appliedFixes: number; updatedFile: BatchFile }> {
+    const response = await api.post<
+      ApiResponse<{ success: boolean; appliedFixes: number; updatedFile: BatchFile }>
+    >(`${BASE_URL}/${batchId}/files/${fileId}/apply-quick-fixes`, { quickFixes });
+    return response.data.data;
+  },
 };
