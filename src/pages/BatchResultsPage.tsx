@@ -69,13 +69,15 @@ export default function BatchResultsPage() {
   };
 
   const handleApplyQuickFixes = async () => {
-    if (!batch || batch.quickFixIssues === 0) {
+    const remainingQuickFixes = batch?.remainingQuickFixes ?? batch?.quickFixIssues ?? 0;
+    
+    if (!batch || remainingQuickFixes === 0) {
       toast('No quick-fixes available to apply', { icon: 'ℹ️' });
       return;
     }
 
     const confirmed = window.confirm(
-      `Apply quick-fixes to ${batch.quickFixIssues} issues across ${batch.filesRemediated} files?\n\n` +
+      `Apply quick-fixes to ${remainingQuickFixes} issues across ${batch.filesRemediated} files?\n\n` +
       `This will automatically fix the remaining quick-fix issues and update the remediated files.`
     );
 
@@ -172,7 +174,7 @@ export default function BatchResultsPage() {
           <button
             type="button"
             onClick={handleApplyQuickFixes}
-            disabled={batch.quickFixIssues === 0 || isApplyingQuickFixes}
+            disabled={(batch.remainingQuickFixes ?? batch.quickFixIssues) === 0 || isApplyingQuickFixes}
             className="flex flex-col items-center justify-center p-6 border-2 border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isApplyingQuickFixes ? (
@@ -184,9 +186,11 @@ export default function BatchResultsPage() {
             <p className="text-sm text-gray-600 text-center">
               {isApplyingQuickFixes
                 ? 'Applying quick-fixes...'
-                : batch.quickFixIssues > 0
-                  ? `${batch.quickFixIssues} issues need quick-fixes`
-                  : 'No quick-fixes available'}
+                : (batch.remainingQuickFixes ?? batch.quickFixIssues) > 0
+                  ? `${batch.remainingQuickFixes ?? batch.quickFixIssues} issues need quick-fixes`
+                  : (batch.quickFixesApplied ?? 0) > 0
+                    ? `All applied (${batch.quickFixesApplied})`
+                    : 'No quick-fixes available'}
             </p>
           </button>
         </div>

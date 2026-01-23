@@ -97,14 +97,25 @@ export function FileResultsList({ batchId, files }: FileResultsListProps) {
                   Issues: {file.issuesFound}
                 </span>
               )}
-              {file.issuesAutoFixed !== undefined && file.issuesAutoFixed > 0 && (
+              {(file.issuesAutoFix ?? file.issuesAutoFixed ?? 0) > 0 && (
                 <span className="text-xs text-green-600">
-                  Auto-Fixed: {file.issuesAutoFixed}
+                  Auto-Fixed: {file.issuesAutoFix ?? file.issuesAutoFixed}
                 </span>
               )}
-              {file.remainingQuickFix !== undefined && file.remainingQuickFix > 0 && (
-                <span className="text-xs text-orange-600">
-                  Quick-Fix: {file.remainingQuickFix}
+              {(file.remainingQuickFix !== undefined || file.quickFixesApplied !== undefined) && (
+                <span className="text-xs">
+                  {file.remainingQuickFix === 0 && (file.quickFixesApplied ?? 0) > 0 ? (
+                    <span className="text-green-600">
+                      Quick-Fix: All applied ({file.quickFixesApplied})
+                    </span>
+                  ) : (file.remainingQuickFix ?? 0) > 0 ? (
+                    <>
+                      <span className="text-orange-600">Quick-Fix: {file.remainingQuickFix}</span>
+                      {(file.quickFixesApplied ?? 0) > 0 && (
+                        <span className="text-green-600 ml-1">({file.quickFixesApplied} applied)</span>
+                      )}
+                    </>
+                  ) : null}
                 </span>
               )}
               {file.remainingManual !== undefined && file.remainingManual > 0 && (
