@@ -86,9 +86,9 @@ export function FileStatusList({ files }: FileStatusListProps) {
                         Issues: {file.issuesFound}
                       </span>
                     )}
-                    {file.issuesAutoFixed !== undefined && (
+                    {(file.issuesAutoFix !== undefined || file.issuesAutoFixed !== undefined) && (
                       <span className="text-xs text-green-600">
-                        Fixed: {file.issuesAutoFixed}
+                        Fixed: {file.issuesAutoFix ?? file.issuesAutoFixed ?? 0}
                       </span>
                     )}
                     {file.remainingQuickFix !== undefined && file.remainingQuickFix > 0 && (

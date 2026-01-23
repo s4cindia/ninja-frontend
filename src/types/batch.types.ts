@@ -39,6 +39,7 @@ export interface BatchFile {
 
   auditScore?: number;
   issuesFound?: number;
+  issuesAutoFix?: number;
   issuesAutoFixed?: number;
   remainingQuickFix?: number;
   remainingManual?: number;
