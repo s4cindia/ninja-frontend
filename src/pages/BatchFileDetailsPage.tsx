@@ -287,7 +287,7 @@ export default function BatchFileDetailsPage() {
             <p className="text-2xl font-bold text-green-600">
               {file.issuesAutoFix ?? file.issuesAutoFixed ?? 0}
             </p>
-            <p className="text-xs text-gray-600">Auto-Fixed</p>
+            <p className="text-xs text-gray-600">Auto-Fix</p>
           </div>
           <div className="text-center">
             <p className="text-2xl font-bold text-amber-600">
