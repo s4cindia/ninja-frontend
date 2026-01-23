@@ -42,6 +42,7 @@ export interface BatchFile {
   issuesAutoFix?: number;
   issuesAutoFixed?: number;
   remainingQuickFix?: number;
+  quickFixesApplied?: number;
   remainingManual?: number;
 
   error?: string;
@@ -74,6 +75,8 @@ export interface Batch {
   totalIssuesFound: number;
   autoFixedIssues: number;
   quickFixIssues: number;
+  quickFixesApplied?: number;
+  remainingQuickFixes?: number;
   manualIssues: number;
 
   files: BatchFile[];
@@ -124,10 +127,14 @@ export interface BatchSSEEvent {
     | 'file_remediating'
     | 'file_remediated'
     | 'file_failed'
-    | 'batch_completed';
+    | 'batch_completed'
+    | 'batch_quick_fix_applied';
   batchId: string;
   fileId?: string;
   fileName?: string;
+  batchQuickFixesApplied?: number;
+  remainingQuickFixes?: number;
+  fileQuickFixesApplied?: number;
   [key: string]: unknown;
 }
 

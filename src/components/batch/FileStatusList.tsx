@@ -91,9 +91,22 @@ export function FileStatusList({ files }: FileStatusListProps) {
                         Auto-Fix: {file.issuesAutoFix ?? file.issuesAutoFixed ?? 0}
                       </span>
                     )}
-                    {file.remainingQuickFix !== undefined && file.remainingQuickFix > 0 && (
+                    {(file.remainingQuickFix !== undefined || file.quickFixesApplied !== undefined) && (
                       <span className="text-xs text-amber-600">
-                        Quick Fix: {file.remainingQuickFix}
+                        {file.remainingQuickFix === 0 && (file.quickFixesApplied ?? 0) > 0 ? (
+                          <span className="text-green-600">
+                            Quick Fix: All applied ({file.quickFixesApplied})
+                          </span>
+                        ) : (
+                          <>
+                            Quick Fix: {file.remainingQuickFix ?? 0}
+                            {(file.quickFixesApplied ?? 0) > 0 && (
+                              <span className="text-green-600 ml-1">
+                                ({file.quickFixesApplied} applied)
+                              </span>
+                            )}
+                          </>
+                        )}
                       </span>
                     )}
                     {file.remainingManual !== undefined && file.remainingManual > 0 && (

@@ -79,7 +79,12 @@ export function BatchProgressCard({ batch }: BatchProgressCardProps) {
           </div>
           <div>
             <p className="text-sm text-gray-600">Quick Fix</p>
-            <p className="text-2xl font-bold text-amber-600">{batch.quickFixIssues}</p>
+            <p className="text-2xl font-bold text-amber-600">
+              {batch.remainingQuickFixes ?? batch.quickFixIssues}
+            </p>
+            {(batch.quickFixesApplied ?? 0) > 0 && (
+              <p className="text-xs text-green-600">{batch.quickFixesApplied} applied</p>
+            )}
           </div>
           <div>
             <p className="text-sm text-gray-600">Manual</p>

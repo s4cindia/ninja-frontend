@@ -294,6 +294,9 @@ export default function BatchFileDetailsPage() {
               {file.remainingQuickFix ?? 0}
             </p>
             <p className="text-xs text-gray-600">Quick-Fix</p>
+            {(file.quickFixesApplied ?? 0) > 0 && (
+              <p className="text-xs text-green-600">{file.quickFixesApplied} applied</p>
+            )}
           </div>
           <div className="text-center">
             <p className="text-2xl font-bold text-gray-500">

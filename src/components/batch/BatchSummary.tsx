@@ -6,6 +6,9 @@ interface BatchSummaryProps {
 }
 
 export function BatchSummary({ batch }: BatchSummaryProps) {
+  const remainingQuickFixes = batch.remainingQuickFixes ?? batch.quickFixIssues;
+  const appliedQuickFixes = batch.quickFixesApplied ?? 0;
+
   const stats = [
     {
       label: 'Total Files',
@@ -33,8 +36,9 @@ export function BatchSummary({ batch }: BatchSummaryProps) {
       icon: <Zap className="h-5 w-5 text-purple-600" aria-hidden="true" />,
     },
     {
-      label: 'Remaining Quick-Fixes',
-      value: batch.quickFixIssues,
+      label: 'Quick-Fixes',
+      value: remainingQuickFixes,
+      subLabel: appliedQuickFixes > 0 ? `${appliedQuickFixes} applied` : undefined,
       icon: <Wrench className="h-5 w-5 text-orange-600" aria-hidden="true" />,
     },
     {
@@ -48,12 +52,15 @@ export function BatchSummary({ batch }: BatchSummaryProps) {
     <div className="bg-white rounded-lg shadow p-6">
       <h2 className="text-lg font-semibold text-gray-900 mb-4">Batch Summary</h2>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
         {stats.map((stat) => (
           <div key={stat.label} className="text-center">
             <div className="flex justify-center mb-2">{stat.icon}</div>
             <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
             <p className="text-xs text-gray-600 mt-1">{stat.label}</p>
+            {'subLabel' in stat && stat.subLabel && (
+              <p className="text-xs text-green-600">{stat.subLabel}</p>
+            )}
           </div>
         ))}
       </div>
