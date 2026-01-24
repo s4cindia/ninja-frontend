@@ -74,7 +74,7 @@ export function BatchProgressCard({ batch }: BatchProgressCardProps) {
             <p className="text-2xl font-bold text-gray-900">{batch.totalIssuesFound}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Auto-Fixed</p>
+            <p className="text-sm text-gray-600">Auto-Fix</p>
             <p className="text-2xl font-bold text-green-600">{batch.autoFixedIssues}</p>
           </div>
           <div>
