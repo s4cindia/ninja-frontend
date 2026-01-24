@@ -76,8 +76,12 @@ export default function BatchResultsPage() {
       return;
     }
 
+    const filesWithRemainingQuickFixes = batch.files.filter(
+      (f) => (f.remainingQuickFix ?? 0) > 0
+    ).length;
+
     const confirmed = window.confirm(
-      `Apply quick-fixes to ${remainingQuickFixes} issues across ${batch.filesRemediated} files?\n\n` +
+      `Apply quick-fixes to ${remainingQuickFixes} issues across ${filesWithRemainingQuickFixes} files?\n\n` +
       `This will automatically fix the remaining quick-fix issues and update the remediated files.`
     );
 
