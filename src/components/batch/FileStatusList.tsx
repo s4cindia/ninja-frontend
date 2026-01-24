@@ -31,7 +31,8 @@ function getStatusIcon(status: FileStatus) {
 }
 
 function getStatusVariant(
-  status: FileStatus
+  status: FileStatus,
+  remainingQuickFix?: number
 ): 'info' | 'success' | 'warning' | 'error' {
   switch (status) {
     case 'UPLOADED':
@@ -43,7 +44,7 @@ function getStatusVariant(
     case 'REMEDIATING':
       return 'warning';
     case 'REMEDIATED':
-      return 'success';
+      return (remainingQuickFix ?? 0) > 0 ? 'warning' : 'success';
     case 'FAILED':
       return 'error';
     case 'SKIPPED':
@@ -51,6 +52,14 @@ function getStatusVariant(
     default:
       return 'info';
   }
+}
+
+function getDisplayStatus(file: BatchFile): string {
+  if (file.status === 'REMEDIATED') {
+    const remaining = file.remainingQuickFix ?? 0;
+    return remaining > 0 ? 'PARTIALLY REMEDIATED' : 'REMEDIATED';
+  }
+  return file.status;
 }
 
 export function FileStatusList({ files }: FileStatusListProps) {
@@ -73,8 +82,8 @@ export function FileStatusList({ files }: FileStatusListProps) {
                     {file.originalName}
                   </p>
                   <div className="flex items-center gap-3 mt-1 flex-wrap">
-                    <Badge variant={getStatusVariant(file.status)} size="sm">
-                      {file.status}
+                    <Badge variant={getStatusVariant(file.status, file.remainingQuickFix)} size="sm">
+                      {getDisplayStatus(file)}
                     </Badge>
                     {file.auditScore !== undefined && (
                       <span className="text-xs text-gray-600">
