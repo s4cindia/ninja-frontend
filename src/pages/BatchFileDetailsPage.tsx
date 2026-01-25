@@ -11,6 +11,7 @@ import { QuickFixPanel } from '@/components/quickfix/QuickFixPanel';
 import { BatchQuickFixModal } from '@/components/batch/BatchQuickFixModal';
 import {
   ArrowLeft,
+  ArrowUp,
   Download,
   CheckCircle,
   AlertCircle,
@@ -70,7 +71,9 @@ function IssueItem({
       ? 'bg-green-50 border-green-200'
       : variant === 'warning'
         ? 'bg-amber-50 border-amber-200'
-        : 'bg-gray-50 border-gray-200';
+        : issue.escalatedFromQuickFix
+          ? 'bg-amber-50 border-amber-200'
+          : 'bg-gray-50 border-gray-200';
 
   return (
     <div className={`p-4 rounded-lg border ${bgClass}`}>
@@ -78,6 +81,15 @@ function IssueItem({
         {issue.code && (
           <span className="font-mono font-semibold text-gray-900 text-sm">
             {issue.code}
+          </span>
+        )}
+        {issue.escalatedFromQuickFix && (
+          <span
+            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-amber-500 text-white rounded"
+            title="This issue was originally auto-fixable but failed during automated remediation. Manual intervention is required."
+          >
+            <ArrowUp className="h-3 w-3" aria-hidden="true" />
+            Escalated
           </span>
         )}
         {issue.criterion && issue.criterion !== 'Unknown' && (
@@ -219,6 +231,7 @@ export default function BatchFileDetailsPage() {
   const autoFixedIssues = file.autoFixedIssues || [];
   const quickFixIssues = file.quickFixIssues || [];
   const manualIssues = file.manualIssues || [];
+  const escalatedCount = file.escalatedToManual ?? manualIssues.filter(i => i.escalatedFromQuickFix).length;
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -387,6 +400,12 @@ export default function BatchFileDetailsPage() {
             <h3 className="flex items-center gap-2 text-md font-medium text-gray-700 mb-3">
               <Edit3 className="h-5 w-5" />
               Manual Issues ({manualIssues.length})
+              {escalatedCount > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-amber-500 text-white rounded">
+                  <ArrowUp className="h-3 w-3" aria-hidden="true" />
+                  {escalatedCount} escalated
+                </span>
+              )}
             </h3>
             <div className="space-y-3">
               {manualIssues.map((issue, idx) => (

@@ -28,6 +28,7 @@ export interface BatchFileIssue {
   suggestedFix?: string;
   guidance?: string;
   location?: string;
+  escalatedFromQuickFix?: boolean;
 }
 
 export interface BatchFile {
@@ -58,6 +59,7 @@ export interface BatchFile {
   autoFixedIssues?: BatchFileIssue[];
   quickFixIssues?: BatchFileIssue[];
   manualIssues?: BatchFileIssue[];
+  escalatedToManual?: number;
 }
 
 export interface Batch {
