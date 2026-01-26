@@ -14,6 +14,7 @@ interface AcrWorkflow {
 interface BatchAcrListProps {
   batchId: string;
   acrWorkflowIds: string[];
+  fileNames?: string[];
   generatedAt?: string;
   workflowDetails?: AcrWorkflow[];
 }
@@ -21,6 +22,7 @@ interface BatchAcrListProps {
 export function BatchAcrList({
   batchId,
   acrWorkflowIds,
+  fileNames = [],
   generatedAt,
   workflowDetails,
 }: BatchAcrListProps) {
@@ -28,7 +30,7 @@ export function BatchAcrList({
 
   const acrWorkflows: AcrWorkflow[] = workflowDetails ?? acrWorkflowIds.map((id, index) => ({
     acrWorkflowId: id,
-    epubFileName: `book${index + 1}.epub`,
+    epubFileName: fileNames[index] ?? `File ${index + 1}`,
     status: 'pending' as const,
   }));
 
