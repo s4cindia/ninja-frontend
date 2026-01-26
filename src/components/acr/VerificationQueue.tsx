@@ -785,13 +785,31 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
         </div>
       </div>
 
-      {verifiedCount === totalCount && totalCount > 0 && (
-        <div className="flex justify-center">
-          <Button onClick={onComplete} size="lg">
+      {/* Action buttons - always visible */}
+      <div className="bg-white rounded-lg border p-4 flex items-center justify-between">
+        <div className="text-sm text-gray-600">
+          {verifiedCount === totalCount && totalCount > 0 ? (
+            <span className="text-green-600 font-medium">All items verified! Ready to proceed.</span>
+          ) : (
+            <span>{totalCount - verifiedCount} item{totalCount - verifiedCount !== 1 ? 's' : ''} remaining to verify</span>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            onClick={onComplete}
+            disabled={verifiedCount === 0}
+          >
+            Skip & Continue
+          </Button>
+          <Button
+            onClick={onComplete}
+            disabled={verifiedCount !== totalCount || totalCount === 0}
+          >
             Complete Verification
           </Button>
         </div>
-      )}
+      </div>
 
       {/* Criterion Guidance Modal */}
       {selectedCriterionForGuidance && (
