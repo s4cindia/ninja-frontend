@@ -1,12 +1,19 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { VerificationQueue } from '@/components/acr/VerificationQueue';
 
+interface LocationState {
+  fileName?: string;
+}
+
 export function VerificationQueuePage() {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const state = location.state as LocationState | null;
+  const fileName = state?.fileName;
 
   const handleComplete = () => {
     navigate(`/jobs/${jobId}`);
@@ -37,7 +44,7 @@ export function VerificationQueuePage() {
         </div>
       </div>
 
-      <VerificationQueue jobId={jobId} onComplete={handleComplete} />
+      <VerificationQueue jobId={jobId} fileName={fileName} onComplete={handleComplete} />
     </div>
   );
 }

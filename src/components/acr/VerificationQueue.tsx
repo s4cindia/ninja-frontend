@@ -27,6 +27,7 @@ interface SavedVerification {
 
 interface VerificationQueueProps {
   jobId: string;
+  fileName?: string;
   onComplete: () => void;
   savedVerifications?: { [itemId: string]: SavedVerification };
   onVerificationUpdate?: (itemId: string, status: string, method: string, notes: string) => void;
@@ -285,7 +286,7 @@ const VERIFICATION_METHODS: VerificationMethod[] = [
   'WAVE',
 ];
 
-export function VerificationQueue({ jobId, onComplete, savedVerifications, onVerificationUpdate, criteriaFromAnalysis }: VerificationQueueProps) {
+export function VerificationQueue({ jobId, fileName, onComplete, savedVerifications, onVerificationUpdate, criteriaFromAnalysis }: VerificationQueueProps) {
   const [filters, setFilters] = useState<VerificationFilters>({});
   const [showFilters, setShowFilters] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
@@ -607,7 +608,12 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
           />
         </div>
         <div className="flex items-center justify-between mt-2">
-          <p className="text-xs text-gray-500">Job ID: {jobId}</p>
+          <div className="flex flex-col gap-0.5">
+            {fileName && (
+              <p className="text-sm font-medium text-gray-700">{fileName}</p>
+            )}
+            <p className="text-xs text-gray-500">Job ID: {jobId}</p>
+          </div>
           {useMockData && (
             <span className="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded">Demo Mode</span>
           )}

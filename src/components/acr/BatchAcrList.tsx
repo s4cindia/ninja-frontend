@@ -34,8 +34,10 @@ export function BatchAcrList({
     status: 'pending' as const,
   }));
 
-  const handleVerify = (acrWorkflowId: string) => {
-    navigate(`/acr/verification/${acrWorkflowId}`);
+  const handleVerify = (acrWorkflowId: string, fileName: string) => {
+    navigate(`/acr/verification/${acrWorkflowId}`, {
+      state: { fileName },
+    });
   };
 
   const getStatusBadge = (status: AcrWorkflow['status']) => {
@@ -161,7 +163,7 @@ export function BatchAcrList({
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <Button
                         size="sm"
-                        onClick={() => handleVerify(workflow.acrWorkflowId)}
+                        onClick={() => handleVerify(workflow.acrWorkflowId, workflow.epubFileName)}
                       >
                         Verify
                       </Button>
