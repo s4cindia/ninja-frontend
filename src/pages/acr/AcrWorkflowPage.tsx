@@ -195,6 +195,10 @@ export function AcrWorkflowPage() {
   const [searchParams] = useSearchParams();
   const jobIdFromQuery = searchParams.get('jobId');
   const fileNameFromQuery = searchParams.get('fileName');
+  const editionFromQuery = searchParams.get('edition');
+  const productNameFromQuery = searchParams.get('productName');
+  const vendorFromQuery = searchParams.get('vendor');
+  const contactEmailFromQuery = searchParams.get('contactEmail');
   const navigate = useNavigate();
   
   const effectiveJobId = urlJobId || jobIdFromQuery;
@@ -352,16 +356,71 @@ export function AcrWorkflowPage() {
     }
   }, [state]);
 
-  // Fetch and apply pre-filled values from ACR workflow API
+  // Apply pre-filled values from URL query parameters (highest priority)
   useEffect(() => {
+    // Skip if editions not loaded yet or already applied
+    if (!editions?.length || preFilledValuesApplied) {
+      return;
+    }
+    
+    // Check if we have query params to apply
+    const hasQueryParams = editionFromQuery || productNameFromQuery || vendorFromQuery || contactEmailFromQuery;
+    
+    if (hasQueryParams) {
+      const updates: Partial<WorkflowState> = {};
+      let shouldSkipEditionStep = false;
+      
+      // Pre-fill edition from query param
+      if (editionFromQuery && !state.selectedEdition) {
+        const matchedEdition = editions.find(e => e.code === editionFromQuery);
+        if (matchedEdition) {
+          updates.selectedEdition = matchedEdition;
+          updates.editionPreFilled = true;
+          shouldSkipEditionStep = true;
+        }
+      }
+      
+      // Pre-fill productName as fileName
+      if (productNameFromQuery && !state.fileName) {
+        updates.fileName = productNameFromQuery;
+        setDocumentTitle(productNameFromQuery);
+      }
+      
+      // Pre-fill vendor
+      if (vendorFromQuery && !state.vendor) {
+        updates.vendor = vendorFromQuery;
+      }
+      
+      // Pre-fill contactEmail
+      if (contactEmailFromQuery && !state.contactEmail) {
+        updates.contactEmail = contactEmailFromQuery;
+      }
+      
+      // Apply updates if any
+      if (Object.keys(updates).length > 0) {
+        setState(prev => {
+          const newState = { ...prev, ...updates };
+          // Auto-advance to step 2 if edition was pre-filled and we're on step 1
+          if (shouldSkipEditionStep && prev.currentStep === 1) {
+            newState.currentStep = 2;
+          }
+          return newState;
+        });
+      }
+      
+      setPreFilledValuesApplied(true);
+      return;
+    }
+    
+    // If no query params, try fetching from API (only if we have a job ID)
+    if (!effectiveJobId) {
+      setPreFilledValuesApplied(true);
+      return;
+    }
+    
     const controller = new AbortController();
     
     const fetchPreFilledValues = async () => {
-      // Skip if no job ID, values already applied, or editions not loaded yet
-      if (!effectiveJobId || preFilledValuesApplied || !editions?.length) {
-        return;
-      }
-      
       try {
         // Try fetching from ACR job endpoint first, then fall back to EPUB job
         let jobData = null;
@@ -432,7 +491,7 @@ export function AcrWorkflowPage() {
     return () => {
       controller.abort();
     };
-  }, [effectiveJobId, editions, preFilledValuesApplied, state.selectedEdition, state.fileName, state.vendor, state.contactEmail, state.currentStep]);
+  }, [effectiveJobId, editions, preFilledValuesApplied, editionFromQuery, productNameFromQuery, vendorFromQuery, contactEmailFromQuery, state.selectedEdition, state.fileName, state.vendor, state.contactEmail, state.currentStep]);
 
   const updateState = (updates: Partial<WorkflowState>) => {
     setState(prev => ({ ...prev, ...updates }));

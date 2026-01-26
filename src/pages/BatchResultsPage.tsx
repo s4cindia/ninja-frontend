@@ -45,14 +45,22 @@ export default function BatchResultsPage() {
       });
       setShowAcrModal(false);
 
+      // Build query params with ACR configuration to pre-fill the workflow
+      const queryParams = new URLSearchParams();
+      queryParams.set('edition', options.edition);
+      queryParams.set('productName', options.batchName);
+      queryParams.set('vendor', options.vendor);
+      queryParams.set('contactEmail', options.contactEmail);
+      const queryString = queryParams.toString();
+
       if (mode === 'individual') {
-        navigate('/acr/workflow');
+        navigate(`/acr/workflow?${queryString}`);
       } else {
         const workflowId = (result as { workflowId?: string })?.workflowId;
         if (workflowId) {
-          navigate(`/acr/workflow/${workflowId}`);
+          navigate(`/acr/workflow/${workflowId}?${queryString}`);
         } else {
-          navigate('/acr/workflow');
+          navigate(`/acr/workflow?${queryString}`);
         }
       }
     } catch {
