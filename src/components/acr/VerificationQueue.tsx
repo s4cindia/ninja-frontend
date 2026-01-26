@@ -426,17 +426,11 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
     });
   }, [items, filters, useMockData]);
 
-  // When using local items, always calculate from local state (not API data)
-  const verifiedCount = (useLocalItems || useMockData)
-    ? items.filter(i => 
-        i.status === 'verified_pass' || i.status === 'verified_fail' || i.status === 'verified_partial'
-      ).length
-    : (apiData?.verifiedCount ?? items.filter(i => 
-        i.status === 'verified_pass' || i.status === 'verified_fail' || i.status === 'verified_partial'
-      ).length);
-  const totalCount = (useLocalItems || useMockData) 
-    ? items.length 
-    : (apiData?.totalCount ?? items.length);
+  // Always calculate count from actual items array to ensure consistency with display
+  const verifiedCount = items.filter(i => 
+    i.status === 'verified_pass' || i.status === 'verified_fail' || i.status === 'verified_partial'
+  ).length;
+  const totalCount = items.length;
   const progressPercent = totalCount > 0 ? Math.round((verifiedCount / totalCount) * 100) : 0;
 
   console.log('[VerificationQueue] Progress:', {
