@@ -756,7 +756,8 @@ export function AcrWorkflowPage() {
       case 1:
         return state.selectedEdition !== null;
       case 2:
-        return state.jobId !== null;
+        // Allow proceeding if a document is selected OR if pre-filled from batch flow
+        return state.jobId !== null || (state.editionPreFilled && state.fileName !== null);
       case 3:
         return true;
       case 4:
@@ -812,7 +813,23 @@ export function AcrWorkflowPage() {
               </p>
             </div>
 
-            {state.fileName && (
+            {state.fileName && state.editionPreFilled && (
+              <Alert variant="success">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4" />
+                    <span>Batch/Product: <strong>{state.fileName}</strong></span>
+                    {state.selectedEdition && (
+                      <Badge variant="info">{state.selectedEdition.name}</Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-green-700 ml-6">
+                    Pre-configured from batch. You can optionally select a specific document below, or click Next to continue.
+                  </p>
+                </div>
+              </Alert>
+            )}
+            {state.fileName && !state.editionPreFilled && (
               <Alert variant="info">
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4" />
