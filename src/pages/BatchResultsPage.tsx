@@ -54,12 +54,12 @@ export default function BatchResultsPage() {
       queryParams.set('contactEmail', options.contactEmail);
 
       if (mode === 'individual') {
-        // For individual mode, pass the first ACR workflow ID if available
+        // For individual mode, navigate to list view showing all generated ACRs
         const individualResult = result as IndividualAcrGenerationResult;
         if (individualResult.acrWorkflowIds && individualResult.acrWorkflowIds.length > 0) {
-          queryParams.set('acrId', individualResult.acrWorkflowIds[0]);
-          const updatedQueryString = queryParams.toString();
-          navigate(`/acr/workflow?${updatedQueryString}`);
+          navigate(`/acr/batch/${batchId}/list`, {
+            state: { acrWorkflowIds: individualResult.acrWorkflowIds },
+          });
         } else {
           const queryString = queryParams.toString();
           navigate(`/acr/workflow?${queryString}`);
