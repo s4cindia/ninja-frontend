@@ -9,6 +9,7 @@ import { AcrGenerationModal } from '@/components/batch/AcrGenerationModal';
 import { useBatch, useGenerateAcr, useExportBatch, useApplyQuickFixes } from '@/hooks/useBatch';
 import { Download, FileText, Wrench, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import type { IndividualAcrGenerationResult, AggregateAcrGenerationResult } from '@/types/batch-acr.types';
 
 export default function BatchResultsPage() {
   const { batchId } = useParams<{ batchId: string }>();
@@ -51,24 +52,31 @@ export default function BatchResultsPage() {
       queryParams.set('productName', options.batchName);
       queryParams.set('vendor', options.vendor);
       queryParams.set('contactEmail', options.contactEmail);
-      const queryString = queryParams.toString();
+
+      console.log('[BatchResultsPage] ACR generation result:', result);
 
       if (mode === 'individual') {
         // For individual mode, pass the first ACR workflow ID if available
-        const acrWorkflowIds = (result as { acrWorkflowIds?: string[] })?.acrWorkflowIds;
-        if (acrWorkflowIds && acrWorkflowIds.length > 0) {
-          queryParams.set('acrId', acrWorkflowIds[0]);
+        const individualResult = result as IndividualAcrGenerationResult;
+        console.log('[BatchResultsPage] Individual mode - acrWorkflowIds:', individualResult.acrWorkflowIds);
+        if (individualResult.acrWorkflowIds && individualResult.acrWorkflowIds.length > 0) {
+          queryParams.set('acrId', individualResult.acrWorkflowIds[0]);
           const updatedQueryString = queryParams.toString();
+          console.log('[BatchResultsPage] Navigating to:', `/acr/workflow?${updatedQueryString}`);
           navigate(`/acr/workflow?${updatedQueryString}`);
         } else {
+          const queryString = queryParams.toString();
           navigate(`/acr/workflow?${queryString}`);
         }
       } else {
         // For aggregate mode, use the single workflow ID
-        const workflowId = (result as { workflowId?: string })?.workflowId;
-        if (workflowId) {
-          navigate(`/acr/workflow/${workflowId}?${queryString}`);
+        const aggregateResult = result as AggregateAcrGenerationResult;
+        console.log('[BatchResultsPage] Aggregate mode - acrWorkflowId:', aggregateResult.acrWorkflowId);
+        if (aggregateResult.acrWorkflowId) {
+          const queryString = queryParams.toString();
+          navigate(`/acr/workflow/${aggregateResult.acrWorkflowId}?${queryString}`);
         } else {
+          const queryString = queryParams.toString();
           navigate(`/acr/workflow?${queryString}`);
         }
       }

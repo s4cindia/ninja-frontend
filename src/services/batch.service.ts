@@ -8,6 +8,7 @@ import type {
   GenerateAcrRequest,
   BatchExportResponse,
 } from '@/types/batch.types';
+import type { BatchAcrGenerationResult } from '@/types/batch-acr.types';
 
 const BASE_URL = '/batch';
 
@@ -67,11 +68,12 @@ export const batchService = {
     await api.post(`${BASE_URL}/${batchId}/cancel`);
   },
 
-  async generateAcr(batchId: string, data: GenerateAcrRequest): Promise<unknown> {
-    const response = await api.post<ApiResponse<unknown>>(
+  async generateAcr(batchId: string, data: GenerateAcrRequest): Promise<BatchAcrGenerationResult> {
+    const response = await api.post<ApiResponse<BatchAcrGenerationResult>>(
       `${BASE_URL}/${batchId}/acr/generate`,
       data
     );
+    console.log('[BatchService] ACR generation response:', response.data.data);
     return response.data.data;
   },
 
