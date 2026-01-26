@@ -791,14 +791,13 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
           {verifiedCount === totalCount && totalCount > 0 ? (
             <span className="text-green-600 font-medium">All items verified! Ready to proceed.</span>
           ) : (
-            <span>{totalCount - verifiedCount} item{totalCount - verifiedCount !== 1 ? 's' : ''} remaining to verify</span>
+            <span>{verifiedCount} of {totalCount} items verified</span>
           )}
         </div>
         <div className="flex items-center gap-3">
           <Button
             variant="outline"
             onClick={onComplete}
-            disabled={verifiedCount === 0}
           >
             Skip & Continue
           </Button>
