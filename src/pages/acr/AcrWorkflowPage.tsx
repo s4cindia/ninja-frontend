@@ -201,6 +201,14 @@ export function AcrWorkflowPage() {
   const contactEmailFromQuery = searchParams.get('contactEmail');
   const acrIdFromQuery = searchParams.get('acrId');
   const navigate = useNavigate();
+
+  // Debug log for ACR ID resolution
+  console.log('[AcrWorkflowPage] ACR ID sources:', {
+    acrIdFromQuery,
+    urlJobId,
+    jobIdFromQuery,
+    currentUrl: window.location.href
+  });
   
   const effectiveJobId = urlJobId || jobIdFromQuery;
   
@@ -1085,7 +1093,14 @@ export function AcrWorkflowPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div 
                 className="border rounded-lg p-6 text-center cursor-pointer hover:border-primary-400 hover:bg-primary-50 transition-colors"
-                onClick={() => setIsExportOpen(true)}
+                onClick={() => {
+                  const exportAcrId = acrIdFromQuery || state.acrId || 'demo';
+                  console.log('[AcrWorkflowPage] Opening export with acrId:', exportAcrId, {
+                    acrIdFromQuery,
+                    stateAcrId: state.acrId
+                  });
+                  setIsExportOpen(true);
+                }}
               >
                 <Download className="h-10 w-10 mx-auto text-primary-600 mb-3" />
                 <h3 className="font-medium text-gray-900 mb-1">Export Document</h3>
