@@ -54,8 +54,17 @@ export default function BatchResultsPage() {
       const queryString = queryParams.toString();
 
       if (mode === 'individual') {
-        navigate(`/acr/workflow?${queryString}`);
+        // For individual mode, pass the first ACR workflow ID if available
+        const acrWorkflowIds = (result as { acrWorkflowIds?: string[] })?.acrWorkflowIds;
+        if (acrWorkflowIds && acrWorkflowIds.length > 0) {
+          queryParams.set('acrId', acrWorkflowIds[0]);
+          const updatedQueryString = queryParams.toString();
+          navigate(`/acr/workflow?${updatedQueryString}`);
+        } else {
+          navigate(`/acr/workflow?${queryString}`);
+        }
       } else {
+        // For aggregate mode, use the single workflow ID
         const workflowId = (result as { workflowId?: string })?.workflowId;
         if (workflowId) {
           navigate(`/acr/workflow/${workflowId}?${queryString}`);

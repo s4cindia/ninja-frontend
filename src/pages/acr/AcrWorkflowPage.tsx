@@ -199,6 +199,7 @@ export function AcrWorkflowPage() {
   const productNameFromQuery = searchParams.get('productName');
   const vendorFromQuery = searchParams.get('vendor');
   const contactEmailFromQuery = searchParams.get('contactEmail');
+  const acrIdFromQuery = searchParams.get('acrId');
   const navigate = useNavigate();
   
   const effectiveJobId = urlJobId || jobIdFromQuery;
@@ -1294,7 +1295,7 @@ export function AcrWorkflowPage() {
       </div>
 
       <ExportDialog
-        acrId={state.acrId || 'demo'}
+        acrId={acrIdFromQuery || state.acrId || 'demo'}
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}
       />
