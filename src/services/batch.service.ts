@@ -73,7 +73,6 @@ export const batchService = {
       `${BASE_URL}/${batchId}/acr/generate`,
       data
     );
-    console.log('[BatchService] ACR generation response:', response.data.data);
     return response.data.data;
   },
 

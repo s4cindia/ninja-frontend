@@ -53,16 +53,12 @@ export default function BatchResultsPage() {
       queryParams.set('vendor', options.vendor);
       queryParams.set('contactEmail', options.contactEmail);
 
-      console.log('[BatchResultsPage] ACR generation result:', result);
-
       if (mode === 'individual') {
         // For individual mode, pass the first ACR workflow ID if available
         const individualResult = result as IndividualAcrGenerationResult;
-        console.log('[BatchResultsPage] Individual mode - acrWorkflowIds:', individualResult.acrWorkflowIds);
         if (individualResult.acrWorkflowIds && individualResult.acrWorkflowIds.length > 0) {
           queryParams.set('acrId', individualResult.acrWorkflowIds[0]);
           const updatedQueryString = queryParams.toString();
-          console.log('[BatchResultsPage] Navigating to:', `/acr/workflow?${updatedQueryString}`);
           navigate(`/acr/workflow?${updatedQueryString}`);
         } else {
           const queryString = queryParams.toString();
@@ -71,7 +67,6 @@ export default function BatchResultsPage() {
       } else {
         // For aggregate mode, use the single workflow ID
         const aggregateResult = result as AggregateAcrGenerationResult;
-        console.log('[BatchResultsPage] Aggregate mode - acrWorkflowId:', aggregateResult.acrWorkflowId);
         if (aggregateResult.acrWorkflowId) {
           const queryString = queryParams.toString();
           navigate(`/acr/workflow/${aggregateResult.acrWorkflowId}?${queryString}`);
