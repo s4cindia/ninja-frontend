@@ -6,6 +6,9 @@ import { VerificationQueue } from '@/components/acr/VerificationQueue';
 
 interface LocationState {
   fileName?: string;
+  returnTo?: string;
+  batchId?: string;
+  acrWorkflowId?: string;
 }
 
 export function VerificationQueuePage() {
@@ -14,9 +17,25 @@ export function VerificationQueuePage() {
   const location = useLocation();
   const state = location.state as LocationState | null;
   const fileName = state?.fileName;
+  const returnTo = state?.returnTo;
+  const batchId = state?.batchId;
+  const acrWorkflowId = state?.acrWorkflowId ?? jobId;
 
   const handleComplete = () => {
-    navigate(`/jobs/${jobId}`);
+    // If we have a specific return path, use it
+    if (returnTo) {
+      navigate(returnTo);
+      return;
+    }
+    
+    // Default: return to ACR workflow at review step with verification complete
+    navigate(`/acr/workflow?acrWorkflowId=${acrWorkflowId}&verificationComplete=true`, {
+      state: { 
+        verificationComplete: true,
+        jobId,
+        batchId,
+      }
+    });
   };
 
   if (!jobId) {

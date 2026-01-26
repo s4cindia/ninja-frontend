@@ -36,7 +36,11 @@ export function BatchAcrList({
 
   const handleVerify = (acrWorkflowId: string, fileName: string) => {
     navigate(`/acr/verification/${acrWorkflowId}`, {
-      state: { fileName },
+      state: { 
+        fileName,
+        acrWorkflowId,
+        batchId,
+      },
     });
   };
 
