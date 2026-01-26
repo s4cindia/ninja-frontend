@@ -360,19 +360,35 @@ export function AcrWorkflowPage() {
   useEffect(() => {
     // Skip if editions not loaded yet or already applied
     if (!editions?.length || preFilledValuesApplied) {
+      console.log('[ACR Pre-fill] Skipping: editions loaded:', !!editions?.length, 'already applied:', preFilledValuesApplied);
       return;
     }
     
     // Check if we have query params to apply
     const hasQueryParams = editionFromQuery || productNameFromQuery || vendorFromQuery || contactEmailFromQuery;
+    console.log('[ACR Pre-fill] Query params:', { editionFromQuery, productNameFromQuery, vendorFromQuery, contactEmailFromQuery });
+    console.log('[ACR Pre-fill] Available editions:', editions?.map(e => e.code));
     
     if (hasQueryParams) {
       const updates: Partial<WorkflowState> = {};
       let shouldSkipEditionStep = false;
       
-      // Pre-fill edition from query param
-      if (editionFromQuery && !state.selectedEdition) {
-        const matchedEdition = editions.find(e => e.code === editionFromQuery);
+      // Pre-fill edition from query param - always override if provided in query
+      if (editionFromQuery) {
+        // Map VPAT codes to API edition codes for matching
+        const editionCodeMap: Record<string, string> = {
+          'VPAT2.5-508': 'section508',
+          'VPAT2.5-WCAG': 'wcag',
+          'VPAT2.5-EU': 'eu',
+          'VPAT2.5-INT': 'international',
+        };
+        const normalizedCode = editionCodeMap[editionFromQuery] || editionFromQuery.toLowerCase();
+        const matchedEdition = editions.find(e => 
+          e.code === editionFromQuery || 
+          e.code === normalizedCode ||
+          e.code.toLowerCase() === normalizedCode
+        );
+        console.log('[ACR Pre-fill] Matched edition:', matchedEdition?.code, matchedEdition?.name, 'from query:', editionFromQuery, 'normalized:', normalizedCode);
         if (matchedEdition) {
           updates.selectedEdition = matchedEdition;
           updates.editionPreFilled = true;
@@ -380,23 +396,24 @@ export function AcrWorkflowPage() {
         }
       }
       
-      // Pre-fill productName as fileName
-      if (productNameFromQuery && !state.fileName) {
+      // Pre-fill productName as fileName - always override if provided in query
+      if (productNameFromQuery) {
         updates.fileName = productNameFromQuery;
         setDocumentTitle(productNameFromQuery);
       }
       
-      // Pre-fill vendor
-      if (vendorFromQuery && !state.vendor) {
+      // Pre-fill vendor - always override if provided in query
+      if (vendorFromQuery) {
         updates.vendor = vendorFromQuery;
       }
       
-      // Pre-fill contactEmail
-      if (contactEmailFromQuery && !state.contactEmail) {
+      // Pre-fill contactEmail - always override if provided in query
+      if (contactEmailFromQuery) {
         updates.contactEmail = contactEmailFromQuery;
       }
       
       // Apply updates if any
+      console.log('[ACR Pre-fill] Applying updates:', updates, 'shouldSkipEditionStep:', shouldSkipEditionStep);
       if (Object.keys(updates).length > 0) {
         setState(prev => {
           const newState = { ...prev, ...updates };
@@ -794,6 +811,18 @@ export function AcrWorkflowPage() {
                 Upload a document or select an existing audited job.
               </p>
             </div>
+
+            {state.fileName && (
+              <Alert variant="info">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  <span>Batch/Product: <strong>{state.fileName}</strong></span>
+                  {state.selectedEdition && (
+                    <Badge variant="info">{state.selectedEdition.name}</Badge>
+                  )}
+                </div>
+              </Alert>
+            )}
 
             {effectiveJobId && state.jobId === effectiveJobId && (
               <Alert variant="success">
