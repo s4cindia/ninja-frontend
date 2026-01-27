@@ -431,10 +431,16 @@ export function AcrWorkflowPage() {
     const hasQueryParams = editionFromQuery || productNameFromQuery || vendorFromQuery || contactEmailFromState;
     
     if (hasQueryParams) {
+      // If we have an edition query param but editions aren't loaded yet, wait for them
+      if (editionFromQuery && (!editions || editions.length === 0)) {
+        // Don't mark as applied yet - wait for editions to load
+        return;
+      }
+      
       const updates: Partial<WorkflowState> = {};
       let shouldSkipEditionStep = false;
       
-      // Pre-fill edition from query param - only if editions are loaded
+      // Pre-fill edition from query param - editions are now loaded
       if (editionFromQuery && editions?.length) {
         // Map VPAT codes to API edition codes for matching using shared constant
         const normalizedCode = EDITION_CODE_MAP[editionFromQuery] || editionFromQuery.toLowerCase();
@@ -488,6 +494,12 @@ export function AcrWorkflowPage() {
       return;
     }
     
+    // Wait for editions to be loaded before attempting to match
+    if (!editions || editions.length === 0) {
+      // Don't mark as applied yet - wait for editions to load
+      return;
+    }
+    
     const controller = new AbortController();
     
     const fetchPreFilledValues = async () => {
@@ -509,9 +521,9 @@ export function AcrWorkflowPage() {
         const updates: Partial<WorkflowState> = {};
         let shouldSkipEditionStep = false;
         
-        // Pre-fill edition if present - only if editions are loaded
+        // Pre-fill edition if present - editions are now loaded
         const editionCode = jobData.edition as AcrEditionCode | undefined;
-        if (editionCode && !state.selectedEdition && editions?.length) {
+        if (editionCode && !state.selectedEdition) {
           const matchedEdition = editions.find(e => e.code === editionCode);
           if (matchedEdition) {
             updates.selectedEdition = matchedEdition;

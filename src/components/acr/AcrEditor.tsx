@@ -226,6 +226,11 @@ export function AcrEditor({ jobId, documentTitle, onFinalized }: AcrEditorProps)
     }
   }, [documentTitle, localDocument.productName]);
 
+  // Reset finalized notification flag when jobId changes
+  useEffect(() => {
+    setHasNotifiedFinalized(false);
+  }, [jobId]);
+
   // Notify parent when document is already finalized (enables Next button)
   useEffect(() => {
     if (localDocument.status === 'final' && !hasNotifiedFinalized && onFinalized) {

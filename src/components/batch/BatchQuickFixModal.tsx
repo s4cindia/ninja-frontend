@@ -77,10 +77,16 @@ export function BatchQuickFixModal({
     }
   };
 
+  // Clean accessibilityFeature: split, trim, and filter empty strings
+  const cleanedAccessibilityFeatures = accessibilityFeature
+    .split(',')
+    .map(f => f.trim())
+    .filter(Boolean);
+
   const isValid =
     (!hasAccessMode || accessMode.length > 0) &&
     (!hasAccessModeSufficient || (accessModeSufficient && isAccessModeSufficientCompatible)) &&
-    (!hasAccessibilityFeature || accessibilityFeature.trim().length > 0) &&
+    (!hasAccessibilityFeature || cleanedAccessibilityFeatures.length > 0) &&
     (!hasAccessibilityHazard || isAccessibilityHazardValid) &&
     (!hasAccessibilitySummary || accessibilitySummary.trim().length >= 20);
 
@@ -101,10 +107,10 @@ export function BatchQuickFixModal({
       });
     }
 
-    if (hasAccessibilityFeature && accessibilityFeature.trim()) {
+    if (hasAccessibilityFeature && cleanedAccessibilityFeatures.length > 0) {
       quickFixes.push({
         issueCode: 'METADATA-ACCESSIBILITYFEATURE',
-        value: accessibilityFeature.trim(),
+        value: cleanedAccessibilityFeatures.join(', '),
       });
     }
 
@@ -147,8 +153,8 @@ ${accessMode.map(mode => `<meta property="schema:accessMode">${mode}</meta>`).jo
 <meta property="schema:accessModeSufficient">${accessModeSufficient}</meta>
 
 <!-- Accessibility Features -->
-${accessibilityFeature.split(',').map(feat =>
-  `<meta property="schema:accessibilityFeature">${feat.trim()}</meta>`
+${cleanedAccessibilityFeatures.map(feat =>
+  `<meta property="schema:accessibilityFeature">${feat}</meta>`
 ).join('\n')}
 
 <!-- Accessibility Hazards -->
@@ -163,7 +169,7 @@ ${Array.isArray(accessibilityHazard)
   const filledCount = [
     hasAccessMode && accessMode.length > 0,
     hasAccessModeSufficient && accessModeSufficient && isAccessModeSufficientCompatible,
-    hasAccessibilityFeature && accessibilityFeature.trim(),
+    hasAccessibilityFeature && cleanedAccessibilityFeatures.length > 0,
     hasAccessibilityHazard && isAccessibilityHazardValid,
     hasAccessibilitySummary && accessibilitySummary.trim().length >= 20,
   ].filter(Boolean).length;

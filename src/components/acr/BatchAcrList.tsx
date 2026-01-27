@@ -30,7 +30,12 @@ export function BatchAcrList({
   const navigate = useNavigate();
 
   const acrWorkflows: AcrWorkflow[] = useMemo(() => {
-    return workflowDetails ?? acrWorkflowIds.map((id, index) => {
+    // Prefer workflowDetails only if it's a non-empty array
+    if (workflowDetails && workflowDetails.length > 0) {
+      return workflowDetails;
+    }
+    // Fallback: build list from acrWorkflowIds and fileNames
+    return acrWorkflowIds.map((id, index) => {
       // Type guard for safe array access
       const fileName = Array.isArray(fileNames) ? fileNames[index] : undefined;
       // Safe fallback: check id length before slicing

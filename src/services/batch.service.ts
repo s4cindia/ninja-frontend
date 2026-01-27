@@ -115,12 +115,25 @@ export const batchService = {
     batchId: string,
     onEvent: (event: unknown) => void
   ): EventSource {
-    const getApiBaseUrl = () => '/api/v1';
+    // Use configured API base URL from environment or axios defaults
+    const getApiBaseUrl = (): string => {
+      // Try environment variable first, then axios defaults, then fallback
+      const envUrl = import.meta.env.VITE_API_URL;
+      if (envUrl) {
+        return envUrl.replace(/\/$/, ''); // Remove trailing slash
+      }
+      const axiosBase = api.defaults.baseURL;
+      if (axiosBase) {
+        return axiosBase.replace(/\/$/, '');
+      }
+      return '/api/v1';
+    };
     
     const createEventSource = (): EventSource => {
       const token = localStorage.getItem('token');
       const tokenParam = token ? `&token=${encodeURIComponent(token)}` : '';
-      const url = `${getApiBaseUrl()}/sse/subscribe?channel=batch:${batchId}${tokenParam}`;
+      const baseUrl = getApiBaseUrl();
+      const url = `${baseUrl}/sse/subscribe?channel=batch:${batchId}${tokenParam}`;
       return new EventSource(url);
     };
 

@@ -17,12 +17,16 @@ export type FileStatus =
   | 'FAILED'
   | 'SKIPPED';
 
+// BatchSeverity extends standard Severity to include 'major' for batch-specific issue handling
+// Note: 'major' is intentionally included as the batch API may return this severity level
+export type BatchSeverity = 'critical' | 'serious' | 'major' | 'moderate' | 'minor';
+
 export interface BatchFileIssue {
   id?: string;
   code?: string;
   criterion: string;
   title?: string;
-  severity: 'critical' | 'serious' | 'major' | 'moderate' | 'minor';
+  severity: BatchSeverity;
   description: string;
   fixApplied?: string;
   suggestedFix?: string;
