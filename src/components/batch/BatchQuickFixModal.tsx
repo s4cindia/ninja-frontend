@@ -57,9 +57,29 @@ export function BatchQuickFixModal({
     (typeof accessibilityHazard === 'string' && accessibilityHazard.trim().length > 0) ||
     (Array.isArray(accessibilityHazard) && accessibilityHazard.length > 0);
 
+  // Check if accessModeSufficient is compatible with current accessMode selection
+  const isAccessModeSufficientCompatible = (() => {
+    if (!accessModeSufficient) return false;
+    const requiredModes = accessModeSufficient.split(',').map(m => m.trim());
+    return requiredModes.every(mode => accessMode.includes(mode));
+  })();
+
+  // Handler to update accessMode and clear incompatible accessModeSufficient
+  const handleAccessModeChange = (newAccessMode: string[]) => {
+    setAccessMode(newAccessMode);
+    // Clear accessModeSufficient if it becomes incompatible
+    if (accessModeSufficient) {
+      const requiredModes = accessModeSufficient.split(',').map(m => m.trim());
+      const stillCompatible = requiredModes.every(mode => newAccessMode.includes(mode));
+      if (!stillCompatible) {
+        setAccessModeSufficient('');
+      }
+    }
+  };
+
   const isValid =
     (!hasAccessMode || accessMode.length > 0) &&
-    (!hasAccessModeSufficient || accessModeSufficient) &&
+    (!hasAccessModeSufficient || (accessModeSufficient && isAccessModeSufficientCompatible)) &&
     (!hasAccessibilityFeature || accessibilityFeature.trim().length > 0) &&
     (!hasAccessibilityHazard || isAccessibilityHazardValid) &&
     (!hasAccessibilitySummary || accessibilitySummary.trim().length >= 20);
@@ -74,7 +94,7 @@ export function BatchQuickFixModal({
       });
     }
 
-    if (hasAccessModeSufficient && accessModeSufficient) {
+    if (hasAccessModeSufficient && accessModeSufficient && isAccessModeSufficientCompatible) {
       quickFixes.push({
         issueCode: 'METADATA-ACCESSMODESUFFICIENT',
         value: accessModeSufficient,
@@ -142,10 +162,10 @@ ${Array.isArray(accessibilityHazard)
 
   const filledCount = [
     hasAccessMode && accessMode.length > 0,
-    hasAccessModeSufficient && accessModeSufficient,
+    hasAccessModeSufficient && accessModeSufficient && isAccessModeSufficientCompatible,
     hasAccessibilityFeature && accessibilityFeature.trim(),
     hasAccessibilityHazard && isAccessibilityHazardValid,
-    hasAccessibilitySummary && accessibilitySummary.trim(),
+    hasAccessibilitySummary && accessibilitySummary.trim().length >= 20,
   ].filter(Boolean).length;
 
   const totalFields = [
@@ -197,7 +217,7 @@ ${Array.isArray(accessibilityHazard)
             {hasAccessMode && (
               <AccessModeSelector
                 value={accessMode}
-                onChange={setAccessMode}
+                onChange={handleAccessModeChange}
               />
             )}
 
