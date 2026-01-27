@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Filter, CheckSquare } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
@@ -6,6 +6,8 @@ import { Spinner } from '@/components/ui/Spinner';
 import { VerificationItem } from './VerificationItem';
 import { CriterionDetailsModal } from './CriterionDetailsModal';
 import { useVerificationQueue, useSubmitVerification, useBulkVerification } from '@/hooks/useVerification';
+import { CONFIDENCE_THRESHOLD_HIGH, CONFIDENCE_THRESHOLDS } from '@/constants/verification';
+import { MOCK_VERIFICATION_ITEMS } from '@/constants/mockVerificationData';
 import type { CriterionConfidence } from '@/services/api';
 import type { 
   VerificationItem as VerificationItemType,
@@ -27,7 +29,8 @@ interface SavedVerification {
 
 interface VerificationQueueProps {
   jobId: string;
-  onComplete: () => void;
+  fileName?: string;
+  onComplete: (verified: boolean) => void;
   savedVerifications?: { [itemId: string]: SavedVerification };
   onVerificationUpdate?: (itemId: string, status: string, method: string, notes: string) => void;
   criteriaFromAnalysis?: CriterionConfidence[];
@@ -37,7 +40,7 @@ function needsHumanVerification(c: CriterionConfidence): boolean {
   if (c.needsVerification === true) return true;
   if (c.needsVerification === false) return false;
   if (c.status === 'not_applicable') return false;
-  if (c.confidenceScore < 90) return true;
+  if (c.confidenceScore < CONFIDENCE_THRESHOLD_HIGH) return true;
   return false;
 }
 
@@ -46,16 +49,15 @@ function convertCriteriaToVerificationItems(
   savedVerifications?: { [itemId: string]: SavedVerification }
 ): VerificationItemType[] {
   const filtered = criteria.filter(needsHumanVerification);
-  console.log(`[VerificationQueue] Converting ${criteria.length} criteria → ${filtered.length} verification items`);
   
   return filtered.map((c, index) => {
       const saved = savedVerifications?.[c.id];
       const score = typeof c.confidenceScore === 'number' ? c.confidenceScore : 0;
       
       const confidenceLevel: ConfidenceLevel = 
-        score >= 90 ? 'high' :
-        score >= 60 ? 'medium' :
-        score > 0 ? 'low' : 'manual';
+        score >= CONFIDENCE_THRESHOLDS.HIGH ? 'high' :
+        score >= CONFIDENCE_THRESHOLDS.MEDIUM ? 'medium' :
+        score > CONFIDENCE_THRESHOLDS.LOW ? 'low' : 'manual';
       
       const severity: Severity = 
         c.status === 'fail' ? 'critical' :
@@ -152,105 +154,6 @@ function convertCriteriaToVerificationItems(
     });
 }
 
-const MOCK_ITEMS: VerificationItemType[] = [
-  {
-    id: '1',
-    criterionId: '1.1.1',
-    criterionName: 'Non-text Content',
-    wcagLevel: 'A',
-    severity: 'serious',
-    confidenceLevel: 'low',
-    confidenceScore: 55,
-    automatedResult: 'warning',
-    automatedNotes: 'Found 3 images with alt text that may need review. Alt text appears to be auto-generated.',
-    status: 'pending',
-    history: [],
-  },
-  {
-    id: '2',
-    criterionId: '1.4.1',
-    criterionName: 'Use of Color',
-    wcagLevel: 'A',
-    severity: 'critical',
-    confidenceLevel: 'low',
-    confidenceScore: 45,
-    automatedResult: 'fail',
-    automatedNotes: 'Color-only indicators detected for required form fields. No text or icon alternative provided.',
-    status: 'pending',
-    history: [],
-  },
-  {
-    id: '3',
-    criterionId: '2.1.1',
-    criterionName: 'Keyboard',
-    wcagLevel: 'A',
-    severity: 'critical',
-    confidenceLevel: 'manual',
-    confidenceScore: 0,
-    automatedResult: 'not_tested',
-    automatedNotes: 'Custom dropdown component requires manual keyboard testing.',
-    status: 'pending',
-    history: [],
-  },
-  {
-    id: '4',
-    criterionId: '1.2.1',
-    criterionName: 'Audio-only and Video-only',
-    wcagLevel: 'A',
-    severity: 'moderate',
-    confidenceLevel: 'manual',
-    confidenceScore: 0,
-    automatedResult: 'not_tested',
-    automatedNotes: 'Media content detected but transcript availability could not be automatically verified.',
-    status: 'pending',
-    history: [],
-  },
-  {
-    id: '5',
-    criterionId: '2.4.4',
-    criterionName: 'Link Purpose',
-    wcagLevel: 'A',
-    severity: 'minor',
-    confidenceLevel: 'low',
-    confidenceScore: 58,
-    automatedResult: 'pass',
-    automatedNotes: 'All links have descriptive text. Low confidence due to context-dependent link text.',
-    status: 'verified_pass',
-    history: [
-      {
-        id: 'h1',
-        status: 'verified_pass',
-        method: 'Manual Review',
-        notes: 'Reviewed all links - context is clear',
-        verifiedBy: 'John Doe',
-        verifiedAt: '2024-12-15 10:30',
-      },
-    ],
-  },
-  {
-    id: '6',
-    criterionId: '3.1.1',
-    criterionName: 'Language of Page',
-    wcagLevel: 'A',
-    severity: 'moderate',
-    confidenceLevel: 'low',
-    confidenceScore: 50,
-    automatedResult: 'warning',
-    automatedNotes: 'Page language is set but may not match actual content language.',
-    status: 'deferred',
-    history: [
-      {
-        id: 'h2',
-        status: 'deferred',
-        method: 'Manual Review',
-        notes: 'Waiting for translation team input',
-        verifiedBy: 'Jane Smith',
-        verifiedAt: '2024-12-14 15:45',
-      },
-    ],
-  },
-];
-
 const SEVERITY_OPTIONS: { value: Severity; label: string }[] = [
   { value: 'critical', label: 'Critical' },
   { value: 'serious', label: 'Serious' },
@@ -285,7 +188,7 @@ const VERIFICATION_METHODS: VerificationMethod[] = [
   'WAVE',
 ];
 
-export function VerificationQueue({ jobId, onComplete, savedVerifications, onVerificationUpdate, criteriaFromAnalysis }: VerificationQueueProps) {
+export function VerificationQueue({ jobId, fileName, onComplete, savedVerifications, onVerificationUpdate, criteriaFromAnalysis }: VerificationQueueProps) {
   const [filters, setFilters] = useState<VerificationFilters>({});
   const [showFilters, setShowFilters] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
@@ -301,7 +204,7 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
       return convertCriteriaToVerificationItems(criteriaFromAnalysis, savedVerifications);
     }
     if (savedVerifications && Object.keys(savedVerifications).length > 0) {
-      return MOCK_ITEMS.map(item => {
+      return MOCK_VERIFICATION_ITEMS.map(item => {
         const saved = savedVerifications[item.id];
         if (saved) {
           return {
@@ -320,7 +223,7 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
         return item;
       });
     }
-    return MOCK_ITEMS;
+    return MOCK_VERIFICATION_ITEMS;
   });
   const [useMockData, setUseMockData] = useState(!hasCriteriaFromAnalysis);
 
@@ -331,7 +234,8 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
   const [useLocalItems, setUseLocalItems] = useState(hasCriteriaFromAnalysis);
 
   // Track if we've done initial conversion to avoid resetting verified items
-  const [hasInitialized, setHasInitialized] = useState(false);
+  // Using useRef instead of useState to avoid race conditions and unnecessary re-renders
+  const hasInitializedRef = useRef(false);
   
   useEffect(() => {
     if (criteriaFromAnalysis && criteriaFromAnalysis.length > 0) {
@@ -357,7 +261,7 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
       }
       
       // If already initialized, preserve existing verification status
-      if (hasInitialized) {
+      if (hasInitializedRef.current) {
         setLocalItems(prev => {
           const existingMap = new Map(prev.map(item => [item.id, item]));
           return mergedItems.map(item => {
@@ -375,11 +279,11 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
         });
       } else {
         setLocalItems(mergedItems);
-        setHasInitialized(true);
+        hasInitializedRef.current = true;
       }
       setUseLocalItems(true);
     }
-  }, [criteriaFromAnalysis, savedVerifications, apiData, hasInitialized]);
+  }, [criteriaFromAnalysis, savedVerifications, apiData]);
 
   useEffect(() => {
     if (hasCriteriaFromAnalysis || useLocalItems) return;
@@ -425,28 +329,14 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
     });
   }, [items, filters, useMockData]);
 
-  // When using local items, always calculate from local state (not API data)
-  const verifiedCount = (useLocalItems || useMockData)
-    ? items.filter(i => 
-        i.status === 'verified_pass' || i.status === 'verified_fail' || i.status === 'verified_partial'
-      ).length
-    : (apiData?.verifiedCount ?? items.filter(i => 
-        i.status === 'verified_pass' || i.status === 'verified_fail' || i.status === 'verified_partial'
-      ).length);
-  const totalCount = (useLocalItems || useMockData) 
-    ? items.length 
-    : (apiData?.totalCount ?? items.length);
+  // Memoize verification count to prevent unnecessary recalculations
+  const verifiedCount = useMemo(() => {
+    return items.filter(i => 
+      i.status === 'verified_pass' || i.status === 'verified_fail' || i.status === 'verified_partial'
+    ).length;
+  }, [items]);
+  const totalCount = items.length;
   const progressPercent = totalCount > 0 ? Math.round((verifiedCount / totalCount) * 100) : 0;
-
-  console.log('[VerificationQueue] Progress:', {
-    verifiedCount,
-    totalCount,
-    canComplete: verifiedCount === totalCount && totalCount > 0,
-    useLocalItems,
-    useMockData,
-    itemsLength: items.length,
-    itemStatuses: items.slice(0, 5).map(i => ({ id: i.id, status: i.status })),
-  });
 
   const criteriaMap = useMemo(() => {
     const map = new Map<string, CriterionConfidence>();
@@ -607,7 +497,12 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
           />
         </div>
         <div className="flex items-center justify-between mt-2">
-          <p className="text-xs text-gray-500">Job ID: {jobId}</p>
+          <div className="flex flex-col gap-0.5">
+            {fileName && (
+              <p className="text-sm font-medium text-gray-700">{fileName}</p>
+            )}
+            <p className="text-xs text-gray-500">Job ID: {jobId}</p>
+          </div>
           {useMockData && (
             <span className="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded">Demo Mode</span>
           )}
@@ -785,13 +680,30 @@ export function VerificationQueue({ jobId, onComplete, savedVerifications, onVer
         </div>
       </div>
 
-      {verifiedCount === totalCount && totalCount > 0 && (
-        <div className="flex justify-center">
-          <Button onClick={onComplete} size="lg">
+      {/* Action buttons - always visible */}
+      <div className="bg-white rounded-lg border p-4 flex items-center justify-between">
+        <div className="text-sm text-gray-600">
+          {verifiedCount === totalCount && totalCount > 0 ? (
+            <span className="text-green-600 font-medium">All items verified! Ready to proceed.</span>
+          ) : (
+            <span>{verifiedCount} of {totalCount} items verified</span>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            onClick={() => onComplete(false)}
+          >
+            Skip & Continue
+          </Button>
+          <Button
+            onClick={() => onComplete(true)}
+            disabled={verifiedCount !== totalCount || totalCount === 0}
+          >
             Complete Verification
           </Button>
         </div>
-      )}
+      </div>
 
       {/* Criterion Guidance Modal */}
       {selectedCriterionForGuidance && (

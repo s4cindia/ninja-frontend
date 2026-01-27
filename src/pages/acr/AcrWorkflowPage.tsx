@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { api, CriterionConfidence, createAcrAnalysis } from '@/services/api';
+import { EDITION_CODE_MAP } from '@/services/acr.service';
 import { 
   CheckCircle, 
   ChevronLeft, 
@@ -27,7 +28,8 @@ import { VerificationQueue } from '@/components/acr/VerificationQueue';
 import { AcrEditor } from '@/components/acr/AcrEditor';
 import { ExportDialog } from '@/components/acr/ExportDialog';
 import { VersionHistory } from '@/components/acr/VersionHistory';
-import type { AcrEdition } from '@/types/acr.types';
+import { useEditions } from '@/hooks/useAcr';
+import type { AcrEdition, AcrEditionCode } from '@/types/acr.types';
 
 interface WorkflowStep {
   id: number;
@@ -44,6 +46,18 @@ const WORKFLOW_STEPS: WorkflowStep[] = [
   { id: 5, name: 'Review & Edit', description: 'Edit and finalize', icon: Edit3 },
   { id: 6, name: 'Export', description: 'Download ACR', icon: Download },
 ];
+
+const UNTITLED_DOCUMENT = 'Untitled Document';
+
+/**
+ * Gets the display file name, preferring the actual file name over fallbacks.
+ */
+function getDisplayFileName(fileName?: string | null, documentTitle?: string): string {
+  if (fileName && fileName !== UNTITLED_DOCUMENT) {
+    return fileName;
+  }
+  return documentTitle || UNTITLED_DOCUMENT;
+}
 
 type DocumentSource = 'upload' | 'existing' | null;
 
@@ -62,7 +76,17 @@ interface VerificationData {
   };
 }
 
+/**
+ * Workflow state for ACR generation process.
+ * 
+ * URL-SAFE FIELDS (passed in query params):
+ * - edition, productName, vendor: Non-sensitive identifiers that can appear in URLs
+ * 
+ * SENSITIVE FIELDS (passed in navigation state only):
+ * - contactEmail: PII that should not be logged in browser history or server logs
+ */
 interface WorkflowState {
+  version: number;  // State schema version for migrations
   currentStep: number;
   selectedEdition: AcrEdition | null;
   documentSource: DocumentSource;
@@ -73,20 +97,17 @@ interface WorkflowState {
   isFinalized: boolean;
   verifications: VerificationData;
   fileName: string | null;
+  vendor: string | null;
+  contactEmail: string | null;
+  editionPreFilled: boolean;
 }
 
 const STORAGE_KEY = 'acr-workflow-state';
+const STATE_VERSION = 1;
 
-function loadWorkflowState(jobId?: string): WorkflowState {
-  try {
-    const stored = localStorage.getItem(`${STORAGE_KEY}-${jobId || 'new'}`);
-    if (stored) {
-      return JSON.parse(stored);
-    }
-  } catch (e) {
-    console.error('Failed to load workflow state:', e);
-  }
+function getDefaultState(jobId?: string): WorkflowState {
   return {
+    version: STATE_VERSION,
     currentStep: 1,
     selectedEdition: null,
     documentSource: null,
@@ -97,7 +118,45 @@ function loadWorkflowState(jobId?: string): WorkflowState {
     isFinalized: false,
     verifications: {},
     fileName: null,
+    vendor: null,
+    contactEmail: null,
+    editionPreFilled: false,
   };
+}
+
+function loadWorkflowState(jobId?: string): WorkflowState {
+  try {
+    const stored = localStorage.getItem(`${STORAGE_KEY}-${jobId || 'new'}`);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // Validate state version and migrate if needed
+      if (typeof parsed === 'object' && parsed !== null) {
+        // If version is missing or outdated, use default state with preserved compatible fields
+        if (!parsed.version || parsed.version < STATE_VERSION) {
+          const defaultState = getDefaultState(jobId);
+          // Validate verifications is an object (not array) with string keys
+          const isValidVerifications = parsed.verifications 
+            && typeof parsed.verifications === 'object' 
+            && !Array.isArray(parsed.verifications);
+          return {
+            ...defaultState,
+            // Preserve compatible fields from old state
+            currentStep: typeof parsed.currentStep === 'number' ? parsed.currentStep : defaultState.currentStep,
+            selectedEdition: parsed.selectedEdition ?? defaultState.selectedEdition,
+            verificationComplete: typeof parsed.verificationComplete === 'boolean' ? parsed.verificationComplete : defaultState.verificationComplete,
+            verifications: isValidVerifications ? parsed.verifications : defaultState.verifications,
+            fileName: parsed.fileName ?? defaultState.fileName,
+            vendor: parsed.vendor ?? defaultState.vendor,
+            contactEmail: parsed.contactEmail ?? defaultState.contactEmail,
+          };
+        }
+        return parsed as WorkflowState;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load workflow state:', e);
+  }
+  return getDefaultState(jobId);
 }
 
 function saveWorkflowState(state: WorkflowState) {
@@ -188,9 +247,19 @@ export function AcrWorkflowPage() {
   const [searchParams] = useSearchParams();
   const jobIdFromQuery = searchParams.get('jobId');
   const fileNameFromQuery = searchParams.get('fileName');
+  const editionFromQuery = searchParams.get('edition');
+  const productNameFromQuery = searchParams.get('productName');
+  const vendorFromQuery = searchParams.get('vendor');
+  // Read contactEmail from navigation state (not URL for security)
+  const location = useLocation();
+  const locationState = location.state as { contactEmail?: string } | null;
+  const contactEmailFromState = locationState?.contactEmail ?? null;
+  const acrIdFromQuery = searchParams.get('acrId');
+  const acrWorkflowIdFromQuery = searchParams.get('acrWorkflowId');
+  const verificationCompleteFromQuery = searchParams.get('verificationComplete') === 'true';
   const navigate = useNavigate();
   
-  const effectiveJobId = urlJobId || jobIdFromQuery;
+  const effectiveJobId = urlJobId || acrWorkflowIdFromQuery || jobIdFromQuery;
   
   const [state, setState] = useState<WorkflowState>(() => loadWorkflowState(effectiveJobId ?? undefined));
   const [isExportOpen, setIsExportOpen] = useState(false);
@@ -203,9 +272,18 @@ export function AcrWorkflowPage() {
   const [documentTitle, setDocumentTitle] = useState<string>('Untitled Document');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [preFilledValuesApplied, setPreFilledValuesApplied] = useState(false);
   
   // Store actual File object for upload (not serializable to localStorage)
   const uploadedFileRef = useRef<File | null>(null);
+  
+  // Fetch available editions to match pre-filled edition code
+  const { data: editions } = useEditions();
+
+  // Reset preFilledValuesApplied when query params or job ID change
+  useEffect(() => {
+    setPreFilledValuesApplied(false);
+  }, [effectiveJobId, editionFromQuery, productNameFromQuery, vendorFromQuery, contactEmailFromState]);
 
   const handleCriteriaLoaded = useCallback((criteria: CriterionConfidence[]) => {
     setAnalysisResults(criteria);
@@ -253,12 +331,13 @@ export function AcrWorkflowPage() {
           const name = jobData.input?.fileName ||
                        jobData.output?.fileName ||
                        jobData.fileName ||
-                       'Untitled Document';
+                       UNTITLED_DOCUMENT;
           setState(prev => ({ ...prev, fileName: name }));
         } catch (err: unknown) {
           if (controller.signal.aborted) return;
           if ((err as { name?: string })?.name === 'AbortError') return;
-          setState(prev => ({ ...prev, fileName: 'Untitled Document' }));
+          console.warn('[ACR] Failed to fetch file name:', err);
+          setState(prev => ({ ...prev, fileName: UNTITLED_DOCUMENT }));
         }
       }
     };
@@ -340,6 +419,162 @@ export function AcrWorkflowPage() {
       saveWorkflowState(state);
     }
   }, [state]);
+
+  // Apply pre-filled values from URL query parameters (highest priority)
+  useEffect(() => {
+    // Skip if already applied
+    if (preFilledValuesApplied) {
+      return;
+    }
+    
+    // Check if we have query params to apply
+    const hasQueryParams = editionFromQuery || productNameFromQuery || vendorFromQuery || contactEmailFromState;
+    
+    if (hasQueryParams) {
+      const updates: Partial<WorkflowState> = {};
+      let shouldSkipEditionStep = false;
+      
+      // Pre-fill edition from query param - only if editions are loaded
+      if (editionFromQuery && editions?.length) {
+        // Map VPAT codes to API edition codes for matching using shared constant
+        const normalizedCode = EDITION_CODE_MAP[editionFromQuery] || editionFromQuery.toLowerCase();
+        const matchedEdition = editions.find(e => 
+          e.code === editionFromQuery || 
+          e.code === normalizedCode ||
+          e.code.toLowerCase() === normalizedCode
+        );
+        if (matchedEdition) {
+          updates.selectedEdition = matchedEdition;
+          updates.editionPreFilled = true;
+          shouldSkipEditionStep = true;
+        }
+      }
+      
+      // Pre-fill productName as fileName - always override if provided in query
+      if (productNameFromQuery) {
+        updates.fileName = productNameFromQuery;
+        setDocumentTitle(productNameFromQuery);
+      }
+      
+      // Pre-fill vendor - always override if provided in query
+      if (vendorFromQuery) {
+        updates.vendor = vendorFromQuery;
+      }
+      
+      // Pre-fill contactEmail - always override if provided in navigation state
+      if (contactEmailFromState) {
+        updates.contactEmail = contactEmailFromState;
+      }
+      
+      // Apply updates if any
+      if (Object.keys(updates).length > 0) {
+        setState(prev => {
+          const newState = { ...prev, ...updates };
+          // Auto-advance to step 2 if edition was pre-filled and we're on step 1
+          if (shouldSkipEditionStep && prev.currentStep === 1) {
+            newState.currentStep = 2;
+          }
+          return newState;
+        });
+      }
+      
+      setPreFilledValuesApplied(true);
+      return;
+    }
+    
+    // If no query params, try fetching from API (only if we have a job ID)
+    if (!effectiveJobId) {
+      setPreFilledValuesApplied(true);
+      return;
+    }
+    
+    const controller = new AbortController();
+    
+    const fetchPreFilledValues = async () => {
+      try {
+        // Try fetching from ACR job endpoint first, then fall back to EPUB job
+        let jobData = null;
+        
+        try {
+          const acrResponse = await api.get(`/acr/job/${effectiveJobId}`, { signal: controller.signal });
+          jobData = acrResponse.data?.data || acrResponse.data;
+        } catch {
+          // ACR endpoint may not exist, try EPUB job endpoint
+          const epubResponse = await api.get(`/epub/job/${effectiveJobId}`, { signal: controller.signal });
+          jobData = epubResponse.data?.data || epubResponse.data;
+        }
+        
+        if (controller.signal.aborted || !jobData) return;
+        
+        const updates: Partial<WorkflowState> = {};
+        let shouldSkipEditionStep = false;
+        
+        // Pre-fill edition if present - only if editions are loaded
+        const editionCode = jobData.edition as AcrEditionCode | undefined;
+        if (editionCode && !state.selectedEdition && editions?.length) {
+          const matchedEdition = editions.find(e => e.code === editionCode);
+          if (matchedEdition) {
+            updates.selectedEdition = matchedEdition;
+            updates.editionPreFilled = true;
+            shouldSkipEditionStep = true;
+          }
+        }
+        
+        // Pre-fill productName as fileName
+        if (jobData.productName && !state.fileName) {
+          updates.fileName = jobData.productName;
+          setDocumentTitle(jobData.productName);
+        }
+        
+        // Pre-fill vendor
+        if (jobData.vendor && !state.vendor) {
+          updates.vendor = jobData.vendor;
+        }
+        
+        // Pre-fill contactEmail
+        if (jobData.contactEmail && !state.contactEmail) {
+          updates.contactEmail = jobData.contactEmail;
+        }
+        
+        // Apply updates if any
+        if (Object.keys(updates).length > 0) {
+          setState(prev => {
+            const newState = { ...prev, ...updates };
+            // Auto-advance to step 2 if edition was pre-filled and we're on step 1
+            if (shouldSkipEditionStep && prev.currentStep === 1) {
+              newState.currentStep = 2;
+            }
+            return newState;
+          });
+        }
+        
+        setPreFilledValuesApplied(true);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        console.warn('[ACR] Failed to fetch pre-filled values:', error);
+        setPreFilledValuesApplied(true);
+      }
+    };
+    
+    fetchPreFilledValues();
+    
+    return () => {
+      controller.abort();
+    };
+  }, [effectiveJobId, editions, preFilledValuesApplied, editionFromQuery, productNameFromQuery, vendorFromQuery, contactEmailFromState, state.selectedEdition, state.fileName, state.vendor, state.contactEmail, state.currentStep]);
+
+  // Handle return from verification - go directly to Review & Edit step (step 5)
+  useEffect(() => {
+    if (verificationCompleteFromQuery && acrWorkflowIdFromQuery) {
+      setState(prev => ({
+        ...prev,
+        currentStep: 5,
+        verificationComplete: true,
+        acrId: prev.acrId || acrWorkflowIdFromQuery,
+        jobId: prev.jobId || acrWorkflowIdFromQuery,
+      }));
+    }
+  }, [verificationCompleteFromQuery, acrWorkflowIdFromQuery]);
 
   const updateState = (updates: Partial<WorkflowState>) => {
     setState(prev => ({ ...prev, ...updates }));
@@ -466,18 +701,7 @@ export function AcrWorkflowPage() {
 
   const handleResetWorkflow = () => {
     localStorage.removeItem(`${STORAGE_KEY}-${state.jobId || 'new'}`);
-    setState({
-      currentStep: 1,
-      selectedEdition: null,
-      documentSource: null,
-      uploadedFile: null,
-      jobId: null,
-      acrId: null,
-      verificationComplete: false,
-      isFinalized: false,
-      verifications: {},
-      fileName: null,
-    });
+    setState(getDefaultState());
   };
 
   const handleVerificationUpdate = (itemId: string, status: string, method: string, notes: string) => {
@@ -584,7 +808,8 @@ export function AcrWorkflowPage() {
       case 1:
         return state.selectedEdition !== null;
       case 2:
-        return state.jobId !== null;
+        // Allow proceeding if a document is selected OR if pre-filled from batch flow
+        return state.jobId !== null || (state.editionPreFilled && state.fileName !== null);
       case 3:
         return true;
       case 4:
@@ -609,11 +834,16 @@ export function AcrWorkflowPage() {
                 Choose the accessibility standard edition for your ACR document.
               </p>
             </div>
+            {state.editionPreFilled && state.selectedEdition && (
+              <Alert variant="info">
+                Edition pre-selected from batch configuration: <strong>{state.selectedEdition.name}</strong>. You can change it if needed.
+              </Alert>
+            )}
             <EditionSelector
               selectedEdition={state.selectedEdition}
               onSelect={handleEditionSelect}
             />
-            {state.selectedEdition && (
+            {state.selectedEdition && !state.editionPreFilled && (
               <Alert variant="success">
                 Selected: {state.selectedEdition.name}
               </Alert>
@@ -634,6 +864,34 @@ export function AcrWorkflowPage() {
                 Upload a document or select an existing audited job.
               </p>
             </div>
+
+            {state.fileName && state.editionPreFilled && (
+              <Alert variant="success">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4" />
+                    <span>Batch/Product: <strong>{state.fileName}</strong></span>
+                    {state.selectedEdition && (
+                      <Badge variant="info">{state.selectedEdition.name}</Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-green-700 ml-6">
+                    Pre-configured from batch. You can optionally select a specific document below, or click Next to continue.
+                  </p>
+                </div>
+              </Alert>
+            )}
+            {state.fileName && !state.editionPreFilled && (
+              <Alert variant="info">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  <span>Batch/Product: <strong>{state.fileName}</strong></span>
+                  {state.selectedEdition && (
+                    <Badge variant="info">{state.selectedEdition.name}</Badge>
+                  )}
+                </div>
+              </Alert>
+            )}
 
             {effectiveJobId && state.jobId === effectiveJobId && (
               <Alert variant="success">
@@ -994,7 +1252,7 @@ export function AcrWorkflowPage() {
             <FileText className="h-5 w-5 text-blue-600" />
             <span className="text-sm text-gray-600">Title:</span>
             <span className="text-sm font-semibold text-gray-900">
-              {state.fileName && state.fileName !== 'Untitled Document' ? state.fileName : documentTitle}
+              {getDisplayFileName(state.fileName, documentTitle)}
             </span>
           </div>
         </div>
@@ -1088,7 +1346,7 @@ export function AcrWorkflowPage() {
       </div>
 
       <ExportDialog
-        acrId={state.acrId || 'demo'}
+        acrId={acrIdFromQuery || state.acrId || 'demo'}
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}
       />

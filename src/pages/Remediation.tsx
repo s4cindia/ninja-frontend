@@ -125,7 +125,7 @@ export const RemediationPage: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={() => navigate('/remediation/batch')}>
+          <Button variant="outline" onClick={() => navigate('/batches')}>
             <Layers className="h-4 w-4 mr-2" aria-hidden="true" />
             Batch Remediation
           </Button>

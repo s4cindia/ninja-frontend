@@ -1,15 +1,65 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { VerificationQueue } from '@/components/acr/VerificationQueue';
 
+interface LocationState {
+  fileName?: string;
+  returnTo?: string;
+  batchId?: string;
+  acrWorkflowId?: string;
+}
+
 export function VerificationQueuePage() {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const state = location.state as LocationState | null;
+  const fileName = state?.fileName;
+  const returnTo = state?.returnTo;
+  const batchId = state?.batchId;
+  const acrWorkflowId = state?.acrWorkflowId ?? jobId;
 
-  const handleComplete = () => {
-    navigate(`/jobs/${jobId}`);
+  const handleComplete = (verified: boolean) => {
+    // If we have a specific return path, use it
+    if (returnTo) {
+      navigate(returnTo, {
+        state: {
+          verificationComplete: verified,
+          jobId,
+          batchId,
+        }
+      });
+      return;
+    }
+    
+    // Guard against undefined acrWorkflowId
+    if (!acrWorkflowId) {
+      navigate('/acr/workflow', {
+        state: { 
+          verificationComplete: verified,
+          jobId,
+          batchId,
+        }
+      });
+      return;
+    }
+    
+    // Default: return to ACR workflow at review step
+    // Only set verificationComplete=true if all items were verified
+    const params = new URLSearchParams();
+    params.set('acrWorkflowId', acrWorkflowId);
+    if (verified) {
+      params.set('verificationComplete', 'true');
+    }
+    navigate(`/acr/workflow?${params.toString()}`, {
+      state: { 
+        verificationComplete: verified,
+        jobId,
+        batchId,
+      }
+    });
   };
 
   if (!jobId) {
@@ -37,7 +87,7 @@ export function VerificationQueuePage() {
         </div>
       </div>
 
-      <VerificationQueue jobId={jobId} onComplete={handleComplete} />
+      <VerificationQueue jobId={jobId} fileName={fileName} onComplete={handleComplete} />
     </div>
   );
 }

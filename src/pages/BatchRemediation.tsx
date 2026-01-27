@@ -4,11 +4,16 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { Spinner } from '@/components/ui/Spinner';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
 import { BatchJobSelector } from '@/components/remediation/BatchJobSelector';
 import { BatchProgress } from '@/components/remediation/BatchProgress';
 import { BatchResultsSummary } from '@/components/remediation/BatchResultsSummary';
+import { BatchAcrConfigModal } from '@/components/acr/BatchAcrConfigModal';
+import { useGenerateBatchAcr, useBatchAcrHistory } from '@/hooks/useBatchAcr';
 import { api } from '@/services/api';
-import { ArrowLeft, Play, Layers } from 'lucide-react';
+import { ArrowLeft, Play, Layers, FileCheck } from 'lucide-react';
+import type { BatchAcrOptions } from '@/types/batch-acr.types';
 
 type BatchState = 'selection' | 'processing' | 'completed';
 
@@ -42,6 +47,38 @@ const BatchRemediationPage: React.FC = () => {
   const [batchSummary, setBatchSummary] = useState<BatchSummary | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAcrModalOpen, setIsAcrModalOpen] = useState(false);
+
+  const { data: acrHistory } = useBatchAcrHistory(batchId);
+  const generateBatchAcr = useGenerateBatchAcr();
+
+  const handleGenerateAcr = async (
+    mode: 'individual' | 'aggregate',
+    options?: BatchAcrOptions
+  ) => {
+    if (!batchId) return;
+
+    try {
+      const result = await generateBatchAcr.mutateAsync({
+        batchId,
+        mode,
+        options,
+      });
+
+      setIsAcrModalOpen(false);
+
+      if (result.mode === 'individual') {
+        const fileNames = batchSummary?.jobs?.map(job => job.fileName) ?? [];
+        navigate(`/acr/batch/${batchId}/list`, {
+          state: { acrWorkflowIds: result.acrWorkflowIds, fileNames },
+        });
+      } else {
+        navigate(`/acr/editor/${result.acrWorkflowId}`);
+      }
+    } catch {
+      // Error handled by mutation hook (toast)
+    }
+  };
 
   const handleStartBatch = async () => {
     if (selectedJobs.length === 0) {
@@ -225,10 +262,87 @@ const BatchRemediationPage: React.FC = () => {
       )}
 
       {state === 'completed' && batchSummary && (
-        <BatchResultsSummary
-          batchId={batchSummary.batchId}
-          summary={batchSummary}
-        />
+        <>
+          <BatchResultsSummary
+            batchId={batchSummary.batchId}
+            summary={batchSummary}
+          />
+
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>ACR/VPAT Generation</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-gray-600">
+                Generate Accessibility Conformance Reports (ACR/VPAT) for the remediated EPUBs.
+              </p>
+
+              <Button
+                onClick={() => setIsAcrModalOpen(true)}
+                disabled={batchSummary.successfulJobs === 0}
+                leftIcon={<FileCheck className="h-4 w-4" />}
+              >
+                Generate ACR/VPAT Report
+              </Button>
+
+              {batchSummary.successfulJobs === 0 && (
+                <p className="text-sm text-amber-600">
+                  No successful jobs available for ACR generation.
+                </p>
+              )}
+
+              {acrHistory?.history && acrHistory.history.length > 0 && (
+                <div className="border-t pt-4 mt-4">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2">
+                    Previously Generated ACRs:
+                  </h4>
+                  <ul className="space-y-2">
+                    {acrHistory.history.map((entry, index) => (
+                      <li
+                        key={index}
+                        className="flex items-center justify-between p-2 bg-gray-50 rounded"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Badge variant="info">{entry.mode}</Badge>
+                          <span className="text-sm text-gray-600">
+                            {new Date(entry.generatedAt).toLocaleString()}
+                          </span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            if (entry.mode === 'individual') {
+                              const fileNames = batchSummary?.jobs?.map(job => job.fileName) ?? [];
+                              navigate(`/acr/batch/${batchId}/list`, {
+                                state: { acrWorkflowIds: entry.acrWorkflowIds, fileNames },
+                              });
+                            } else {
+                              navigate(`/acr/editor/${entry.acrWorkflowIds[0]}`);
+                            }
+                          }}
+                        >
+                          View ACR
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <BatchAcrConfigModal
+            isOpen={isAcrModalOpen}
+            onClose={() => setIsAcrModalOpen(false)}
+            batchId={batchId ?? ''}
+            totalJobs={batchSummary.totalJobs}
+            successfulJobs={batchSummary.successfulJobs}
+            failedJobs={batchSummary.failedJobs}
+            onGenerate={handleGenerateAcr}
+            isGenerating={generateBatchAcr.isPending}
+          />
+        </>
       )}
     </div>
   );

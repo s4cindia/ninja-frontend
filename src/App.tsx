@@ -40,6 +40,12 @@ import { FeedbackDashboard } from '@/pages/FeedbackDashboard';
 import { RemediationPage } from '@/pages/Remediation';
 import { ComparisonPage } from '@/pages/ComparisonPage';
 import BatchRemediationPage from '@/pages/BatchRemediation';
+import BatchAcrListPage from '@/pages/BatchAcrListPage';
+import BatchCreationPage from '@/pages/BatchCreationPage';
+import BatchProcessingPage from '@/pages/BatchProcessingPage';
+import BatchResultsPage from '@/pages/BatchResultsPage';
+import BatchFileDetailsPage from '@/pages/BatchFileDetailsPage';
+import BatchListPage from '@/pages/BatchListPage';
 import Settings from '@/pages/Settings';
 
 const queryClient = new QueryClient({
@@ -153,8 +159,16 @@ function AppRoutes() {
           <Route path="/feedback" element={<FeedbackDashboard />} />
           <Route path="/remediation" element={<RemediationPage />} />
           <Route path="/remediation/batch" element={<BatchRemediationPage />} />
+          <Route path="/remediation/batch/:batchId" element={<BatchRemediationPage />} />
           <Route path="/remediation/:jobId" element={<RemediationPage />} />
           <Route path="/remediation/:jobId/comparison" element={<ComparisonPage />} />
+          <Route path="/acr/batch/:batchId/list" element={<BatchAcrListPage />} />
+          <Route path="/batch/new" element={<BatchCreationPage />} />
+          <Route path="/batch/:batchId" element={<BatchProcessingPage />} />
+          <Route path="/batch/:batchId/results" element={<BatchResultsPage />} />
+          <Route path="/batch/:batchId/file/:fileId" element={<BatchFileDetailsPage />} />
+          <Route path="/batches" element={<BatchListPage />} />
+          <Route path="/batches/new" element={<BatchCreationPage />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
 
