@@ -77,16 +77,10 @@ export function BatchQuickFixModal({
     }
   };
 
-  // Clean accessibilityFeature: split, trim, and filter empty strings
-  const cleanedAccessibilityFeatures = accessibilityFeature
-    .split(',')
-    .map(f => f.trim())
-    .filter(Boolean);
-
   const isValid =
     (!hasAccessMode || accessMode.length > 0) &&
     (!hasAccessModeSufficient || (accessModeSufficient && isAccessModeSufficientCompatible)) &&
-    (!hasAccessibilityFeature || cleanedAccessibilityFeatures.length > 0) &&
+    (!hasAccessibilityFeature || accessibilityFeature.trim().length > 0) &&
     (!hasAccessibilityHazard || isAccessibilityHazardValid) &&
     (!hasAccessibilitySummary || accessibilitySummary.trim().length >= 20);
 
@@ -107,10 +101,10 @@ export function BatchQuickFixModal({
       });
     }
 
-    if (hasAccessibilityFeature && cleanedAccessibilityFeatures.length > 0) {
+    if (hasAccessibilityFeature && accessibilityFeature.trim()) {
       quickFixes.push({
         issueCode: 'METADATA-ACCESSIBILITYFEATURE',
-        value: cleanedAccessibilityFeatures.join(', '),
+        value: accessibilityFeature.trim(),
       });
     }
 
@@ -153,8 +147,8 @@ ${accessMode.map(mode => `<meta property="schema:accessMode">${mode}</meta>`).jo
 <meta property="schema:accessModeSufficient">${accessModeSufficient}</meta>
 
 <!-- Accessibility Features -->
-${cleanedAccessibilityFeatures.map(feat =>
-  `<meta property="schema:accessibilityFeature">${feat}</meta>`
+${accessibilityFeature.split(',').map(feat =>
+  `<meta property="schema:accessibilityFeature">${feat.trim()}</meta>`
 ).join('\n')}
 
 <!-- Accessibility Hazards -->
@@ -169,7 +163,7 @@ ${Array.isArray(accessibilityHazard)
   const filledCount = [
     hasAccessMode && accessMode.length > 0,
     hasAccessModeSufficient && accessModeSufficient && isAccessModeSufficientCompatible,
-    hasAccessibilityFeature && cleanedAccessibilityFeatures.length > 0,
+    hasAccessibilityFeature && accessibilityFeature.trim(),
     hasAccessibilityHazard && isAccessibilityHazardValid,
     hasAccessibilitySummary && accessibilitySummary.trim().length >= 20,
   ].filter(Boolean).length;
@@ -324,7 +318,7 @@ ${Array.isArray(accessibilityHazard)
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={!isValid || isSubmitting || isLoading || totalFields === 0}
+              disabled={!isValid || isSubmitting || isLoading}
               leftIcon={
                 isSubmitting || isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -335,9 +329,7 @@ ${Array.isArray(accessibilityHazard)
             >
               {isSubmitting || isLoading
                 ? 'Applying...'
-                : totalFields === 0
-                  ? 'No fixes available'
-                  : `Apply ${filledCount} Fix${filledCount !== 1 ? 'es' : ''}`}
+                : `Apply ${filledCount} Fix${filledCount !== 1 ? 'es' : ''}`}
             </Button>
           </div>
         </div>

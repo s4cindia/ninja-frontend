@@ -12,7 +12,6 @@ import { BatchResultsSummary } from '@/components/remediation/BatchResultsSummar
 import { BatchAcrConfigModal } from '@/components/acr/BatchAcrConfigModal';
 import { useGenerateBatchAcr, useBatchAcrHistory } from '@/hooks/useBatchAcr';
 import { api } from '@/services/api';
-import toast from 'react-hot-toast';
 import { ArrowLeft, Play, Layers, FileCheck } from 'lucide-react';
 import type { BatchAcrOptions } from '@/types/batch-acr.types';
 
@@ -74,11 +73,6 @@ const BatchRemediationPage: React.FC = () => {
           state: { acrWorkflowIds: result.acrWorkflowIds, fileNames },
         });
       } else {
-        // Guard against missing workflow ID for aggregate mode
-        if (!result.acrWorkflowId) {
-          toast.error('Failed to generate ACR: no workflow ID returned');
-          return;
-        }
         navigate(`/acr/editor/${result.acrWorkflowId}`);
       }
     } catch {

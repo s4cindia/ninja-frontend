@@ -71,15 +71,6 @@ export function BatchAcrSummary({ criteria }: BatchAcrSummaryProps) {
       bgColor: 'bg-gray-100',
       Icon: MinusCircle,
     },
-    // Include "Other" category if there are unknown conformance levels
-    ...(counts['Other'] > 0 ? [{
-      label: 'Other',
-      count: counts['Other'],
-      percentage: total > 0 ? Math.round((counts['Other'] / total) * 100) : 0,
-      color: 'text-slate-600',
-      bgColor: 'bg-slate-100',
-      Icon: MinusCircle,
-    }] : []),
   ];
 
   return (

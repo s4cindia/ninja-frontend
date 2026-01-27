@@ -115,25 +115,12 @@ export const batchService = {
     batchId: string,
     onEvent: (event: unknown) => void
   ): EventSource {
-    // Use configured API base URL from environment or axios defaults
-    const getApiBaseUrl = (): string => {
-      // Try environment variable first, then axios defaults, then fallback
-      const envUrl = import.meta.env.VITE_API_URL;
-      if (envUrl) {
-        return envUrl.replace(/\/$/, ''); // Remove trailing slash
-      }
-      const axiosBase = api.defaults.baseURL;
-      if (axiosBase) {
-        return axiosBase.replace(/\/$/, '');
-      }
-      return '/api/v1';
-    };
+    const getApiBaseUrl = () => '/api/v1';
     
     const createEventSource = (): EventSource => {
       const token = localStorage.getItem('token');
       const tokenParam = token ? `&token=${encodeURIComponent(token)}` : '';
-      const baseUrl = getApiBaseUrl();
-      const url = `${baseUrl}/sse/subscribe?channel=batch:${batchId}${tokenParam}`;
+      const url = `${getApiBaseUrl()}/sse/subscribe?channel=batch:${batchId}${tokenParam}`;
       return new EventSource(url);
     };
 
@@ -142,16 +129,15 @@ export const batchService = {
     const maxBackoffMs = 30000;
     let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    // Helper to attach close proxy to any EventSource instance
-    const attachCloseProxy = (es: EventSource): void => {
-      const originalClose = es.close.bind(es);
-      es.close = () => {
-        if (reconnectTimeout) {
-          clearTimeout(reconnectTimeout);
-          reconnectTimeout = null;
-        }
-        originalClose();
-      };
+    const reconnect = () => {
+      if (reconnectTimeout) return;
+      
+      reconnectTimeout = setTimeout(() => {
+        reconnectTimeout = null;
+        eventSource = createEventSource();
+        setupHandlers(eventSource);
+        backoffMs = Math.min(backoffMs * 2, maxBackoffMs);
+      }, backoffMs);
     };
 
     const setupHandlers = (es: EventSource) => {
@@ -174,20 +160,16 @@ export const batchService = {
       };
     };
 
-    const reconnect = () => {
-      if (reconnectTimeout) return;
-      
-      reconnectTimeout = setTimeout(() => {
-        reconnectTimeout = null;
-        eventSource = createEventSource();
-        attachCloseProxy(eventSource);
-        setupHandlers(eventSource);
-        backoffMs = Math.min(backoffMs * 2, maxBackoffMs);
-      }, backoffMs);
-    };
-
-    attachCloseProxy(eventSource);
     setupHandlers(eventSource);
+
+    const originalClose = eventSource.close.bind(eventSource);
+    eventSource.close = () => {
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+        reconnectTimeout = null;
+      }
+      originalClose();
+    };
 
     return eventSource;
   },

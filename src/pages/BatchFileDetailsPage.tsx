@@ -142,16 +142,10 @@ export default function BatchFileDetailsPage() {
   const handleApplyFix = async (fix: QuickFix) => {
     if (!batchId || !fileId || !selectedIssue) return;
 
-    // Guard against missing issue code
-    if (!selectedIssue.code || selectedIssue.code.trim() === '') {
-      toast.error('Cannot apply fix: issue code is missing');
-      return;
-    }
-
     try {
       const fixValue = fix.changes?.[0]?.content || fix.summary || '';
       await batchService.applyFileQuickFixes(batchId, fileId, [
-        { issueCode: selectedIssue.code, value: fixValue },
+        { issueCode: selectedIssue.code || '', value: fixValue },
       ]);
 
       queryClient.invalidateQueries({ queryKey: ['batch-file', batchId, fileId] });

@@ -172,7 +172,7 @@ export default function BatchListPage() {
                   size="sm"
                   onClick={() => setPage((p) => p + 1)}
                   disabled={page * 20 >= data.total}
-                  rightIcon={<ChevronRight className="h-4 w-4" />}
+                  leftIcon={<ChevronRight className="h-4 w-4" />}
                 >
                   Next
                 </Button>

@@ -22,32 +22,44 @@ export function VerificationQueuePage() {
   const acrWorkflowId = state?.acrWorkflowId ?? jobId;
 
   const handleComplete = (verified: boolean) => {
-    // Consistent state shape: verificationComplete=true means process is done,
-    // skipped=true means user skipped verification (verified=false)
-    const navigationState = {
-      verificationComplete: true,
-      skipped: !verified,
-      jobId,
-      batchId,
-    };
-
     // If we have a specific return path, use it
     if (returnTo) {
-      navigate(returnTo, { state: navigationState });
+      navigate(returnTo, {
+        state: {
+          verificationComplete: verified,
+          jobId,
+          batchId,
+        }
+      });
       return;
     }
     
     // Guard against undefined acrWorkflowId
     if (!acrWorkflowId) {
-      navigate('/acr/workflow', { state: navigationState });
+      navigate('/acr/workflow', {
+        state: { 
+          verificationComplete: verified,
+          jobId,
+          batchId,
+        }
+      });
       return;
     }
     
     // Default: return to ACR workflow at review step
+    // Only set verificationComplete=true if all items were verified
     const params = new URLSearchParams();
     params.set('acrWorkflowId', acrWorkflowId);
-    params.set('verificationComplete', 'true');
-    navigate(`/acr/workflow?${params.toString()}`, { state: navigationState });
+    if (verified) {
+      params.set('verificationComplete', 'true');
+    }
+    navigate(`/acr/workflow?${params.toString()}`, {
+      state: { 
+        verificationComplete: verified,
+        jobId,
+        batchId,
+      }
+    });
   };
 
   if (!jobId) {

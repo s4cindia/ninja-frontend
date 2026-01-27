@@ -6,10 +6,7 @@ interface BatchSummaryProps {
 }
 
 export function BatchSummary({ batch }: BatchSummaryProps) {
-  // Calculate remaining quick fixes properly: use remainingQuickFixes if available,
-  // otherwise compute from total - applied, protecting against negative values
-  const remainingQuickFixes = batch.remainingQuickFixes 
-    ?? Math.max(0, (batch.quickFixIssues ?? 0) - (batch.quickFixesApplied ?? 0));
+  const remainingQuickFixes = batch.remainingQuickFixes ?? batch.quickFixIssues;
   const appliedQuickFixes = batch.quickFixesApplied ?? 0;
 
   const stats = [
