@@ -226,6 +226,11 @@ export function AcrWorkflowPage() {
   // Fetch available editions to match pre-filled edition code
   const { data: editions } = useEditions();
 
+  // Reset preFilledValuesApplied when query params or job ID change
+  useEffect(() => {
+    setPreFilledValuesApplied(false);
+  }, [effectiveJobId, editionFromQuery, productNameFromQuery, vendorFromQuery, contactEmailFromQuery]);
+
   const handleCriteriaLoaded = useCallback((criteria: CriterionConfidence[]) => {
     setAnalysisResults(criteria);
   }, []);

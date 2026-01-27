@@ -21,18 +21,12 @@ export function VerificationQueuePage() {
   const batchId = state?.batchId;
   const acrWorkflowId = state?.acrWorkflowId ?? jobId;
 
-  const handleComplete = () => {
+  const handleComplete = (verified: boolean) => {
     // If we have a specific return path, use it
     if (returnTo) {
-      navigate(returnTo);
-      return;
-    }
-    
-    // Guard against undefined acrWorkflowId
-    if (!acrWorkflowId) {
-      navigate('/acr/workflow', {
-        state: { 
-          verificationComplete: true,
+      navigate(returnTo, {
+        state: {
+          verificationComplete: verified,
           jobId,
           batchId,
         }
@@ -40,10 +34,24 @@ export function VerificationQueuePage() {
       return;
     }
     
-    // Default: return to ACR workflow at review step with verification complete
-    navigate(`/acr/workflow?acrWorkflowId=${encodeURIComponent(acrWorkflowId)}&verificationComplete=true`, {
+    // Guard against undefined acrWorkflowId
+    if (!acrWorkflowId) {
+      navigate('/acr/workflow', {
+        state: { 
+          verificationComplete: verified,
+          jobId,
+          batchId,
+        }
+      });
+      return;
+    }
+    
+    // Default: return to ACR workflow at review step
+    // Only set verificationComplete=true if all items were verified
+    const queryParam = verified ? '&verificationComplete=true' : '';
+    navigate(`/acr/workflow?acrWorkflowId=${encodeURIComponent(acrWorkflowId)}${queryParam}`, {
       state: { 
-        verificationComplete: true,
+        verificationComplete: verified,
         jobId,
         batchId,
       }

@@ -103,7 +103,7 @@ export function BatchQuickFixModal({
       }
     }
 
-    if (hasAccessibilitySummary && accessibilitySummary.trim()) {
+    if (hasAccessibilitySummary && accessibilitySummary.trim().length >= 20) {
       quickFixes.push({
         issueCode: 'METADATA-ACCESSIBILITYSUMMARY',
         value: accessibilitySummary.trim(),
@@ -173,8 +173,13 @@ ${Array.isArray(accessibilityHazard)
             </h2>
           </div>
           <button
-            onClick={onClose}
-            className="p-1 hover:bg-gray-100 rounded"
+            onClick={() => {
+              if (isSubmitting) return;
+              onClose();
+            }}
+            disabled={isSubmitting}
+            aria-disabled={isSubmitting}
+            className={`p-1 hover:bg-gray-100 rounded ${isSubmitting ? 'opacity-50 pointer-events-none' : ''}`}
             aria-label="Close"
           >
             <X className="h-5 w-5 text-gray-500" />

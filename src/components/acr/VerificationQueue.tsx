@@ -28,7 +28,7 @@ interface SavedVerification {
 interface VerificationQueueProps {
   jobId: string;
   fileName?: string;
-  onComplete: () => void;
+  onComplete: (verified: boolean) => void;
   savedVerifications?: { [itemId: string]: SavedVerification };
   onVerificationUpdate?: (itemId: string, status: string, method: string, notes: string) => void;
   criteriaFromAnalysis?: CriterionConfidence[];
@@ -786,12 +786,12 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
         <div className="flex items-center gap-3">
           <Button
             variant="outline"
-            onClick={onComplete}
+            onClick={() => onComplete(false)}
           >
             Skip & Continue
           </Button>
           <Button
-            onClick={onComplete}
+            onClick={() => onComplete(true)}
             disabled={verifiedCount !== totalCount || totalCount === 0}
           >
             Complete Verification
