@@ -422,8 +422,8 @@ export function AcrWorkflowPage() {
 
   // Apply pre-filled values from URL query parameters (highest priority)
   useEffect(() => {
-    // Skip if editions not loaded yet or already applied
-    if (!editions?.length || preFilledValuesApplied) {
+    // Skip if already applied
+    if (preFilledValuesApplied) {
       return;
     }
     
@@ -434,8 +434,8 @@ export function AcrWorkflowPage() {
       const updates: Partial<WorkflowState> = {};
       let shouldSkipEditionStep = false;
       
-      // Pre-fill edition from query param - always override if provided in query
-      if (editionFromQuery) {
+      // Pre-fill edition from query param - only if editions are loaded
+      if (editionFromQuery && editions?.length) {
         // Map VPAT codes to API edition codes for matching using shared constant
         const normalizedCode = EDITION_CODE_MAP[editionFromQuery] || editionFromQuery.toLowerCase();
         const matchedEdition = editions.find(e => 
@@ -461,7 +461,7 @@ export function AcrWorkflowPage() {
         updates.vendor = vendorFromQuery;
       }
       
-      // Pre-fill contactEmail - always override if provided in query
+      // Pre-fill contactEmail - always override if provided in navigation state
       if (contactEmailFromState) {
         updates.contactEmail = contactEmailFromState;
       }
@@ -509,9 +509,9 @@ export function AcrWorkflowPage() {
         const updates: Partial<WorkflowState> = {};
         let shouldSkipEditionStep = false;
         
-        // Pre-fill edition if present
+        // Pre-fill edition if present - only if editions are loaded
         const editionCode = jobData.edition as AcrEditionCode | undefined;
-        if (editionCode && !state.selectedEdition) {
+        if (editionCode && !state.selectedEdition && editions?.length) {
           const matchedEdition = editions.find(e => e.code === editionCode);
           if (matchedEdition) {
             updates.selectedEdition = matchedEdition;
