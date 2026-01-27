@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useDropzone } from 'react-dropzone';
+import { useDropzone, type FileRejection } from 'react-dropzone';
 import { Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -26,8 +26,25 @@ export function FileUploadZone({ onFilesSelected, disabled }: FileUploadZoneProp
     [onFilesSelected]
   );
 
+  const onDropRejected = useCallback((rejections: FileRejection[]) => {
+    rejections.forEach((rejection) => {
+      const { file, errors } = rejection;
+      const errorMessages = errors.map((e) => {
+        if (e.code === 'file-too-large') {
+          return `${file.name}: File is too large (max 100MB)`;
+        }
+        if (e.code === 'file-invalid-type') {
+          return `${file.name}: Invalid file type (only EPUB files allowed)`;
+        }
+        return `${file.name}: ${e.message}`;
+      });
+      errorMessages.forEach((msg) => toast.error(msg));
+    });
+  }, []);
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
+    onDropRejected,
     accept: {
       'application/epub+zip': ['.epub'],
     },

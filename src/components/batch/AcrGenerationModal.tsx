@@ -9,20 +9,13 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import type { Batch } from '@/types/batch.types';
+import type { BatchAcrOptions } from '@/types/batch-acr.types';
 
 interface AcrGenerationModalProps {
   batch: Batch;
-  onGenerate: (mode: 'individual' | 'aggregate', options: AcrOptions) => void;
+  onGenerate: (mode: 'individual' | 'aggregate', options: BatchAcrOptions) => void;
   onClose: () => void;
   isLoading: boolean;
-}
-
-interface AcrOptions {
-  edition: string;
-  batchName: string;
-  vendor: string;
-  contactEmail: string;
-  aggregationStrategy: 'conservative' | 'optimistic';
 }
 
 export function AcrGenerationModal({
@@ -32,7 +25,7 @@ export function AcrGenerationModal({
   isLoading,
 }: AcrGenerationModalProps) {
   const [mode, setMode] = useState<'individual' | 'aggregate'>('individual');
-  const [edition, setEdition] = useState('VPAT2.5-WCAG');
+  const [edition, setEdition] = useState<BatchAcrOptions['edition']>('VPAT2.5-WCAG');
   const [batchName, setBatchName] = useState(batch.name);
   const [vendor, setVendor] = useState('');
   const [contactEmail, setContactEmail] = useState('');
@@ -106,7 +99,7 @@ export function AcrGenerationModal({
             <select
               id="edition"
               value={edition}
-              onChange={(e) => setEdition(e.target.value)}
+              onChange={(e) => setEdition(e.target.value as BatchAcrOptions['edition'])}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
             >
               <option value="VPAT2.5-WCAG">VPAT 2.5 WCAG</option>

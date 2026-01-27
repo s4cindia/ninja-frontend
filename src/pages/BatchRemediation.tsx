@@ -68,8 +68,9 @@ const BatchRemediationPage: React.FC = () => {
       setIsAcrModalOpen(false);
 
       if (result.mode === 'individual') {
+        const fileNames = batchSummary?.jobs?.map(job => job.fileName) ?? [];
         navigate(`/acr/batch/${batchId}/list`, {
-          state: { acrWorkflowIds: result.acrWorkflowIds },
+          state: { acrWorkflowIds: result.acrWorkflowIds, fileNames },
         });
       } else {
         navigate(`/acr/editor/${result.acrWorkflowId}`);
@@ -312,8 +313,9 @@ const BatchRemediationPage: React.FC = () => {
                           variant="outline"
                           onClick={() => {
                             if (entry.mode === 'individual') {
+                              const fileNames = batchSummary?.jobs?.map(job => job.fileName) ?? [];
                               navigate(`/acr/batch/${batchId}/list`, {
-                                state: { acrWorkflowIds: entry.acrWorkflowIds },
+                                state: { acrWorkflowIds: entry.acrWorkflowIds, fileNames },
                               });
                             } else {
                               navigate(`/acr/editor/${entry.acrWorkflowIds[0]}`);

@@ -13,7 +13,28 @@ export default function BatchAcrListPage() {
   const location = useLocation();
   const state = location.state as LocationState | null;
 
-  const { data: acrHistory } = useBatchAcrHistory(batchId ?? null);
+  const { data: acrHistory, isLoading } = useBatchAcrHistory(batchId ?? null);
+
+  if (!batchId) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        <div className="text-center py-12">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Invalid Batch</h2>
+          <p className="text-gray-600">No batch ID provided.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        <div className="text-center py-12">
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   const acrWorkflowIds = state?.acrWorkflowIds ?? acrHistory?.currentAcr?.workflowIds ?? [];
   const fileNames = state?.fileNames ?? [];
@@ -29,7 +50,7 @@ export default function BatchAcrListPage() {
         ]}
       />
       <BatchAcrList
-        batchId={batchId!}
+        batchId={batchId}
         acrWorkflowIds={acrWorkflowIds}
         fileNames={fileNames}
         generatedAt={generatedAt}

@@ -9,8 +9,11 @@ interface BatchAcrSummaryProps {
   criteria: Criterion[];
 }
 
+const KNOWN_LEVELS = ['Supports', 'Partially Supports', 'Does Not Support', 'Not Applicable'] as const;
+type KnownLevel = typeof KNOWN_LEVELS[number];
+
 export function BatchAcrSummary({ criteria }: BatchAcrSummaryProps) {
-  const counts = criteria.reduce(
+  const rawCounts = criteria.reduce(
     (acc, c) => {
       acc[c.conformanceLevel] = (acc[c.conformanceLevel] || 0) + 1;
       return acc;
@@ -18,7 +21,22 @@ export function BatchAcrSummary({ criteria }: BatchAcrSummaryProps) {
     {} as Record<string, number>
   );
 
-  const total = criteria.length;
+  const counts: Record<string, number> = {};
+  let otherCount = 0;
+
+  for (const [level, count] of Object.entries(rawCounts)) {
+    if (KNOWN_LEVELS.includes(level as KnownLevel)) {
+      counts[level] = count;
+    } else {
+      otherCount += count;
+    }
+  }
+
+  if (otherCount > 0) {
+    counts['Other'] = otherCount;
+  }
+
+  const total = Object.values(counts).reduce((sum, c) => sum + c, 0);
 
   const stats = [
     {

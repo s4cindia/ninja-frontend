@@ -82,13 +82,18 @@ export function BatchQuickFixModal({
     }
 
     if (hasAccessibilityHazard) {
-      const hazardValue = Array.isArray(accessibilityHazard)
-        ? accessibilityHazard.join(', ')
-        : accessibilityHazard;
-      quickFixes.push({
-        issueCode: 'METADATA-ACCESSIBILITYHAZARD',
-        value: hazardValue,
-      });
+      const isValidString = typeof accessibilityHazard === 'string' && accessibilityHazard.trim() !== '';
+      const isValidArray = Array.isArray(accessibilityHazard) && accessibilityHazard.length > 0;
+      
+      if (isValidString || isValidArray) {
+        const hazardValue = Array.isArray(accessibilityHazard)
+          ? accessibilityHazard.join(', ')
+          : accessibilityHazard;
+        quickFixes.push({
+          issueCode: 'METADATA-ACCESSIBILITYHAZARD',
+          value: hazardValue,
+        });
+      }
     }
 
     if (hasAccessibilitySummary && accessibilitySummary.trim()) {

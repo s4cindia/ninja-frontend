@@ -31,21 +31,31 @@ export default function BatchCreationPage() {
       return;
     }
 
+    let createdBatchId: string | null = null;
+
     try {
       const result = await createBatchMutation.mutateAsync({
         name: batchName || undefined,
       });
 
-      await uploadFilesMutation.mutateAsync({
-        batchId: result.batchId,
-        files: selectedFiles,
-      });
+      createdBatchId = result.batchId;
 
-      toast.success('Batch created successfully');
+      try {
+        await uploadFilesMutation.mutateAsync({
+          batchId: result.batchId,
+          files: selectedFiles,
+        });
 
-      navigate(`/batch/${result.batchId}`);
+        toast.success('Batch created successfully');
+        navigate(`/batch/${result.batchId}`);
+      } catch (uploadError) {
+        toast.error('Files failed to upload. Navigating to batch to retry.');
+        navigate(`/batch/${result.batchId}`);
+      }
     } catch {
-      toast.error('Failed to create batch');
+      if (!createdBatchId) {
+        toast.error('Failed to create batch');
+      }
     }
   };
 

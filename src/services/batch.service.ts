@@ -24,11 +24,7 @@ export const batchService = {
       formData.append('files', file);
     });
 
-    await api.post(`${BASE_URL}/${batchId}/files`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    await api.post(`${BASE_URL}/${batchId}/files`, formData);
   },
 
   async removeFile(batchId: string, fileId: string): Promise<void> {
@@ -119,22 +115,60 @@ export const batchService = {
     batchId: string,
     onEvent: (event: unknown) => void
   ): EventSource {
-    const token = localStorage.getItem('token');
-    const eventSource = new EventSource(
-      `/api/v1/sse/subscribe?channel=batch:${batchId}&token=${token}`
-    );
-
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        onEvent(data);
-      } catch (error) {
-        console.error('Failed to parse SSE event:', error);
-      }
+    const getApiBaseUrl = () => '/api/v1';
+    
+    const createEventSource = (): EventSource => {
+      const token = localStorage.getItem('token');
+      const tokenParam = token ? `&token=${encodeURIComponent(token)}` : '';
+      const url = `${getApiBaseUrl()}/sse/subscribe?channel=batch:${batchId}${tokenParam}`;
+      return new EventSource(url);
     };
 
-    eventSource.onerror = (error) => {
-      console.error('SSE error:', error);
+    let eventSource = createEventSource();
+    let backoffMs = 1000;
+    const maxBackoffMs = 30000;
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    const reconnect = () => {
+      if (reconnectTimeout) return;
+      
+      reconnectTimeout = setTimeout(() => {
+        reconnectTimeout = null;
+        eventSource = createEventSource();
+        setupHandlers(eventSource);
+        backoffMs = Math.min(backoffMs * 2, maxBackoffMs);
+      }, backoffMs);
+    };
+
+    const setupHandlers = (es: EventSource) => {
+      es.onopen = () => {
+        backoffMs = 1000;
+      };
+
+      es.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          onEvent(data);
+        } catch (error) {
+          console.error('Failed to parse SSE event:', error);
+        }
+      };
+
+      es.onerror = () => {
+        es.close();
+        reconnect();
+      };
+    };
+
+    setupHandlers(eventSource);
+
+    const originalClose = eventSource.close.bind(eventSource);
+    eventSource.close = () => {
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+        reconnectTimeout = null;
+      }
+      originalClose();
     };
 
     return eventSource;

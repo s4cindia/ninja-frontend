@@ -48,7 +48,10 @@ export function useExportBatchAcr() {
     mutationFn: ({ batchAcrId, format, includeMethodology = true }) =>
       acrService.exportBatchAcr(batchAcrId, format, includeMethodology),
     onSuccess: (data) => {
-      window.open(data.downloadUrl, '_blank');
+      const newWindow = window.open(data.downloadUrl, '_blank', 'noopener,noreferrer');
+      if (newWindow) {
+        newWindow.opener = null;
+      }
       toast.success(`Exporting ACR as ${data.format.toUpperCase()}...`);
     },
     onError: (error) => {

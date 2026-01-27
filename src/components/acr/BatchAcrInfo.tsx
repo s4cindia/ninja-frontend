@@ -32,7 +32,7 @@ export function BatchAcrInfo({ batchInfo, productInfo }: BatchAcrInfoProps) {
         <CardTitle>Batch ACR Information</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <dt className="text-sm font-medium text-gray-500">Batch Name</dt>
             <dd className="mt-1 text-sm text-gray-900">{productInfo.name}</dd>
@@ -49,10 +49,10 @@ export function BatchAcrInfo({ batchInfo, productInfo }: BatchAcrInfoProps) {
             <dt className="text-sm font-medium text-gray-500">VPAT Edition</dt>
             <dd className="mt-1 text-sm text-gray-900">{productInfo.edition}</dd>
           </div>
-        </div>
+        </dl>
 
         <div className="border-t pt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <dt className="text-sm font-medium text-gray-500">Total Documents</dt>
               <dd className="mt-1 text-sm text-gray-900">{batchInfo.totalDocuments}</dd>
@@ -65,7 +65,7 @@ export function BatchAcrInfo({ batchInfo, productInfo }: BatchAcrInfoProps) {
                 </Badge>
               </dd>
             </div>
-          </div>
+          </dl>
         </div>
 
         <div className="border-t pt-4">

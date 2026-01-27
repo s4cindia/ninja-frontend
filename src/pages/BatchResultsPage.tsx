@@ -57,8 +57,9 @@ export default function BatchResultsPage() {
         // For individual mode, navigate to list view showing all generated ACRs
         const individualResult = result as IndividualAcrGenerationResult;
         if (individualResult.acrWorkflowIds && individualResult.acrWorkflowIds.length > 0) {
-          // Map workflow IDs to file names from batch data
-          const fileNames = batch?.files.map(f => f.fileName) ?? [];
+          // Use file names from batch data, preferring originalName over fileName
+          const fileNames = batch?.files.map((f) => f.originalName || f.fileName) ?? [];
+          
           navigate(`/acr/batch/${batchId}/list`, {
             state: { 
               acrWorkflowIds: individualResult.acrWorkflowIds,

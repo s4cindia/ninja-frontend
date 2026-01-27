@@ -58,7 +58,12 @@ export function useStartBatch(batchId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data?: StartBatchRequest) => batchService.startBatch(batchId, data),
+    mutationFn: (data?: StartBatchRequest) => {
+      if (!batchId) {
+        return Promise.reject(new Error('Batch ID is required'));
+      }
+      return batchService.startBatch(batchId, data);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['batch', batchId] });
       toast.success('Batch processing started');
@@ -95,7 +100,12 @@ export function useCancelBatch(batchId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: () => batchService.cancelBatch(batchId),
+    mutationFn: () => {
+      if (!batchId) {
+        return Promise.reject(new Error('Batch ID is required'));
+      }
+      return batchService.cancelBatch(batchId);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['batch', batchId] });
       queryClient.invalidateQueries({ queryKey: ['batches'] });
@@ -108,9 +118,12 @@ export function useCancelBatch(batchId: string) {
 }
 
 export function useGenerateAcr(batchId: string) {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (data: GenerateAcrRequest) => batchService.generateAcr(batchId, data),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['batch', batchId] });
       toast.success('ACR generation started');
     },
     onError: (error: Error) => {
@@ -124,7 +137,7 @@ export function useExportBatch(batchId: string) {
     mutationFn: () => batchService.exportBatch(batchId),
     onSuccess: (data) => {
       if (data.downloadUrl) {
-        window.open(data.downloadUrl, '_blank');
+        window.open(data.downloadUrl, '_blank', 'noopener,noreferrer');
       }
       toast.success('Export ready for download');
     },

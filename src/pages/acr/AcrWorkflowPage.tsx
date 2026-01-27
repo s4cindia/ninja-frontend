@@ -363,14 +363,11 @@ export function AcrWorkflowPage() {
   useEffect(() => {
     // Skip if editions not loaded yet or already applied
     if (!editions?.length || preFilledValuesApplied) {
-      console.log('[ACR Pre-fill] Skipping: editions loaded:', !!editions?.length, 'already applied:', preFilledValuesApplied);
       return;
     }
     
     // Check if we have query params to apply
     const hasQueryParams = editionFromQuery || productNameFromQuery || vendorFromQuery || contactEmailFromQuery;
-    console.log('[ACR Pre-fill] Query params:', { editionFromQuery, productNameFromQuery, vendorFromQuery, contactEmailFromQuery });
-    console.log('[ACR Pre-fill] Available editions:', editions?.map(e => e.code));
     
     if (hasQueryParams) {
       const updates: Partial<WorkflowState> = {};
@@ -391,7 +388,6 @@ export function AcrWorkflowPage() {
           e.code === normalizedCode ||
           e.code.toLowerCase() === normalizedCode
         );
-        console.log('[ACR Pre-fill] Matched edition:', matchedEdition?.code, matchedEdition?.name, 'from query:', editionFromQuery, 'normalized:', normalizedCode);
         if (matchedEdition) {
           updates.selectedEdition = matchedEdition;
           updates.editionPreFilled = true;
@@ -416,7 +412,6 @@ export function AcrWorkflowPage() {
       }
       
       // Apply updates if any
-      console.log('[ACR Pre-fill] Applying updates:', updates, 'shouldSkipEditionStep:', shouldSkipEditionStep);
       if (Object.keys(updates).length > 0) {
         setState(prev => {
           const newState = { ...prev, ...updates };

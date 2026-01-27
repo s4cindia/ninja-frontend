@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { Lightbulb } from 'lucide-react';
 import { ACCESSIBILITY_HAZARDS } from '@/constants/epubMetadata';
 
@@ -10,6 +11,7 @@ export function AccessibilityHazardsSelector({
   value,
   onChange,
 }: AccessibilityHazardsSelectorProps) {
+  const radioGroupId = useId();
   const isMultiple = Array.isArray(value);
   const selectedHazard = isMultiple ? 'multiple' : value;
   const selectedHazards = isMultiple ? value : [];
@@ -54,7 +56,7 @@ export function AccessibilityHazardsSelector({
             <label className="flex items-start gap-3 p-2 rounded hover:bg-gray-50 cursor-pointer">
               <input
                 type="radio"
-                name="accessibilityHazard"
+                name={`accessibilityHazard-${radioGroupId}`}
                 value={hazard.value}
                 checked={selectedHazard === hazard.value}
                 onChange={() => handleRadioChange(hazard.value)}
