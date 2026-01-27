@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import { X, Zap, Loader2, Code } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { AccessModeSelector } from './AccessModeSelector';
@@ -25,6 +25,9 @@ export function BatchQuickFixModal({
   onClose,
   isLoading = false,
 }: BatchQuickFixModalProps) {
+  const dialogTitleId = useId();
+  const dialogDescId = useId();
+
   const [accessMode, setAccessMode] = useState<string[]>(
     mode === 'batch' ? [...DEFAULT_METADATA_VALUES.accessMode] : []
   );
@@ -50,11 +53,15 @@ export function BatchQuickFixModal({
   const hasAccessibilityHazard = issueCodes.some(c => c.includes('ACCESSIBILITYHAZARD'));
   const hasAccessibilitySummary = issueCodes.some(c => c.includes('ACCESSIBILITYSUMMARY'));
 
+  const isAccessibilityHazardValid = 
+    (typeof accessibilityHazard === 'string' && accessibilityHazard.trim().length > 0) ||
+    (Array.isArray(accessibilityHazard) && accessibilityHazard.length > 0);
+
   const isValid =
     (!hasAccessMode || accessMode.length > 0) &&
     (!hasAccessModeSufficient || accessModeSufficient) &&
     (!hasAccessibilityFeature || accessibilityFeature.trim().length > 0) &&
-    (!hasAccessibilityHazard || (typeof accessibilityHazard === 'string' || accessibilityHazard.length > 0)) &&
+    (!hasAccessibilityHazard || isAccessibilityHazardValid) &&
     (!hasAccessibilitySummary || accessibilitySummary.trim().length >= 20);
 
   const handleSubmit = async () => {
@@ -137,7 +144,7 @@ ${Array.isArray(accessibilityHazard)
     hasAccessMode && accessMode.length > 0,
     hasAccessModeSufficient && accessModeSufficient,
     hasAccessibilityFeature && accessibilityFeature.trim(),
-    hasAccessibilityHazard && (typeof accessibilityHazard === 'string' || accessibilityHazard.length > 0),
+    hasAccessibilityHazard && isAccessibilityHazardValid,
     hasAccessibilitySummary && accessibilitySummary.trim(),
   ].filter(Boolean).length;
 
@@ -151,11 +158,17 @@ ${Array.isArray(accessibilityHazard)
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div 
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={dialogTitleId}
+        aria-describedby={dialogDescId}
+        className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+      >
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center gap-2">
             <Zap className="h-5 w-5 text-amber-600" />
-            <h2 className="text-lg font-semibold text-gray-900">
+            <h2 id={dialogTitleId} className="text-lg font-semibold text-gray-900">
               {mode === 'batch' ? 'Batch Apply Quick-Fixes' : 'Apply Quick-Fixes'}
             </h2>
           </div>
@@ -169,7 +182,7 @@ ${Array.isArray(accessibilityHazard)
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
-          <p className="text-sm text-gray-600 mb-6">
+          <p id={dialogDescId} className="text-sm text-gray-600 mb-6">
             {mode === 'batch'
               ? 'Review and edit the pre-filled values below, then apply all fixes at once.'
               : 'Select values for each metadata field below.'}

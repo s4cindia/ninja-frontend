@@ -28,8 +28,20 @@ export function VerificationQueuePage() {
       return;
     }
     
+    // Guard against undefined acrWorkflowId
+    if (!acrWorkflowId) {
+      navigate('/acr/workflow', {
+        state: { 
+          verificationComplete: true,
+          jobId,
+          batchId,
+        }
+      });
+      return;
+    }
+    
     // Default: return to ACR workflow at review step with verification complete
-    navigate(`/acr/workflow?acrWorkflowId=${acrWorkflowId}&verificationComplete=true`, {
+    navigate(`/acr/workflow?acrWorkflowId=${encodeURIComponent(acrWorkflowId)}&verificationComplete=true`, {
       state: { 
         verificationComplete: true,
         jobId,

@@ -17,7 +17,7 @@ import type {
   BatchAcrExportResult,
 } from '@/types/batch-acr.types';
 
-const EDITION_CODE_MAP: Record<string, string> = {
+export const EDITION_CODE_MAP: Record<string, string> = {
   'VPAT2.5-508': 'section508',
   'VPAT2.5-WCAG': 'wcag',
   'VPAT2.5-EU': 'eu',
@@ -28,7 +28,7 @@ const EDITION_CODE_MAP: Record<string, string> = {
   'international': 'international',
 };
 
-function normalizeEditionCode(edition: string): string {
+export function normalizeEditionCode(edition: string): string {
   return EDITION_CODE_MAP[edition] || edition.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 

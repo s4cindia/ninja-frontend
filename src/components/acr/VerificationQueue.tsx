@@ -47,7 +47,6 @@ function convertCriteriaToVerificationItems(
   savedVerifications?: { [itemId: string]: SavedVerification }
 ): VerificationItemType[] {
   const filtered = criteria.filter(needsHumanVerification);
-  console.log(`[VerificationQueue] Converting ${criteria.length} criteria → ${filtered.length} verification items`);
   
   return filtered.map((c, index) => {
       const saved = savedVerifications?.[c.id];
@@ -432,16 +431,6 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
   ).length;
   const totalCount = items.length;
   const progressPercent = totalCount > 0 ? Math.round((verifiedCount / totalCount) * 100) : 0;
-
-  console.log('[VerificationQueue] Progress:', {
-    verifiedCount,
-    totalCount,
-    canComplete: verifiedCount === totalCount && totalCount > 0,
-    useLocalItems,
-    useMockData,
-    itemsLength: items.length,
-    itemStatuses: items.slice(0, 5).map(i => ({ id: i.id, status: i.status })),
-  });
 
   const criteriaMap = useMemo(() => {
     const map = new Map<string, CriterionConfidence>();

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, CriterionConfidence, createAcrAnalysis } from '@/services/api';
+import { EDITION_CODE_MAP } from '@/services/acr.service';
 import { 
   CheckCircle, 
   ChevronLeft, 
@@ -375,14 +376,8 @@ export function AcrWorkflowPage() {
       
       // Pre-fill edition from query param - always override if provided in query
       if (editionFromQuery) {
-        // Map VPAT codes to API edition codes for matching
-        const editionCodeMap: Record<string, string> = {
-          'VPAT2.5-508': 'section508',
-          'VPAT2.5-WCAG': 'wcag',
-          'VPAT2.5-EU': 'eu',
-          'VPAT2.5-INT': 'international',
-        };
-        const normalizedCode = editionCodeMap[editionFromQuery] || editionFromQuery.toLowerCase();
+        // Map VPAT codes to API edition codes for matching using shared constant
+        const normalizedCode = EDITION_CODE_MAP[editionFromQuery] || editionFromQuery.toLowerCase();
         const matchedEdition = editions.find(e => 
           e.code === editionFromQuery || 
           e.code === normalizedCode ||
