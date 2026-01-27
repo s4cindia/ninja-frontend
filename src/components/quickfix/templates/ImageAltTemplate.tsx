@@ -199,10 +199,17 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
     }));
   }, [currentImageIndex]);
 
-  // Helper to sync all image data to parent onChange
-  const syncToParent = useCallback((updatedData: typeof imageData) => {
+  // Sync image data to parent when it changes
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    // Skip first render to avoid setState during mount
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    
     const images = allImagePaths.map((path, idx) => {
-      const data = updatedData[idx] || { imageType: 'informative', altText: '', longDescription: '' };
+      const data = imageData[idx] || { imageType: 'informative', altText: '', longDescription: '' };
       return {
         imagePath: path,
         imageType: data.imageType,
@@ -211,7 +218,7 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
       };
     });
     onChange({ images });
-  }, [allImagePaths, onChange]);
+  }, [imageData, allImagePaths, onChange]);
 
   // Validate all images have required data
   useEffect(() => {
@@ -257,37 +264,25 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
       setError(null);
     }
     
-    setImageData(prev => {
-      const updated = {
-        ...prev,
-        [currentImageIndex]: { ...prev[currentImageIndex], ...updates },
-      };
-      syncToParent(updated);
-      return updated;
-    });
-  }, [currentImageIndex, altText, longDesc, aiResult, syncToParent]);
+    setImageData(prev => ({
+      ...prev,
+      [currentImageIndex]: { ...prev[currentImageIndex], ...updates },
+    }));
+  }, [currentImageIndex, altText, longDesc, aiResult]);
 
   const handleAltTextChange = useCallback((value: string) => {
-    setImageData(prev => {
-      const updated = {
-        ...prev,
-        [currentImageIndex]: { ...prev[currentImageIndex], altText: value },
-      };
-      syncToParent(updated);
-      return updated;
-    });
-  }, [currentImageIndex, syncToParent]);
+    setImageData(prev => ({
+      ...prev,
+      [currentImageIndex]: { ...prev[currentImageIndex], altText: value },
+    }));
+  }, [currentImageIndex]);
 
   const handleLongDescChange = useCallback((value: string) => {
-    setImageData(prev => {
-      const updated = {
-        ...prev,
-        [currentImageIndex]: { ...prev[currentImageIndex], longDescription: value },
-      };
-      syncToParent(updated);
-      return updated;
-    });
-  }, [currentImageIndex, syncToParent]);
+    setImageData(prev => ({
+      ...prev,
+      [currentImageIndex]: { ...prev[currentImageIndex], longDescription: value },
+    }));
+  }, [currentImageIndex]);
 
   const handleGenerateClick = async () => {
     if (imageType === 'decorative') {
@@ -314,12 +309,10 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
           updates.longDescription = result.longDescription;
         }
         
-        const updated = {
+        return {
           ...prev,
           [currentImageIndex]: { ...prev[currentImageIndex], ...updates },
         };
-        syncToParent(updated);
-        return updated;
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to generate alt text';
