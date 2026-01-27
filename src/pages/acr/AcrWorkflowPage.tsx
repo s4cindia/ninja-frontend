@@ -122,12 +122,17 @@ function loadWorkflowState(jobId?: string): WorkflowState {
         // If version is missing or outdated, use default state with preserved compatible fields
         if (!parsed.version || parsed.version < STATE_VERSION) {
           const defaultState = getDefaultState(jobId);
+          // Validate verifications is an object (not array) with string keys
+          const isValidVerifications = parsed.verifications 
+            && typeof parsed.verifications === 'object' 
+            && !Array.isArray(parsed.verifications);
           return {
             ...defaultState,
             // Preserve compatible fields from old state
             currentStep: typeof parsed.currentStep === 'number' ? parsed.currentStep : defaultState.currentStep,
             selectedEdition: parsed.selectedEdition ?? defaultState.selectedEdition,
             verificationComplete: typeof parsed.verificationComplete === 'boolean' ? parsed.verificationComplete : defaultState.verificationComplete,
+            verifications: isValidVerifications ? parsed.verifications : defaultState.verifications,
             fileName: parsed.fileName ?? defaultState.fileName,
             vendor: parsed.vendor ?? defaultState.vendor,
             contactEmail: parsed.contactEmail ?? defaultState.contactEmail,
