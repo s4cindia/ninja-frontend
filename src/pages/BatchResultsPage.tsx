@@ -47,11 +47,19 @@ export default function BatchResultsPage() {
       setShowAcrModal(false);
 
       // Build query params with ACR configuration to pre-fill the workflow
+      // Note: contactEmail is passed via navigation state for security (not in URL)
       const queryParams = new URLSearchParams();
       queryParams.set('edition', options.edition);
       queryParams.set('productName', options.batchName);
       queryParams.set('vendor', options.vendor);
-      queryParams.set('contactEmail', options.contactEmail);
+
+      // Common navigation state with sensitive data
+      const navigationState = {
+        contactEmail: options.contactEmail,
+        edition: options.edition,
+        productName: options.batchName,
+        vendor: options.vendor,
+      };
 
       if (mode === 'individual') {
         // For individual mode, navigate to list view showing all generated ACRs
@@ -64,33 +72,40 @@ export default function BatchResultsPage() {
             state: { 
               acrWorkflowIds: individualResult.acrWorkflowIds,
               fileNames,
+              ...navigationState,
             },
           });
         } else {
           const queryString = queryParams.toString();
-          navigate(`/acr/workflow?${queryString}`);
+          navigate(`/acr/workflow?${queryString}`, { state: navigationState });
         }
       } else {
         // For aggregate mode, use the single workflow ID
         const aggregateResult = result as AggregateAcrGenerationResult;
         if (aggregateResult.acrWorkflowId) {
           const queryString = queryParams.toString();
-          navigate(`/acr/workflow/${aggregateResult.acrWorkflowId}?${queryString}`);
+          navigate(`/acr/workflow/${aggregateResult.acrWorkflowId}?${queryString}`, { state: navigationState });
         } else {
           const queryString = queryParams.toString();
-          navigate(`/acr/workflow?${queryString}`);
+          navigate(`/acr/workflow?${queryString}`, { state: navigationState });
         }
       }
-    } catch {
-      // Error handled by hook
+    } catch (error) {
+      // Fallback error handling - hook may also show toast
+      if (error instanceof Error && !error.message.includes('handled')) {
+        toast.error(`ACR generation failed: ${error.message}`);
+      }
     }
   };
 
   const handleExport = async () => {
     try {
       await exportBatchMutation.mutateAsync();
-    } catch {
-      // Error handled by hook
+    } catch (error) {
+      // Fallback error handling - hook may also show toast
+      if (error instanceof Error && !error.message.includes('handled')) {
+        toast.error(`Export failed: ${error.message}`);
+      }
     }
   };
 

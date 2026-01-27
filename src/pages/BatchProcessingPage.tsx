@@ -42,8 +42,11 @@ export default function BatchProcessingPage() {
   const handleStartProcessing = async () => {
     try {
       await startBatchMutation.mutateAsync(undefined);
-    } catch {
-      // Error handled by hook
+    } catch (error) {
+      // Fallback error handling - hook may also show toast
+      if (error instanceof Error && !error.message.includes('handled')) {
+        console.error('Failed to start processing:', error);
+      }
     }
   };
 
@@ -54,8 +57,11 @@ export default function BatchProcessingPage() {
 
     try {
       await cancelBatchMutation.mutateAsync();
-    } catch {
-      // Error handled by hook
+    } catch (error) {
+      // Fallback error handling - hook may also show toast
+      if (error instanceof Error && !error.message.includes('handled')) {
+        console.error('Failed to cancel batch:', error);
+      }
     }
   };
 

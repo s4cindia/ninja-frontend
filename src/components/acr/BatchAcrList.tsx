@@ -28,11 +28,18 @@ export function BatchAcrList({
 }: BatchAcrListProps) {
   const navigate = useNavigate();
 
-  const acrWorkflows: AcrWorkflow[] = workflowDetails ?? acrWorkflowIds.map((id, index) => ({
-    acrWorkflowId: id,
-    epubFileName: fileNames[index] ?? `File ${index + 1}`,
-    status: 'pending' as const,
-  }));
+  const acrWorkflows: AcrWorkflow[] = workflowDetails ?? acrWorkflowIds.map((id, index) => {
+    // Provide more context when file name is missing
+    const fileName = fileNames[index];
+    const displayName = fileName 
+      ? fileName 
+      : `Unknown File (ID: ${id.slice(0, 8)}...)`;
+    return {
+      acrWorkflowId: id,
+      epubFileName: displayName,
+      status: 'pending' as const,
+    };
+  });
 
   const handleVerify = (acrWorkflowId: string, fileName: string) => {
     navigate(`/acr/verification/${acrWorkflowId}`, {

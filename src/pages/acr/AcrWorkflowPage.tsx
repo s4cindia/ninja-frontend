@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { api, CriterionConfidence, createAcrAnalysis } from '@/services/api';
 import { EDITION_CODE_MAP } from '@/services/acr.service';
 import { 
@@ -199,7 +199,10 @@ export function AcrWorkflowPage() {
   const editionFromQuery = searchParams.get('edition');
   const productNameFromQuery = searchParams.get('productName');
   const vendorFromQuery = searchParams.get('vendor');
-  const contactEmailFromQuery = searchParams.get('contactEmail');
+  // Read contactEmail from navigation state (not URL for security)
+  const location = useLocation();
+  const locationState = location.state as { contactEmail?: string } | null;
+  const contactEmailFromState = locationState?.contactEmail ?? null;
   const acrIdFromQuery = searchParams.get('acrId');
   const acrWorkflowIdFromQuery = searchParams.get('acrWorkflowId');
   const verificationCompleteFromQuery = searchParams.get('verificationComplete') === 'true';
@@ -229,7 +232,7 @@ export function AcrWorkflowPage() {
   // Reset preFilledValuesApplied when query params or job ID change
   useEffect(() => {
     setPreFilledValuesApplied(false);
-  }, [effectiveJobId, editionFromQuery, productNameFromQuery, vendorFromQuery, contactEmailFromQuery]);
+  }, [effectiveJobId, editionFromQuery, productNameFromQuery, vendorFromQuery, contactEmailFromState]);
 
   const handleCriteriaLoaded = useCallback((criteria: CriterionConfidence[]) => {
     setAnalysisResults(criteria);
@@ -373,7 +376,7 @@ export function AcrWorkflowPage() {
     }
     
     // Check if we have query params to apply
-    const hasQueryParams = editionFromQuery || productNameFromQuery || vendorFromQuery || contactEmailFromQuery;
+    const hasQueryParams = editionFromQuery || productNameFromQuery || vendorFromQuery || contactEmailFromState;
     
     if (hasQueryParams) {
       const updates: Partial<WorkflowState> = {};
@@ -407,8 +410,8 @@ export function AcrWorkflowPage() {
       }
       
       // Pre-fill contactEmail - always override if provided in query
-      if (contactEmailFromQuery) {
-        updates.contactEmail = contactEmailFromQuery;
+      if (contactEmailFromState) {
+        updates.contactEmail = contactEmailFromState;
       }
       
       // Apply updates if any
@@ -506,7 +509,7 @@ export function AcrWorkflowPage() {
     return () => {
       controller.abort();
     };
-  }, [effectiveJobId, editions, preFilledValuesApplied, editionFromQuery, productNameFromQuery, vendorFromQuery, contactEmailFromQuery, state.selectedEdition, state.fileName, state.vendor, state.contactEmail, state.currentStep]);
+  }, [effectiveJobId, editions, preFilledValuesApplied, editionFromQuery, productNameFromQuery, vendorFromQuery, contactEmailFromState, state.selectedEdition, state.fileName, state.vendor, state.contactEmail, state.currentStep]);
 
   // Handle return from verification - go directly to Review & Edit step (step 5)
   useEffect(() => {
