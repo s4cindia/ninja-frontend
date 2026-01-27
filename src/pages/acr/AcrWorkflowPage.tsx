@@ -47,6 +47,18 @@ const WORKFLOW_STEPS: WorkflowStep[] = [
   { id: 6, name: 'Export', description: 'Download ACR', icon: Download },
 ];
 
+const UNTITLED_DOCUMENT = 'Untitled Document';
+
+/**
+ * Gets the display file name, preferring the actual file name over fallbacks.
+ */
+function getDisplayFileName(fileName?: string | null, documentTitle?: string): string {
+  if (fileName && fileName !== UNTITLED_DOCUMENT) {
+    return fileName;
+  }
+  return documentTitle || UNTITLED_DOCUMENT;
+}
+
 type DocumentSource = 'upload' | 'existing' | null;
 
 interface UploadedFile {
@@ -319,12 +331,13 @@ export function AcrWorkflowPage() {
           const name = jobData.input?.fileName ||
                        jobData.output?.fileName ||
                        jobData.fileName ||
-                       'Untitled Document';
+                       UNTITLED_DOCUMENT;
           setState(prev => ({ ...prev, fileName: name }));
         } catch (err: unknown) {
           if (controller.signal.aborted) return;
           if ((err as { name?: string })?.name === 'AbortError') return;
-          setState(prev => ({ ...prev, fileName: 'Untitled Document' }));
+          console.warn('[ACR] Failed to fetch file name:', err);
+          setState(prev => ({ ...prev, fileName: UNTITLED_DOCUMENT }));
         }
       }
     };
@@ -1239,7 +1252,7 @@ export function AcrWorkflowPage() {
             <FileText className="h-5 w-5 text-blue-600" />
             <span className="text-sm text-gray-600">Title:</span>
             <span className="text-sm font-semibold text-gray-900">
-              {state.fileName && state.fileName !== 'Untitled Document' ? state.fileName : documentTitle}
+              {getDisplayFileName(state.fileName, documentTitle)}
             </span>
           </div>
         </div>

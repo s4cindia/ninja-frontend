@@ -48,8 +48,12 @@ export function VerificationQueuePage() {
     
     // Default: return to ACR workflow at review step
     // Only set verificationComplete=true if all items were verified
-    const queryParam = verified ? '&verificationComplete=true' : '';
-    navigate(`/acr/workflow?acrWorkflowId=${encodeURIComponent(acrWorkflowId)}${queryParam}`, {
+    const params = new URLSearchParams();
+    params.set('acrWorkflowId', acrWorkflowId);
+    if (verified) {
+      params.set('verificationComplete', 'true');
+    }
+    navigate(`/acr/workflow?${params.toString()}`, {
       state: { 
         verificationComplete: verified,
         jobId,

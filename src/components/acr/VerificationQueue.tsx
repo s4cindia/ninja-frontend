@@ -329,10 +329,12 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
     });
   }, [items, filters, useMockData]);
 
-  // Always calculate count from actual items array to ensure consistency with display
-  const verifiedCount = items.filter(i => 
-    i.status === 'verified_pass' || i.status === 'verified_fail' || i.status === 'verified_partial'
-  ).length;
+  // Memoize verification count to prevent unnecessary recalculations
+  const verifiedCount = useMemo(() => {
+    return items.filter(i => 
+      i.status === 'verified_pass' || i.status === 'verified_fail' || i.status === 'verified_partial'
+    ).length;
+  }, [items]);
   const totalCount = items.length;
   const progressPercent = totalCount > 0 ? Math.round((verifiedCount / totalCount) * 100) : 0;
 

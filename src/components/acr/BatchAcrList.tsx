@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -28,20 +29,22 @@ export function BatchAcrList({
 }: BatchAcrListProps) {
   const navigate = useNavigate();
 
-  const acrWorkflows: AcrWorkflow[] = workflowDetails ?? acrWorkflowIds.map((id, index) => {
-    // Provide more context when file name is missing
-    const fileName = fileNames[index];
-    // Safe fallback: check id length before slicing
-    const idPreview = id && id.length >= 8 ? id.slice(0, 8) : id || 'unknown';
-    const displayName = fileName 
-      ? fileName 
-      : `Unknown File (ID: ${idPreview}...)`;
-    return {
-      acrWorkflowId: id,
-      epubFileName: displayName,
-      status: 'pending' as const,
-    };
-  });
+  const acrWorkflows: AcrWorkflow[] = useMemo(() => {
+    return workflowDetails ?? acrWorkflowIds.map((id, index) => {
+      // Type guard for safe array access
+      const fileName = Array.isArray(fileNames) ? fileNames[index] : undefined;
+      // Safe fallback: check id length before slicing
+      const idPreview = id && id.length >= 8 ? id.slice(0, 8) : id || 'unknown';
+      const displayName = fileName 
+        ? fileName 
+        : `Unknown File (ID: ${idPreview}...)`;
+      return {
+        acrWorkflowId: id,
+        epubFileName: displayName,
+        status: 'pending' as const,
+      };
+    });
+  }, [workflowDetails, acrWorkflowIds, fileNames]);
 
   const handleVerify = (acrWorkflowId: string, fileName: string) => {
     navigate(`/acr/verification/${acrWorkflowId}`, {
