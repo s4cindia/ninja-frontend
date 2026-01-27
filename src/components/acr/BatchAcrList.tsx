@@ -31,9 +31,11 @@ export function BatchAcrList({
   const acrWorkflows: AcrWorkflow[] = workflowDetails ?? acrWorkflowIds.map((id, index) => {
     // Provide more context when file name is missing
     const fileName = fileNames[index];
+    // Safe fallback: check id length before slicing
+    const idPreview = id && id.length >= 8 ? id.slice(0, 8) : id || 'unknown';
     const displayName = fileName 
       ? fileName 
-      : `Unknown File (ID: ${id.slice(0, 8)}...)`;
+      : `Unknown File (ID: ${idPreview}...)`;
     return {
       acrWorkflowId: id,
       epubFileName: displayName,

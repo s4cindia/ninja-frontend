@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Filter, CheckSquare } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
@@ -6,6 +6,8 @@ import { Spinner } from '@/components/ui/Spinner';
 import { VerificationItem } from './VerificationItem';
 import { CriterionDetailsModal } from './CriterionDetailsModal';
 import { useVerificationQueue, useSubmitVerification, useBulkVerification } from '@/hooks/useVerification';
+import { CONFIDENCE_THRESHOLD_HIGH, CONFIDENCE_THRESHOLDS } from '@/constants/verification';
+import { MOCK_VERIFICATION_ITEMS } from '@/constants/mockVerificationData';
 import type { CriterionConfidence } from '@/services/api';
 import type { 
   VerificationItem as VerificationItemType,
@@ -38,7 +40,7 @@ function needsHumanVerification(c: CriterionConfidence): boolean {
   if (c.needsVerification === true) return true;
   if (c.needsVerification === false) return false;
   if (c.status === 'not_applicable') return false;
-  if (c.confidenceScore < 90) return true;
+  if (c.confidenceScore < CONFIDENCE_THRESHOLD_HIGH) return true;
   return false;
 }
 
@@ -53,9 +55,9 @@ function convertCriteriaToVerificationItems(
       const score = typeof c.confidenceScore === 'number' ? c.confidenceScore : 0;
       
       const confidenceLevel: ConfidenceLevel = 
-        score >= 90 ? 'high' :
-        score >= 60 ? 'medium' :
-        score > 0 ? 'low' : 'manual';
+        score >= CONFIDENCE_THRESHOLDS.HIGH ? 'high' :
+        score >= CONFIDENCE_THRESHOLDS.MEDIUM ? 'medium' :
+        score > CONFIDENCE_THRESHOLDS.LOW ? 'low' : 'manual';
       
       const severity: Severity = 
         c.status === 'fail' ? 'critical' :
@@ -152,105 +154,6 @@ function convertCriteriaToVerificationItems(
     });
 }
 
-const MOCK_ITEMS: VerificationItemType[] = [
-  {
-    id: '1',
-    criterionId: '1.1.1',
-    criterionName: 'Non-text Content',
-    wcagLevel: 'A',
-    severity: 'serious',
-    confidenceLevel: 'low',
-    confidenceScore: 55,
-    automatedResult: 'warning',
-    automatedNotes: 'Found 3 images with alt text that may need review. Alt text appears to be auto-generated.',
-    status: 'pending',
-    history: [],
-  },
-  {
-    id: '2',
-    criterionId: '1.4.1',
-    criterionName: 'Use of Color',
-    wcagLevel: 'A',
-    severity: 'critical',
-    confidenceLevel: 'low',
-    confidenceScore: 45,
-    automatedResult: 'fail',
-    automatedNotes: 'Color-only indicators detected for required form fields. No text or icon alternative provided.',
-    status: 'pending',
-    history: [],
-  },
-  {
-    id: '3',
-    criterionId: '2.1.1',
-    criterionName: 'Keyboard',
-    wcagLevel: 'A',
-    severity: 'critical',
-    confidenceLevel: 'manual',
-    confidenceScore: 0,
-    automatedResult: 'not_tested',
-    automatedNotes: 'Custom dropdown component requires manual keyboard testing.',
-    status: 'pending',
-    history: [],
-  },
-  {
-    id: '4',
-    criterionId: '1.2.1',
-    criterionName: 'Audio-only and Video-only',
-    wcagLevel: 'A',
-    severity: 'moderate',
-    confidenceLevel: 'manual',
-    confidenceScore: 0,
-    automatedResult: 'not_tested',
-    automatedNotes: 'Media content detected but transcript availability could not be automatically verified.',
-    status: 'pending',
-    history: [],
-  },
-  {
-    id: '5',
-    criterionId: '2.4.4',
-    criterionName: 'Link Purpose',
-    wcagLevel: 'A',
-    severity: 'minor',
-    confidenceLevel: 'low',
-    confidenceScore: 58,
-    automatedResult: 'pass',
-    automatedNotes: 'All links have descriptive text. Low confidence due to context-dependent link text.',
-    status: 'verified_pass',
-    history: [
-      {
-        id: 'h1',
-        status: 'verified_pass',
-        method: 'Manual Review',
-        notes: 'Reviewed all links - context is clear',
-        verifiedBy: 'John Doe',
-        verifiedAt: '2024-12-15 10:30',
-      },
-    ],
-  },
-  {
-    id: '6',
-    criterionId: '3.1.1',
-    criterionName: 'Language of Page',
-    wcagLevel: 'A',
-    severity: 'moderate',
-    confidenceLevel: 'low',
-    confidenceScore: 50,
-    automatedResult: 'warning',
-    automatedNotes: 'Page language is set but may not match actual content language.',
-    status: 'deferred',
-    history: [
-      {
-        id: 'h2',
-        status: 'deferred',
-        method: 'Manual Review',
-        notes: 'Waiting for translation team input',
-        verifiedBy: 'Jane Smith',
-        verifiedAt: '2024-12-14 15:45',
-      },
-    ],
-  },
-];
-
 const SEVERITY_OPTIONS: { value: Severity; label: string }[] = [
   { value: 'critical', label: 'Critical' },
   { value: 'serious', label: 'Serious' },
@@ -301,7 +204,7 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
       return convertCriteriaToVerificationItems(criteriaFromAnalysis, savedVerifications);
     }
     if (savedVerifications && Object.keys(savedVerifications).length > 0) {
-      return MOCK_ITEMS.map(item => {
+      return MOCK_VERIFICATION_ITEMS.map(item => {
         const saved = savedVerifications[item.id];
         if (saved) {
           return {
@@ -320,7 +223,7 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
         return item;
       });
     }
-    return MOCK_ITEMS;
+    return MOCK_VERIFICATION_ITEMS;
   });
   const [useMockData, setUseMockData] = useState(!hasCriteriaFromAnalysis);
 
@@ -331,7 +234,8 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
   const [useLocalItems, setUseLocalItems] = useState(hasCriteriaFromAnalysis);
 
   // Track if we've done initial conversion to avoid resetting verified items
-  const [hasInitialized, setHasInitialized] = useState(false);
+  // Using useRef instead of useState to avoid race conditions and unnecessary re-renders
+  const hasInitializedRef = useRef(false);
   
   useEffect(() => {
     if (criteriaFromAnalysis && criteriaFromAnalysis.length > 0) {
@@ -357,7 +261,7 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
       }
       
       // If already initialized, preserve existing verification status
-      if (hasInitialized) {
+      if (hasInitializedRef.current) {
         setLocalItems(prev => {
           const existingMap = new Map(prev.map(item => [item.id, item]));
           return mergedItems.map(item => {
@@ -375,11 +279,11 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
         });
       } else {
         setLocalItems(mergedItems);
-        setHasInitialized(true);
+        hasInitializedRef.current = true;
       }
       setUseLocalItems(true);
     }
-  }, [criteriaFromAnalysis, savedVerifications, apiData, hasInitialized]);
+  }, [criteriaFromAnalysis, savedVerifications, apiData]);
 
   useEffect(() => {
     if (hasCriteriaFromAnalysis || useLocalItems) return;

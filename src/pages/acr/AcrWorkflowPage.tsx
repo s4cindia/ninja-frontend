@@ -64,7 +64,17 @@ interface VerificationData {
   };
 }
 
+/**
+ * Workflow state for ACR generation process.
+ * 
+ * URL-SAFE FIELDS (passed in query params):
+ * - edition, productName, vendor: Non-sensitive identifiers that can appear in URLs
+ * 
+ * SENSITIVE FIELDS (passed in navigation state only):
+ * - contactEmail: PII that should not be logged in browser history or server logs
+ */
 interface WorkflowState {
+  version: number;  // State schema version for migrations
   currentStep: number;
   selectedEdition: AcrEdition | null;
   documentSource: DocumentSource;
@@ -81,17 +91,11 @@ interface WorkflowState {
 }
 
 const STORAGE_KEY = 'acr-workflow-state';
+const STATE_VERSION = 1;
 
-function loadWorkflowState(jobId?: string): WorkflowState {
-  try {
-    const stored = localStorage.getItem(`${STORAGE_KEY}-${jobId || 'new'}`);
-    if (stored) {
-      return JSON.parse(stored);
-    }
-  } catch (e) {
-    console.error('Failed to load workflow state:', e);
-  }
+function getDefaultState(jobId?: string): WorkflowState {
   return {
+    version: STATE_VERSION,
     currentStep: 1,
     selectedEdition: null,
     documentSource: null,
@@ -106,6 +110,36 @@ function loadWorkflowState(jobId?: string): WorkflowState {
     contactEmail: null,
     editionPreFilled: false,
   };
+}
+
+function loadWorkflowState(jobId?: string): WorkflowState {
+  try {
+    const stored = localStorage.getItem(`${STORAGE_KEY}-${jobId || 'new'}`);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // Validate state version and migrate if needed
+      if (typeof parsed === 'object' && parsed !== null) {
+        // If version is missing or outdated, use default state with preserved compatible fields
+        if (!parsed.version || parsed.version < STATE_VERSION) {
+          const defaultState = getDefaultState(jobId);
+          return {
+            ...defaultState,
+            // Preserve compatible fields from old state
+            currentStep: typeof parsed.currentStep === 'number' ? parsed.currentStep : defaultState.currentStep,
+            selectedEdition: parsed.selectedEdition ?? defaultState.selectedEdition,
+            verificationComplete: typeof parsed.verificationComplete === 'boolean' ? parsed.verificationComplete : defaultState.verificationComplete,
+            fileName: parsed.fileName ?? defaultState.fileName,
+            vendor: parsed.vendor ?? defaultState.vendor,
+            contactEmail: parsed.contactEmail ?? defaultState.contactEmail,
+          };
+        }
+        return parsed as WorkflowState;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load workflow state:', e);
+  }
+  return getDefaultState(jobId);
 }
 
 function saveWorkflowState(state: WorkflowState) {
@@ -649,21 +683,7 @@ export function AcrWorkflowPage() {
 
   const handleResetWorkflow = () => {
     localStorage.removeItem(`${STORAGE_KEY}-${state.jobId || 'new'}`);
-    setState({
-      currentStep: 1,
-      selectedEdition: null,
-      documentSource: null,
-      uploadedFile: null,
-      jobId: null,
-      acrId: null,
-      verificationComplete: false,
-      isFinalized: false,
-      verifications: {},
-      fileName: null,
-      vendor: null,
-      contactEmail: null,
-      editionPreFilled: false,
-    });
+    setState(getDefaultState());
   };
 
   const handleVerificationUpdate = (itemId: string, status: string, method: string, notes: string) => {
