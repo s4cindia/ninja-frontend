@@ -46,8 +46,24 @@ export const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
 
         if (controller.signal.aborted) return;
 
-        const blob = response.data;
+        const blob = response.data as Blob;
         console.log('[AuthenticatedImage] Received blob:', blob.type, blob.size, 'bytes');
+        
+        // Validate the response is actually an image
+        if (!blob.type.startsWith('image/')) {
+          console.error('[AuthenticatedImage] Response is not an image:', blob.type);
+          // Try to read the response as text to see the error
+          try {
+            const text = await blob.text();
+            console.error('[AuthenticatedImage] Response body:', text.substring(0, 500));
+          } catch {
+            // Ignore text parsing errors
+          }
+          setHasError(true);
+          onError?.();
+          return;
+        }
+        
         objectUrl = URL.createObjectURL(blob);
         setBlobUrl(objectUrl);
         onLoad?.();
