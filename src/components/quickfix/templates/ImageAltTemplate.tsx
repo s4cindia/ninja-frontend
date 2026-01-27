@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Sparkles, RefreshCw, AlertTriangle, CheckCircle, Info, Image as ImageIcon } from 'lucide-react';
 import { altTextService } from '@/services/alt-text.service';
+import { AuthenticatedImage } from '@/components/ui/AuthenticatedImage';
 import type { AltTextFlag, QuickFixImageType, QuickFixAltTextResponse } from '@/types/alt-text.types';
 
 interface QuickFixIssue {
@@ -245,11 +246,12 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
         </p>
         <div className="flex items-center justify-center min-h-[8rem] bg-gray-200 rounded overflow-hidden">
           {imagePreviewUrl && !imageLoadError ? (
-            <img
+            <AuthenticatedImage
               src={imagePreviewUrl}
               alt="Preview of the image needing alt text"
               className="max-h-48 max-w-full object-contain"
               onError={() => setImageLoadError(true)}
+              fallbackMessage={imagePath ? 'Image preview not available' : 'Image path could not be detected'}
             />
           ) : (
             <div className="flex flex-col items-center justify-center h-32 text-gray-500 text-sm">
