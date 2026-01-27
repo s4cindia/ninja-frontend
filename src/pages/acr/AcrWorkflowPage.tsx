@@ -200,9 +200,11 @@ export function AcrWorkflowPage() {
   const vendorFromQuery = searchParams.get('vendor');
   const contactEmailFromQuery = searchParams.get('contactEmail');
   const acrIdFromQuery = searchParams.get('acrId');
+  const acrWorkflowIdFromQuery = searchParams.get('acrWorkflowId');
+  const verificationCompleteFromQuery = searchParams.get('verificationComplete') === 'true';
   const navigate = useNavigate();
   
-  const effectiveJobId = urlJobId || jobIdFromQuery;
+  const effectiveJobId = urlJobId || acrWorkflowIdFromQuery || jobIdFromQuery;
   
   const [state, setState] = useState<WorkflowState>(() => loadWorkflowState(effectiveJobId ?? undefined));
   const [isExportOpen, setIsExportOpen] = useState(false);
@@ -510,6 +512,19 @@ export function AcrWorkflowPage() {
       controller.abort();
     };
   }, [effectiveJobId, editions, preFilledValuesApplied, editionFromQuery, productNameFromQuery, vendorFromQuery, contactEmailFromQuery, state.selectedEdition, state.fileName, state.vendor, state.contactEmail, state.currentStep]);
+
+  // Handle return from verification - go directly to Review & Edit step (step 5)
+  useEffect(() => {
+    if (verificationCompleteFromQuery && acrWorkflowIdFromQuery) {
+      setState(prev => ({
+        ...prev,
+        currentStep: 5,
+        verificationComplete: true,
+        acrId: prev.acrId || acrWorkflowIdFromQuery,
+        jobId: prev.jobId || acrWorkflowIdFromQuery,
+      }));
+    }
+  }, [verificationCompleteFromQuery, acrWorkflowIdFromQuery]);
 
   const updateState = (updates: Partial<WorkflowState>) => {
     setState(prev => ({ ...prev, ...updates }));
