@@ -142,15 +142,16 @@ export const batchService = {
     const maxBackoffMs = 30000;
     let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    const reconnect = () => {
-      if (reconnectTimeout) return;
-      
-      reconnectTimeout = setTimeout(() => {
-        reconnectTimeout = null;
-        eventSource = createEventSource();
-        setupHandlers(eventSource);
-        backoffMs = Math.min(backoffMs * 2, maxBackoffMs);
-      }, backoffMs);
+    // Helper to attach close proxy to any EventSource instance
+    const attachCloseProxy = (es: EventSource): void => {
+      const originalClose = es.close.bind(es);
+      es.close = () => {
+        if (reconnectTimeout) {
+          clearTimeout(reconnectTimeout);
+          reconnectTimeout = null;
+        }
+        originalClose();
+      };
     };
 
     const setupHandlers = (es: EventSource) => {
@@ -173,16 +174,20 @@ export const batchService = {
       };
     };
 
-    setupHandlers(eventSource);
-
-    const originalClose = eventSource.close.bind(eventSource);
-    eventSource.close = () => {
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
+    const reconnect = () => {
+      if (reconnectTimeout) return;
+      
+      reconnectTimeout = setTimeout(() => {
         reconnectTimeout = null;
-      }
-      originalClose();
+        eventSource = createEventSource();
+        attachCloseProxy(eventSource);
+        setupHandlers(eventSource);
+        backoffMs = Math.min(backoffMs * 2, maxBackoffMs);
+      }, backoffMs);
     };
+
+    attachCloseProxy(eventSource);
+    setupHandlers(eventSource);
 
     return eventSource;
   },

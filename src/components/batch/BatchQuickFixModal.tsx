@@ -324,7 +324,7 @@ ${Array.isArray(accessibilityHazard)
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={!isValid || isSubmitting || isLoading}
+              disabled={!isValid || isSubmitting || isLoading || totalFields === 0}
               leftIcon={
                 isSubmitting || isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -335,7 +335,9 @@ ${Array.isArray(accessibilityHazard)
             >
               {isSubmitting || isLoading
                 ? 'Applying...'
-                : `Apply ${filledCount} Fix${filledCount !== 1 ? 'es' : ''}`}
+                : totalFields === 0
+                  ? 'No fixes available'
+                  : `Apply ${filledCount} Fix${filledCount !== 1 ? 'es' : ''}`}
             </Button>
           </div>
         </div>

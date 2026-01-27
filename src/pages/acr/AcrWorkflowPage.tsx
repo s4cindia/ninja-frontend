@@ -522,9 +522,15 @@ export function AcrWorkflowPage() {
         let shouldSkipEditionStep = false;
         
         // Pre-fill edition if present - editions are now loaded
+        // Normalize edition code same way as query path using EDITION_CODE_MAP
         const editionCode = jobData.edition as AcrEditionCode | undefined;
         if (editionCode && !state.selectedEdition) {
-          const matchedEdition = editions.find(e => e.code === editionCode);
+          const normalizedCode = EDITION_CODE_MAP[editionCode] || editionCode.toLowerCase();
+          const matchedEdition = editions.find(e => 
+            e.code === editionCode || 
+            e.code === normalizedCode ||
+            e.code.toLowerCase() === normalizedCode
+          );
           if (matchedEdition) {
             updates.selectedEdition = matchedEdition;
             updates.editionPreFilled = true;
