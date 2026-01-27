@@ -118,8 +118,9 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
   const imagePath = extractImagePath(issue);
   
   // Build image URL for preview - backend serves EPUB images at this endpoint
+  // Note: Don't include /api/v1 prefix since AuthenticatedImage uses the api client which has baseURL set
   const imagePreviewUrl = imagePath 
-    ? `/api/v1/epub/job/${jobId}/image/${imagePath}`
+    ? `/epub/job/${jobId}/image/${imagePath}`
     : '';
   const prevValidRef = useRef<boolean | null>(null);
 

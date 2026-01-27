@@ -38,6 +38,7 @@ export const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
       setHasError(false);
 
       try {
+        console.log('[AuthenticatedImage] Fetching image from:', src);
         const response = await api.get(src, {
           responseType: 'blob',
           signal: controller.signal,
@@ -46,12 +47,13 @@ export const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
         if (controller.signal.aborted) return;
 
         const blob = response.data;
+        console.log('[AuthenticatedImage] Received blob:', blob.type, blob.size, 'bytes');
         objectUrl = URL.createObjectURL(blob);
         setBlobUrl(objectUrl);
         onLoad?.();
       } catch (err) {
         if (controller.signal.aborted) return;
-        console.warn('[AuthenticatedImage] Failed to fetch image:', err);
+        console.error('[AuthenticatedImage] Failed to fetch image:', src, err);
         setHasError(true);
         onError?.();
       } finally {
