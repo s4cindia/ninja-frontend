@@ -280,15 +280,27 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
     }
     
     debounceTimerRef.current = setTimeout(() => {
-      const images = allImagePaths.map((path, idx) => {
-        const data = imageData[idx] || { imageType: 'informative', altText: '', longDescription: '' };
-        return {
-          imagePath: path,
+      let images;
+      if (allImagePaths.length === 0) {
+        // Emit a placeholder entry to preserve edits when no image paths detected
+        const data = imageData[0] || { imageType: 'informative', altText: '', longDescription: '' };
+        images = [{
+          imagePath: '',
           imageType: data.imageType,
           altText: data.altText,
           longDescription: data.longDescription,
-        };
-      });
+        }];
+      } else {
+        images = allImagePaths.map((path, idx) => {
+          const data = imageData[idx] || { imageType: 'informative', altText: '', longDescription: '' };
+          return {
+            imagePath: path,
+            imageType: data.imageType,
+            altText: data.altText,
+            longDescription: data.longDescription,
+          };
+        });
+      }
       onChangeRef.current({ images });
     }, 150);
     
@@ -429,9 +441,12 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
     }
   };
 
-  const handleImageLoadError = useCallback(() => {
-    setImageLoadErrors(prev => ({ ...prev, [currentImageIndex]: true }));
-  }, [currentImageIndex]);
+  // Returns a closure pinned to the given image index to prevent stale closures during navigation
+  const createImageLoadErrorHandler = useCallback((index: number) => {
+    return () => {
+      setImageLoadErrors(prev => ({ ...prev, [index]: true }));
+    };
+  }, []);
 
   const getConfidenceBadge = (confidence: number) => {
     if (confidence >= 85) return { text: `${confidence}%`, variant: 'success' };
@@ -483,7 +498,7 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
               src={imagePreviewUrl}
               alt="Preview of the image needing alt text"
               className="max-h-48 max-w-full object-contain"
-              onError={handleImageLoadError}
+              onError={createImageLoadErrorHandler(currentImageIndex)}
               fallbackMessage={imagePath ? 'Image preview not available' : 'Image path could not be detected'}
             />
           ) : (
