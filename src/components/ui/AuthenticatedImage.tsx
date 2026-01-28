@@ -38,7 +38,6 @@ export const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
       setHasError(false);
 
       try {
-        console.log('[AuthenticatedImage] Fetching image from:', src);
         const response = await api.get(src, {
           responseType: 'blob',
           signal: controller.signal,
@@ -47,18 +46,10 @@ export const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
         if (controller.signal.aborted) return;
 
         const blob = response.data as Blob;
-        console.log('[AuthenticatedImage] Received blob:', blob.type, blob.size, 'bytes');
         
         // Validate the response is actually an image
         if (!blob.type.startsWith('image/')) {
           console.error('[AuthenticatedImage] Response is not an image:', blob.type);
-          // Try to read the response as text to see the error
-          try {
-            const text = await blob.text();
-            console.error('[AuthenticatedImage] Response body:', text.substring(0, 500));
-          } catch {
-            // Ignore text parsing errors
-          }
           setHasError(true);
           onError?.();
           return;
@@ -69,7 +60,7 @@ export const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
         onLoad?.();
       } catch (err) {
         if (controller.signal.aborted) return;
-        console.error('[AuthenticatedImage] Failed to fetch image:', src, err);
+        console.error('[AuthenticatedImage] Failed to fetch image:', err);
         setHasError(true);
         onError?.();
       } finally {
@@ -88,14 +79,6 @@ export const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
       }
     };
   }, [src, onError, onLoad]);
-
-  useEffect(() => {
-    return () => {
-      if (blobUrl) {
-        URL.revokeObjectURL(blobUrl);
-      }
-    };
-  }, [blobUrl]);
 
   if (isLoading) {
     return (

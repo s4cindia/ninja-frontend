@@ -53,6 +53,15 @@ interface ImageData {
   html: string;
 }
 
+// Helper to normalize image paths relative to the issue location
+function normalizeImagePath(src: string, issueLocation?: string): string {
+  if (src.startsWith('OEBPS/') || src.startsWith('/') || src.startsWith('http')) {
+    return src;
+  }
+  const fileDir = issueLocation?.replace(/[^/]+$/, '') || '';
+  return fileDir + src;
+}
+
 function extractAllImagePaths(issue: QuickFixIssue): string[] {
   const images: string[] = [];
   
@@ -84,14 +93,9 @@ function extractAllImagePaths(issue: QuickFixIssue): string[] {
     // Try to extract all src attributes from img tags
     const srcMatches = elementSource.matchAll(/src=["']([^"']+)["']/g);
     for (const match of srcMatches) {
-      let src = match[1];
+      const src = match[1];
       if (src && !images.includes(src)) {
-        // Normalize path
-        if (!src.startsWith('OEBPS/') && !src.startsWith('/') && !src.startsWith('http')) {
-          const fileDir = issue.location?.replace(/[^/]+$/, '') || '';
-          src = fileDir + src;
-        }
-        images.push(src);
+        images.push(normalizeImagePath(src, issue.location));
       }
     }
     
@@ -99,13 +103,9 @@ function extractAllImagePaths(issue: QuickFixIssue): string[] {
     if (images.length === 0) {
       const imgFileMatches = elementSource.matchAll(/([\w\-./]+\.(png|jpg|jpeg|gif|svg|webp))/gi);
       for (const match of imgFileMatches) {
-        let src = match[1];
+        const src = match[1];
         if (src && !images.includes(src)) {
-          if (!src.startsWith('OEBPS/') && !src.startsWith('/') && !src.startsWith('http')) {
-            const fileDir = issue.location?.replace(/[^/]+$/, '') || '';
-            src = fileDir + src;
-          }
-          images.push(src);
+          images.push(normalizeImagePath(src, issue.location));
         }
       }
     }
@@ -200,11 +200,14 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
   }, [currentImageIndex]);
 
   // Sync image data to parent when it changes
-  const isFirstRender = useRef(true);
+  const isMounted = useRef(false);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  
   useEffect(() => {
     // Skip first render to avoid setState during mount
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
+    if (!isMounted.current) {
+      isMounted.current = true;
       return;
     }
     
@@ -217,8 +220,8 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
         longDescription: data.longDescription,
       };
     });
-    onChange({ images });
-  }, [imageData, allImagePaths, onChange]);
+    onChangeRef.current({ images });
+  }, [imageData, allImagePaths]);
 
   // Validate all images have required data
   useEffect(() => {

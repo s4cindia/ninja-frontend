@@ -665,11 +665,17 @@ const remediationTemplates: Record<
   },
 };
 
+// Escape markdown special characters to prevent rendering issues
+function escapeMarkdown(text: string): string {
+  return text.replace(/([*_`[\]\\])/g, '\\$1');
+}
+
 function createDynamicTemplate(
   suggestion: string,
   code: string,
 ): RemediationTask["remediation"] {
   const upperCode = code.toUpperCase();
+  const sanitizedSuggestion = suggestion ? escapeMarkdown(suggestion) : '';
   
   let title = "Manual Fix Required";
   let baseSteps: string[] = [
@@ -705,8 +711,8 @@ function createDynamicTemplate(
     ];
   }
   
-  const suggestionStep = suggestion 
-    ? `**Suggestion:** ${suggestion}`
+  const suggestionStep = sanitizedSuggestion 
+    ? `**Suggestion:** ${sanitizedSuggestion}`
     : "**Review the error message** and make the appropriate correction";
   
   return {
