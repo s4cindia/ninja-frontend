@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '@/services/api';
 import { Image as ImageIcon, Loader2 } from 'lucide-react';
 
@@ -22,6 +22,11 @@ export const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  
+  const onErrorRef = useRef(onError);
+  const onLoadRef = useRef(onLoad);
+  onErrorRef.current = onError;
+  onLoadRef.current = onLoad;
 
   useEffect(() => {
     if (!src) {
@@ -51,18 +56,18 @@ export const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
         if (!blob.type.startsWith('image/')) {
           console.error('[AuthenticatedImage] Response is not an image:', blob.type);
           setHasError(true);
-          onError?.();
+          onErrorRef.current?.();
           return;
         }
         
         objectUrl = URL.createObjectURL(blob);
         setBlobUrl(objectUrl);
-        onLoad?.();
+        onLoadRef.current?.();
       } catch (err) {
         if (controller.signal.aborted) return;
         console.error('[AuthenticatedImage] Failed to fetch image:', err);
         setHasError(true);
-        onError?.();
+        onErrorRef.current?.();
       } finally {
         if (!controller.signal.aborted) {
           setIsLoading(false);
@@ -78,7 +83,7 @@ export const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [src, onError, onLoad]);
+  }, [src]);
 
   if (isLoading) {
     return (

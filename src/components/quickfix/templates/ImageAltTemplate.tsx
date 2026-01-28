@@ -47,6 +47,10 @@ const VARIANT_CLASSES: Record<string, string> = {
   info: 'bg-blue-100 text-blue-700',
 };
 
+const MAX_ALT_TEXT_LENGTH = 125;
+
+const IMAGE_FILE_PATTERN = /(?:^|\/)([\w-]+\.(png|jpg|jpeg|gif|svg|webp))$/gi;
+
 interface ImageData {
   src: string;
   fullPath: string;
@@ -99,11 +103,11 @@ function extractAllImagePaths(issue: QuickFixIssue): string[] {
       }
     }
     
-    // If still no images, try to find image filename patterns
+    // If still no images, try to find image filename patterns (stricter pattern)
     if (images.length === 0) {
-      const imgFileMatches = elementSource.matchAll(/([\w\-./]+\.(png|jpg|jpeg|gif|svg|webp))/gi);
+      const imgFileMatches = elementSource.matchAll(IMAGE_FILE_PATTERN);
       for (const match of imgFileMatches) {
-        const src = match[1];
+        const src = match[0];
         if (src && !images.includes(src)) {
           images.push(normalizeImagePath(src, issue.location));
         }
@@ -166,9 +170,11 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
     return initial;
   });
   
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatingImages, setGeneratingImages] = useState<Record<number, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [imageLoadErrors, setImageLoadErrors] = useState<Record<number, boolean>>({});
+  
+  const isGenerating = generatingImages[currentImageIndex] || false;
 
   // Current image data
   const currentData = imageData[currentImageIndex] || { imageType: 'informative' as QuickFixImageType, altText: '', longDescription: '', aiResult: null };
@@ -204,6 +210,40 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   
+  // Reset state when issue changes
+  const prevIssueId = useRef(issue.id);
+  useEffect(() => {
+    if (prevIssueId.current !== issue.id) {
+      prevIssueId.current = issue.id;
+      setCurrentImageIndex(0);
+      setGeneratingImages({});
+      setError(null);
+      setImageLoadErrors({});
+      
+      const savedImages = values.images as Array<{ imageType: QuickFixImageType; altText: string; longDescription?: string }> | undefined;
+      const newImageData: Record<number, { imageType: QuickFixImageType; altText: string; longDescription: string; aiResult: QuickFixAltTextResponse | null }> = {};
+      
+      for (let i = 0; i < Math.max(allImagePaths.length, 1); i++) {
+        if (savedImages && savedImages[i]) {
+          newImageData[i] = {
+            imageType: savedImages[i].imageType || 'informative',
+            altText: savedImages[i].altText || '',
+            longDescription: savedImages[i].longDescription || '',
+            aiResult: null,
+          };
+        } else {
+          newImageData[i] = {
+            imageType: 'informative',
+            altText: '',
+            longDescription: '',
+            aiResult: null,
+          };
+        }
+      }
+      setImageData(newImageData);
+    }
+  }, [issue.id, allImagePaths.length, values.images]);
+  
   useEffect(() => {
     // Skip first render to avoid setState during mount
     if (!isMounted.current) {
@@ -237,12 +277,12 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
       if (data.imageType === 'decorative') {
         continue; // Decorative images are always valid
       } else if (data.imageType === 'complex') {
-        if (!data.altText.trim() || data.altText.length > 125 || !data.longDescription.trim()) {
+        if (!data.altText.trim() || data.altText.length > MAX_ALT_TEXT_LENGTH || !data.longDescription.trim()) {
           allValid = false;
           break;
         }
       } else {
-        if (!data.altText.trim() || data.altText.length > 125) {
+        if (!data.altText.trim() || data.altText.length > MAX_ALT_TEXT_LENGTH) {
           allValid = false;
           break;
         }
@@ -256,22 +296,24 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
   }, [imageData, totalImages, onValidate]);
 
   const handleImageTypeChange = useCallback((type: QuickFixImageType) => {
-    const updates = {
-      imageType: type,
-      altText: type === 'decorative' ? '' : altText,
-      longDescription: type === 'decorative' ? '' : longDesc,
-      aiResult: type === 'decorative' ? null : aiResult,
-    };
-    
     if (type === 'decorative') {
       setError(null);
     }
     
-    setImageData(prev => ({
-      ...prev,
-      [currentImageIndex]: { ...prev[currentImageIndex], ...updates },
-    }));
-  }, [currentImageIndex, altText, longDesc, aiResult]);
+    setImageData(prev => {
+      const current = prev[currentImageIndex];
+      return {
+        ...prev,
+        [currentImageIndex]: {
+          ...current,
+          imageType: type,
+          altText: type === 'decorative' ? '' : current.altText,
+          longDescription: type === 'decorative' ? '' : current.longDescription,
+          aiResult: type === 'decorative' ? null : current.aiResult,
+        },
+      };
+    });
+  }, [currentImageIndex]);
 
   const handleAltTextChange = useCallback((value: string) => {
     setImageData(prev => ({
@@ -293,35 +335,34 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
       return;
     }
 
-    console.log('[ImageAltTemplate] Generate clicked for image', currentImageIndex + 1, 'of', totalImages);
-    console.log('[ImageAltTemplate] Image path:', imagePath);
-
-    setIsGenerating(true);
+    const imageIdx = currentImageIndex;
+    setGeneratingImages(prev => ({ ...prev, [imageIdx]: true }));
     setError(null);
 
     try {
       const result = await altTextService.generateForQuickFix(jobId, imagePath, imageType);
       
       setImageData(prev => {
-        const updates: Partial<typeof currentData> = {
-          aiResult: result,
-          altText: result.shortAlt,
-        };
-        
-        if (imageType === 'complex' && result.longDescription) {
-          updates.longDescription = result.longDescription;
-        }
+        const current = prev[imageIdx];
+        if (!current) return prev;
         
         return {
           ...prev,
-          [currentImageIndex]: { ...prev[currentImageIndex], ...updates },
+          [imageIdx]: {
+            ...current,
+            aiResult: result,
+            altText: result.shortAlt,
+            longDescription: imageType === 'complex' && result.longDescription 
+              ? result.longDescription 
+              : current.longDescription,
+          },
         };
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to generate alt text';
       setError(message);
     } finally {
-      setIsGenerating(false);
+      setGeneratingImages(prev => ({ ...prev, [imageIdx]: false }));
     }
   };
 
@@ -368,7 +409,11 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
               >
                 <ChevronLeft className="h-5 w-5" />
               </button>
-              <span className="text-sm text-gray-600">
+              <span 
+                className="text-sm text-gray-600"
+                aria-live="polite"
+                aria-atomic="true"
+              >
                 {currentImageIndex + 1} of {totalImages}
               </span>
               <button
@@ -483,16 +528,16 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
               value={altText}
               onChange={(e) => handleAltTextChange(e.target.value)}
               placeholder="Describe the image content and purpose..."
-              maxLength={125}
+              maxLength={MAX_ALT_TEXT_LENGTH}
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
             />
             <div className="flex justify-between mt-1">
               <p className="text-xs text-gray-500">
-                Keep it concise (125 chars max). Describe what the image shows.
+                Keep it concise ({MAX_ALT_TEXT_LENGTH} chars max). Describe what the image shows.
               </p>
-              <span className={`text-xs ${altText.length > 125 ? 'text-red-500' : 'text-gray-400'}`}>
-                {altText.length}/125
+              <span className={`text-xs ${altText.length > MAX_ALT_TEXT_LENGTH ? 'text-red-500' : 'text-gray-400'}`}>
+                {altText.length}/{MAX_ALT_TEXT_LENGTH}
               </span>
             </div>
           </div>
