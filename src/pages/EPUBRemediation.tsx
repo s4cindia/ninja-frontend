@@ -600,7 +600,140 @@ const remediationTemplates: Record<
       { label: "DPUB-ARIA Roles", url: "https://www.w3.org/TR/dpub-aria-1.0/" },
     ],
   },
+  opf: {
+    title: "Fix OPF Package Document Issue",
+    steps: [
+      "**Open in Sigil:** File → Open → Select your EPUB",
+      "**Find the OPF file:** In Book Browser, double-click `content.opf`",
+      "**Switch to Code View:** Press `F9` if needed",
+      "**Locate the issue** based on the error message",
+      "**Make the required correction** (see suggestion below)",
+      "**Save:** `Ctrl+S` and validate with Tools → Validate EPUB",
+    ],
+    resources: [
+      {
+        label: "EPUB Packages Specification",
+        url: "https://www.w3.org/TR/epub-33/#sec-package-doc",
+      },
+      {
+        label: "Sigil User Guide",
+        url: "https://sigil-ebook.com/sigil/guide/",
+      },
+    ],
+  },
+  html: {
+    title: "Fix HTML/XHTML Issue",
+    steps: [
+      "**Open in Sigil:** File → Open → Select your EPUB",
+      "**Find the file:** In Book Browser, expand \"Text\" and open the file from the issue location",
+      "**Switch to Code View:** Press `F9`",
+      "**Locate the issue** based on the error message and line number",
+      "**Make the required correction** (see suggestion below)",
+      "**Save:** `Ctrl+S`",
+    ],
+    resources: [
+      {
+        label: "HTML Validator",
+        url: "https://validator.w3.org/",
+      },
+      {
+        label: "Sigil User Guide",
+        url: "https://sigil-ebook.com/sigil/guide/",
+      },
+    ],
+  },
+  css: {
+    title: "Fix CSS Styling Issue",
+    steps: [
+      "**Open in Sigil:** File → Open → Select your EPUB",
+      "**Find the CSS file:** In Book Browser, expand \"Styles\" and open the relevant stylesheet",
+      "**Switch to Code View:** Press `F9` if needed",
+      "**Locate the issue** based on the error message",
+      "**Make the required correction** (see suggestion below)",
+      "**Save:** `Ctrl+S`",
+    ],
+    resources: [
+      {
+        label: "CSS Validator",
+        url: "https://jigsaw.w3.org/css-validator/",
+      },
+      {
+        label: "Sigil User Guide",
+        url: "https://sigil-ebook.com/sigil/guide/",
+      },
+    ],
+  },
 };
+
+// Escape markdown special characters to prevent rendering issues
+function escapeMarkdown(text: string): string {
+  return text.replace(/([*_`[\]\\])/g, '\\$1');
+}
+
+function createDynamicTemplate(
+  suggestion: string,
+  code: string,
+): RemediationTask["remediation"] {
+  const upperCode = code.toUpperCase();
+  const sanitizedSuggestion = suggestion ? escapeMarkdown(suggestion) : '';
+  
+  let title = "Manual Fix Required";
+  let baseSteps: string[] = [
+    "**Open in Sigil:** File → Open → Select your EPUB",
+    "**Locate the issue:** Find the file mentioned in the location",
+    "**Switch to Code View:** Press `F9`",
+  ];
+  
+  if (upperCode.startsWith("OPF-") || upperCode.startsWith("PKG-")) {
+    title = "Fix Package Document Issue";
+    baseSteps = [
+      "**Open in Sigil:** File → Open → Select your EPUB",
+      "**Open the OPF file:** Double-click `content.opf` in Book Browser",
+      "**Switch to Code View:** Press `F9`",
+    ];
+  } else if (upperCode.startsWith("HTM-") || upperCode.startsWith("HTML-")) {
+    title = "Fix HTML/XHTML Issue";
+  } else if (upperCode.startsWith("CSS-")) {
+    title = "Fix CSS Issue";
+    baseSteps = [
+      "**Open in Sigil:** File → Open → Select your EPUB",
+      "**Open the stylesheet:** In Book Browser, expand \"Styles\"",
+      "**Switch to Code View:** Press `F9`",
+    ];
+  } else if (upperCode.startsWith("RSC-")) {
+    title = "Fix Resource Issue";
+  } else if (upperCode.startsWith("NAV-")) {
+    title = "Fix Navigation Issue";
+    baseSteps = [
+      "**Open in Sigil:** File → Open → Select your EPUB",
+      "**Open the navigation file:** Find `nav.xhtml` in Book Browser",
+      "**Switch to Code View:** Press `F9`",
+    ];
+  }
+  
+  const suggestionStep = sanitizedSuggestion 
+    ? `**Suggestion:** ${sanitizedSuggestion}`
+    : "**Review the error message** and make the appropriate correction";
+  
+  return {
+    title,
+    steps: [
+      ...baseSteps,
+      suggestionStep,
+      "**Save:** `Ctrl+S` and validate with Tools → Validate EPUB",
+    ],
+    resources: [
+      {
+        label: "EPUB Accessibility",
+        url: "https://www.w3.org/TR/epub-a11y-11/",
+      },
+      {
+        label: "Sigil User Guide",
+        url: "https://sigil-ebook.com/sigil/guide/",
+      },
+    ],
+  };
+}
 
 function getWcagCriteriaFromCode(code: string, message: string): string[] {
   const lowerCode = code.toLowerCase();
@@ -663,6 +796,7 @@ const issueCodeAliases: Record<string, string> = {
 function getRemediationFromCode(
   code: string,
   message: string,
+  suggestion?: string,
 ): RemediationTask["remediation"] {
   const upperCode = code.toUpperCase().trim();
   const lowerCode = code.toLowerCase();
@@ -688,7 +822,24 @@ function getRemediationFromCode(
     }
   }
 
-  // 3. Priority-based keyword matching on code
+  // 3. Check for code prefix-based templates (OPF-*, HTM-*, CSS-*, etc.)
+  if (upperCode.startsWith("OPF-") || upperCode.startsWith("PKG-")) {
+    return createDynamicTemplate(suggestion || "", code);
+  }
+  if (upperCode.startsWith("HTM-") || upperCode.startsWith("HTML-")) {
+    return createDynamicTemplate(suggestion || "", code);
+  }
+  if (upperCode.startsWith("CSS-")) {
+    return createDynamicTemplate(suggestion || "", code);
+  }
+  if (upperCode.startsWith("RSC-")) {
+    return createDynamicTemplate(suggestion || "", code);
+  }
+  if (upperCode.startsWith("NAV-")) {
+    return createDynamicTemplate(suggestion || "", code);
+  }
+
+  // 4. Priority-based keyword matching on code
   const priorityOrder = [
     "landmark",
     "accessmodesufficient",
@@ -718,11 +869,16 @@ function getRemediationFromCode(
     }
   }
 
-  // 4. Fallback: check message keywords
+  // 5. Fallback: check message keywords
   for (const keyword of priorityOrder) {
     if (lowerMessage.includes(keyword) && remediationTemplates[keyword]) {
       return remediationTemplates[keyword];
     }
+  }
+
+  // 6. Final fallback: use dynamic template with suggestion
+  if (suggestion) {
+    return createDynamicTemplate(suggestion, code);
   }
 
   return undefined;
@@ -809,10 +965,15 @@ function normalizeAceTask(
   const source = raw.source || getSourceFromCode(code);
   const filePath =
     raw.filePath || (location ? location.split(",")[0].trim() : undefined);
+  
+  // Extract suggestion early so we can pass it to getRemediationFromCode
+  const suggestion = raw.suggestion ||
+    raw.help ||
+    (typeof raw.remediation === "string" ? raw.remediation : undefined);
 
   // Handle remediation - prefer detailed templates over generic API strings
   let remediation: RemediationTask["remediation"] = undefined;
-  const templateRemediation = getRemediationFromCode(code, message);
+  const templateRemediation = getRemediationFromCode(code, message, suggestion);
 
   if (taskType === "manual") {
     if (raw.remediation && typeof raw.remediation === "object") {
@@ -836,10 +997,7 @@ function normalizeAceTask(
     severity,
     message,
     location,
-    suggestion:
-      raw.suggestion ||
-      raw.help ||
-      (typeof raw.remediation === "string" ? raw.remediation : undefined),
+    suggestion,
     type: taskType,
     fixType,
     status: (raw.status as TaskStatus) || "pending",
