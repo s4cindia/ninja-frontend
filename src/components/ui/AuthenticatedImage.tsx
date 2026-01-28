@@ -28,6 +28,8 @@ export const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
   onErrorRef.current = onError;
   onLoadRef.current = onLoad;
 
+  const objectUrlRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!src) {
       setIsLoading(false);
@@ -36,7 +38,6 @@ export const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
     }
 
     const controller = new AbortController();
-    let objectUrl: string | null = null;
 
     const fetchImage = async () => {
       setIsLoading(true);
@@ -60,8 +61,13 @@ export const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
           return;
         }
         
-        objectUrl = URL.createObjectURL(blob);
-        setBlobUrl(objectUrl);
+        // Clean up previous blob URL before creating new one
+        if (objectUrlRef.current) {
+          URL.revokeObjectURL(objectUrlRef.current);
+        }
+        
+        objectUrlRef.current = URL.createObjectURL(blob);
+        setBlobUrl(objectUrlRef.current);
         onLoadRef.current?.();
       } catch (err) {
         if (controller.signal.aborted) return;
@@ -79,8 +85,9 @@ export const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
 
     return () => {
       controller.abort();
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
       }
     };
   }, [src]);

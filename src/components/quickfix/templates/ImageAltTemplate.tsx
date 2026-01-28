@@ -140,7 +140,11 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
   }>>(() => {
     // Initialize from values if available
     const initial: Record<number, { imageType: QuickFixImageType; altText: string; longDescription: string; aiResult: QuickFixAltTextResponse | null }> = {};
-    const savedImages = values.images as Array<{ imageType: QuickFixImageType; altText: string; longDescription?: string }> | undefined;
+    
+    // Runtime validation: ensure values.images is an array
+    const savedImages = Array.isArray(values.images) 
+      ? values.images as Array<{ imageType: QuickFixImageType; altText: string; longDescription?: string }>
+      : undefined;
     
     for (let i = 0; i < Math.max(totalImages, 1); i++) {
       if (savedImages && savedImages[i]) {
@@ -187,8 +191,10 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
   
   // Build image URL for preview - backend serves EPUB images at this endpoint
   // Note: Don't include /api/v1 prefix since AuthenticatedImage uses the api client which has baseURL set
-  const imagePreviewUrl = imagePath 
-    ? `/epub/job/${jobId}/image/${imagePath}`
+  // Strip leading slashes to avoid double slashes in URL
+  const normalizedPath = imagePath.replace(/^\/+/, '');
+  const imagePreviewUrl = normalizedPath 
+    ? `/epub/job/${jobId}/image/${normalizedPath}`
     : '';
   const imageLoadError = imageLoadErrors[currentImageIndex] || false;
   
@@ -212,6 +218,9 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
   
   // Reset state when issue changes
   const prevIssueId = useRef(issue.id);
+  const issueIdRef = useRef(issue.id);
+  issueIdRef.current = issue.id;
+  
   useEffect(() => {
     if (prevIssueId.current !== issue.id) {
       prevIssueId.current = issue.id;
@@ -220,7 +229,10 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
       setError(null);
       setImageLoadErrors({});
       
-      const savedImages = values.images as Array<{ imageType: QuickFixImageType; altText: string; longDescription?: string }> | undefined;
+      // Runtime validation: ensure values.images is an array
+      const savedImages = Array.isArray(values.images)
+        ? values.images as Array<{ imageType: QuickFixImageType; altText: string; longDescription?: string }>
+        : undefined;
       const newImageData: Record<number, { imageType: QuickFixImageType; altText: string; longDescription: string; aiResult: QuickFixAltTextResponse | null }> = {};
       
       for (let i = 0; i < Math.max(allImagePaths.length, 1); i++) {
@@ -229,6 +241,14 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
             imageType: savedImages[i].imageType || 'informative',
             altText: savedImages[i].altText || '',
             longDescription: savedImages[i].longDescription || '',
+            aiResult: null,
+          };
+        } else if (i === 0 && !savedImages) {
+          // Preserve legacy single-image fields when values.images is undefined
+          newImageData[i] = {
+            imageType: (values.imageType as QuickFixImageType) || 'informative',
+            altText: (values.altText as string) || '',
+            longDescription: (values.longDescription as string) || '',
             aiResult: null,
           };
         } else {
@@ -242,7 +262,10 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
       }
       setImageData(newImageData);
     }
-  }, [issue.id, allImagePaths.length, values.images]);
+  }, [issue.id, allImagePaths.length, values.images, values.imageType, values.altText, values.longDescription]);
+  
+  // Debounce timer ref for onChange
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   useEffect(() => {
     // Skip first render to avoid setState during mount
@@ -251,16 +274,29 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
       return;
     }
     
-    const images = allImagePaths.map((path, idx) => {
-      const data = imageData[idx] || { imageType: 'informative', altText: '', longDescription: '' };
-      return {
-        imagePath: path,
-        imageType: data.imageType,
-        altText: data.altText,
-        longDescription: data.longDescription,
-      };
-    });
-    onChangeRef.current({ images });
+    // Debounce onChange calls to reduce parent re-renders during typing
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    debounceTimerRef.current = setTimeout(() => {
+      const images = allImagePaths.map((path, idx) => {
+        const data = imageData[idx] || { imageType: 'informative', altText: '', longDescription: '' };
+        return {
+          imagePath: path,
+          imageType: data.imageType,
+          altText: data.altText,
+          longDescription: data.longDescription,
+        };
+      });
+      onChangeRef.current({ images });
+    }, 150);
+    
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
   }, [imageData, allImagePaths]);
 
   // Validate all images have required data
@@ -336,11 +372,17 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
     }
 
     const imageIdx = currentImageIndex;
+    const currentIssueId = issue.id;
     setGeneratingImages(prev => ({ ...prev, [imageIdx]: true }));
     setError(null);
 
     try {
       const result = await altTextService.generateForQuickFix(jobId, imagePath, imageType);
+      
+      // Guard against stale responses from previous issue
+      if (currentIssueId !== issueIdRef.current) {
+        return;
+      }
       
       setImageData(prev => {
         const current = prev[imageIdx];
@@ -359,10 +401,17 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
         };
       });
     } catch (err) {
+      // Guard against stale errors from previous issue
+      if (currentIssueId !== issueIdRef.current) {
+        return;
+      }
       const message = err instanceof Error ? err.message : 'Failed to generate alt text';
       setError(message);
     } finally {
-      setGeneratingImages(prev => ({ ...prev, [imageIdx]: false }));
+      // Guard against stale state updates from previous issue
+      if (currentIssueId === issueIdRef.current) {
+        setGeneratingImages(prev => ({ ...prev, [imageIdx]: false }));
+      }
     }
   };
 
