@@ -49,7 +49,8 @@ const VARIANT_CLASSES: Record<string, string> = {
 
 const MAX_ALT_TEXT_LENGTH = 125;
 
-const IMAGE_FILE_PATTERN = /(?:^|\/)([\w-]+\.(png|jpg|jpeg|gif|svg|webp))$/gi;
+// Pattern to match image filenames - no global flag to avoid stateful matching issues
+const IMAGE_FILE_PATTERN = /(?:^|\/|OEBPS\/)([\w-]+\.(png|jpg|jpeg|gif|svg|webp))$/i;
 
 interface ImageData {
   src: string;
@@ -105,12 +106,9 @@ function extractAllImagePaths(issue: QuickFixIssue): string[] {
     
     // If still no images, try to find image filename patterns (stricter pattern)
     if (images.length === 0) {
-      const imgFileMatches = elementSource.matchAll(IMAGE_FILE_PATTERN);
-      for (const match of imgFileMatches) {
-        const src = match[0];
-        if (src && !images.includes(src)) {
-          images.push(normalizeImagePath(src, issue.location));
-        }
+      const match = elementSource.match(IMAGE_FILE_PATTERN);
+      if (match && match[0] && !images.includes(match[0])) {
+        images.push(normalizeImagePath(match[0], issue.location));
       }
     }
   }
@@ -302,7 +300,7 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
         });
       }
       onChangeRef.current({ images });
-    }, 150);
+    }, 300);
     
     return () => {
       if (debounceTimerRef.current) {
@@ -377,6 +375,15 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
     }));
   }, [currentImageIndex]);
 
+  // Track component mount state for async cleanup
+  const isComponentMountedRef = useRef(true);
+  useEffect(() => {
+    isComponentMountedRef.current = true;
+    return () => {
+      isComponentMountedRef.current = false;
+    };
+  }, []);
+
   const handleGenerateClick = async () => {
     if (imageType === 'decorative') {
       updateCurrentImageData({ altText: '' });
@@ -391,8 +398,8 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
     try {
       const result = await altTextService.generateForQuickFix(jobId, imagePath, imageType);
       
-      // Guard against stale responses from previous issue
-      if (currentIssueId !== issueIdRef.current) {
+      // Guard against unmounted component and stale responses
+      if (!isComponentMountedRef.current || currentIssueId !== issueIdRef.current) {
         return;
       }
       
@@ -413,15 +420,15 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
         };
       });
     } catch (err) {
-      // Guard against stale errors from previous issue
-      if (currentIssueId !== issueIdRef.current) {
+      // Guard against unmounted component and stale errors
+      if (!isComponentMountedRef.current || currentIssueId !== issueIdRef.current) {
         return;
       }
       const message = err instanceof Error ? err.message : 'Failed to generate alt text';
       setError(message);
     } finally {
-      // Guard against stale state updates from previous issue
-      if (currentIssueId === issueIdRef.current) {
+      // Guard against unmounted component and stale state updates
+      if (isComponentMountedRef.current && currentIssueId === issueIdRef.current) {
         setGeneratingImages(prev => ({ ...prev, [imageIdx]: false }));
       }
     }
@@ -475,8 +482,10 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
               </button>
               <span 
                 className="text-sm text-gray-600"
+                role="status"
                 aria-live="polite"
                 aria-atomic="true"
+                aria-label={`Viewing image ${currentImageIndex + 1} of ${totalImages} images requiring alt text`}
               >
                 {currentImageIndex + 1} of {totalImages}
               </span>

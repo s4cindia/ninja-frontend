@@ -51,6 +51,15 @@ export const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
 
         if (controller.signal.aborted) return;
 
+        // Check for error responses (403, 404, 500 often return HTML error pages)
+        const contentType = response.headers?.['content-type'] || '';
+        if (contentType.includes('text/html') || contentType.includes('application/json')) {
+          console.error('[AuthenticatedImage] Received non-image response:', contentType);
+          setHasError(true);
+          onErrorRef.current?.();
+          return;
+        }
+
         const blob = response.data as Blob;
         
         // Validate the response is actually an image
