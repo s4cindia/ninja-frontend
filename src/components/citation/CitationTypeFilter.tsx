@@ -1,7 +1,13 @@
+import { useCallback } from 'react';
 import { Filter, X, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/utils/cn';
+import {
+  CITATION_TYPE_OPTIONS,
+  CITATION_STYLE_OPTIONS,
+  CONFIDENCE_THRESHOLDS,
+} from '@/types/citation.types';
 import type { CitationType, CitationStyle, CitationFilters } from '@/types/citation.types';
 
 interface CitationTypeFilterProps {
@@ -9,55 +15,35 @@ interface CitationTypeFilterProps {
   onFilterChange: (filters: CitationFilters) => void;
 }
 
-const CITATION_TYPES: CitationType[] = [
-  'PARENTHETICAL',
-  'NARRATIVE',
-  'FOOTNOTE',
-  'ENDNOTE',
-  'NUMERIC',
-  'UNKNOWN',
-];
-
-const CITATION_STYLES: CitationStyle[] = [
-  'APA',
-  'MLA',
-  'CHICAGO',
-  'VANCOUVER',
-  'HARVARD',
-  'IEEE',
-  'UNKNOWN',
-];
-
 const CONFIDENCE_LEVELS = [
   { label: 'All', value: undefined },
-  { label: 'High (80%+)', value: 80 },
-  { label: 'Medium (50%+)', value: 50 },
-  { label: 'Low (<50%)', value: 0 },
+  { label: `High (${CONFIDENCE_THRESHOLDS.HIGH}%+)`, value: CONFIDENCE_THRESHOLDS.HIGH },
+  { label: `Medium (${CONFIDENCE_THRESHOLDS.MEDIUM}%+)`, value: CONFIDENCE_THRESHOLDS.MEDIUM },
+  { label: `Low (<${CONFIDENCE_THRESHOLDS.MEDIUM}%)`, value: 0 },
 ];
 
 export function CitationTypeFilter({ filters, onFilterChange }: CitationTypeFilterProps) {
   const hasActiveFilters = filters.type || filters.style || filters.minConfidence || filters.needsReview;
 
-  const handleTypeChange = (type: CitationType | undefined) => {
+  const handleTypeChange = useCallback((type: CitationType | undefined) => {
     onFilterChange({ ...filters, type, page: 1 });
-  };
+  }, [filters, onFilterChange]);
 
-  const handleStyleChange = (style: CitationStyle | undefined) => {
+  const handleStyleChange = useCallback((style: CitationStyle | undefined) => {
     onFilterChange({ ...filters, style, page: 1 });
-  };
+  }, [filters, onFilterChange]);
 
-  const handleConfidenceChange = (minConfidence: number | undefined) => {
+  const handleConfidenceChange = useCallback((minConfidence: number | undefined) => {
     onFilterChange({ ...filters, minConfidence, page: 1 });
-  };
+  }, [filters, onFilterChange]);
 
-  // AC-26: Toggle needs review filter
-  const handleNeedsReviewChange = (needsReview: boolean | undefined) => {
+  const handleNeedsReviewChange = useCallback((needsReview: boolean | undefined) => {
     onFilterChange({ ...filters, needsReview, page: 1 });
-  };
+  }, [filters, onFilterChange]);
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     onFilterChange({ page: 1, limit: filters.limit });
-  };
+  }, [filters.limit, onFilterChange]);
 
   return (
     <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
@@ -94,7 +80,7 @@ export function CitationTypeFilter({ filters, onFilterChange }: CitationTypeFilt
           >
             All
           </Badge>
-          {CITATION_TYPES.map((type) => (
+          {CITATION_TYPE_OPTIONS.map((type) => (
             <Badge
               key={type}
               className={cn(
@@ -124,7 +110,7 @@ export function CitationTypeFilter({ filters, onFilterChange }: CitationTypeFilt
           >
             All
           </Badge>
-          {CITATION_STYLES.map((style) => (
+          {CITATION_STYLE_OPTIONS.map((style) => (
             <Badge
               key={style}
               className={cn(

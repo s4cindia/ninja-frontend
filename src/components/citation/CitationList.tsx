@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
+import { CONFIDENCE_THRESHOLDS } from '@/types/citation.types';
 import type { Citation, CitationType, CitationStyle } from '@/types/citation.types';
 
 interface CitationListProps {
@@ -44,9 +45,9 @@ const styleColors: Record<CitationStyle, string> = {
 };
 
 function ConfidenceBadge({ confidence }: { confidence: number }) {
-  const color = confidence >= 80
+  const color = confidence >= CONFIDENCE_THRESHOLDS.HIGH
     ? 'text-green-600'
-    : confidence >= 50
+    : confidence >= CONFIDENCE_THRESHOLDS.MEDIUM
       ? 'text-yellow-600'
       : 'text-red-600';
 

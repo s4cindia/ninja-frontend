@@ -3,7 +3,7 @@
  * Frontend types for US-4.1 (Detection) and US-4.2 (Parsing)
  */
 
-// Enums matching backend Prisma enums
+// Type aliases (must be declared before constants that reference them)
 export type CitationType =
   | 'PARENTHETICAL'
   | 'NARRATIVE'
@@ -35,6 +35,50 @@ export type SourceType =
   | 'LEGAL'
   | 'PERSONAL_COMMUNICATION'
   | 'UNKNOWN';
+
+// Confidence thresholds for display
+export const CONFIDENCE_THRESHOLDS = {
+  HIGH: 80,
+  MEDIUM: 50,
+} as const;
+
+// Citation type options for filters
+export const CITATION_TYPE_OPTIONS: CitationType[] = [
+  'PARENTHETICAL',
+  'NARRATIVE',
+  'FOOTNOTE',
+  'ENDNOTE',
+  'NUMERIC',
+  'UNKNOWN',
+];
+
+// Citation style options for filters
+export const CITATION_STYLE_OPTIONS: CitationStyle[] = [
+  'APA',
+  'MLA',
+  'CHICAGO',
+  'VANCOUVER',
+  'HARVARD',
+  'IEEE',
+  'UNKNOWN',
+];
+
+// Source type options
+export const SOURCE_TYPE_OPTIONS: SourceType[] = [
+  'JOURNAL_ARTICLE',
+  'BOOK',
+  'BOOK_CHAPTER',
+  'CONFERENCE_PAPER',
+  'WEBSITE',
+  'THESIS',
+  'REPORT',
+  'NEWSPAPER',
+  'MAGAZINE',
+  'PATENT',
+  'LEGAL',
+  'PERSONAL_COMMUNICATION',
+  'UNKNOWN',
+];
 
 // Citation from detection (US-4.1)
 export interface Citation {

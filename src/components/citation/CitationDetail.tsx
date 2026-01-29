@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X,
   Quote,
@@ -16,6 +16,7 @@ import { Tabs } from '@/components/ui/Tabs';
 import { ParsedComponentsView } from './ParsedComponentsView';
 import { useCitationComponents, useParseCitation } from '@/hooks/useCitation';
 import { cn } from '@/utils/cn';
+import { CONFIDENCE_THRESHOLDS } from '@/types/citation.types';
 import type { Citation } from '@/types/citation.types';
 
 interface CitationDetailProps {
@@ -25,6 +26,9 @@ interface CitationDetailProps {
 
 export function CitationDetail({ citation, onClose }: CitationDetailProps) {
   const [activeTab, setActiveTab] = useState<'current' | 'history'>('current');
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previousActiveElement = useRef<Element | null>(null);
 
   const {
     data: components,
@@ -33,32 +37,88 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
 
   const parseMutation = useParseCitation();
 
-  const handleParse = () => {
+  const handleParse = useCallback(() => {
     parseMutation.mutate(citation.id);
-  };
+  }, [parseMutation, citation.id]);
 
   const hasParsedComponent = !!citation.primaryComponent;
 
+  useEffect(() => {
+    previousActiveElement.current = document.activeElement;
+    closeButtonRef.current?.focus();
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = '';
+      if (previousActiveElement.current instanceof HTMLElement) {
+        previousActiveElement.current.focus();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+        return;
+      }
+
+      if (event.key === 'Tab' && panelRef.current) {
+        const focusableElements = panelRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (event.shiftKey && document.activeElement === firstElement) {
+          event.preventDefault();
+          lastElement?.focus();
+        } else if (!event.shiftKey && document.activeElement === lastElement) {
+          event.preventDefault();
+          firstElement?.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="citation-detail-title"
+    >
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/50"
         onClick={onClose}
+        aria-hidden="true"
       />
 
       {/* Panel */}
-      <div className="fixed inset-y-0 right-0 w-full max-w-2xl bg-white shadow-xl">
+      <div
+        ref={panelRef}
+        className="fixed inset-y-0 right-0 w-full max-w-2xl bg-white shadow-xl"
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center gap-2">
-            <Quote className="h-5 w-5 text-blue-600" />
-            <h2 className="text-lg font-semibold text-gray-900">
+            <Quote className="h-5 w-5 text-blue-600" aria-hidden="true" />
+            <h2 id="citation-detail-title" className="text-lg font-semibold text-gray-900">
               Citation Details
             </h2>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <X className="h-5 w-5" />
+          <Button
+            ref={closeButtonRef}
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            aria-label="Close citation details"
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
           </Button>
         </div>
 
@@ -84,8 +144,8 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
                 </Badge>
               )}
               <Badge className={cn(
-                citation.confidence >= 80 ? 'bg-green-100 text-green-800' :
-                citation.confidence >= 50 ? 'bg-yellow-100 text-yellow-800' :
+                citation.confidence >= CONFIDENCE_THRESHOLDS.HIGH ? 'bg-green-100 text-green-800' :
+                citation.confidence >= CONFIDENCE_THRESHOLDS.MEDIUM ? 'bg-yellow-100 text-yellow-800' :
                 'bg-red-100 text-red-800'
               )}>
                 {citation.confidence}% confidence
