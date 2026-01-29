@@ -5,9 +5,9 @@ export { ReportExporter, default as ReportExporterDefault } from './ReportExport
 export type {
   UploadedFile,
   FileUploaderProps,
-  SupportedFormat,
 } from './FileUploader';
-export { SUPPORTED_FORMATS } from './FileUploader';
+export { SUPPORTED_FORMATS } from './fileFormats';
+export type { SupportedFormat } from './fileFormats';
 
 export type {
   ProgressIndicatorProps,
