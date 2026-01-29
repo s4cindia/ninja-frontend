@@ -174,7 +174,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
       setFiles(prev => prev.map(f => 
         f.id === uploadedFile.id ? { ...f, status: 'success' as const, progress: 100, url } : f
       ));
-      onUploadComplete?.({ ...uploadedFile, status: 'success', url });
+      onUploadComplete?.({ ...uploadedFile, status: 'success', progress: 100, url });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Upload failed';
       setFiles(prev => prev.map(f => 
