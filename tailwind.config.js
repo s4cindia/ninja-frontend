@@ -20,6 +20,20 @@ export default {
           900: '#0c4a6e',
         },
       },
+      animation: {
+        'indeterminate': 'indeterminate 1.5s infinite ease-in-out',
+        'circular-progress': 'circular-progress 1.4s linear infinite',
+      },
+      keyframes: {
+        indeterminate: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(400%)' },
+        },
+        'circular-progress': {
+          '0%': { transform: 'rotate(0deg)' },
+          '100%': { transform: 'rotate(360deg)' },
+        },
+      },
     },
   },
   plugins: [],
