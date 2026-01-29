@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   isPdfAuditStatus,
   isMatterhornCheckpointStatus,
+  isIssueSeverity,
+  isMatterhornSummary,
   isPdfMetadata,
   isPdfAuditIssue,
   isPdfAuditResult,
@@ -14,6 +16,7 @@ import {
   type PdfAuditResult,
   type PdfAuditResponse,
   type PdfAuditListResponse,
+  type MatterhornSummary,
 } from '../pdf.types';
 
 describe('pdf.types', () => {
@@ -66,6 +69,88 @@ describe('pdf.types', () => {
       expect(isMatterhornCheckpointStatus(null)).toBe(false);
       expect(isMatterhornCheckpointStatus(undefined)).toBe(false);
       expect(isMatterhornCheckpointStatus(123)).toBe(false);
+    });
+  });
+
+  describe('isIssueSeverity', () => {
+    it('returns true for valid severity levels', () => {
+      expect(isIssueSeverity('critical')).toBe(true);
+      expect(isIssueSeverity('serious')).toBe(true);
+      expect(isIssueSeverity('moderate')).toBe(true);
+      expect(isIssueSeverity('minor')).toBe(true);
+    });
+
+    it('returns false for invalid severity levels', () => {
+      expect(isIssueSeverity('invalid')).toBe(false);
+      expect(isIssueSeverity('major')).toBe(false);
+      expect(isIssueSeverity('CRITICAL')).toBe(false);
+      expect(isIssueSeverity('')).toBe(false);
+    });
+
+    it('returns false for non-string values', () => {
+      expect(isIssueSeverity(null)).toBe(false);
+      expect(isIssueSeverity(undefined)).toBe(false);
+      expect(isIssueSeverity(123)).toBe(false);
+      expect(isIssueSeverity({})).toBe(false);
+    });
+  });
+
+  describe('isMatterhornSummary', () => {
+    it('returns true for valid MatterhornSummary', () => {
+      const validSummary: MatterhornSummary = {
+        totalCheckpoints: 100,
+        passed: 85,
+        failed: 10,
+        notApplicable: 5,
+        categories: [],
+      };
+      expect(isMatterhornSummary(validSummary)).toBe(true);
+    });
+
+    it('returns true for MatterhornSummary with categories', () => {
+      const validSummary: MatterhornSummary = {
+        totalCheckpoints: 100,
+        passed: 85,
+        failed: 10,
+        notApplicable: 5,
+        categories: [
+          {
+            id: '01',
+            name: 'Document',
+            checkpoints: [],
+          },
+        ],
+      };
+      expect(isMatterhornSummary(validSummary)).toBe(true);
+    });
+
+    it('returns false for missing required fields', () => {
+      expect(isMatterhornSummary({})).toBe(false);
+      expect(isMatterhornSummary({ totalCheckpoints: 100 })).toBe(false);
+      expect(isMatterhornSummary({ totalCheckpoints: 100, passed: 85 })).toBe(false);
+    });
+
+    it('returns false for invalid field types', () => {
+      expect(isMatterhornSummary({
+        totalCheckpoints: '100',
+        passed: 85,
+        failed: 10,
+        notApplicable: 5,
+        categories: [],
+      })).toBe(false);
+
+      expect(isMatterhornSummary({
+        totalCheckpoints: 100,
+        passed: 85,
+        failed: 10,
+        notApplicable: 5,
+        categories: 'not-array',
+      })).toBe(false);
+    });
+
+    it('returns false for null or undefined', () => {
+      expect(isMatterhornSummary(null)).toBe(false);
+      expect(isMatterhornSummary(undefined)).toBe(false);
     });
   });
 
@@ -152,6 +237,53 @@ describe('pdf.types', () => {
       expect(isPdfAuditIssue({ id: 'issue-123', ruleId: 'rule-001' })).toBe(false);
     });
 
+    it('returns false for invalid severity', () => {
+      expect(isPdfAuditIssue({
+        id: 'issue-123',
+        ruleId: 'rule-001',
+        severity: 'invalid',
+        message: 'Test',
+        description: 'Test',
+      })).toBe(false);
+
+      expect(isPdfAuditIssue({
+        id: 'issue-123',
+        ruleId: 'rule-001',
+        severity: 'CRITICAL',
+        message: 'Test',
+        description: 'Test',
+      })).toBe(false);
+    });
+
+    it('returns false for invalid optional field types', () => {
+      expect(isPdfAuditIssue({
+        id: 'issue-123',
+        ruleId: 'rule-001',
+        severity: 'critical',
+        message: 'Test',
+        description: 'Test',
+        pageNumber: 'five',
+      })).toBe(false);
+
+      expect(isPdfAuditIssue({
+        id: 'issue-123',
+        ruleId: 'rule-001',
+        severity: 'critical',
+        message: 'Test',
+        description: 'Test',
+        wcagCriteria: 'not-array',
+      })).toBe(false);
+
+      expect(isPdfAuditIssue({
+        id: 'issue-123',
+        ruleId: 'rule-001',
+        severity: 'critical',
+        message: 'Test',
+        description: 'Test',
+        wcagCriteria: [1, 2, 3],
+      })).toBe(false);
+    });
+
     it('returns false for invalid field types', () => {
       expect(isPdfAuditIssue({
         id: 123,
@@ -219,6 +351,30 @@ describe('pdf.types', () => {
 
     it('returns false for invalid metadata', () => {
       const invalidResult = { ...validResult, metadata: {} };
+      expect(isPdfAuditResult(invalidResult)).toBe(false);
+    });
+
+    it('returns false for invalid matterhornSummary', () => {
+      const invalidResult = { ...validResult, matterhornSummary: {} };
+      expect(isPdfAuditResult(invalidResult)).toBe(false);
+
+      const invalidResult2 = { ...validResult, matterhornSummary: { totalCheckpoints: 100 } };
+      expect(isPdfAuditResult(invalidResult2)).toBe(false);
+    });
+
+    it('returns false for invalid issues array', () => {
+      const invalidResult = { ...validResult, issues: 'not-array' };
+      expect(isPdfAuditResult(invalidResult)).toBe(false);
+
+      const invalidResult2 = {
+        ...validResult,
+        issues: [{ id: 'test', invalid: true }],
+      };
+      expect(isPdfAuditResult(invalidResult2)).toBe(false);
+    });
+
+    it('returns false for invalid optional completedAt', () => {
+      const invalidResult = { ...validResult, completedAt: 123 };
       expect(isPdfAuditResult(invalidResult)).toBe(false);
     });
 
@@ -387,6 +543,34 @@ describe('pdf.types', () => {
         success: true,
         data: validResult,
         pagination: { total: 1, page: 1, limit: 10 },
+      })).toBe(false);
+    });
+
+    it('returns false for invalid pagination fields', () => {
+      expect(isPdfAuditListResponse({
+        success: true,
+        data: [validResult],
+        pagination: { total: '1', page: 1, limit: 10 },
+      })).toBe(false);
+
+      expect(isPdfAuditListResponse({
+        success: true,
+        data: [validResult],
+        pagination: { total: 1, page: 1 }, // missing limit
+      })).toBe(false);
+    });
+
+    it('returns false for invalid data array items', () => {
+      expect(isPdfAuditListResponse({
+        success: true,
+        data: [{ invalid: 'item' }],
+        pagination: { total: 1, page: 1, limit: 10 },
+      })).toBe(false);
+
+      expect(isPdfAuditListResponse({
+        success: true,
+        data: [validResult, { id: 'invalid' }],
+        pagination: { total: 2, page: 1, limit: 10 },
       })).toBe(false);
     });
 

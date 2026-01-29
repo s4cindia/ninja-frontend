@@ -234,6 +234,16 @@ export function isMatterhornCheckpointStatus(value: unknown): value is Matterhor
 }
 
 /**
+ * Type guard to check if a value is a valid IssueSeverity
+ */
+export function isIssueSeverity(value: unknown): value is IssueSeverity {
+  return (
+    typeof value === 'string' &&
+    (value === 'critical' || value === 'serious' || value === 'moderate' || value === 'minor')
+  );
+}
+
+/**
  * Type guard to validate PdfMetadata structure
  */
 export function isPdfMetadata(value: unknown): value is PdfMetadata {
@@ -247,18 +257,51 @@ export function isPdfMetadata(value: unknown): value is PdfMetadata {
 }
 
 /**
+ * Type guard to validate MatterhornSummary structure
+ */
+export function isMatterhornSummary(value: unknown): value is MatterhornSummary {
+  if (typeof value !== 'object' || value === null) return false;
+  const obj = value as Record<string, unknown>;
+  return (
+    typeof obj.totalCheckpoints === 'number' &&
+    typeof obj.passed === 'number' &&
+    typeof obj.failed === 'number' &&
+    typeof obj.notApplicable === 'number' &&
+    Array.isArray(obj.categories)
+  );
+}
+
+/**
  * Type guard to validate PdfAuditIssue structure
  */
 export function isPdfAuditIssue(value: unknown): value is PdfAuditIssue {
   if (typeof value !== 'object' || value === null) return false;
   const obj = value as Record<string, unknown>;
-  return (
-    typeof obj.id === 'string' &&
-    typeof obj.ruleId === 'string' &&
-    typeof obj.severity === 'string' &&
-    typeof obj.message === 'string' &&
-    typeof obj.description === 'string'
-  );
+
+  // Validate required fields
+  if (
+    typeof obj.id !== 'string' ||
+    typeof obj.ruleId !== 'string' ||
+    !isIssueSeverity(obj.severity) ||
+    typeof obj.message !== 'string' ||
+    typeof obj.description !== 'string'
+  ) {
+    return false;
+  }
+
+  // Validate optional fields when present
+  if (obj.pageNumber !== undefined && typeof obj.pageNumber !== 'number') return false;
+  if (obj.elementPath !== undefined && typeof obj.elementPath !== 'string') return false;
+  if (obj.matterhornCheckpoint !== undefined && typeof obj.matterhornCheckpoint !== 'string') return false;
+  if (obj.suggestedFix !== undefined && typeof obj.suggestedFix !== 'string') return false;
+
+  // Validate wcagCriteria is array of strings when present
+  if (obj.wcagCriteria !== undefined) {
+    if (!Array.isArray(obj.wcagCriteria)) return false;
+    if (!obj.wcagCriteria.every((item) => typeof item === 'string')) return false;
+  }
+
+  return true;
 }
 
 /**
@@ -267,19 +310,31 @@ export function isPdfAuditIssue(value: unknown): value is PdfAuditIssue {
 export function isPdfAuditResult(value: unknown): value is PdfAuditResult {
   if (typeof value !== 'object' || value === null) return false;
   const obj = value as Record<string, unknown>;
-  return (
-    typeof obj.id === 'string' &&
-    typeof obj.jobId === 'string' &&
-    typeof obj.fileName === 'string' &&
-    typeof obj.fileSize === 'number' &&
-    typeof obj.pageCount === 'number' &&
-    typeof obj.score === 'number' &&
-    isPdfAuditStatus(obj.status) &&
-    typeof obj.createdAt === 'string' &&
-    Array.isArray(obj.issues) &&
-    typeof obj.matterhornSummary === 'object' &&
-    isPdfMetadata(obj.metadata)
-  );
+
+  // Validate required fields
+  if (
+    typeof obj.id !== 'string' ||
+    typeof obj.jobId !== 'string' ||
+    typeof obj.fileName !== 'string' ||
+    typeof obj.fileSize !== 'number' ||
+    typeof obj.pageCount !== 'number' ||
+    typeof obj.score !== 'number' ||
+    !isPdfAuditStatus(obj.status) ||
+    typeof obj.createdAt !== 'string' ||
+    !isPdfMetadata(obj.metadata) ||
+    !isMatterhornSummary(obj.matterhornSummary)
+  ) {
+    return false;
+  }
+
+  // Validate issues array and its elements
+  if (!Array.isArray(obj.issues)) return false;
+  if (!obj.issues.every((issue) => isPdfAuditIssue(issue))) return false;
+
+  // Validate optional completedAt field
+  if (obj.completedAt !== undefined && typeof obj.completedAt !== 'string') return false;
+
+  return true;
 }
 
 /**
@@ -313,11 +368,22 @@ export function isPdfAuditListResponse(value: unknown): value is PdfAuditListRes
   const obj = value as Record<string, unknown>;
 
   if (obj.success === true) {
-    return (
-      Array.isArray(obj.data) &&
-      typeof obj.pagination === 'object' &&
-      obj.pagination !== null
-    );
+    // Validate data array
+    if (!Array.isArray(obj.data)) return false;
+    if (!obj.data.every((item) => isPdfAuditResult(item))) return false;
+
+    // Validate pagination object structure
+    if (typeof obj.pagination !== 'object' || obj.pagination === null) return false;
+    const pagination = obj.pagination as Record<string, unknown>;
+    if (
+      typeof pagination.total !== 'number' ||
+      typeof pagination.page !== 'number' ||
+      typeof pagination.limit !== 'number'
+    ) {
+      return false;
+    }
+
+    return true;
   }
 
   if (obj.success === false) {
