@@ -159,3 +159,8 @@ export function TabsContent({ value, children, className }: TabsContentProps) {
     </div>
   );
 }
+
+// Compound component pattern for alternative API
+Tabs.List = TabsList;
+Tabs.Trigger = TabsTrigger;
+Tabs.Content = TabsContent;
