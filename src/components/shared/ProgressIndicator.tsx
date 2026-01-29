@@ -107,7 +107,10 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
               cy={circleSize / 2}
             />
             <circle
-              className={clsx(colorConfig.strokeFill, 'transition-all duration-300')}
+              className={clsx(
+                colorConfig.strokeFill,
+                indeterminate ? 'animate-circular-progress origin-center' : 'transition-all duration-300'
+              )}
               strokeWidth={strokeWidth}
               strokeLinecap="round"
               fill="transparent"
@@ -117,6 +120,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
               style={{
                 strokeDasharray: circumference,
                 strokeDashoffset: indeterminate ? circumference * 0.75 : offset,
+                transformOrigin: 'center',
               }}
             />
           </svg>

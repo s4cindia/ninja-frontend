@@ -95,10 +95,14 @@ export const ReportExporter: React.FC<ReportExporterProps> = ({
 
   const getFilename = (format: ExportFormat): string => {
     const sanitizedTitle = reportTitle
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
+      .split('')
+      .filter(char => char.charCodeAt(0) > 31)
+      .join('')
+      .replace(/[<>:"/\\|?*]/g, '')
+      .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '');
+      .replace(/^-|-$/g, '')
+      .slice(0, 100);
     const timestamp = new Date().toISOString().split('T')[0];
     return `${sanitizedTitle}-${timestamp}.${format}`;
   };

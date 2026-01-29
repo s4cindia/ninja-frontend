@@ -190,7 +190,8 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
 
   const handleUploadAll = useCallback(() => {
     setFiles(currentFiles => {
-      currentFiles.filter(f => f.status === 'pending').forEach(handleUpload);
+      const pendingFiles = currentFiles.filter(f => f.status === 'pending');
+      setTimeout(() => pendingFiles.forEach(handleUpload), 0);
       return currentFiles;
     });
   }, [handleUpload]);
@@ -324,6 +325,10 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
               Upload All ({files.filter(f => f.status === 'pending').length} files)
             </button>
           )}
+          
+          <div aria-live="polite" aria-atomic="true" className="sr-only">
+            {files.filter(f => f.status === 'error').map(f => f.error).join('. ')}
+          </div>
         </div>
       )}
     </div>
