@@ -48,6 +48,8 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const onFilesSelectedRef = useRef(onFilesSelected);
+  onFilesSelectedRef.current = onFilesSelected;
 
   const generateId = () => `file-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 
@@ -104,11 +106,11 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
         };
       });
 
-      const updated = multiple ? [...prevFiles, ...newFiles] : newFiles.slice(0, 1);
-      onFilesSelected?.(newFiles);
-      return updated;
+      const updatedFiles = multiple ? [...prevFiles, ...newFiles] : newFiles.slice(0, 1);
+      onFilesSelectedRef.current?.(updatedFiles);
+      return updatedFiles;
     });
-  }, [multiple, maxFiles, validateFile, onFilesSelected]);
+  }, [multiple, maxFiles, validateFile]);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -190,7 +192,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
     .map(f => SUPPORTED_FORMATS[f].extension)
     .join(',');
 
-  const StatusIcon: React.FC<{ status: UploadedFile['status'] }> = ({ status }) => {
+  const renderStatusIcon = (status: UploadedFile['status']) => {
     switch (status) {
       case 'pending':
         return <Upload className="w-4 h-4 text-gray-400" aria-label="Pending" />;
@@ -262,7 +264,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
                 file.status === 'error' ? 'border-red-200 bg-red-50' : 'border-gray-200 bg-gray-50'
               )}
             >
-              <StatusIcon status={file.status} />
+              {renderStatusIcon(file.status)}
               
               <div className="ml-3 flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-700 truncate">

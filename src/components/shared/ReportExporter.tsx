@@ -14,7 +14,6 @@ export interface ExportOption {
 }
 
 export interface ReportExporterProps {
-  reportId: string;
   reportTitle: string;
   formats?: ExportFormat[];
   options?: ExportOption[];
@@ -86,6 +85,8 @@ export const ReportExporter: React.FC<ReportExporterProps> = ({
     enabled: true,
   }));
 
+  const enabledOptions = exportOptions.filter(o => o.enabled);
+
   const getFilename = (format: ExportFormat): string => {
     const sanitizedTitle = reportTitle
       .toLowerCase()
@@ -153,34 +154,86 @@ export const ReportExporter: React.FC<ReportExporterProps> = ({
     }
   };
 
-  const ButtonVariant = () => (
-    <div className={clsx('flex flex-wrap gap-2', className)} role="group" aria-label="Export options">
-      {exportOptions.filter(o => o.enabled).map(option => (
-        <button
-          key={option.format}
-          type="button"
-          onClick={() => handleExport(option.format)}
-          disabled={disabled || !!exporting}
-          aria-busy={exporting === option.format}
-          className={clsx(
-            'px-4 py-2 rounded-lg border flex items-center gap-2',
-            'transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
-            disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50',
-            exporting === option.format ? 'bg-blue-50 border-blue-300' : 'border-gray-300'
-          )}
-        >
-          {exporting === option.format ? (
-            <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <span aria-hidden="true">{option.icon}</span>
-          )}
-          <span>{exporting === option.format ? 'Exporting...' : option.label}</span>
-        </button>
-      ))}
-    </div>
-  );
+  const getShareFormat = (): ExportFormat => {
+    if (formats.length > 0) return formats[0];
+    if (enabledOptions.length > 0) return enabledOptions[0].format;
+    return 'pdf';
+  };
 
-  const DropdownVariant = () => (
+  if (variant === 'button') {
+    return (
+      <div className={clsx('flex flex-wrap gap-2', className)} role="group" aria-label="Export options">
+        {enabledOptions.map(option => (
+          <button
+            key={option.format}
+            type="button"
+            onClick={() => handleExport(option.format)}
+            disabled={disabled || !!exporting}
+            aria-busy={exporting === option.format}
+            className={clsx(
+              'px-4 py-2 rounded-lg border flex items-center gap-2',
+              'transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+              disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50',
+              exporting === option.format ? 'bg-blue-50 border-blue-300' : 'border-gray-300'
+            )}
+          >
+            {exporting === option.format ? (
+              <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <span aria-hidden="true">{option.icon}</span>
+            )}
+            <span>{exporting === option.format ? 'Exporting...' : option.label}</span>
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  if (variant === 'card') {
+    return (
+      <div className={clsx('p-4 bg-white rounded-lg border', className)}>
+        <h3 className="font-medium text-gray-900 mb-3">Export Report</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Download "{reportTitle}" in your preferred format
+        </p>
+        
+        <div className="grid grid-cols-2 gap-2" role="group" aria-label="Export format options">
+          {enabledOptions.map(option => (
+            <button
+              key={option.format}
+              type="button"
+              onClick={() => handleExport(option.format)}
+              disabled={disabled || !!exporting}
+              aria-busy={exporting === option.format}
+              className={clsx(
+                'p-3 rounded-lg border text-center',
+                'transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+                disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 hover:border-blue-300',
+                exporting === option.format ? 'bg-blue-50 border-blue-300' : 'border-gray-200'
+              )}
+            >
+              <div className="flex justify-center mb-1" aria-hidden="true">
+                {exporting === option.format ? (
+                  <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+                ) : (
+                  <span className="text-gray-600">{option.icon}</span>
+                )}
+              </div>
+              <div className="text-sm font-medium">
+                {exporting === option.format ? 'Exporting...' : option.label}
+              </div>
+            </button>
+          ))}
+        </div>
+        
+        {error && (
+          <p className="mt-3 text-sm text-red-500" role="alert">{error}</p>
+        )}
+      </div>
+    );
+  }
+
+  return (
     <div className={clsx('relative', className)} ref={dropdownRef}>
       <button
         type="button"
@@ -206,7 +259,7 @@ export const ReportExporter: React.FC<ReportExporterProps> = ({
           aria-orientation="vertical"
         >
           <div className="py-1">
-            {exportOptions.filter(o => o.enabled).map(option => (
+            {enabledOptions.map(option => (
               <button
                 key={option.format}
                 type="button"
@@ -240,7 +293,7 @@ export const ReportExporter: React.FC<ReportExporterProps> = ({
                 <div className="border-t my-1" role="separator" />
                 <button
                   type="button"
-                  onClick={() => handleShare(exportOptions[0]?.format || 'pdf')}
+                  onClick={() => handleShare(getShareFormat())}
                   role="menuitem"
                   className="w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-gray-50 focus:outline-none focus:bg-gray-100"
                 >
@@ -260,55 +313,5 @@ export const ReportExporter: React.FC<ReportExporterProps> = ({
         <p className="mt-2 text-sm text-red-500" role="alert">{error}</p>
       )}
     </div>
-  );
-
-  const CardVariant = () => (
-    <div className={clsx('p-4 bg-white rounded-lg border', className)}>
-      <h3 className="font-medium text-gray-900 mb-3">Export Report</h3>
-      <p className="text-sm text-gray-500 mb-4">
-        Download "{reportTitle}" in your preferred format
-      </p>
-      
-      <div className="grid grid-cols-2 gap-2" role="group" aria-label="Export format options">
-        {exportOptions.filter(o => o.enabled).map(option => (
-          <button
-            key={option.format}
-            type="button"
-            onClick={() => handleExport(option.format)}
-            disabled={disabled || !!exporting}
-            aria-busy={exporting === option.format}
-            className={clsx(
-              'p-3 rounded-lg border text-center',
-              'transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
-              disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 hover:border-blue-300',
-              exporting === option.format ? 'bg-blue-50 border-blue-300' : 'border-gray-200'
-            )}
-          >
-            <div className="flex justify-center mb-1" aria-hidden="true">
-              {exporting === option.format ? (
-                <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
-              ) : (
-                <span className="text-gray-600">{option.icon}</span>
-              )}
-            </div>
-            <div className="text-sm font-medium">
-              {exporting === option.format ? 'Exporting...' : option.label}
-            </div>
-          </button>
-        ))}
-      </div>
-      
-      {error && (
-        <p className="mt-3 text-sm text-red-500" role="alert">{error}</p>
-      )}
-    </div>
-  );
-
-  return (
-    <>
-      {variant === 'button' && <ButtonVariant />}
-      {variant === 'dropdown' && <DropdownVariant />}
-      {variant === 'card' && <CardVariant />}
-    </>
   );
 };
