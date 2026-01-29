@@ -1,4 +1,6 @@
 import React from 'react';
+import { clsx } from 'clsx';
+import { Check, X, Loader2 } from 'lucide-react';
 
 export type ProgressVariant = 'linear' | 'circular' | 'steps';
 export type ProgressStatus = 'idle' | 'active' | 'success' | 'error' | 'warning';
@@ -58,29 +60,29 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
     <div className="w-full" role="progressbar" aria-valuenow={indeterminate ? undefined : value} aria-valuemin={0} aria-valuemax={100} aria-label={label || 'Progress'}>
       {(label || showPercentage) && (
         <div className="flex justify-between mb-1">
-          {label && <span className={`${sizeConfig.text} font-medium text-gray-700`}>{label}</span>}
+          {label && <span className={clsx(sizeConfig.text, 'font-medium text-gray-700')}>{label}</span>}
           {showPercentage && !indeterminate && (
-            <span className={`${sizeConfig.text} ${colorConfig.text}`}>{Math.round(value)}%</span>
+            <span className={clsx(sizeConfig.text, colorConfig.text)}>{Math.round(value)}%</span>
           )}
         </div>
       )}
       
-      <div className={`w-full ${colorConfig.bg} rounded-full ${sizeConfig.bar} overflow-hidden`}>
+      <div className={clsx('w-full rounded-full overflow-hidden', colorConfig.bg, sizeConfig.bar)}>
         {indeterminate ? (
           <div 
-            className={`${sizeConfig.bar} ${colorConfig.fill} rounded-full animate-indeterminate`}
+            className={clsx(sizeConfig.bar, colorConfig.fill, 'rounded-full animate-indeterminate')}
             style={{ width: '30%' }}
           />
         ) : (
           <div
-            className={`${sizeConfig.bar} ${colorConfig.fill} rounded-full transition-all duration-300`}
+            className={clsx(sizeConfig.bar, colorConfig.fill, 'rounded-full transition-all duration-300')}
             style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
           />
         )}
       </div>
       
       {description && (
-        <p className={`mt-1 ${sizeConfig.text} text-gray-500`}>{description}</p>
+        <p className={clsx('mt-1 text-gray-500', sizeConfig.text)}>{description}</p>
       )}
     </div>
   );
@@ -105,7 +107,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
               cy={circleSize / 2}
             />
             <circle
-              className={`${colorConfig.strokeFill} transition-all duration-300`}
+              className={clsx(colorConfig.strokeFill, 'transition-all duration-300')}
               strokeWidth={strokeWidth}
               strokeLinecap="round"
               fill="transparent"
@@ -121,7 +123,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
           
           {showPercentage && !indeterminate && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className={`${sizeConfig.text} font-semibold ${colorConfig.text}`}>
+              <span className={clsx(sizeConfig.text, 'font-semibold', colorConfig.text)}>
                 {Math.round(value)}%
               </span>
             </div>
@@ -129,16 +131,16 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
           
           {indeterminate && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="animate-spin" aria-hidden="true">⏳</span>
+              <Loader2 className="w-6 h-6 animate-spin text-blue-500" aria-hidden="true" />
             </div>
           )}
         </div>
         
         {label && (
-          <span className={`mt-2 ${sizeConfig.text} font-medium text-gray-700`}>{label}</span>
+          <span className={clsx('mt-2 font-medium text-gray-700', sizeConfig.text)}>{label}</span>
         )}
         {description && (
-          <span className={`${sizeConfig.text} text-gray-500`}>{description}</span>
+          <span className={clsx('text-gray-500', sizeConfig.text)}>{description}</span>
         )}
       </div>
     );
@@ -150,7 +152,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
     return (
       <div className="w-full" role="list" aria-label={label || 'Progress steps'}>
         {label && (
-          <h3 className={`${sizeConfig.text} font-medium text-gray-700 mb-4`}>{label}</h3>
+          <h3 className={clsx(sizeConfig.text, 'font-medium text-gray-700 mb-4')}>{label}</h3>
         )}
         
         <div className="relative">
@@ -163,36 +165,37 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
               <div key={step.id} className="flex items-start mb-4 last:mb-0" role="listitem">
                 <div className="flex flex-col items-center mr-4">
                   <div
-                    className={`
-                      ${sizeConfig.stepIcon} rounded-full flex items-center justify-center
-                      font-medium ${sizeConfig.text}
-                      ${isCompleted ? 'bg-green-500 text-white' : ''}
-                      ${isActive && !isCompleted ? 'bg-blue-500 text-white' : ''}
-                      ${isError ? 'bg-red-500 text-white' : ''}
-                      ${!isCompleted && !isActive && !isError ? 'bg-gray-200 text-gray-500' : ''}
-                    `}
+                    className={clsx(
+                      sizeConfig.stepIcon,
+                      'rounded-full flex items-center justify-center font-medium',
+                      sizeConfig.text,
+                      isCompleted && 'bg-green-500 text-white',
+                      isActive && !isCompleted && 'bg-blue-500 text-white',
+                      isError && 'bg-red-500 text-white',
+                      !isCompleted && !isActive && !isError && 'bg-gray-200 text-gray-500'
+                    )}
                     aria-label={isCompleted ? 'Completed' : isError ? 'Error' : isActive ? 'In progress' : 'Pending'}
                   >
-                    {isCompleted ? '✓' : isError ? '✗' : index + 1}
+                    {isCompleted ? <Check className="w-4 h-4" /> : isError ? <X className="w-4 h-4" /> : index + 1}
                   </div>
                   
                   {index < displaySteps.length - 1 && (
                     <div
-                      className={`
-                        w-0.5 h-8 mt-2
-                        ${isCompleted ? 'bg-green-500' : 'bg-gray-200'}
-                      `}
+                      className={clsx(
+                        'w-0.5 h-8 mt-2',
+                        isCompleted ? 'bg-green-500' : 'bg-gray-200'
+                      )}
                       aria-hidden="true"
                     />
                   )}
                 </div>
                 
                 <div className="flex-1 pt-1">
-                  <p className={`${sizeConfig.text} font-medium ${isActive ? 'text-gray-900' : 'text-gray-600'}`}>
+                  <p className={clsx(sizeConfig.text, 'font-medium', isActive ? 'text-gray-900' : 'text-gray-600')}>
                     {step.label}
                   </p>
                   {step.description && (
-                    <p className={`${sizeConfig.text} text-gray-500 mt-0.5`}>
+                    <p className={clsx(sizeConfig.text, 'text-gray-500 mt-0.5')}>
                       {step.description}
                     </p>
                   )}
@@ -203,7 +206,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
         </div>
         
         {description && (
-          <p className={`mt-4 ${sizeConfig.text} text-gray-500`}>{description}</p>
+          <p className={clsx('mt-4 text-gray-500', sizeConfig.text)}>{description}</p>
         )}
       </div>
     );
@@ -217,5 +220,3 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
     </div>
   );
 };
-
-export default ProgressIndicator;

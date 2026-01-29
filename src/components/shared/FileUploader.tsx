@@ -1,4 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
+import { clsx } from 'clsx';
+import toast from 'react-hot-toast';
+import { FileText, Upload, Check, X, Loader2 } from 'lucide-react';
 import { SUPPORTED_FORMATS, SupportedFormat } from './fileFormats';
 
 export interface UploadedFile {
@@ -46,7 +49,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const generateId = () => `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const generateId = () => `file-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 
   const detectFormat = (file: File): SupportedFormat | 'UNKNOWN' => {
     const extension = file.name.toLowerCase().split('.').pop();
@@ -81,33 +84,31 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
   const handleFiles = useCallback((selectedFiles: FileList | File[]) => {
     const fileArray = Array.from(selectedFiles);
     
-    if (multiple && files.length + fileArray.length > maxFiles) {
-      alert(`Maximum ${maxFiles} files allowed`);
-      return;
-    }
+    setFiles(prevFiles => {
+      if (multiple && prevFiles.length + fileArray.length > maxFiles) {
+        toast.error(`Maximum ${maxFiles} files allowed`);
+        return prevFiles;
+      }
 
-    const newFiles: UploadedFile[] = fileArray.map(file => {
-      const error = validateFile(file);
-      return {
-        id: generateId(),
-        file,
-        name: file.name,
-        size: file.size,
-        format: detectFormat(file),
-        status: error ? 'error' : 'pending',
-        progress: 0,
-        error: error || undefined,
-      };
+      const newFiles: UploadedFile[] = fileArray.map(file => {
+        const error = validateFile(file);
+        return {
+          id: generateId(),
+          file,
+          name: file.name,
+          size: file.size,
+          format: detectFormat(file),
+          status: error ? 'error' : 'pending',
+          progress: 0,
+          error: error || undefined,
+        };
+      });
+
+      const updated = multiple ? [...prevFiles, ...newFiles] : newFiles.slice(0, 1);
+      onFilesSelected?.(newFiles);
+      return updated;
     });
-
-    if (multiple) {
-      setFiles(prev => [...prev, ...newFiles]);
-    } else {
-      setFiles(newFiles.slice(0, 1));
-    }
-
-    onFilesSelected?.(newFiles);
-  }, [files.length, multiple, maxFiles, validateFile, onFilesSelected]);
+  }, [multiple, maxFiles, validateFile, onFilesSelected]);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -192,18 +193,18 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
   const StatusIcon: React.FC<{ status: UploadedFile['status'] }> = ({ status }) => {
     switch (status) {
       case 'pending':
-        return <span className="text-gray-400" aria-label="Pending">○</span>;
+        return <Upload className="w-4 h-4 text-gray-400" aria-label="Pending" />;
       case 'uploading':
-        return <span className="text-blue-500 animate-spin" aria-label="Uploading">↻</span>;
+        return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" aria-label="Uploading" />;
       case 'success':
-        return <span className="text-green-500" aria-label="Success">✓</span>;
+        return <Check className="w-4 h-4 text-green-500" aria-label="Success" />;
       case 'error':
-        return <span className="text-red-500" aria-label="Error">✗</span>;
+        return <X className="w-4 h-4 text-red-500" aria-label="Error" />;
     }
   };
 
   return (
-    <div className={`w-full ${className}`}>
+    <div className={clsx('w-full', className)}>
       <div
         onClick={handleClick}
         onDragEnter={handleDragEnter}
@@ -220,12 +221,12 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
         }}
         aria-label={`File upload area. ${isDragging ? 'Drop files here' : 'Click or drag files to upload'}. Accepted formats: ${acceptedFormats.join(', ')}. Maximum size: ${formatSize(maxFileSize)}`}
         aria-disabled={disabled}
-        className={`
-          border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
-          transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
-          ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'}
-          ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
-        `}
+        className={clsx(
+          'border-2 border-dashed rounded-lg p-8 text-center cursor-pointer',
+          'transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+          isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400',
+          disabled && 'opacity-50 cursor-not-allowed'
+        )}
       >
         <input
           ref={fileInputRef}
@@ -238,7 +239,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
           aria-hidden="true"
         />
         
-        <div className="text-4xl mb-2" aria-hidden="true">📄</div>
+        <FileText className="w-12 h-12 mx-auto mb-2 text-gray-400" aria-hidden="true" />
         <p className="text-gray-600 mb-1">
           {isDragging ? 'Drop files here' : 'Drag & drop files here'}
         </p>
@@ -256,10 +257,10 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
             <div
               key={file.id}
               role="listitem"
-              className={`
-                flex items-center p-3 rounded-lg border
-                ${file.status === 'error' ? 'border-red-200 bg-red-50' : 'border-gray-200 bg-gray-50'}
-              `}
+              className={clsx(
+                'flex items-center p-3 rounded-lg border',
+                file.status === 'error' ? 'border-red-200 bg-red-50' : 'border-gray-200 bg-gray-50'
+              )}
             >
               <StatusIcon status={file.status} />
               
@@ -299,7 +300,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
                   className="text-gray-400 hover:text-red-500 focus:outline-none focus:text-red-500"
                   aria-label={`Remove ${file.name}`}
                 >
-                  ✕
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -319,5 +320,3 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
     </div>
   );
 };
-
-export default FileUploader;

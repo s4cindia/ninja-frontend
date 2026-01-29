@@ -1,6 +1,6 @@
-export { FileUploader, default as FileUploaderDefault } from './FileUploader';
-export { ProgressIndicator, default as ProgressIndicatorDefault } from './ProgressIndicator';
-export { ReportExporter, default as ReportExporterDefault } from './ReportExporter';
+export { FileUploader } from './FileUploader';
+export { ProgressIndicator } from './ProgressIndicator';
+export { ReportExporter } from './ReportExporter';
 
 export type {
   UploadedFile,
