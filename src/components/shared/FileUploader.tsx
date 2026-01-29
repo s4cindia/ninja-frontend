@@ -51,7 +51,10 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
   const onFilesSelectedRef = useRef(onFilesSelected);
   onFilesSelectedRef.current = onFilesSelected;
 
-  const generateId = () => `file-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+  const generateId = () => 
+    typeof crypto !== 'undefined' && crypto.randomUUID 
+      ? `file-${crypto.randomUUID()}` 
+      : `file-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 
   const detectFormat = (file: File): SupportedFormat | 'UNKNOWN' => {
     const extension = file.name.toLowerCase().split('.').pop();
@@ -148,6 +151,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       handleFiles(e.target.files);
+      e.target.value = '';
     }
   };
 
@@ -185,8 +189,11 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
   }, [uploadFile, onUploadProgress, onUploadComplete, onUploadError]);
 
   const handleUploadAll = useCallback(() => {
-    files.filter(f => f.status === 'pending').forEach(handleUpload);
-  }, [files, handleUpload]);
+    setFiles(currentFiles => {
+      currentFiles.filter(f => f.status === 'pending').forEach(handleUpload);
+      return currentFiles;
+    });
+  }, [handleUpload]);
 
   const acceptString = acceptedFormats
     .map(f => SUPPORTED_FORMATS[f].extension)
