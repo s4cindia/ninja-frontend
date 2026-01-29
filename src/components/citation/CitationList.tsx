@@ -45,15 +45,16 @@ const styleColors: Record<CitationStyle, string> = {
 };
 
 function ConfidenceBadge({ confidence }: { confidence: number }) {
-  const color = confidence >= CONFIDENCE_THRESHOLDS.HIGH
+  const percent = confidence <= 1 ? Math.round(confidence * 100) : Math.round(confidence);
+  const color = percent >= CONFIDENCE_THRESHOLDS.HIGH
     ? 'text-green-600'
-    : confidence >= CONFIDENCE_THRESHOLDS.MEDIUM
+    : percent >= CONFIDENCE_THRESHOLDS.MEDIUM
       ? 'text-yellow-600'
       : 'text-red-600';
 
   return (
     <span className={cn('text-sm font-medium', color)}>
-      {confidence}%
+      {percent}%
     </span>
   );
 }
@@ -95,7 +96,7 @@ function CitationRow({
             {/* Badges */}
             <div className="flex flex-wrap gap-2 mt-2">
               <Badge className={typeColors[citation.citationType]}>
-                {citation.citationType.toLowerCase().replace('_', ' ')}
+                {citation.citationType.toLowerCase().replace(/_/g, ' ')}
               </Badge>
               {citation.detectedStyle && (
                 <Badge className={styleColors[citation.detectedStyle]}>

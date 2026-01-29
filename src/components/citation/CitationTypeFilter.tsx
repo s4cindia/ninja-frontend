@@ -15,15 +15,21 @@ interface CitationTypeFilterProps {
   onFilterChange: (filters: CitationFilters) => void;
 }
 
-const CONFIDENCE_LEVELS = [
-  { label: 'All', value: undefined },
-  { label: `High (${CONFIDENCE_THRESHOLDS.HIGH}%+)`, value: CONFIDENCE_THRESHOLDS.HIGH },
-  { label: `Medium (${CONFIDENCE_THRESHOLDS.MEDIUM}%+)`, value: CONFIDENCE_THRESHOLDS.MEDIUM },
-  { label: `Low (<${CONFIDENCE_THRESHOLDS.MEDIUM}%)`, value: 0 },
+interface ConfidenceLevel {
+  label: string;
+  min?: number;
+  max?: number;
+}
+
+const CONFIDENCE_LEVELS: ConfidenceLevel[] = [
+  { label: 'All' },
+  { label: `High (${CONFIDENCE_THRESHOLDS.HIGH}%+)`, min: CONFIDENCE_THRESHOLDS.HIGH },
+  { label: `Medium (${CONFIDENCE_THRESHOLDS.MEDIUM}%+)`, min: CONFIDENCE_THRESHOLDS.MEDIUM },
+  { label: `Low (<${CONFIDENCE_THRESHOLDS.MEDIUM}%)`, max: CONFIDENCE_THRESHOLDS.MEDIUM },
 ];
 
 export function CitationTypeFilter({ filters, onFilterChange }: CitationTypeFilterProps) {
-  const hasActiveFilters = filters.type || filters.style || filters.minConfidence || filters.needsReview;
+  const hasActiveFilters = filters.type || filters.style || filters.minConfidence !== undefined || filters.maxConfidence !== undefined || filters.needsReview;
 
   const handleTypeChange = useCallback((type: CitationType | undefined) => {
     onFilterChange({ ...filters, type, page: 1 });
@@ -33,8 +39,13 @@ export function CitationTypeFilter({ filters, onFilterChange }: CitationTypeFilt
     onFilterChange({ ...filters, style, page: 1 });
   }, [filters, onFilterChange]);
 
-  const handleConfidenceChange = useCallback((minConfidence: number | undefined) => {
-    onFilterChange({ ...filters, minConfidence, page: 1 });
+  const handleConfidenceChange = useCallback((level: ConfidenceLevel) => {
+    onFilterChange({
+      ...filters,
+      minConfidence: level.min,
+      maxConfidence: level.max,
+      page: 1,
+    });
   }, [filters, onFilterChange]);
 
   const handleNeedsReviewChange = useCallback((needsReview: boolean | undefined) => {
@@ -89,7 +100,7 @@ export function CitationTypeFilter({ filters, onFilterChange }: CitationTypeFilt
               )}
               onClick={() => handleTypeChange(type)}
             >
-              {type.toLowerCase().replace('_', ' ')}
+              {type.toLowerCase().replace(/_/g, ' ')}
             </Badge>
           ))}
         </div>
@@ -131,18 +142,21 @@ export function CitationTypeFilter({ filters, onFilterChange }: CitationTypeFilt
           Confidence Level
         </label>
         <div className="flex flex-wrap gap-2">
-          {CONFIDENCE_LEVELS.map((level) => (
-            <Badge
-              key={level.label}
-              className={cn(
-                'cursor-pointer transition-colors',
-                filters.minConfidence === level.value ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-              )}
-              onClick={() => handleConfidenceChange(level.value)}
-            >
-              {level.label}
-            </Badge>
-          ))}
+          {CONFIDENCE_LEVELS.map((level) => {
+            const isActive = filters.minConfidence === level.min && filters.maxConfidence === level.max;
+            return (
+              <Badge
+                key={level.label}
+                className={cn(
+                  'cursor-pointer transition-colors',
+                  isActive ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                )}
+                onClick={() => handleConfidenceChange(level)}
+              >
+                {level.label}
+              </Badge>
+            );
+          })}
         </div>
       </div>
 

@@ -136,7 +136,7 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
             {/* Metadata badges */}
             <div className="flex flex-wrap gap-2 mt-3">
               <Badge className="bg-blue-100 text-blue-800">
-                {citation.citationType.toLowerCase().replace('_', ' ')}
+                {citation.citationType.toLowerCase().replace(/_/g, ' ')}
               </Badge>
               {citation.detectedStyle && (
                 <Badge className="bg-green-100 text-green-800">

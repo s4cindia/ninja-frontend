@@ -170,6 +170,7 @@ export interface CitationFilters {
   type?: CitationType;
   style?: CitationStyle;
   minConfidence?: number;
+  maxConfidence?: number;        // For filtering low confidence items
   needsReview?: boolean;         // AC-26: Filter by review status
   page?: number;
   limit?: number;

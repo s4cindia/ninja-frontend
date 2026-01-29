@@ -118,7 +118,7 @@ export function CitationStats({ stats, isLoading }: CitationStatsProps) {
             >
               <p className="text-lg font-semibold text-gray-900">{count}</p>
               <p className="text-xs text-gray-500 capitalize">
-                {type.toLowerCase().replace('_', ' ')}
+                {type.toLowerCase().replace(/_/g, ' ')}
               </p>
             </div>
           ))}
