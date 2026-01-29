@@ -81,10 +81,41 @@ Side-by-side visual comparison of remediation changes with:
 - `POST /api/v1/jobs/:jobId/comparison/export-pdf` - Export PDF (Phase 2)
 
 ### Session Checkpoint
-**Updated:** [DATE TIME]  
-**Last completed:** [Step name]  
-**Next step:** [Step name]  
+**Updated:** [DATE TIME]
+**Last completed:** [Step name]
+**Next step:** [Step name]
 **Blockers:** [None / Description]
+
+---
+
+## PDF Accessibility Sprint - Frontend (Active Development)
+
+### Feature Overview
+React UI for PDF accessibility audit results:
+- PDF audit results display with Matterhorn Protocol summary
+- Issue navigation with page-level grouping
+- PDF preview panel with issue highlighting
+- Reuses 80% of EPUB components (AuditHeader, ScoreDisplay, IssueCard)
+
+### New Files
+**Frontend:**
+- `src/pages/PdfAuditResultsPage.tsx`
+- `src/components/pdf/MatterhornSummary.tsx`
+- `src/components/pdf/PdfPageNavigator.tsx`
+- `src/components/pdf/PdfPreviewPanel.tsx`
+- `src/services/api/pdfAuditApi.ts`
+- `src/hooks/usePdfAudit.ts`
+- `src/types/pdf.types.ts`
+
+### Updated Files (Shared Components)
+- `src/components/shared/FileUpload.tsx` - Add PDF MIME type
+- `src/components/shared/IssueCard.tsx` - Add Matterhorn checkpoint display
+
+### Session Checkpoint (PDF Sprint)
+**Updated:** January 29, 2026
+**Current Story:** Not started
+**Last completed:** Setup - CLAUDE.md updated
+**Next step:** FE-PDF-8 - TypeScript types (start with types before components)
 
 ---
 
