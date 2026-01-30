@@ -71,6 +71,16 @@ const CitationRow = memo(function CitationRow({
       <div
         className="p-4 cursor-pointer hover:bg-gray-50"
         onClick={() => setIsExpanded(!isExpanded)}
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        aria-label={`${isExpanded ? 'Collapse' : 'Expand'} citation details`}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setIsExpanded(!isExpanded);
+          }
+        }}
       >
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0">
