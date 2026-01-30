@@ -80,7 +80,14 @@ export const SOURCE_TYPE_OPTIONS: SourceType[] = [
   'UNKNOWN',
 ];
 
-// Citation from detection (US-4.1)
+/**
+ * Citation from detection (US-4.1)
+ * 
+ * Confidence values:
+ * - All confidence fields are stored as 0-100 integers (percentages)
+ * - Backend may return 0-1 floats; use normalizeConfidence() from citation.utils.ts to convert
+ * - Use CONFIDENCE_THRESHOLDS for display logic (HIGH: 80+, MEDIUM: 50+)
+ */
 export interface Citation {
   id: string;
   documentId: string;
@@ -91,22 +98,31 @@ export interface Citation {
   paragraphIndex: number | null;
   startOffset: number;
   endOffset: number;
+  /** Detection confidence as 0-100 percentage. Use normalizeConfidence() if backend returns 0-1. */
   confidence: number;
   createdAt: string;
   updatedAt: string;
-  // Primary component pattern (from schema)
   primaryComponentId: string | null;
   primaryComponent?: CitationComponent;
-  // AC-26: Aggregated review status from primary component
+  /** AC-26: Aggregated review status from primary component */
   needsReview: boolean;
 }
 
-// Parsed citation component (US-4.2)
+/**
+ * Parsed citation component (US-4.2)
+ * 
+ * Confidence values:
+ * - All confidence fields are stored as 0-100 integers (percentages)
+ * - Backend may return 0-1 floats; use normalizeConfidence() from citation.utils.ts to convert
+ * - Use CONFIDENCE_THRESHOLDS for display logic (HIGH: 80+, MEDIUM: 50+)
+ */
 export interface CitationComponent {
   id: string;
   citationId: string;
-  parseVariant: string | null;   // Which style was used to parse (e.g., "APA", "MLA")
-  confidence: number;            // Overall parse confidence (0-100 percentage)
+  /** Which style was used to parse (e.g., "APA", "MLA") */
+  parseVariant: string | null;
+  /** Overall parse confidence as 0-100 percentage. Use normalizeConfidence() if backend returns 0-1. */
+  confidence: number;
   authors: string[];
   year: string | null;
   title: string | null;
@@ -120,14 +136,15 @@ export interface CitationComponent {
   edition: string | null;
   accessDate: string | null;
   sourceType: SourceType | null;
-  fieldConfidence: Record<string, number>;  // Field-level confidence (0-100 percentages)
-  // Validation fields
+  /** Field-level confidence as 0-100 percentages. Use normalizeConfidence() if backend returns 0-1. */
+  fieldConfidence: Record<string, number>;
   doiVerified: boolean | null;
   urlValid: boolean | null;
   urlCheckedAt: string | null;
-  // AC-26: Explicit flag for ambiguous/incomplete citations
-  needsReview: boolean;          // True if citation is ambiguous or incomplete
-  reviewReasons: string[];       // Reasons why review is needed
+  /** AC-26: True if citation is ambiguous or incomplete and requires manual review */
+  needsReview: boolean;
+  /** Reasons why review is needed (see REVIEW_REASON_LABELS for display text) */
+  reviewReasons: string[];
   createdAt: string;
 }
 
