@@ -359,9 +359,11 @@ class PdfAuditApiService {
   ): Promise<PdfAuditResult> {
     const startTime = Date.now();
     const abortController = new AbortController();
+    let timeoutReached = false;
 
     // Setup timeout
     const timeoutId = setTimeout(() => {
+      timeoutReached = true;
       abortController.abort();
     }, timeout);
 
@@ -397,6 +399,15 @@ class PdfAuditApiService {
 
         // Wait before next poll
         await sleep(interval);
+      }
+
+      // Check if aborted due to timeout or manual abort
+      if (timeoutReached) {
+        throw new PdfApiError(
+          'Audit polling timeout exceeded',
+          'POLLING_TIMEOUT',
+          408
+        );
       }
 
       throw new PdfApiError(

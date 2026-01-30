@@ -1,85 +1,25 @@
-In `@lint/lint` errors 1.txt:
-- Around line 1-55: The file "lint/lint errors 1.txt" contains CI/log output and
-should not be committed; remove this file from the repository (delete the file
-and commit the deletion) and, if you need to preserve such logs, move them to CI
-build artifacts or a dedicated logs folder that is not committed, and add a rule
-to .gitignore to prevent re-adding (reference the filename "lint/lint errors
-1.txt" when locating the offending file and update your commit to remove it).
-
-In `@src/components/epub/EPUBUploader.tsx`:
-- Around line 215-222: For PDF uploads, disable the multipart/form-data fallback
-and require a successful presign; update uploadService.uploadFile (and/or the
-presign call it relies on) so that when the file's MIME/type indicates PDF
-(e.g., selectedFile.type or filename.endsWith('.pdf')) it does not call or fall
-back to uploadDirect and instead surfaces an error if the presign step fails;
-ensure the calling code around uploadService.uploadFile (referencing
-endpoint.directUpload and uploadResult) handles and surfaces that error to the
-user rather than attempting a form upload.
-
-In `@src/components/pdf/PdfPreviewPanel.test.tsx`:
-- Around line 45-50: Tests reference placeholder strings that the
-PdfPreviewPanel component does not render; update either the tests or the
-component. Option A: change tests in PdfPreviewPanel.test.tsx to assert the
-actual behavior of PdfPreviewPanel (e.g., check for loading indicators and that
-react-pdf's Document/Page elements or their test-ids are rendered) instead of
-'PDF Preview Placeholder'/'Install react-pdf to enable PDF rendering'. Reference
-the test file's existing test cases and the PdfPreviewPanel component exports
-(PdfPreviewPanel) to locate assertions to update. Option B: if you prefer
-placeholder behavior, modify PdfPreviewPanel to detect a missing react-pdf
-(e.g., dynamic import/try-catch or feature flag) and render the placeholder
-strings used in tests ('PDF Preview Placeholder' and 'Install react-pdf to
-enable PDF rendering'), then keep tests as-is; ensure the placeholder branch is
-covered by tests.
-- Around line 21-22: Tests currently use jest.fn(); update the mocks to Vitest
-by replacing jest.fn() with vi.fn() for mockOnPageChange and mockOnIssueSelect
-and add an import for vi from 'vitest' at the top of the test file so the
-symbols mockOnPageChange and mockOnIssueSelect use Vitest's mocking API.
-- Around line 123-130: The test fails because PdfPreviewPanel's internal
-numPages remains null (handleDocumentLoadSuccess not invoked), so the
-next-button guard (if (numPages && currentPage < numPages)) prevents calling
-onPageChange; fix the test in PdfPreviewPanel.test.tsx by either: 1) passing a
-numPages prop to the rendered component (e.g., render(<PdfPreviewPanel
-{...defaultProps} currentPage={1} numPages={3} />) so clicking the "Next page"
-button calls mockOnPageChange(2)), or 2) mocking react-pdf to simulate a
-successful load and invoking handleDocumentLoadSuccess to set numPages before
-clicking the next button; update the test to use one of these approaches and
-assert mockOnPageChange was called with 2.
-
 In `@src/components/pdf/PdfPreviewPanel.tsx`:
-- Around line 28-32: Replace the hardcoded CDN worker URL assigned to
-pdfjs.GlobalWorkerOptions.workerSrc in PdfPreviewPanel (where you import
-Document, Page, pdfjs) with the import.meta.url-based local bundling approach
-recommended by react-pdf: set pdfjs.GlobalWorkerOptions.workerSrc to new
-URL('pdfjs-dist/build/pdf.worker.min.js', import.meta.url).toString() so the
-worker matches the installed pdfjs-dist version and avoids external CDN/CSP
-issues.
+- Around line 307-313: The Button in PdfPreviewPanel.tsx is using an undefined
+variant "default" (Button supports primary/secondary/outline/ghost/danger);
+update the Button's variant prop in the render where showHighlights is toggled
+(the Button that calls setShowHighlights and uses aria-label/showHighlights) to
+a supported variant such as 'primary' or 'secondary' (e.g., use
+variant={showHighlights ? 'secondary' : 'outline'}) so the component uses an
+existing style.
 
 In `@src/pages/PdfAuditResultsPage.tsx`:
-- Around line 346-351: The Breadcrumbs usage passes items with { label, href }
-but the component expects { label, path }, so update both Breadcrumbs instances
-(the one around PDF Accessibility / Audit Results and the later instance at
-lines ~370-374) to replace href with path for each item; ensure the prop names
-match the Breadcrumbs component interface so links render as navigable links
-rather than plain text.
+- Around line 132-141: The current useMemo that builds issuesByPage forces
+issues without a page into page 0 via issue.pageNumber || 0; update the logic in
+the useMemo that computes issuesByPage to either skip issues with undefined/null
+pageNumber or place them into a clearly named separate bucket (e.g., "ungrouped"
+or NaN key) instead of numeric 0; adjust the map population code (the const map
+and auditResult.issues.forEach block) to check for issue.pageNumber ===
+undefined/null and handle those cases explicitly so downstream
+pagination/navigation that expects pages 1..pageCount is not affected.
 
 In `@src/services/api/pdfAuditApi.example.ts`:
-- Around line 332-456: The component and examples call React namespace APIs
-(e.g., PdfAuditComponent uses React.useState and React.ChangeEvent;
-handleFileChange references React.ChangeEvent; batchProcessExample uses no JSX
-but the file declares `declare const React: any;`) yet there is no runtime React
-import, causing "React is undefined"; fix by adding a real import at the top
-(either import React from 'react' to preserve React.useX calls or replace
-namespace calls with named hook imports like import { useState, useEffect,
-useRef, ChangeEvent } from 'react' and update PdfAuditComponent accordingly) and
-remove the placeholder `declare const React: any;`.
-
-In `@src/services/api/pdfAuditApi.ts`:
-- Around line 355-409: The pollForCompletion loop can surface POLLING_ABORTED
-when the timeout fires during sleep; to ensure timeouts consistently surface as
-POLLING_TIMEOUT, add a flag (e.g., timeoutReached) initialized false, set it to
-true inside the setTimeout handler before calling abortController.abort(), and
-then in the loop/final abort-handling path check that flag: if timeoutReached
-throw the PdfApiError with code 'POLLING_TIMEOUT' (408), otherwise throw
-'POLLING_ABORTED' (499); update references in pollForCompletion (timeoutId,
-abortController, PdfApiError, getAuditStatus, getAuditResult) accordingly and
-keep clearing timeoutId in finally.
+- Around line 96-123: When jobId changes the hook doesn't reset previous
+loading/result/error state; inside useEffect at the start setResult(null),
+setError(null) and setIsLoading(true) before calling
+pdfAuditApi.createCancellablePolling(jobId, 2000, 300000) so the UI isn't stale;
+keep abortRef assignment and existing cleanup that calls abortRef.current().

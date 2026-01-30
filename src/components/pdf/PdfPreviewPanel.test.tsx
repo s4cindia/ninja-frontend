@@ -45,8 +45,8 @@ describe('PdfPreviewPanel', () => {
     it('displays loading state initially', () => {
       render(<PdfPreviewPanel {...defaultProps} />);
 
-      // Since react-pdf is not installed, it shows the placeholder
-      expect(screen.getByText('PDF Preview Placeholder')).toBeInTheDocument();
+      // Component shows loading spinner initially
+      expect(screen.getByText('Loading PDF...')).toBeInTheDocument();
     });
 
     it('shows current page number', () => {
@@ -292,25 +292,25 @@ describe('PdfPreviewPanel', () => {
     });
   });
 
-  describe('Placeholder State', () => {
-    it('shows installation instructions when react-pdf is not available', () => {
+  describe('PDF Rendering', () => {
+    it('shows loading state while PDF loads', () => {
       render(<PdfPreviewPanel {...defaultProps} />);
 
-      expect(screen.getByText('PDF Preview Placeholder')).toBeInTheDocument();
-      expect(screen.getByText('Install react-pdf to enable PDF rendering')).toBeInTheDocument();
-      expect(screen.getByText('npm install react-pdf pdfjs-dist')).toBeInTheDocument();
+      expect(screen.getByText('Loading PDF...')).toBeInTheDocument();
     });
 
-    it('displays current page in placeholder', () => {
+    it('displays current page number in input', () => {
       render(<PdfPreviewPanel {...defaultProps} currentPage={7} />);
 
-      expect(screen.getByText('Page 7')).toBeInTheDocument();
+      const pageInput = screen.getByLabelText('Current page') as HTMLInputElement;
+      expect(pageInput.value).toBe('7');
     });
 
-    it('displays zoom level in placeholder', () => {
+    it('displays current zoom level', () => {
       render(<PdfPreviewPanel {...defaultProps} />);
 
-      expect(screen.getByText('Zoom: 100%')).toBeInTheDocument();
+      const zoomSelect = screen.getByLabelText('Zoom level') as HTMLSelectElement;
+      expect(zoomSelect.value).toBe('100');
     });
   });
 
