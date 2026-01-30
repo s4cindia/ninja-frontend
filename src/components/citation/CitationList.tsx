@@ -77,9 +77,10 @@ const CitationRow = memo(function CitationRow({
             {/* Citation text */}
             <div className="flex items-start gap-2">
               <Quote className="h-4 w-4 text-gray-400 mt-1 flex-shrink-0" />
-              <p className="text-sm text-gray-900 font-medium line-clamp-2">
-                {sanitizedText}
-              </p>
+              <p 
+                className="text-sm text-gray-900 font-medium line-clamp-2"
+                dangerouslySetInnerHTML={{ __html: sanitizedText }}
+              />
             </div>
 
             {/* Badges */}
@@ -251,7 +252,7 @@ export function CitationList({
   }
 
   return (
-    <div className="space-y-3" aria-live="polite" aria-atomic="false">
+    <div className="space-y-3" aria-live="polite" aria-label="Citation list">
       {citations.map((citation) => (
         <CitationRow
           key={citation.id}

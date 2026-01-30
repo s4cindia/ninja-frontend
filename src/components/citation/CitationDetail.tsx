@@ -147,9 +147,10 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
             <h3 className="text-sm font-medium text-gray-700 mb-2">
               Original Citation
             </h3>
-            <p className="text-gray-900 bg-gray-50 p-3 rounded-lg border">
-              {DOMPurify.sanitize(citation.rawText)}
-            </p>
+            <p 
+              className="text-gray-900 bg-gray-50 p-3 rounded-lg border"
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(citation.rawText) }}
+            />
 
             {/* Metadata badges */}
             <div className="flex flex-wrap gap-2 mt-3">

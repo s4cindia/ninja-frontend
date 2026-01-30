@@ -47,6 +47,9 @@ function getUserFriendlyMessage(statusCode?: number, fallback?: string): string 
 
 function handleError(error: unknown, context: string): never {
   if (error instanceof CitationServiceError) {
+    if (!error.code) {
+      throw new CitationServiceError(error.message, context, error.statusCode);
+    }
     throw error;
   }
   
