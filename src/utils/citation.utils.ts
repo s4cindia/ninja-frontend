@@ -1,5 +1,6 @@
 export function normalizeConfidence(confidence: number): number {
-  return confidence <= 1 ? Math.round(confidence * 100) : Math.round(confidence);
+  const normalized = confidence <= 1 ? Math.round(confidence * 100) : Math.round(confidence);
+  return Math.max(0, Math.min(100, normalized));
 }
 
 export function isSafeUrl(url: string): boolean {

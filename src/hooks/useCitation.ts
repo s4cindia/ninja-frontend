@@ -120,9 +120,11 @@ export function useParseCitation() {
   return useMutation<CitationComponent, Error, string>({
     mutationFn: (citationId: string) => citationService.parse(citationId),
     onSuccess: async (_data, citationId) => {
-      await queryClient.refetchQueries({ queryKey: citationKeys.detail(citationId) });
-      await queryClient.refetchQueries({ queryKey: citationKeys.components(citationId) });
-      queryClient.invalidateQueries({ queryKey: citationKeys.all });
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: citationKeys.detail(citationId) }),
+        queryClient.refetchQueries({ queryKey: citationKeys.components(citationId) }),
+      ]);
+      await queryClient.invalidateQueries({ queryKey: citationKeys.all });
     },
   });
 }

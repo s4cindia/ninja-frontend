@@ -66,9 +66,9 @@ function FieldRow({
   if (!value) return null;
 
   const confidenceColor = confidence
-    ? confidence >= 80
+    ? confidence >= CONFIDENCE_THRESHOLDS.HIGH
       ? 'text-green-600'
-      : confidence >= 50
+      : confidence >= CONFIDENCE_THRESHOLDS.MEDIUM
         ? 'text-yellow-600'
         : 'text-red-600'
     : '';

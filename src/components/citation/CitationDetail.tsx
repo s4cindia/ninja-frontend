@@ -61,9 +61,14 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
 
     return () => {
       document.body.style.overflow = '';
-      if (previousActiveElement.current instanceof HTMLElement) {
-        previousActiveElement.current.focus();
+      const prevElement = previousActiveElement.current;
+      if (
+        prevElement instanceof HTMLElement &&
+        document.body.contains(prevElement)
+      ) {
+        prevElement.focus();
       }
+      previousActiveElement.current = null;
     };
   }, []);
 
