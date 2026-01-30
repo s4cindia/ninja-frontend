@@ -14,7 +14,7 @@ import {
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/utils/cn';
-import { isSafeUrl, normalizeConfidence } from '@/utils/citation.utils';
+import { isSafeUrl, normalizeConfidence, normalizeDoiUrl, isBareDoi } from '@/utils/citation.utils';
 import type { CitationComponent, SourceType } from '@/types/citation.types';
 import { REVIEW_REASON_LABELS, CONFIDENCE_THRESHOLDS } from '@/types/citation.types';
 import {
@@ -53,6 +53,7 @@ interface FieldRowProps {
   confidence?: number;
   showConfidence?: boolean;
   isLink?: boolean;
+  linkHref?: string;
 }
 
 function FieldRow({
@@ -61,7 +62,8 @@ function FieldRow({
   value,
   confidence,
   showConfidence,
-  isLink
+  isLink,
+  linkHref
 }: FieldRowProps) {
   if (!value) return null;
 
@@ -81,7 +83,7 @@ function FieldRow({
       <div className="flex-1 min-w-0">
         <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
         {isLink ? (
-          <SafeLink url={value}>{value}</SafeLink>
+          <SafeLink url={linkHref || value}>{value}</SafeLink>
         ) : (
           <p className="text-sm text-gray-900">{value}</p>
         )}
@@ -275,7 +277,8 @@ export function ParsedComponentsView({
           value={component.doi}
           confidence={fieldConfidence.doi}
           showConfidence={showConfidence}
-          isLink={component.doi?.startsWith('http')}
+          isLink={component.doi ? (component.doi.startsWith('http') || isBareDoi(component.doi)) : false}
+          linkHref={component.doi ? normalizeDoiUrl(component.doi) : undefined}
         />
 
         {/* URL */}

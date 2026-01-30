@@ -29,6 +29,22 @@ export function isSafeUrl(url: string): boolean {
   }
 }
 
+const BARE_DOI_PATTERN = /^10\.\d{4,9}\/\S+$/;
+
+export function isBareDoi(value: string): boolean {
+  return BARE_DOI_PATTERN.test(value);
+}
+
+export function normalizeDoiUrl(doi: string): string {
+  if (doi.startsWith('http://') || doi.startsWith('https://')) {
+    return doi;
+  }
+  if (isBareDoi(doi)) {
+    return `https://doi.org/${doi}`;
+  }
+  return doi;
+}
+
 export function validateId(id: unknown, context: string): asserts id is string {
   if (!id || typeof id !== 'string' || id.trim().length === 0) {
     throw new Error(`Invalid ${context}: must be a non-empty string`);
