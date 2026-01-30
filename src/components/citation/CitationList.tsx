@@ -236,9 +236,14 @@ export function CitationList({
 }: CitationListProps) {
   if (isLoading) {
     return (
-      <div className="space-y-3">
+      <div 
+        className="space-y-3" 
+        role="status" 
+        aria-label="Loading citations"
+        aria-busy="true"
+      >
         {[1, 2, 3].map((i) => (
-          <Card key={i} className="p-4 animate-pulse">
+          <Card key={i} className="p-4 animate-pulse" aria-hidden="true">
             <div className="h-4 w-3/4 bg-gray-200 rounded mb-2" />
             <div className="flex gap-2">
               <div className="h-5 w-20 bg-gray-200 rounded" />
@@ -246,6 +251,7 @@ export function CitationList({
             </div>
           </Card>
         ))}
+        <span className="sr-only">Loading citations, please wait...</span>
       </div>
     );
   }

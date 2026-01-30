@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { citationService } from '@/services/citation.service';
+import { citationService, CitationServiceError } from '@/services/citation.service';
 import { CITATION_STALE_TIME } from '@/config/query.config';
 import type {
   Citation,
@@ -25,7 +25,7 @@ export const citationKeys = {
  * Hook to get citations by job ID
  */
 export function useCitationsByJob(jobId: string, filters?: CitationFilters) {
-  return useQuery<PaginatedCitations>({
+  return useQuery<PaginatedCitations, CitationServiceError>({
     queryKey: [...citationKeys.byJob(jobId), filters],
     queryFn: () => citationService.getByJob(jobId, filters),
     enabled: !!jobId,
@@ -37,7 +37,7 @@ export function useCitationsByJob(jobId: string, filters?: CitationFilters) {
  * Hook to get citations by document ID
  */
 export function useCitationsByDocument(documentId: string, filters?: CitationFilters) {
-  return useQuery<PaginatedCitations>({
+  return useQuery<PaginatedCitations, CitationServiceError>({
     queryKey: [...citationKeys.byDocument(documentId), filters],
     queryFn: () => citationService.getByDocument(documentId, filters),
     enabled: !!documentId,
@@ -49,7 +49,7 @@ export function useCitationsByDocument(documentId: string, filters?: CitationFil
  * Hook to get a single citation with details
  */
 export function useCitation(citationId: string) {
-  return useQuery<Citation>({
+  return useQuery<Citation, CitationServiceError>({
     queryKey: citationKeys.detail(citationId),
     queryFn: () => citationService.getById(citationId),
     enabled: !!citationId,
@@ -61,7 +61,7 @@ export function useCitation(citationId: string) {
  * Hook to get citation component history
  */
 export function useCitationComponents(citationId: string) {
-  return useQuery<CitationComponent[]>({
+  return useQuery<CitationComponent[], CitationServiceError>({
     queryKey: citationKeys.components(citationId),
     queryFn: () => citationService.getComponents(citationId),
     enabled: !!citationId,
@@ -73,7 +73,7 @@ export function useCitationComponents(citationId: string) {
  * Hook to get citation statistics
  */
 export function useCitationStats(documentId: string) {
-  return useQuery<CitationStats>({
+  return useQuery<CitationStats, CitationServiceError>({
     queryKey: citationKeys.stats(documentId),
     queryFn: () => citationService.getStats(documentId),
     enabled: !!documentId,
@@ -99,7 +99,7 @@ export function useCitationStats(documentId: string) {
 export function useDetectCitations() {
   const queryClient = useQueryClient();
 
-  return useMutation<DetectionResult, Error, { file: File; signal?: AbortSignal }>({
+  return useMutation<DetectionResult, CitationServiceError, { file: File; signal?: AbortSignal }>({
     mutationFn: ({ file, signal }) => citationService.detectFromFile(file, signal),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: citationKeys.byDocument(data.documentId) });
@@ -125,7 +125,7 @@ export function useDetectCitations() {
 export function useDetectCitationsFromJob() {
   const queryClient = useQueryClient();
 
-  return useMutation<DetectionResult, Error, { jobId: string; signal?: AbortSignal }>({
+  return useMutation<DetectionResult, CitationServiceError, { jobId: string; signal?: AbortSignal }>({
     mutationFn: ({ jobId, signal }) => citationService.detectFromJob(jobId, signal),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: citationKeys.byDocument(data.documentId) });
@@ -139,7 +139,7 @@ export function useDetectCitationsFromJob() {
 export function useParseCitation() {
   const queryClient = useQueryClient();
 
-  return useMutation<CitationComponent, Error, string>({
+  return useMutation<CitationComponent, CitationServiceError, string>({
     mutationFn: (citationId: string) => citationService.parse(citationId),
     onSuccess: async (_data, citationId) => {
       // Invalidate all citation-related queries to avoid race conditions
@@ -172,7 +172,7 @@ export function useParseCitation() {
 export function useParseAllCitations() {
   const queryClient = useQueryClient();
 
-  return useMutation<BulkParseResult, Error, { documentId: string; signal?: AbortSignal }>({
+  return useMutation<BulkParseResult, CitationServiceError, { documentId: string; signal?: AbortSignal }>({
     mutationFn: ({ documentId, signal }) => citationService.parseAll(documentId, signal),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: citationKeys.byDocument(data.documentId) });
