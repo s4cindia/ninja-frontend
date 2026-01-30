@@ -1,0 +1,86 @@
+Implement FE-PDF-8: PDF Audit TypeScript Types
+
+Create TypeScript type definitions for PDF audit features.
+
+File to create: src/types/pdf.types.ts
+
+Requirements:
+
+1. Core Types:
+
+PdfAuditResult interface with fields:
+- id: string
+- jobId: string
+- fileName: string
+- fileSize: number
+- pageCount: number
+- score: number
+- status: 'pending' | 'processing' | 'completed' | 'failed'
+- createdAt: string
+- completedAt?: string
+- issues: PdfAuditIssue[]
+- matterhornSummary: MatterhornSummary
+- metadata: PdfMetadata
+
+PdfAuditIssue interface with fields:
+- id: string
+- ruleId: string
+- severity: 'critical' | 'serious' | 'moderate' | 'minor'
+- message: string
+- description: string
+- pageNumber?: number
+- elementPath?: string
+- wcagCriteria?: string[]
+- matterhornCheckpoint?: string
+- suggestedFix?: string
+
+MatterhornSummary interface with fields:
+- totalCheckpoints: number
+- passed: number
+- failed: number
+- notApplicable: number
+- categories: MatterhornCategory[]
+
+MatterhornCategory interface with fields:
+- id: string
+- name: string
+- checkpoints: MatterhornCheckpoint[]
+
+MatterhornCheckpoint interface with fields:
+- id: string
+- description: string
+- status: 'passed' | 'failed' | 'not-applicable'
+- issueCount: number
+
+PdfMetadata interface with fields:
+- title?: string
+- author?: string
+- creator?: string
+- producer?: string
+- pdfVersion: string
+- isTagged: boolean
+- hasStructureTree: boolean
+- language?: string
+
+2. API Response Types:
+
+PdfAuditResponse interface with fields:
+- success: boolean
+- data: PdfAuditResult
+
+PdfAuditListResponse interface with fields:
+- success: boolean
+- data: PdfAuditResult[]
+- pagination: { total: number, page: number, limit: number }
+
+3. Filter Types:
+
+PdfAuditFilters interface with fields:
+- status?: PdfAuditResult['status']
+- severity?: PdfAuditIssue['severity']
+- matterhornCategory?: string
+- pageNumber?: number
+
+Reference: Look at src/types/epub.types.ts for consistent patterns.
+
+Export all types from the file.
