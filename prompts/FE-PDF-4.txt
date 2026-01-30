@@ -1,0 +1,53 @@
+Implement FE-PDF-4: IssueCard Enhancement for PDF
+
+Enhance the existing IssueCard component to support PDF-specific features.
+
+File to update: src/components/shared/IssueCard.tsx (or similar location)
+
+Requirements:
+
+1. Add Matterhorn checkpoint display:
+   - Show Matterhorn checkpoint ID (e.g., "01-003")
+   - Show checkpoint description on hover/tooltip
+   - Link to Matterhorn documentation if available
+
+2. Add page number navigation:
+   - Display page number where issue occurs
+   - "Page 5" or "Pages 5-7" for multi-page issues
+   - Clickable to trigger onPageClick callback
+
+3. Update props interface:
+   interface IssueCardProps {
+     issue: AuditIssue | PdfAuditIssue;
+     onIssueClick?: (issue: AuditIssue | PdfAuditIssue) => void;
+     onPageClick?: (pageNumber: number) => void;  // NEW
+     showMatterhorn?: boolean;  // NEW: Show Matterhorn info for PDFs
+     compact?: boolean;
+   }
+
+4. Conditional rendering:
+   - Show Matterhorn section only when showMatterhorn=true
+   - Show page navigation only when issue has pageNumber
+   - Maintain backward compatibility with EPUB issues
+
+5. Visual updates:
+   - Add PDF icon indicator when issue is from PDF
+   - Matterhorn badge with checkpoint ID
+   - Page number as clickable chip/badge
+
+6. Styling:
+   - Use Tailwind CSS
+   - Match existing severity color coding
+   - Responsive design
+   - Use Radix UI Tooltip for Matterhorn descriptions
+
+7. Type handling:
+   - Detect if issue is PdfAuditIssue (has matterhornCheckpoint)
+   - Use type guard function: isPdfIssue(issue)
+
+Reference:
+- PdfAuditIssue type from src/types/pdf.types.ts
+- Existing IssueCard implementation
+- EPUB issue display patterns
+
+Tests: Update IssueCard.test.tsx with PDF issue scenarios
