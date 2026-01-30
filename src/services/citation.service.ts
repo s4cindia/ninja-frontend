@@ -59,7 +59,9 @@ function handleError(error: unknown, context: string): never {
     const serverMessage = error.response?.data?.message;
     const message = serverMessage || getUserFriendlyMessage(statusCode, error.message);
     const err = new CitationServiceError(message, context, statusCode);
-    err.stack = error.stack;
+    if (error.stack) {
+      err.stack = error.stack;
+    }
     throw err;
   }
   
