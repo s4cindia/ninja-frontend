@@ -5,6 +5,8 @@
  * for various PDF accessibility audit operations.
  */
 
+import React, { useState, useEffect, useRef } from 'react';
+import type { ChangeEvent } from 'react';
 import { pdfAuditApi, PdfApiError } from './pdfAuditApi';
 import type { PdfAuditResult } from '@/types/pdf.types';
 
@@ -92,12 +94,12 @@ export async function pollUntilCompleteExample(jobId: string) {
 // ============================================================================
 
 export function useCancellablePolling(jobId: string) {
-  const [result, setResult] = React.useState<PdfAuditResult | null>(null);
-  const [error, setError] = React.useState<Error | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const abortRef = React.useRef<(() => void) | null>(null);
+  const [result, setResult] = useState<PdfAuditResult | null>(null);
+  const [error, setError] = useState<Error | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const abortRef = useRef<(() => void) | null>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const { promise, abort } = pdfAuditApi.createCancellablePolling(jobId, 2000, 300000);
     abortRef.current = abort;
 
@@ -330,11 +332,11 @@ export async function errorHandlingExample(jobId: string) {
 // ============================================================================
 
 export function PdfAuditComponent() {
-  const [jobId, setJobId] = React.useState<string | null>(null);
-  const [result, setResult] = React.useState<PdfAuditResult | null>(null);
-  const [isUploading, setIsUploading] = React.useState(false);
-  const [uploadProgress, setUploadProgress] = React.useState(0);
-  const [error, setError] = React.useState<string | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [result, setResult] = useState<PdfAuditResult | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   const handleFileUpload = async (file: File) => {
     setIsUploading(true);
@@ -380,7 +382,7 @@ export function PdfAuditComponent() {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       handleFileUpload(file);
@@ -451,6 +453,3 @@ export async function batchProcessExample(files: File[]) {
 
   return results;
 }
-
-// Note: React imports for examples
-declare const React: any;

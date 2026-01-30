@@ -345,7 +345,7 @@ export const PdfAuditResultsPage: React.FC = () => {
       <div className="p-6 max-w-7xl mx-auto">
         <Breadcrumbs
           items={[
-            { label: 'PDF Accessibility', href: '/pdf' },
+            { label: 'PDF Accessibility', path: '/pdf' },
             { label: 'Audit Results' },
           ]}
         />
@@ -369,7 +369,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         <div className="px-6 py-4">
           <Breadcrumbs
             items={[
-              { label: 'PDF Accessibility', href: '/pdf' },
+              { label: 'PDF Accessibility', path: '/pdf' },
               { label: 'Audit Results' },
             ]}
           />
