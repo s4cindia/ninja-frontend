@@ -25,11 +25,11 @@ import { cn } from '@/utils/cn';
 import { Button } from '../ui/Button';
 import type { PdfAuditIssue } from '@/types/pdf.types';
 
-// Uncomment when react-pdf is installed:
-// import { Document, Page, pdfjs } from 'react-pdf';
-// import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
-// import 'react-pdf/dist/esm/Page/TextLayer.css';
-// pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
+import 'react-pdf/dist/esm/Page/TextLayer.css';
+
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 export interface PdfPreviewPanelProps {
   pdfUrl: string;
@@ -340,35 +340,24 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
 
           {!isLoading && !error && (
             <div className="relative bg-white shadow-lg">
-              {/* PDF Page Placeholder */}
-              {/* Uncomment when react-pdf is installed: */}
-              {/*
               <Document
                 file={pdfUrl}
                 onLoadSuccess={handleDocumentLoadSuccess}
                 onLoadError={handleDocumentLoadError}
+                loading={
+                  <div className="flex flex-col items-center justify-center py-20">
+                    <Loader2 className="h-12 w-12 text-primary-600 animate-spin mb-4" />
+                    <p className="text-gray-600">Loading PDF...</p>
+                  </div>
+                }
               >
                 <Page
                   pageNumber={currentPage}
                   scale={typeof zoomLevel === 'number' ? zoomLevel / 100 : 1}
-                  width={zoomLevel === 'fit-width' ? containerWidth : undefined}
-                  height={zoomLevel === 'fit-page' ? containerHeight : undefined}
+                  renderTextLayer={true}
+                  renderAnnotationLayer={true}
                 />
               </Document>
-              */}
-
-              {/* Temporary placeholder - remove when react-pdf is integrated */}
-              <div className="w-[800px] h-[1000px] bg-white border border-gray-300 flex items-center justify-center">
-                <div className="text-center text-gray-500">
-                  <p className="text-lg font-medium mb-2">PDF Preview Placeholder</p>
-                  <p className="text-sm mb-4">Install react-pdf to enable PDF rendering</p>
-                  <code className="text-xs bg-gray-100 px-3 py-1 rounded">
-                    npm install react-pdf pdfjs-dist
-                  </code>
-                  <p className="text-xs mt-4">Page {currentPage}</p>
-                  <p className="text-xs">Zoom: {zoomLevel}%</p>
-                </div>
-              </div>
 
               {/* Issue highlights overlay */}
               {showHighlights && highlights.length > 0 && (
