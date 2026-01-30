@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { citationService } from '@/services/citation.service';
+import { CITATION_STALE_TIME } from '@/config/query.config';
 import type {
   Citation,
   CitationComponent,
@@ -9,8 +10,6 @@ import type {
   PaginatedCitations,
   CitationStats,
 } from '@/types/citation.types';
-
-const STALE_TIME = 10 * 60 * 1000; // 10 minutes - citation data is relatively static
 
 // Query keys for cache management
 export const citationKeys = {
@@ -30,7 +29,7 @@ export function useCitationsByJob(jobId: string, filters?: CitationFilters) {
     queryKey: [...citationKeys.byJob(jobId), filters],
     queryFn: () => citationService.getByJob(jobId, filters),
     enabled: !!jobId,
-    staleTime: STALE_TIME,
+    staleTime: CITATION_STALE_TIME,
   });
 }
 
@@ -42,7 +41,7 @@ export function useCitationsByDocument(documentId: string, filters?: CitationFil
     queryKey: [...citationKeys.byDocument(documentId), filters],
     queryFn: () => citationService.getByDocument(documentId, filters),
     enabled: !!documentId,
-    staleTime: STALE_TIME,
+    staleTime: CITATION_STALE_TIME,
   });
 }
 
@@ -54,7 +53,7 @@ export function useCitation(citationId: string) {
     queryKey: citationKeys.detail(citationId),
     queryFn: () => citationService.getById(citationId),
     enabled: !!citationId,
-    staleTime: STALE_TIME,
+    staleTime: CITATION_STALE_TIME,
   });
 }
 
@@ -66,7 +65,7 @@ export function useCitationComponents(citationId: string) {
     queryKey: citationKeys.components(citationId),
     queryFn: () => citationService.getComponents(citationId),
     enabled: !!citationId,
-    staleTime: STALE_TIME,
+    staleTime: CITATION_STALE_TIME,
   });
 }
 
@@ -78,7 +77,7 @@ export function useCitationStats(documentId: string) {
     queryKey: citationKeys.stats(documentId),
     queryFn: () => citationService.getStats(documentId),
     enabled: !!documentId,
-    staleTime: STALE_TIME,
+    staleTime: CITATION_STALE_TIME,
   });
 }
 
