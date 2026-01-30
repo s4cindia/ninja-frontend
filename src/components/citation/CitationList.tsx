@@ -252,7 +252,7 @@ export function CitationList({
   }
 
   return (
-    <div className="space-y-3" aria-live="polite" aria-label="Citation list">
+    <div className="space-y-3" role="list" aria-label="Citation list">
       {citations.map((citation) => (
         <CitationRow
           key={citation.id}
