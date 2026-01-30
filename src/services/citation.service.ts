@@ -119,8 +119,8 @@ export const citationService = {
    * @throws {CitationServiceError} If job not found (404) or detection fails
    */
   async detectFromJob(jobId: string, signal?: AbortSignal): Promise<DetectionResult> {
-    validateId(jobId, 'job ID');
     try {
+      validateId(jobId, 'job ID');
       const response = await api.post<ApiResponse<DetectionResult>>(
         `/citation/detect/${jobId}`,
         undefined,
@@ -143,8 +143,8 @@ export const citationService = {
     documentId: string,
     filters?: CitationFilters
   ): Promise<PaginatedCitations> {
-    validateId(documentId, 'document ID');
     try {
+      validateId(documentId, 'document ID');
       const params = buildFilterParams(filters);
       const response = await api.get<ApiResponse<PaginatedCitations>>(
         `/citation/document/${documentId}?${params}`
@@ -166,8 +166,8 @@ export const citationService = {
     jobId: string,
     filters?: CitationFilters
   ): Promise<PaginatedCitations> {
-    validateId(jobId, 'job ID');
     try {
+      validateId(jobId, 'job ID');
       const params = buildFilterParams(filters);
       const response = await api.get<ApiResponse<PaginatedCitations>>(
         `/citation/job/${jobId}?${params}`
@@ -185,8 +185,8 @@ export const citationService = {
    * @throws {CitationServiceError} If citation not found (404) or access denied (403)
    */
   async getById(citationId: string): Promise<Citation> {
-    validateId(citationId, 'citation ID');
     try {
+      validateId(citationId, 'citation ID');
       const response = await api.get<ApiResponse<Citation>>(
         `/citation/${citationId}`
       );
@@ -203,8 +203,8 @@ export const citationService = {
    * @throws {CitationServiceError} If citation not found (404) or parsing fails (422)
    */
   async parse(citationId: string): Promise<CitationComponent> {
-    validateId(citationId, 'citation ID');
     try {
+      validateId(citationId, 'citation ID');
       const response = await api.post<ApiResponse<CitationComponent>>(
         `/citation/${citationId}/parse`
       );
@@ -222,8 +222,8 @@ export const citationService = {
    * @throws {CitationServiceError} If document not found (404) or bulk operation fails
    */
   async parseAll(documentId: string, signal?: AbortSignal): Promise<BulkParseResult> {
-    validateId(documentId, 'document ID');
     try {
+      validateId(documentId, 'document ID');
       const response = await api.post<ApiResponse<BulkParseResult>>(
         `/citation/document/${documentId}/parse-all`,
         undefined,
@@ -242,8 +242,8 @@ export const citationService = {
    * @throws {CitationServiceError} If citation not found (404) or access denied (403)
    */
   async getComponents(citationId: string): Promise<CitationComponent[]> {
-    validateId(citationId, 'citation ID');
     try {
+      validateId(citationId, 'citation ID');
       const response = await api.get<ApiResponse<CitationComponent[]>>(
         `/citation/${citationId}/components`
       );
@@ -260,8 +260,8 @@ export const citationService = {
    * @throws {CitationServiceError} If document not found (404) or access denied (403)
    */
   async getStats(documentId: string): Promise<CitationStats> {
-    validateId(documentId, 'document ID');
     try {
+      validateId(documentId, 'document ID');
       const response = await api.get<ApiResponse<CitationStats>>(
         `/citation/document/${documentId}/stats`
       );
