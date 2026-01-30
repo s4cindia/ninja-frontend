@@ -12,13 +12,14 @@ import type {
 } from '@/types/citation.types';
 
 class CitationServiceError extends Error {
-  constructor(
-    message: string,
-    public readonly code?: string,
-    public readonly statusCode?: number
-  ) {
+  public code?: string;
+  public readonly statusCode?: number;
+  
+  constructor(message: string, code?: string, statusCode?: number) {
     super(message);
     this.name = 'CitationServiceError';
+    this.code = code;
+    this.statusCode = statusCode;
   }
 }
 
@@ -48,7 +49,7 @@ function getUserFriendlyMessage(statusCode?: number, fallback?: string): string 
 function handleError(error: unknown, context: string): never {
   if (error instanceof CitationServiceError) {
     if (!error.code) {
-      throw new CitationServiceError(error.message, context, error.statusCode);
+      error.code = context;
     }
     throw error;
   }
