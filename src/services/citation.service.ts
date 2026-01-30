@@ -66,7 +66,11 @@ function handleError(error: unknown, context: string): never {
   const message = error instanceof Error 
     ? error.message 
     : 'An unexpected error occurred. Please try again.';
-  throw new CitationServiceError(message, context);
+  const err = new CitationServiceError(message, context);
+  if (error instanceof Error) {
+    err.stack = error.stack;
+  }
+  throw err;
 }
 
 export const citationService = {
