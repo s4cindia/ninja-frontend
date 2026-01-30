@@ -76,6 +76,7 @@ export const CodePreview: React.FC<CodePreviewProps> = ({
           Preview Changes
         </div>
         <pre className="p-4 bg-gray-900 text-sm overflow-x-auto max-h-64">
+          {/* biome-ignore lint/security/noDangerouslySetInnerHtml: HTML is sanitized via formatDiffPreview escaping */}
           <code
             className="text-gray-100"
             dangerouslySetInnerHTML={{

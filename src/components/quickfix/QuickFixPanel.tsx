@@ -602,6 +602,7 @@ export function QuickFixPanel({
             <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
               <span className="text-sm font-medium text-gray-700">Code Changes</span>
             </div>
+            {/* biome-ignore lint/security/noDangerouslySetInnerHtml: HTML is sanitized with DOMPurify.sanitize() */}
             <div 
               className="p-3 bg-gray-900 text-sm font-mono overflow-x-auto"
               dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(preview.diff) }}

@@ -150,6 +150,7 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
             <h3 className="text-sm font-medium text-gray-700 mb-2">
               Original Citation
             </h3>
+            {/* biome-ignore lint/security/noDangerouslySetInnerHtml: HTML is sanitized with DOMPurify.sanitize() */}
             <p 
               className="text-gray-900 bg-gray-50 p-3 rounded-lg border"
               dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(citation.rawText) }}

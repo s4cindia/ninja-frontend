@@ -87,6 +87,7 @@ const CitationRow = memo(function CitationRow({
             {/* Citation text */}
             <div className="flex items-start gap-2">
               <Quote className="h-4 w-4 text-gray-400 mt-1 flex-shrink-0" />
+              {/* biome-ignore lint/security/noDangerouslySetInnerHtml: HTML is sanitized with DOMPurify.sanitize() */}
               <p 
                 className="text-sm text-gray-900 font-medium line-clamp-2"
                 dangerouslySetInnerHTML={{ __html: sanitizedText }}
