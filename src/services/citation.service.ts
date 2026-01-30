@@ -38,8 +38,9 @@ const STATUS_CODE_MESSAGES: Record<number, string> = {
 };
 
 function getUserFriendlyMessage(statusCode?: number, fallback?: string): string {
-  if (statusCode && STATUS_CODE_MESSAGES[statusCode]) {
-    return STATUS_CODE_MESSAGES[statusCode];
+  if (statusCode) {
+    const message = STATUS_CODE_MESSAGES[statusCode];
+    if (message) return message;
   }
   return fallback || 'An unexpected error occurred. Please try again.';
 }

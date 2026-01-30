@@ -251,7 +251,7 @@ export function CitationList({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" aria-live="polite" aria-atomic="false">
       {citations.map((citation) => (
         <CitationRow
           key={citation.id}

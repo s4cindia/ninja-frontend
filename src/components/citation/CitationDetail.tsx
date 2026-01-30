@@ -44,13 +44,11 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
     isLoading: isLoadingHistory
   } = useCitationComponents(citation.id);
 
-  const parseMutation = useParseCitation();
+  const { mutate: parseCitation, isPending: isParsing, isSuccess: parseSuccess, isError: parseError } = useParseCitation();
 
-  // React Query's mutate function is stable, but we include parseMutation
-  // in deps to satisfy exhaustive-deps and ensure correctness if implementation changes
   const handleParse = useCallback(() => {
-    parseMutation.mutate(citation.id);
-  }, [citation.id, parseMutation]);
+    parseCitation(citation.id);
+  }, [citation.id, parseCitation]);
 
   const hasParsedComponent = !!citation.primaryComponent;
 
@@ -210,9 +208,9 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
               <Button
                 size="sm"
                 onClick={handleParse}
-                disabled={parseMutation.isPending}
+                disabled={isParsing}
               >
-                {parseMutation.isPending ? (
+                {isParsing ? (
                   <>
                     <Spinner className="h-4 w-4 mr-1" />
                     Parsing...
@@ -232,7 +230,7 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
             </div>
 
             {/* Success message */}
-            {parseMutation.isSuccess && (
+            {parseSuccess && (
               <div 
                 role="status" 
                 aria-live="polite"
@@ -243,7 +241,7 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
             )}
 
             {/* Error message */}
-            {parseMutation.isError && (
+            {parseError && (
               <div 
                 role="alert" 
                 aria-live="assertive"

@@ -14,7 +14,7 @@ import {
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/utils/cn';
-import { isSafeUrl } from '@/utils/citation.utils';
+import { isSafeUrl, normalizeConfidence } from '@/utils/citation.utils';
 import type { CitationComponent, SourceType } from '@/types/citation.types';
 import { REVIEW_REASON_LABELS, CONFIDENCE_THRESHOLDS } from '@/types/citation.types';
 import {
@@ -193,22 +193,19 @@ export function ParsedComponentsView({
                 ))}
               </div>
             </div>
-            {showConfidence && fieldConfidence.authors !== undefined && (
-              <div className="flex items-center gap-1">
-                <Percent className={cn(
-                  'h-3 w-3',
-                  fieldConfidence.authors >= 80 ? 'text-green-600' :
-                  fieldConfidence.authors >= 50 ? 'text-yellow-600' : 'text-red-600'
-                )} />
-                <span className={cn(
-                  'text-xs font-medium',
-                  fieldConfidence.authors >= 80 ? 'text-green-600' :
-                  fieldConfidence.authors >= 50 ? 'text-yellow-600' : 'text-red-600'
-                )}>
-                  {fieldConfidence.authors}%
-                </span>
-              </div>
-            )}
+            {showConfidence && fieldConfidence.authors !== undefined && (() => {
+              const normalizedAuthors = normalizeConfidence(fieldConfidence.authors);
+              const authorsColor = normalizedAuthors >= CONFIDENCE_THRESHOLDS.HIGH ? 'text-green-600' :
+                normalizedAuthors >= CONFIDENCE_THRESHOLDS.MEDIUM ? 'text-yellow-600' : 'text-red-600';
+              return (
+                <div className="flex items-center gap-1">
+                  <Percent className={cn('h-3 w-3', authorsColor)} />
+                  <span className={cn('text-xs font-medium', authorsColor)}>
+                    {normalizedAuthors}%
+                  </span>
+                </div>
+              );
+            })()}
           </div>
         )}
 
