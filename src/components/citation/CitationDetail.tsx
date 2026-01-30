@@ -44,7 +44,7 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
     isLoading: isLoadingHistory
   } = useCitationComponents(citation.id);
 
-  const { mutate: parseCitation, isPending: isParsing, isSuccess: parseSuccess, isError: parseError } = useParseCitation();
+  const { mutate: parseCitation, isPending: isParsing, isSuccess: parseSuccess, isError: parseError, error: parseErrorDetails } = useParseCitation();
 
   const handleParse = useCallback(() => {
     parseCitation(citation.id);
@@ -251,7 +251,7 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
                 aria-live="assertive"
                 className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800"
               >
-                Failed to parse citation. Please try again.
+                {parseErrorDetails?.message || 'Failed to parse citation. Please try again.'}
               </div>
             )}
 
