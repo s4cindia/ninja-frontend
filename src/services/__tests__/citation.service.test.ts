@@ -184,7 +184,11 @@ describe('citationService', () => {
       const result = await citationService.parseAll('doc-1');
 
       expect(result).toEqual(mockResult);
-      expect(api.post).toHaveBeenCalledWith('/citation/document/doc-1/parse-all');
+      expect(api.post).toHaveBeenCalledWith(
+        '/citation/document/doc-1/parse-all',
+        undefined,
+        { signal: undefined }
+      );
     });
   });
 
@@ -208,7 +212,11 @@ describe('citationService', () => {
       const result = await citationService.detectFromJob('job-1');
 
       expect(result).toEqual(mockDetection);
-      expect(api.post).toHaveBeenCalledWith('/citation/detect/job-1');
+      expect(api.post).toHaveBeenCalledWith(
+        '/citation/detect/job-1',
+        undefined,
+        { signal: undefined }
+      );
     });
   });
 

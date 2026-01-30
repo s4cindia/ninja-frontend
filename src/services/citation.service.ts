@@ -79,17 +79,19 @@ export const citationService = {
   /**
    * Detect citations in an uploaded file
    * @param file - The file to analyze for citations (PDF, EPUB, DOCX)
+   * @param signal - Optional AbortSignal for request cancellation
    * @returns Detection result with citations array and statistics by type/style
    * @throws {CitationServiceError} If file upload fails (413 for size, 415 for type) or parsing errors occur
    */
-  async detectFromFile(file: File): Promise<DetectionResult> {
+  async detectFromFile(file: File, signal?: AbortSignal): Promise<DetectionResult> {
     try {
       const formData = new FormData();
       formData.append('file', file);
 
       const response = await api.post<ApiResponse<DetectionResult>>(
         '/citation/detect',
-        formData
+        formData,
+        { signal }
       );
       return response.data.data;
     } catch (error) {
@@ -100,14 +102,17 @@ export const citationService = {
   /**
    * Detect citations from an existing job's file
    * @param jobId - The job ID whose file should be analyzed
+   * @param signal - Optional AbortSignal for request cancellation
    * @returns Detection result with citations array and statistics by type/style
    * @throws {CitationServiceError} If job not found (404) or detection fails
    */
-  async detectFromJob(jobId: string): Promise<DetectionResult> {
+  async detectFromJob(jobId: string, signal?: AbortSignal): Promise<DetectionResult> {
     validateId(jobId, 'job ID');
     try {
       const response = await api.post<ApiResponse<DetectionResult>>(
-        `/citation/detect/${jobId}`
+        `/citation/detect/${jobId}`,
+        undefined,
+        { signal }
       );
       return response.data.data;
     } catch (error) {
@@ -216,14 +221,17 @@ export const citationService = {
   /**
    * Parse all unparsed citations for a document in bulk
    * @param documentId - The document ID whose citations should be parsed
+   * @param signal - Optional AbortSignal for request cancellation
    * @returns Bulk result with parsed/failed counts and error details
    * @throws {CitationServiceError} If document not found (404) or bulk operation fails
    */
-  async parseAll(documentId: string): Promise<BulkParseResult> {
+  async parseAll(documentId: string, signal?: AbortSignal): Promise<BulkParseResult> {
     validateId(documentId, 'document ID');
     try {
       const response = await api.post<ApiResponse<BulkParseResult>>(
-        `/citation/document/${documentId}/parse-all`
+        `/citation/document/${documentId}/parse-all`,
+        undefined,
+        { signal }
       );
       return response.data.data;
     } catch (error) {
