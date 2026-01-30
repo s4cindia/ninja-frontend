@@ -123,11 +123,12 @@ export class PdfApiError extends Error {
   }
 
   static fromAxiosError(error: AxiosError): PdfApiError {
-    const response = error.response?.data as any;
-    const message = response?.error?.message || response?.message || error.message;
-    const code = response?.error?.code || response?.code || 'API_ERROR';
+    const response = error.response?.data as Record<string, unknown>;
+    const errorData = response?.error as Record<string, unknown> | undefined;
+    const message = (errorData?.message || response?.message || error.message) as string;
+    const code = (errorData?.code || response?.code || 'API_ERROR') as string;
     const status = error.response?.status;
-    const details = response?.error?.details || response?.details;
+    const details = errorData?.details || response?.details;
 
     return new PdfApiError(message, code, status, details);
   }
@@ -424,9 +425,50 @@ class PdfAuditApiService {
     const abortController = new AbortController();
     let timeoutId: NodeJS.Timeout;
 
-    const promise = new Promise<PdfAuditResult>(async (resolve, reject) => {
+    // Extract async polling logic to separate function
+    const runPolling = async (): Promise<PdfAuditResult> => {
       const startTime = Date.now();
 
+      while (!abortController.signal.aborted) {
+        // Check if timeout exceeded
+        if (Date.now() - startTime >= timeout) {
+          throw new PdfApiError(
+            'Audit polling timeout exceeded',
+            'POLLING_TIMEOUT',
+            408
+          );
+        }
+
+        // Get current status
+        const status = await this.getAuditStatus(jobId);
+
+        // Check if completed
+        if (status.status === 'completed') {
+          const result = await this.getAuditResult(jobId);
+          return result;
+        }
+
+        // Check if failed
+        if (status.status === 'failed') {
+          throw new PdfApiError(
+            status.message || 'Audit failed',
+            'AUDIT_FAILED',
+            500
+          );
+        }
+
+        // Wait before next poll
+        await sleep(interval);
+      }
+
+      throw new PdfApiError(
+        'Audit polling was aborted',
+        'POLLING_ABORTED',
+        499
+      );
+    };
+
+    const promise = new Promise<PdfAuditResult>((resolve, reject) => {
       // Setup timeout
       timeoutId = setTimeout(() => {
         abortController.abort();
@@ -439,58 +481,13 @@ class PdfAuditApiService {
         );
       }, timeout);
 
-      try {
-        while (!abortController.signal.aborted) {
-          // Check if timeout exceeded
-          if (Date.now() - startTime >= timeout) {
-            reject(
-              new PdfApiError(
-                'Audit polling timeout exceeded',
-                'POLLING_TIMEOUT',
-                408
-              )
-            );
-            return;
-          }
-
-          // Get current status
-          const status = await this.getAuditStatus(jobId);
-
-          // Check if completed
-          if (status.status === 'completed') {
-            const result = await this.getAuditResult(jobId);
-            resolve(result);
-            return;
-          }
-
-          // Check if failed
-          if (status.status === 'failed') {
-            reject(
-              new PdfApiError(
-                status.message || 'Audit failed',
-                'AUDIT_FAILED',
-                500
-              )
-            );
-            return;
-          }
-
-          // Wait before next poll
-          await sleep(interval);
-        }
-
-        reject(
-          new PdfApiError(
-            'Audit polling was aborted',
-            'POLLING_ABORTED',
-            499
-          )
-        );
-      } catch (error) {
-        reject(error);
-      } finally {
-        clearTimeout(timeoutId);
-      }
+      // Run polling logic
+      runPolling()
+        .then(resolve)
+        .catch(reject)
+        .finally(() => {
+          clearTimeout(timeoutId);
+        });
     });
 
     return {

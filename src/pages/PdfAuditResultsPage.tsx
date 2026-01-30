@@ -12,7 +12,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FileText, Loader2, Download, Share2, RotateCw, Filter, X, ChevronDown } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Card, CardContent } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -23,7 +23,7 @@ import { PdfPreviewPanel } from '@/components/pdf/PdfPreviewPanel';
 import { IssueCard } from '@/components/remediation/IssueCard';
 import { api } from '@/services/api';
 import { cn } from '@/utils/cn';
-import type { PdfAuditResult, PdfAuditIssue, MatterhornCategory } from '@/types/pdf.types';
+import type { PdfAuditResult, PdfAuditIssue } from '@/types/pdf.types';
 import type { IssueSeverity } from '@/types/accessibility.types';
 
 // Filter state interface

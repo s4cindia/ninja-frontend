@@ -1,0 +1,55 @@
+Implement FE-PDF-7: PDF API Service Layer
+
+Create the API service for PDF audit operations.
+
+File to create: src/services/api/pdfAuditApi.ts
+
+Requirements:
+
+1. API methods:
+   - uploadPdfForAudit(file: File, onProgress?: (pct: number) => void): Promise<{ jobId: string }>
+   - getAuditStatus(jobId: string): Promise<{ status: string, progress: number }>
+   - getAuditResult(jobId: string): Promise<PdfAuditResult>
+   - getAcrReport(jobId: string, format: 'json' | 'html'): Promise<ACRReport>
+   - downloadReport(jobId: string, format: 'pdf' | 'docx'): Promise<Blob>
+   - listAudits(page?: number, limit?: number): Promise<PdfAuditListResponse>
+   - deleteAudit(jobId: string): Promise<void>
+
+2. Polling helper:
+   - pollForCompletion(jobId: string, interval?: number, timeout?: number): Promise<PdfAuditResult>
+   - Poll every 2 seconds until status is 'completed' or 'failed'
+   - Timeout after 5 minutes (300000ms)
+   - Return result when complete
+   - Throw error on timeout or failure
+
+3. Error handling:
+   - Create PdfApiError class with code, message, status
+   - Handle network errors gracefully
+   - Retry logic for transient failures (503, network errors)
+   - Max 3 retries with exponential backoff
+
+4. Types:
+   - Import types from src/types/pdf.types.ts
+   - Define ACRReport type if not exists
+   - Export service as singleton instance
+
+5. Base configuration:
+   - Use existing API client/axios instance from the project
+   - Add auth headers automatically
+   - Handle 401 with redirect to login
+   - Base URL: use environment variable or existing config
+
+6. Progress tracking:
+   - Support upload progress callback using axios onUploadProgress
+   - Map processing progress from status endpoint
+
+7. Cancellation support:
+   - Return AbortController or cancel method for long-running operations
+   - Support cancelling polling
+
+Reference:
+- Existing EPUB API service for patterns (check src/services/ folder)
+- PDF types from src/types/pdf.types.ts
+- Upload service patterns from src/services/upload.service.ts
+
+Tests: Create pdfAuditApi.test.ts with mocked axios responses

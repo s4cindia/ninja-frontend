@@ -73,10 +73,11 @@ interface IssueHighlight {
  * - "Page 5, x:100 y:200 w:300 h:50"
  * - "x:100, y:200, width:300, height:50"
  */
-function parseIssueLocation(issue: PdfAuditIssue): IssueHighlight | null {
+function parseIssueLocation(_issue: PdfAuditIssue): IssueHighlight | null {
   // This is a placeholder - actual implementation would parse
-  // issue.elementPath or a dedicated location field
+  // _issue.elementPath or a dedicated location field
   // For now, return null if no valid location data
+  // TODO: Implement coordinate parsing when backend provides location data
   return null;
 }
 

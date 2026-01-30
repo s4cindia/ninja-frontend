@@ -114,7 +114,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     }
   }, [jobStatus]);
 
-  const validateFile = (file: File): string | null => {
+  const validateFile = useCallback((file: File): string | null => {
     const fileType = detectFileType(file);
 
     if (!fileType) {
@@ -131,7 +131,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     }
 
     return null;
-  };
+  }, [acceptedFileTypes]);
 
   const handleFileSelect = useCallback((file: File) => {
     const validationError = validateFile(file);
@@ -142,7 +142,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     }
     setSelectedFile(file);
     setError(null);
-  }, [onError]);
+  }, [validateFile, onError]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

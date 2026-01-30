@@ -197,9 +197,9 @@ export const PdfViewerIntegrationExample: React.FC = () => {
 };
 
 // Example 5: PDF Audit Results Page
-export const AuditResultsPageExample: React.FC<{ pdfAuditResult: any }> = ({
-  pdfAuditResult
-}) => {
+export const AuditResultsPageExample: React.FC<{
+  pdfAuditResult: { issues: PdfAuditIssue[]; pageCount: number };
+}> = ({ pdfAuditResult }) => {
   const [currentPage, setCurrentPage] = useState(1);
 
   // Group issues by page

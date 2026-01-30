@@ -126,9 +126,9 @@ export const MixedIssuesListExample: React.FC = () => {
 };
 
 // Example 8: PDF Audit Results Integration
-export const PdfAuditResultsExample: React.FC<{ pdfAuditResult: any }> = ({
-  pdfAuditResult
-}) => {
+export const PdfAuditResultsExample: React.FC<{
+  pdfAuditResult: { jobId: string; issues: PdfAuditIssue[] };
+}> = ({ pdfAuditResult }) => {
   const handlePageClick = (pageNumber: number) => {
     // Open PDF viewer at specific page
     const jobId = pdfAuditResult.jobId;

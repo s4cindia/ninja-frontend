@@ -139,9 +139,9 @@ export const WithSidebarExample: React.FC = () => {
 };
 
 // Example 3: PDF Audit Results Page
-export const AuditResultsExample: React.FC<{ pdfAuditResult: any }> = ({
-  pdfAuditResult,
-}) => {
+export const AuditResultsExample: React.FC<{
+  pdfAuditResult: { pdfUrl: string; fileName: string; issues: PdfAuditIssue[] };
+}> = ({ pdfAuditResult }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedIssueId, setSelectedIssueId] = useState<string>();
 

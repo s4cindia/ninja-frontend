@@ -183,28 +183,11 @@ export const WithErrorBoundaryExample: React.FC = () => {
 };
 
 // Example 6: Integration with state management (Redux/Zustand)
-interface AuditState {
-  currentJobId: string | null;
-  setCurrentJobId: (jobId: string) => void;
-}
-
-// Simulated state store
-const useAuditStore = (() => {
-  let state: AuditState = {
-    currentJobId: null,
-    setCurrentJobId: (jobId: string) => {
-      state.currentJobId = jobId;
-    },
-  };
-
-  return () => state;
-})();
-
 export const WithStateManagementExample: React.FC = () => {
-  const store = useAuditStore();
+  const [currentJobId, setCurrentJobId] = React.useState<string | null>(null);
 
   const handleJobComplete = (jobId: string) => {
-    store.setCurrentJobId(jobId);
+    setCurrentJobId(jobId);
   };
 
   return (
@@ -217,9 +200,9 @@ export const WithStateManagementExample: React.FC = () => {
           Start Audit
         </button>
 
-        {store.currentJobId && (
+        {currentJobId && (
           <Link
-            to={`/pdf/audit/${store.currentJobId}`}
+            to={`/pdf/audit/${currentJobId}`}
             className="block text-blue-600 hover:underline"
           >
             View Current Audit Results

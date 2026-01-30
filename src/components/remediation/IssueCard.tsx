@@ -28,7 +28,6 @@ interface IssueCardProps {
   onClick?: () => void;
   onPageClick?: (pageNumber: number) => void;
   showMatterhorn?: boolean;
-  compact?: boolean;
 }
 
 export function IssueCard({
@@ -37,7 +36,6 @@ export function IssueCard({
   onClick,
   onPageClick,
   showMatterhorn = false,
-  compact = false
 }: IssueCardProps) {
   const isPdf = isPdfIssue(issue);
   const getConfidenceBadge = () => {

@@ -380,13 +380,20 @@ export function PdfAuditComponent() {
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileUpload(file);
+    }
+  };
+
   return (
     <div>
       {/* File upload UI */}
       <input
         type="file"
         accept=".pdf"
-        onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
+        onChange={handleFileChange}
         disabled={isUploading}
       />
 

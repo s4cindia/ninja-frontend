@@ -9,7 +9,12 @@ import type { PdfAuditResult, PdfAuditIssue, MatterhornSummary } from '@/types/p
 // Mock dependencies
 jest.mock('@/services/api');
 jest.mock('@/components/pdf/PdfPreviewPanel', () => ({
-  PdfPreviewPanel: ({ pdfUrl, currentPage, onPageChange, onIssueSelect }: any) => (
+  PdfPreviewPanel: ({ pdfUrl, currentPage, onPageChange, onIssueSelect }: {
+    pdfUrl: string;
+    currentPage: number;
+    onPageChange: (page: number) => void;
+    onIssueSelect: (issue: { id: string }) => void;
+  }) => (
     <div data-testid="pdf-preview-panel">
       <div>PDF URL: {pdfUrl}</div>
       <div>Current Page: {currentPage}</div>
@@ -20,7 +25,11 @@ jest.mock('@/components/pdf/PdfPreviewPanel', () => ({
 }));
 
 jest.mock('@/components/pdf/PdfPageNavigator', () => ({
-  PdfPageNavigator: ({ pageCount, currentPage, onPageChange }: any) => (
+  PdfPageNavigator: ({ pageCount, currentPage, onPageChange }: {
+    pageCount: number;
+    currentPage: number;
+    onPageChange: (page: number) => void;
+  }) => (
     <div data-testid="pdf-page-navigator">
       <div>Pages: {pageCount}</div>
       <div>Current: {currentPage}</div>
@@ -30,7 +39,10 @@ jest.mock('@/components/pdf/PdfPageNavigator', () => ({
 }));
 
 jest.mock('@/components/pdf/MatterhornSummary', () => ({
-  MatterhornSummary: ({ summary, onCheckpointClick }: any) => (
+  MatterhornSummary: ({ summary, onCheckpointClick }: {
+    summary: { totalCheckpoints: number };
+    onCheckpointClick: (id: string) => void;
+  }) => (
     <div data-testid="matterhorn-summary">
       <div>Total Checkpoints: {summary.totalCheckpoints}</div>
       <button onClick={() => onCheckpointClick('01-003')}>Click Checkpoint</button>
@@ -39,10 +51,13 @@ jest.mock('@/components/pdf/MatterhornSummary', () => ({
 }));
 
 jest.mock('@/components/remediation/IssueCard', () => ({
-  IssueCard: ({ issue, onPageClick }: any) => (
+  IssueCard: ({ issue, onPageClick }: {
+    issue: { id: string; message: string; pageNumber?: number };
+    onPageClick?: (page: number) => void;
+  }) => (
     <div data-testid={`issue-card-${issue.id}`}>
       <div>{issue.message}</div>
-      <button onClick={() => onPageClick && onPageClick(issue.pageNumber)}>
+      <button onClick={() => onPageClick && onPageClick(issue.pageNumber!)}>
         Go to Page {issue.pageNumber}
       </button>
     </div>
@@ -533,8 +548,8 @@ describe('PdfAuditResultsPage', () => {
         click: jest.fn(),
         href: '',
         download: '',
-      };
-      jest.spyOn(document, 'createElement').mockReturnValue(mockLink as any);
+      } as unknown as HTMLAnchorElement;
+      jest.spyOn(document, 'createElement').mockReturnValue(mockLink);
       jest.spyOn(document.body, 'appendChild').mockImplementation();
       jest.spyOn(document.body, 'removeChild').mockImplementation();
 

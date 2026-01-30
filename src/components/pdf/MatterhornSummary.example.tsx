@@ -136,13 +136,16 @@ export const CollapsedExample: React.FC = () => {
 };
 
 // Example 4: Integration with PDF audit results
-export const PDFAuditResultsExample: React.FC<{ pdfAuditResult: any }> = ({
-  pdfAuditResult
-}) => {
+export const PDFAuditResultsExample: React.FC<{
+  pdfAuditResult: {
+    matterhornSummary: MatterhornSummaryType;
+    issues: Array<{ id: string; matterhornCheckpoint?: string }>;
+  };
+}> = ({ pdfAuditResult }) => {
   const handleCheckpointClick = (checkpointId: string) => {
     // Filter issues by Matterhorn checkpoint
     const relatedIssues = pdfAuditResult.issues.filter(
-      (issue: any) => issue.matterhornCheckpoint === checkpointId
+      (issue) => issue.matterhornCheckpoint === checkpointId
     );
     console.log('Issues for checkpoint', checkpointId, relatedIssues);
   };
