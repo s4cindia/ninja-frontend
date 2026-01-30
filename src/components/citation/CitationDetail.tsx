@@ -26,6 +26,8 @@ import {
 } from './badgeStyles';
 import type { Citation } from '@/types/citation.types';
 
+const HEADER_HEIGHT_PX = 64;
+
 interface CitationDetailProps {
   citation: Citation;
   onClose: () => void;
@@ -142,7 +144,7 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
         </div>
 
         {/* Content */}
-        <div className="p-4 overflow-y-auto space-y-6 h-[calc(100%-64px)]">
+        <div className={`p-4 overflow-y-auto space-y-6 h-[calc(100%-${HEADER_HEIGHT_PX}px)]`}>
           {/* Raw Citation Text */}
           <Card className="p-4">
             <h3 className="text-sm font-medium text-gray-700 mb-2">
