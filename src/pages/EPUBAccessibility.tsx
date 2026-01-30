@@ -13,7 +13,9 @@ import { api } from '@/services/api';
 interface UploadSummary {
   jobId: string;
   fileName?: string;
-  epubVersion: string;
+  fileType: 'epub' | 'pdf';
+  epubVersion?: string;
+  pdfVersion?: string;
   isValid: boolean;
   accessibilityScore: number;
   issuesSummary: {
@@ -133,6 +135,7 @@ export const EPUBAccessibility: React.FC = () => {
       const fullResult: AuditResult = {
         jobId: data.jobId || jobId,
         fileName: data.fileName || 'document.epub',
+        fileType: data.fileType || 'epub',
         epubVersion: data.epubVersion || 'EPUB 3.0',
         isValid: data.isValid ?? true,
         accessibilityScore: data.accessibilityScore ?? 72,
@@ -165,11 +168,14 @@ export const EPUBAccessibility: React.FC = () => {
       moderate: 4,
       minor: 3,
     };
-    
+
     const isDemoJob = summary.jobId.startsWith('demo-');
-    
+
+    // Route to appropriate endpoint based on file type
+    const endpointPrefix = summary.fileType === 'pdf' ? '/pdf' : '/epub';
+
     try {
-      const response = await api.get(`/epub/job/${summary.jobId}/audit/result`);
+      const response = await api.get(`${endpointPrefix}/job/${summary.jobId}/audit/result`);
       const data = response.data.data || response.data;
       
       // API returns combinedIssues, not issues
@@ -191,7 +197,7 @@ export const EPUBAccessibility: React.FC = () => {
       // Fetch remediation stats to get accurate fix type breakdown
       let fixTypeStats: { auto: number; quickfix: number; manual: number } | undefined;
       try {
-        const remediationResponse = await api.get(`/epub/job/${summary.jobId}/remediation`);
+        const remediationResponse = await api.get(`${endpointPrefix}/job/${summary.jobId}/remediation`);
         const remediationData = remediationResponse.data.data || remediationResponse.data;
         if (remediationData.stats?.byFixType) {
           fixTypeStats = remediationData.stats.byFixType;
@@ -204,7 +210,9 @@ export const EPUBAccessibility: React.FC = () => {
       const fullResult: AuditResult = {
         jobId: data.jobId || summary.jobId,
         fileName,
-        epubVersion: data.epubVersion || summary.epubVersion || 'EPUB 3.0',
+        fileType: summary.fileType,
+        epubVersion: summary.fileType === 'epub' ? (data.epubVersion || summary.epubVersion || 'EPUB 3.0') : undefined,
+        pdfVersion: summary.fileType === 'pdf' ? (data.pdfVersion || summary.pdfVersion || 'PDF 1.7') : undefined,
         isValid: data.isValid ?? summary.isValid ?? true,
         accessibilityScore: data.accessibilityScore ?? summary.accessibilityScore ?? 72,
         issuesSummary: data.issuesSummary || calculatedSummary,
@@ -217,8 +225,10 @@ export const EPUBAccessibility: React.FC = () => {
       console.warn('[EPUBAccessibility] Failed to fetch audit result, using summary data. isDemoJob:', isDemoJob);
       const fallbackResult: AuditResult = {
         jobId: summary.jobId,
-        fileName: summary.fileName || 'document.epub',
-        epubVersion: summary.epubVersion || 'EPUB 3.0',
+        fileName: summary.fileName || `document.${summary.fileType}`,
+        fileType: summary.fileType,
+        epubVersion: summary.fileType === 'epub' ? (summary.epubVersion || 'EPUB 3.0') : undefined,
+        pdfVersion: summary.fileType === 'pdf' ? (summary.pdfVersion || 'PDF 1.7') : undefined,
         isValid: summary.isValid ?? true,
         accessibilityScore: summary.accessibilityScore ?? 72,
         issuesSummary,
@@ -277,13 +287,15 @@ export const EPUBAccessibility: React.FC = () => {
     console.log('[EPUBAccessibility] jobId:', auditResult.jobId);
     console.log('[EPUBAccessibility] isDemo:', isDemo);
     console.log('[EPUBAccessibility] autoFixableIssues count:', autoFixableIssues.length);
-    
+
+    const endpointPrefix = auditResult.fileType === 'pdf' ? '/pdf' : '/epub';
+
     try {
-      await api.post(`/epub/job/${auditResult.jobId}/remediation`);
-      navigate(`/epub/remediate/${auditResult.jobId}`, { state: remediationState });
+      await api.post(`${endpointPrefix}/job/${auditResult.jobId}/remediation`);
+      navigate(`${endpointPrefix}/remediate/${auditResult.jobId}`, { state: remediationState });
     } catch {
       console.warn('[EPUBAccessibility] API unavailable, navigating to remediation page');
-      navigate(`/epub/remediate/${auditResult.jobId}`, { state: remediationState });
+      navigate(`${endpointPrefix}/remediate/${auditResult.jobId}`, { state: remediationState });
     } finally {
       setIsCreatingPlan(false);
     }
@@ -305,12 +317,14 @@ export const EPUBAccessibility: React.FC = () => {
 
   const handleDownloadReport = async () => {
     if (!auditResult) return;
-    
+
     setIsDownloading(true);
-    const filename = `epub-audit-report-${auditResult.jobId}.json`;
-    
+    const fileType = auditResult.fileType || 'epub';
+    const filename = `${fileType}-audit-report-${auditResult.jobId}.json`;
+    const endpointPrefix = fileType === 'pdf' ? '/pdf' : '/epub';
+
     try {
-      const response = await api.get(`/epub/job/${auditResult.jobId}/report`, {
+      const response = await api.get(`${endpointPrefix}/job/${auditResult.jobId}/report`, {
         params: { format: 'json' },
       });
       const data = response.data.data || response.data;

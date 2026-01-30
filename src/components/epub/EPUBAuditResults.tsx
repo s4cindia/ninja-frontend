@@ -32,7 +32,9 @@ interface AuditIssue {
 interface AuditResult {
   jobId: string;
   fileName?: string;
-  epubVersion: string;
+  fileType?: 'epub' | 'pdf';
+  epubVersion?: string;
+  pdfVersion?: string;
   isValid: boolean;
   accessibilityScore: number;
   issuesSummary: {
@@ -223,7 +225,10 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
   const jobId = result?.jobId ?? '';
   const issues = useMemo(() => result?.issues ?? [], [result?.issues]);
   const isValid = result?.isValid ?? false;
-  const epubVersion = result?.epubVersion ?? 'Unknown';
+  const fileType = result?.fileType || 'epub';
+  const documentVersion = fileType === 'pdf'
+    ? (result?.pdfVersion ?? 'Unknown')
+    : (result?.epubVersion ?? 'Unknown');
   
   // Build issuesSummary with fallbacks - compute from issues if not provided
   const issuesSummary = useMemo(() => {
@@ -370,10 +375,10 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
             <p className="mt-3 font-medium text-gray-900">Accessibility Score</p>
             <div className="flex items-center gap-2 mt-2">
               <Badge variant={isValid ? 'success' : 'error'} size="sm">
-                {isValid ? 'Valid EPUB' : 'Invalid EPUB'}
+                {isValid ? `Valid ${fileType.toUpperCase()}` : `Invalid ${fileType.toUpperCase()}`}
               </Badge>
               <Badge variant="info" size="sm">
-                {epubVersion}
+                {documentVersion}
               </Badge>
             </div>
             <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100">
