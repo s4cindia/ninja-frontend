@@ -17,6 +17,7 @@ import { Tabs } from '@/components/ui/Tabs';
 import { ParsedComponentsView } from './ParsedComponentsView';
 import { useCitationComponents, useParseCitation } from '@/hooks/useCitation';
 import { cn } from '@/utils/cn';
+import { normalizeConfidence } from '@/utils/citation.utils';
 import { CONFIDENCE_THRESHOLDS } from '@/types/citation.types';
 import {
   CITATION_TYPE_BADGE_COLORS,
@@ -156,13 +157,18 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
                   {citation.detectedStyle}
                 </Badge>
               )}
-              <Badge className={cn(
-                citation.confidence >= CONFIDENCE_THRESHOLDS.HIGH ? CONFIDENCE_BADGE_COLORS.high :
-                citation.confidence >= CONFIDENCE_THRESHOLDS.MEDIUM ? CONFIDENCE_BADGE_COLORS.medium :
-                CONFIDENCE_BADGE_COLORS.low
-              )}>
-                {citation.confidence}% confidence
-              </Badge>
+              {(() => {
+                const normalizedConfidence = normalizeConfidence(citation.confidence);
+                return (
+                  <Badge className={cn(
+                    normalizedConfidence >= CONFIDENCE_THRESHOLDS.HIGH ? CONFIDENCE_BADGE_COLORS.high :
+                    normalizedConfidence >= CONFIDENCE_THRESHOLDS.MEDIUM ? CONFIDENCE_BADGE_COLORS.medium :
+                    CONFIDENCE_BADGE_COLORS.low
+                  )}>
+                    {normalizedConfidence}% confidence
+                  </Badge>
+                );
+              })()}
             </div>
 
             {/* Location info */}
