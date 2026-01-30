@@ -47,7 +47,7 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
 
   const handleParse = useCallback(() => {
     parseMutation.mutate(citation.id);
-  }, [citation.id]); // parseMutation is stable from React Query
+  }, [citation.id, parseMutation]);
 
   const hasParsedComponent = !!citation.primaryComponent;
 
