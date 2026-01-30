@@ -207,6 +207,7 @@ export const LongDescriptionEditor: React.FC<LongDescriptionEditorProps> = ({
       </div>
 
       <div className="p-4">
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: HTML is sanitized with DOMPurify.sanitize() */}
         {viewMode === 'preview' ? (
           <div 
             className="prose prose-sm max-w-none"

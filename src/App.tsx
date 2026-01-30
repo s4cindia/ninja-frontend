@@ -30,6 +30,7 @@ import { TestImagePreviewCard } from '@/pages/test/TestImagePreviewCard';
 import { TestBatchApprovalPanel } from '@/pages/test/TestBatchApprovalPanel';
 import { TestChartDescriptionViewer } from '@/pages/test/TestChartDescriptionViewer';
 import { TestLongDescriptionEditor } from '@/pages/test/TestLongDescriptionEditor';
+import { TestCitationComponents } from '@/test-pages/TestCitationComponents';
 import { VerificationQueuePage } from '@/pages/acr/VerificationQueuePage';
 import { AcrEditorPage } from '@/pages/acr/AcrEditorPage';
 import { AcrWorkflowPage } from '@/pages/acr/AcrWorkflowPage';
@@ -187,6 +188,7 @@ function AppRoutes() {
         <Route path="/test/batch-approval" element={<TestBatchApprovalPanel />} />
         <Route path="/test/chart-description" element={<TestChartDescriptionViewer />} />
         <Route path="/test/long-description" element={<TestLongDescriptionEditor />} />
+        <Route path="/test/citations" element={<TestCitationComponents />} />
 
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<NotFound />} />

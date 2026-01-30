@@ -268,6 +268,7 @@ const RemediationGuidance: React.FC<{
         )}
       </div>
     )}
+    {/* biome-ignore lint/security/noDangerouslySetInnerHtml: HTML is sanitized with DOMPurify.sanitize() */}
     <ol className="list-decimal list-inside space-y-1.5 text-sm text-amber-900">
       {steps.map((step, idx) => (
         <li
@@ -297,6 +298,7 @@ const RemediationGuidance: React.FC<{
             </p>
             <CopyButton text={codeExample.after} label="Copy Code" />
           </div>
+          {/* biome-ignore lint/security/noDangerouslySetInnerHtml: HTML is sanitized with DOMPurify.sanitize() */}
           <pre
             className="p-2 bg-green-50 border border-green-200 rounded text-xs overflow-x-auto font-mono text-green-800"
             dangerouslySetInnerHTML={{
