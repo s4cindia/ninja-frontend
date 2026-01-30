@@ -14,7 +14,7 @@ import {
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/utils/cn';
-import { isSafeUrl, normalizeConfidence, normalizeDoiUrl, isBareDoi } from '@/utils/citation.utils';
+import { isSafeUrl, normalizeConfidence, normalizeDoiUrl } from '@/utils/citation.utils';
 import type { CitationComponent, SourceType } from '@/types/citation.types';
 import { REVIEW_REASON_LABELS, CONFIDENCE_THRESHOLDS } from '@/types/citation.types';
 import {
@@ -277,7 +277,7 @@ export function ParsedComponentsView({
           value={component.doi}
           confidence={fieldConfidence.doi}
           showConfidence={showConfidence}
-          isLink={component.doi ? (component.doi.startsWith('http') || isBareDoi(component.doi)) : false}
+          isLink={component.doi ? isSafeUrl(normalizeDoiUrl(component.doi)) : false}
           linkHref={component.doi ? normalizeDoiUrl(component.doi) : undefined}
         />
 
