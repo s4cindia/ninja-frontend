@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
+import DOMPurify from 'dompurify';
 import {
   ChevronDown,
   ChevronUp,
@@ -14,6 +15,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
+import { normalizeConfidence } from '@/utils/citation.utils';
 import { CONFIDENCE_THRESHOLDS } from '@/types/citation.types';
 import type { Citation, CitationType, CitationStyle } from '@/types/citation.types';
 
@@ -45,7 +47,7 @@ const styleColors: Record<CitationStyle, string> = {
 };
 
 function ConfidenceBadge({ confidence }: { confidence: number }) {
-  const percent = confidence <= 1 ? Math.round(confidence * 100) : Math.round(confidence);
+  const percent = normalizeConfidence(confidence);
   const color = percent >= CONFIDENCE_THRESHOLDS.HIGH
     ? 'text-green-600'
     : percent >= CONFIDENCE_THRESHOLDS.MEDIUM
@@ -59,7 +61,7 @@ function ConfidenceBadge({ confidence }: { confidence: number }) {
   );
 }
 
-function CitationRow({
+const CitationRow = memo(function CitationRow({
   citation,
   onParse,
   onViewDetail,
@@ -72,6 +74,7 @@ function CitationRow({
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const hasParsedComponent = !!citation.primaryComponent;
+  const sanitizedText = DOMPurify.sanitize(citation.rawText);
 
   return (
     <Card className={cn(
@@ -89,7 +92,7 @@ function CitationRow({
             <div className="flex items-start gap-2">
               <Quote className="h-4 w-4 text-gray-400 mt-1 flex-shrink-0" />
               <p className="text-sm text-gray-900 font-medium line-clamp-2">
-                {citation.rawText}
+                {sanitizedText}
               </p>
             </div>
 
@@ -225,7 +228,7 @@ function CitationRow({
       )}
     </Card>
   );
-}
+});
 
 export function CitationList({
   citations,

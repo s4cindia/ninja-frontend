@@ -10,7 +10,7 @@ import type {
   CitationStats,
 } from '@/types/citation.types';
 
-const STALE_TIME = 5 * 60 * 1000; // 5 minutes
+const STALE_TIME = 10 * 60 * 1000; // 10 minutes - citation data is relatively static
 
 // Query keys for cache management
 export const citationKeys = {
@@ -119,11 +119,9 @@ export function useParseCitation() {
 
   return useMutation<CitationComponent, Error, string>({
     mutationFn: (citationId: string) => citationService.parse(citationId),
-    onSuccess: (_data, citationId) => {
-      // Update citation detail cache
-      queryClient.invalidateQueries({ queryKey: citationKeys.detail(citationId) });
-      queryClient.invalidateQueries({ queryKey: citationKeys.components(citationId) });
-      // Invalidate list queries
+    onSuccess: async (_data, citationId) => {
+      await queryClient.refetchQueries({ queryKey: citationKeys.detail(citationId) });
+      await queryClient.refetchQueries({ queryKey: citationKeys.components(citationId) });
       queryClient.invalidateQueries({ queryKey: citationKeys.all });
     },
   });

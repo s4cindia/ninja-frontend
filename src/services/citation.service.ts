@@ -1,4 +1,6 @@
+import axios from 'axios';
 import { api, ApiResponse } from './api';
+import { validateId } from '@/utils/citation.utils';
 import type {
   Citation,
   CitationComponent,
@@ -25,11 +27,15 @@ function handleError(error: unknown, context: string): never {
     throw error;
   }
   
-  const axiosError = error as { response?: { status?: number; data?: { message?: string } }; message?: string };
-  const statusCode = axiosError.response?.status;
-  const message = axiosError.response?.data?.message || axiosError.message || `${context} failed`;
+  if (axios.isAxiosError(error)) {
+    const statusCode = error.response?.status;
+    const message = error.response?.data?.message || error.message;
+    const err = new CitationServiceError(message, context, statusCode);
+    err.stack = error.stack;
+    throw err;
+  }
   
-  throw new CitationServiceError(message, context, statusCode);
+  throw error;
 }
 
 export const citationService = {
@@ -58,6 +64,7 @@ export const citationService = {
    * POST /api/v1/citation/detect/:jobId
    */
   async detectFromJob(jobId: string): Promise<DetectionResult> {
+    validateId(jobId, 'job ID');
     try {
       const response = await api.post<ApiResponse<DetectionResult>>(
         `/citation/detect/${jobId}`
@@ -76,6 +83,7 @@ export const citationService = {
     documentId: string,
     filters?: CitationFilters
   ): Promise<PaginatedCitations> {
+    validateId(documentId, 'document ID');
     try {
       const params = new URLSearchParams();
       if (filters?.type) params.append('type', filters.type);
@@ -103,6 +111,7 @@ export const citationService = {
     jobId: string,
     filters?: CitationFilters
   ): Promise<PaginatedCitations> {
+    validateId(jobId, 'job ID');
     try {
       const params = new URLSearchParams();
       if (filters?.type) params.append('type', filters.type);
@@ -127,6 +136,7 @@ export const citationService = {
    * GET /api/v1/citation/:citationId
    */
   async getById(citationId: string): Promise<Citation> {
+    validateId(citationId, 'citation ID');
     try {
       const response = await api.get<ApiResponse<Citation>>(
         `/citation/${citationId}`
@@ -142,6 +152,7 @@ export const citationService = {
    * POST /api/v1/citation/:citationId/parse
    */
   async parse(citationId: string): Promise<CitationComponent> {
+    validateId(citationId, 'citation ID');
     try {
       const response = await api.post<ApiResponse<CitationComponent>>(
         `/citation/${citationId}/parse`
@@ -157,6 +168,7 @@ export const citationService = {
    * POST /api/v1/citation/document/:documentId/parse-all
    */
   async parseAll(documentId: string): Promise<BulkParseResult> {
+    validateId(documentId, 'document ID');
     try {
       const response = await api.post<ApiResponse<BulkParseResult>>(
         `/citation/document/${documentId}/parse-all`
@@ -172,6 +184,7 @@ export const citationService = {
    * GET /api/v1/citation/:citationId/components
    */
   async getComponents(citationId: string): Promise<CitationComponent[]> {
+    validateId(citationId, 'citation ID');
     try {
       const response = await api.get<ApiResponse<CitationComponent[]>>(
         `/citation/${citationId}/components`
@@ -187,6 +200,7 @@ export const citationService = {
    * GET /api/v1/citation/document/:documentId/stats
    */
   async getStats(documentId: string): Promise<CitationStats> {
+    validateId(documentId, 'document ID');
     try {
       const response = await api.get<ApiResponse<CitationStats>>(
         `/citation/document/${documentId}/stats`

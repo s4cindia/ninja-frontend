@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import DOMPurify from 'dompurify';
 import {
   X,
   Quote,
@@ -39,7 +40,7 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
 
   const handleParse = useCallback(() => {
     parseMutation.mutate(citation.id);
-  }, [parseMutation, citation.id]);
+  }, [citation.id]); // parseMutation is stable from React Query
 
   const hasParsedComponent = !!citation.primaryComponent;
 
@@ -130,7 +131,7 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
               Original Citation
             </h3>
             <p className="text-gray-900 bg-gray-50 p-3 rounded-lg border">
-              {citation.rawText}
+              {DOMPurify.sanitize(citation.rawText)}
             </p>
 
             {/* Metadata badges */}

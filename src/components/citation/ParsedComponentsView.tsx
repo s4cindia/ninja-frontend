@@ -14,6 +14,7 @@ import {
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/utils/cn';
+import { isSafeUrl } from '@/utils/citation.utils';
 import type { CitationComponent, SourceType } from '@/types/citation.types';
 import { REVIEW_REASON_LABELS } from '@/types/citation.types';
 
@@ -74,15 +75,7 @@ function FieldRow({
       <div className="flex-1 min-w-0">
         <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
         {isLink ? (
-          <a
-            href={value}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-blue-600 hover:underline flex items-center gap-1"
-          >
-            {value}
-            <ExternalLink className="h-3 w-3" />
-          </a>
+          <SafeLink url={value}>{value}</SafeLink>
         ) : (
           <p className="text-sm text-gray-900">{value}</p>
         )}
@@ -96,6 +89,23 @@ function FieldRow({
         </div>
       )}
     </div>
+  );
+}
+
+function SafeLink({ url, children }: { url: string; children: React.ReactNode }) {
+  if (!isSafeUrl(url)) {
+    return <span className="text-sm text-gray-900">{url}</span>;
+  }
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+    >
+      {children}
+      <ExternalLink className="h-3 w-3" />
+    </a>
   );
 }
 
