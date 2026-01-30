@@ -17,6 +17,12 @@ import { cn } from '@/utils/cn';
 import { isSafeUrl } from '@/utils/citation.utils';
 import type { CitationComponent, SourceType } from '@/types/citation.types';
 import { REVIEW_REASON_LABELS } from '@/types/citation.types';
+import {
+  SOURCE_TYPE_BADGE_COLOR,
+  PARSE_VARIANT_BADGE_COLOR,
+  CONFIDENCE_BADGE_COLORS,
+  STATUS_BADGE_COLORS,
+} from './badgeStyles';
 
 interface ParsedComponentsViewProps {
   component: CitationComponent;
@@ -121,34 +127,30 @@ export function ParsedComponentsView({
       {/* Header with Source Type, Parse Variant, and Primary indicator */}
       <div className="p-4 bg-gray-50 flex items-center gap-2 flex-wrap">
         {component.sourceType && (
-          <Badge className="bg-blue-100 text-blue-800">
+          <Badge className={SOURCE_TYPE_BADGE_COLOR}>
             {sourceTypeLabels[component.sourceType]}
           </Badge>
         )}
-        {/* Parse Variant - which style was used to parse */}
         {component.parseVariant && (
-          <Badge className="bg-purple-100 text-purple-800">
+          <Badge className={PARSE_VARIANT_BADGE_COLOR}>
             Parsed as {component.parseVariant}
           </Badge>
         )}
-        {/* Confidence score */}
         <Badge className={cn(
-          component.confidence >= 0.8 ? 'bg-green-100 text-green-800' :
-          component.confidence >= 0.5 ? 'bg-yellow-100 text-yellow-800' :
-          'bg-red-100 text-red-800'
+          component.confidence >= 0.8 ? CONFIDENCE_BADGE_COLORS.high :
+          component.confidence >= 0.5 ? CONFIDENCE_BADGE_COLORS.medium :
+          CONFIDENCE_BADGE_COLORS.low
         )}>
           {Math.round(component.confidence * 100)}% confidence
         </Badge>
-        {/* Primary indicator - passed from parent */}
         {isPrimary && (
-          <Badge className="bg-green-100 text-green-800">
+          <Badge className={STATUS_BADGE_COLORS.primary}>
             <CheckCircle className="h-3 w-3 mr-1" />
             Primary
           </Badge>
         )}
-        {/* AC-26: Needs Review indicator */}
         {component.needsReview && (
-          <Badge className="bg-orange-100 text-orange-800">
+          <Badge className={STATUS_BADGE_COLORS.needsReview}>
             <AlertTriangle className="h-3 w-3 mr-1" />
             Needs Review
           </Badge>

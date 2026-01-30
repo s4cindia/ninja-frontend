@@ -18,7 +18,14 @@ import { ParsedComponentsView } from './ParsedComponentsView';
 import { useCitationComponents, useParseCitation } from '@/hooks/useCitation';
 import { cn } from '@/utils/cn';
 import { CONFIDENCE_THRESHOLDS } from '@/types/citation.types';
+import {
+  CITATION_TYPE_BADGE_COLORS,
+  CITATION_STYLE_BADGE_COLORS,
+  CONFIDENCE_BADGE_COLORS,
+} from './badgeStyles';
 import type { Citation } from '@/types/citation.types';
+
+const HEADER_HEIGHT_PX = 64;
 
 interface CitationDetailProps {
   citation: Citation;
@@ -124,7 +131,7 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
         </div>
 
         {/* Content */}
-        <div className="p-4 overflow-y-auto h-[calc(100%-64px)] space-y-6">
+        <div className={`p-4 overflow-y-auto h-[calc(100%-${HEADER_HEIGHT_PX}px)] space-y-6`}>
           {/* Raw Citation Text */}
           <Card className="p-4">
             <h3 className="text-sm font-medium text-gray-700 mb-2">
@@ -136,18 +143,18 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
 
             {/* Metadata badges */}
             <div className="flex flex-wrap gap-2 mt-3">
-              <Badge className="bg-blue-100 text-blue-800">
+              <Badge className={CITATION_TYPE_BADGE_COLORS[citation.citationType]}>
                 {citation.citationType.toLowerCase().replace(/_/g, ' ')}
               </Badge>
               {citation.detectedStyle && (
-                <Badge className="bg-green-100 text-green-800">
+                <Badge className={CITATION_STYLE_BADGE_COLORS[citation.detectedStyle]}>
                   {citation.detectedStyle}
                 </Badge>
               )}
               <Badge className={cn(
-                citation.confidence >= CONFIDENCE_THRESHOLDS.HIGH ? 'bg-green-100 text-green-800' :
-                citation.confidence >= CONFIDENCE_THRESHOLDS.MEDIUM ? 'bg-yellow-100 text-yellow-800' :
-                'bg-red-100 text-red-800'
+                citation.confidence >= CONFIDENCE_THRESHOLDS.HIGH ? CONFIDENCE_BADGE_COLORS.high :
+                citation.confidence >= CONFIDENCE_THRESHOLDS.MEDIUM ? CONFIDENCE_BADGE_COLORS.medium :
+                CONFIDENCE_BADGE_COLORS.low
               )}>
                 {citation.confidence}% confidence
               </Badge>

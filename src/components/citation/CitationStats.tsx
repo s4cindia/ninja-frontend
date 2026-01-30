@@ -10,6 +10,8 @@ import { Card } from '@/components/ui/Card';
 import { cn } from '@/utils/cn';
 import type { CitationStats as CitationStatsType } from '@/types/citation.types';
 
+const PERCENTAGE_MULTIPLIER = 100;
+
 interface CitationStatsProps {
   stats: CitationStatsType;
   isLoading?: boolean;
@@ -59,7 +61,7 @@ export function CitationStats({ stats, isLoading }: CitationStatsProps) {
   }
 
   const parseRate = stats.total > 0
-    ? Math.round((stats.parsed / stats.total) * 100)
+    ? Math.round((stats.parsed / stats.total) * PERCENTAGE_MULTIPLIER)
     : 0;
 
   return (

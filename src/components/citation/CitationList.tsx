@@ -17,7 +17,12 @@ import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
 import { normalizeConfidence } from '@/utils/citation.utils';
 import { CONFIDENCE_THRESHOLDS } from '@/types/citation.types';
-import type { Citation, CitationType, CitationStyle } from '@/types/citation.types';
+import {
+  CITATION_TYPE_BADGE_COLORS,
+  CITATION_STYLE_BADGE_COLORS,
+  STATUS_BADGE_COLORS,
+} from './badgeStyles';
+import type { Citation } from '@/types/citation.types';
 
 interface CitationListProps {
   citations: Citation[];
@@ -26,25 +31,6 @@ interface CitationListProps {
   onViewDetail?: (citation: Citation) => void;
   isParsing?: string | null;
 }
-
-const typeColors: Record<CitationType, string> = {
-  PARENTHETICAL: 'bg-blue-100 text-blue-800',
-  NARRATIVE: 'bg-green-100 text-green-800',
-  FOOTNOTE: 'bg-purple-100 text-purple-800',
-  ENDNOTE: 'bg-indigo-100 text-indigo-800',
-  NUMERIC: 'bg-orange-100 text-orange-800',
-  UNKNOWN: 'bg-gray-100 text-gray-800',
-};
-
-const styleColors: Record<CitationStyle, string> = {
-  APA: 'bg-sky-100 text-sky-800',
-  MLA: 'bg-emerald-100 text-emerald-800',
-  CHICAGO: 'bg-amber-100 text-amber-800',
-  VANCOUVER: 'bg-rose-100 text-rose-800',
-  HARVARD: 'bg-violet-100 text-violet-800',
-  IEEE: 'bg-cyan-100 text-cyan-800',
-  UNKNOWN: 'bg-gray-100 text-gray-800',
-};
 
 function ConfidenceBadge({ confidence }: { confidence: number }) {
   const percent = normalizeConfidence(confidence);
@@ -98,28 +84,27 @@ const CitationRow = memo(function CitationRow({
 
             {/* Badges */}
             <div className="flex flex-wrap gap-2 mt-2">
-              <Badge className={typeColors[citation.citationType]}>
+              <Badge className={CITATION_TYPE_BADGE_COLORS[citation.citationType]}>
                 {citation.citationType.toLowerCase().replace(/_/g, ' ')}
               </Badge>
               {citation.detectedStyle && (
-                <Badge className={styleColors[citation.detectedStyle]}>
+                <Badge className={CITATION_STYLE_BADGE_COLORS[citation.detectedStyle]}>
                   {citation.detectedStyle}
                 </Badge>
               )}
               {hasParsedComponent ? (
-                <Badge className="bg-green-100 text-green-800">
+                <Badge className={STATUS_BADGE_COLORS.parsed}>
                   <CheckCircle className="h-3 w-3 mr-1" />
                   Parsed
                 </Badge>
               ) : (
-                <Badge className="bg-yellow-100 text-yellow-800">
+                <Badge className={STATUS_BADGE_COLORS.unparsed}>
                   <AlertCircle className="h-3 w-3 mr-1" />
                   Unparsed
                 </Badge>
               )}
-              {/* AC-26: Show needs review badge */}
               {citation.needsReview && (
-                <Badge className="bg-orange-100 text-orange-800">
+                <Badge className={STATUS_BADGE_COLORS.needsReview}>
                   <AlertTriangle className="h-3 w-3 mr-1" />
                   Needs Review
                 </Badge>
