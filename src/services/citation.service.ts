@@ -50,8 +50,7 @@ export const citationService = {
 
       const response = await api.post<ApiResponse<DetectionResult>>(
         '/citation/detect',
-        formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } }
+        formData
       );
       return response.data.data;
     } catch (error) {

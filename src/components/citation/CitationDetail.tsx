@@ -162,10 +162,10 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
 
             {/* Location info */}
             <div className="text-xs text-gray-500 mt-3 flex gap-4">
-              {citation.pageNumber && (
+              {citation.pageNumber != null && (
                 <span>Page: {citation.pageNumber}</span>
               )}
-              {citation.paragraphIndex !== null && (
+              {citation.paragraphIndex != null && (
                 <span>Paragraph: {citation.paragraphIndex + 1}</span>
               )}
               <span>

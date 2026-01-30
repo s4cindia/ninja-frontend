@@ -106,7 +106,7 @@ export interface CitationComponent {
   id: string;
   citationId: string;
   parseVariant: string | null;   // Which style was used to parse (e.g., "APA", "MLA")
-  confidence: number;            // Overall parse confidence (0-1)
+  confidence: number;            // Overall parse confidence (0-100 percentage)
   authors: string[];
   year: string | null;
   title: string | null;
@@ -120,7 +120,7 @@ export interface CitationComponent {
   edition: string | null;
   accessDate: string | null;
   sourceType: SourceType | null;
-  fieldConfidence: Record<string, number>;
+  fieldConfidence: Record<string, number>;  // Field-level confidence (0-100 percentages)
   // Validation fields
   doiVerified: boolean | null;
   urlValid: boolean | null;

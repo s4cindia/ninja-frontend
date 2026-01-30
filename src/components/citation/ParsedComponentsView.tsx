@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/utils/cn';
 import { isSafeUrl } from '@/utils/citation.utils';
 import type { CitationComponent, SourceType } from '@/types/citation.types';
-import { REVIEW_REASON_LABELS } from '@/types/citation.types';
+import { REVIEW_REASON_LABELS, CONFIDENCE_THRESHOLDS } from '@/types/citation.types';
 import {
   SOURCE_TYPE_BADGE_COLOR,
   PARSE_VARIANT_BADGE_COLOR,
@@ -137,11 +137,11 @@ export function ParsedComponentsView({
           </Badge>
         )}
         <Badge className={cn(
-          component.confidence >= 0.8 ? CONFIDENCE_BADGE_COLORS.high :
-          component.confidence >= 0.5 ? CONFIDENCE_BADGE_COLORS.medium :
+          component.confidence >= CONFIDENCE_THRESHOLDS.HIGH ? CONFIDENCE_BADGE_COLORS.high :
+          component.confidence >= CONFIDENCE_THRESHOLDS.MEDIUM ? CONFIDENCE_BADGE_COLORS.medium :
           CONFIDENCE_BADGE_COLORS.low
         )}>
-          {Math.round(component.confidence * 100)}% confidence
+          {Math.round(component.confidence)}% confidence
         </Badge>
         {isPrimary && (
           <Badge className={STATUS_BADGE_COLORS.primary}>

@@ -129,10 +129,10 @@ const CitationRow = memo(function CitationRow({
         <div className="px-4 pb-4 border-t border-gray-100 pt-3 space-y-3">
           {/* Location info */}
           <div className="text-xs text-gray-500 flex gap-4">
-            {citation.pageNumber && (
+            {citation.pageNumber != null && (
               <span>Page: {citation.pageNumber}</span>
             )}
-            {citation.paragraphIndex !== null && (
+            {citation.paragraphIndex != null && (
               <span>Paragraph: {citation.paragraphIndex + 1}</span>
             )}
             <span>

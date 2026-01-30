@@ -1,15 +1,27 @@
-import { HTMLAttributes } from 'react';
+import { HTMLAttributes, ButtonHTMLAttributes } from 'react';
 import { clsx } from 'clsx';
 
-interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
+type BadgeBaseProps = {
   variant?: 'default' | 'success' | 'warning' | 'error' | 'info';
   size?: 'sm' | 'md';
-}
+  as?: 'span' | 'button';
+};
+
+type BadgeAsSpanProps = BadgeBaseProps & {
+  as?: 'span';
+} & HTMLAttributes<HTMLSpanElement>;
+
+type BadgeAsButtonProps = BadgeBaseProps & {
+  as: 'button';
+} & ButtonHTMLAttributes<HTMLButtonElement>;
+
+type BadgeProps = BadgeAsSpanProps | BadgeAsButtonProps;
 
 export function Badge({ 
   className, 
   variant = 'default', 
   size = 'md',
+  as = 'span',
   children, 
   ...props 
 }: BadgeProps) {
@@ -26,15 +38,30 @@ export function Badge({
     md: 'px-2.5 py-0.5 text-sm',
   };
 
+  const baseClasses = clsx(
+    'inline-flex items-center font-medium rounded-full',
+    variants[variant],
+    sizes[size],
+    as === 'button' && 'focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500',
+    className
+  );
+
+  if (as === 'button') {
+    return (
+      <button
+        type="button"
+        className={baseClasses}
+        {...(props as ButtonHTMLAttributes<HTMLButtonElement>)}
+      >
+        {children}
+      </button>
+    );
+  }
+
   return (
     <span
-      className={clsx(
-        'inline-flex items-center font-medium rounded-full',
-        variants[variant],
-        sizes[size],
-        className
-      )}
-      {...props}
+      className={baseClasses}
+      {...(props as HTMLAttributes<HTMLSpanElement>)}
     >
       {children}
     </span>
