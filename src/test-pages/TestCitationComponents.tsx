@@ -134,7 +134,7 @@ export function TestCitationComponents() {
     setParsingId(citationId);
     setTimeout(() => {
       setParsingId(null);
-      alert(`Citation ${citationId} parsed (mock)`);
+      console.log(`[Test] Citation ${citationId} parsed (mock)`);
     }, 1500);
   };
 
