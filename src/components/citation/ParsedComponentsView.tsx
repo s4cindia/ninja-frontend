@@ -14,7 +14,7 @@ import {
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/utils/cn';
-import { isTrustedCitationUrl, normalizeConfidence, normalizeDoiUrl } from '@/utils/citation.utils';
+import { isTrustedCitationUrl, normalizeConfidence, normalizeDoiUrl, getConfidenceColor } from '@/utils/citation.utils';
 import type { CitationComponent, SourceType } from '@/types/citation.types';
 import { REVIEW_REASON_LABELS, CONFIDENCE_THRESHOLDS } from '@/types/citation.types';
 import {
@@ -67,12 +67,11 @@ function FieldRow({
 }: FieldRowProps) {
   if (!value) return null;
 
-  const confidenceColor = confidence
-    ? confidence >= CONFIDENCE_THRESHOLDS.HIGH
-      ? 'text-green-600'
-      : confidence >= CONFIDENCE_THRESHOLDS.MEDIUM
-        ? 'text-yellow-600'
-        : 'text-red-600'
+  const normalizedConfidence = confidence !== undefined && confidence !== null
+    ? normalizeConfidence(confidence)
+    : undefined;
+  const confidenceColor = normalizedConfidence !== undefined
+    ? getConfidenceColor(normalizedConfidence)
     : '';
 
   return (
@@ -88,11 +87,11 @@ function FieldRow({
           <p className="text-sm text-gray-900">{value}</p>
         )}
       </div>
-      {showConfidence && confidence !== undefined && (
+      {showConfidence && normalizedConfidence !== undefined && (
         <div className="flex items-center gap-1">
           <Percent className={cn('h-3 w-3', confidenceColor)} />
           <span className={cn('text-xs font-medium', confidenceColor)}>
-            {confidence}%
+            {normalizedConfidence}%
           </span>
         </div>
       )}
@@ -123,6 +122,7 @@ export function ParsedComponentsView({
   showConfidence = true
 }: ParsedComponentsViewProps) {
   const { fieldConfidence } = component;
+  const normalizedComponentConfidence = normalizeConfidence(component.confidence);
 
   return (
     <Card className="divide-y divide-gray-100">
@@ -139,11 +139,11 @@ export function ParsedComponentsView({
           </Badge>
         )}
         <Badge className={cn(
-          component.confidence >= CONFIDENCE_THRESHOLDS.HIGH ? CONFIDENCE_BADGE_COLORS.high :
-          component.confidence >= CONFIDENCE_THRESHOLDS.MEDIUM ? CONFIDENCE_BADGE_COLORS.medium :
+          normalizedComponentConfidence >= CONFIDENCE_THRESHOLDS.HIGH ? CONFIDENCE_BADGE_COLORS.high :
+          normalizedComponentConfidence >= CONFIDENCE_THRESHOLDS.MEDIUM ? CONFIDENCE_BADGE_COLORS.medium :
           CONFIDENCE_BADGE_COLORS.low
         )}>
-          {Math.round(component.confidence)}% confidence
+          {normalizedComponentConfidence}% confidence
         </Badge>
         {isPrimary && (
           <Badge className={STATUS_BADGE_COLORS.primary}>
