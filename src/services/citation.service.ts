@@ -72,7 +72,9 @@ function handleError(error: unknown, context: string): never {
 export const citationService = {
   /**
    * Detect citations in an uploaded file
-   * POST /api/v1/citation/detect
+   * @param file - The file to analyze for citations (PDF, EPUB, DOCX)
+   * @returns Detection result with citations array and statistics by type/style
+   * @throws {CitationServiceError} If file upload fails (413 for size, 415 for type) or parsing errors occur
    */
   async detectFromFile(file: File): Promise<DetectionResult> {
     try {
@@ -91,7 +93,9 @@ export const citationService = {
 
   /**
    * Detect citations from an existing job's file
-   * POST /api/v1/citation/detect/:jobId
+   * @param jobId - The job ID whose file should be analyzed
+   * @returns Detection result with citations array and statistics by type/style
+   * @throws {CitationServiceError} If job not found (404) or detection fails
    */
   async detectFromJob(jobId: string): Promise<DetectionResult> {
     validateId(jobId, 'job ID');
@@ -106,8 +110,11 @@ export const citationService = {
   },
 
   /**
-   * Get all citations for a document
-   * GET /api/v1/citation/document/:documentId
+   * Get all citations for a document with optional filtering
+   * @param documentId - The document ID to fetch citations for
+   * @param filters - Optional filters for type, style, confidence, review status, and pagination
+   * @returns Paginated list of citations matching the filters
+   * @throws {CitationServiceError} If document not found (404) or access denied (403)
    */
   async getByDocument(
     documentId: string,
@@ -134,8 +141,11 @@ export const citationService = {
   },
 
   /**
-   * Get citations by job ID
-   * GET /api/v1/citation/job/:jobId
+   * Get citations by job ID with optional filtering
+   * @param jobId - The job ID to fetch citations for
+   * @param filters - Optional filters for type, style, confidence, review status, and pagination
+   * @returns Paginated list of citations matching the filters
+   * @throws {CitationServiceError} If job not found (404) or access denied (403)
    */
   async getByJob(
     jobId: string,
@@ -162,8 +172,10 @@ export const citationService = {
   },
 
   /**
-   * Get a single citation with its components
-   * GET /api/v1/citation/:citationId
+   * Get a single citation with its primary component
+   * @param citationId - The citation ID to fetch
+   * @returns Citation with populated primaryComponent if parsed
+   * @throws {CitationServiceError} If citation not found (404) or access denied (403)
    */
   async getById(citationId: string): Promise<Citation> {
     validateId(citationId, 'citation ID');
@@ -178,8 +190,10 @@ export const citationService = {
   },
 
   /**
-   * Parse a single citation into components
-   * POST /api/v1/citation/:citationId/parse
+   * Parse a single citation into structured components (authors, title, etc.)
+   * @param citationId - The citation ID to parse
+   * @returns Parsed citation component with extracted fields and confidence scores
+   * @throws {CitationServiceError} If citation not found (404) or parsing fails (422)
    */
   async parse(citationId: string): Promise<CitationComponent> {
     validateId(citationId, 'citation ID');
@@ -194,8 +208,10 @@ export const citationService = {
   },
 
   /**
-   * Parse all citations for a document
-   * POST /api/v1/citation/document/:documentId/parse-all
+   * Parse all unparsed citations for a document in bulk
+   * @param documentId - The document ID whose citations should be parsed
+   * @returns Bulk result with parsed/failed counts and error details
+   * @throws {CitationServiceError} If document not found (404) or bulk operation fails
    */
   async parseAll(documentId: string): Promise<BulkParseResult> {
     validateId(documentId, 'document ID');
@@ -210,8 +226,10 @@ export const citationService = {
   },
 
   /**
-   * Get all parse history for a citation
-   * GET /api/v1/citation/:citationId/components
+   * Get all parsed components (parse history) for a citation
+   * @param citationId - The citation ID to fetch components for
+   * @returns Array of all parsed components, including historical parses
+   * @throws {CitationServiceError} If citation not found (404) or access denied (403)
    */
   async getComponents(citationId: string): Promise<CitationComponent[]> {
     validateId(citationId, 'citation ID');
@@ -227,7 +245,9 @@ export const citationService = {
 
   /**
    * Get citation statistics for a document
-   * GET /api/v1/citation/document/:documentId/stats
+   * @param documentId - The document ID to get statistics for
+   * @returns Statistics including total, parsed, unparsed counts and breakdowns by type/style
+   * @throws {CitationServiceError} If document not found (404) or access denied (403)
    */
   async getStats(documentId: string): Promise<CitationStats> {
     validateId(documentId, 'document ID');
