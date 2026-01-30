@@ -17,6 +17,8 @@ type BadgeAsButtonProps = BadgeBaseProps & {
 
 type BadgeProps = BadgeAsSpanProps | BadgeAsButtonProps;
 
+export function Badge(props: BadgeAsSpanProps): JSX.Element;
+export function Badge(props: BadgeAsButtonProps): JSX.Element;
 export function Badge({ 
   className, 
   variant = 'default', 
@@ -24,7 +26,7 @@ export function Badge({
   as = 'span',
   children, 
   ...props 
-}: BadgeProps) {
+}: BadgeProps): JSX.Element {
   const variants = {
     default: 'bg-gray-100 text-gray-800',
     success: 'bg-green-100 text-green-800',
