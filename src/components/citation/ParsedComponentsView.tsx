@@ -14,7 +14,7 @@ import {
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/utils/cn';
-import { isSafeUrl, normalizeConfidence, normalizeDoiUrl } from '@/utils/citation.utils';
+import { isTrustedCitationUrl, normalizeConfidence, normalizeDoiUrl } from '@/utils/citation.utils';
 import type { CitationComponent, SourceType } from '@/types/citation.types';
 import { REVIEW_REASON_LABELS, CONFIDENCE_THRESHOLDS } from '@/types/citation.types';
 import {
@@ -101,7 +101,7 @@ function FieldRow({
 }
 
 function SafeLink({ url, children }: { url: string; children: React.ReactNode }) {
-  if (!isSafeUrl(url)) {
+  if (!isTrustedCitationUrl(url)) {
     return <span className="text-sm text-gray-900">{url}</span>;
   }
   return (
@@ -277,7 +277,7 @@ export function ParsedComponentsView({
           value={component.doi}
           confidence={fieldConfidence.doi}
           showConfidence={showConfidence}
-          isLink={component.doi ? isSafeUrl(normalizeDoiUrl(component.doi)) : false}
+          isLink={component.doi ? isTrustedCitationUrl(normalizeDoiUrl(component.doi)) : false}
           linkHref={component.doi ? normalizeDoiUrl(component.doi) : undefined}
         />
 

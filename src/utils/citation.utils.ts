@@ -29,6 +29,57 @@ export function isSafeUrl(url: string): boolean {
   }
 }
 
+/**
+ * Whitelist of trusted domains for academic/citation links.
+ * Protects against open redirect attacks by only allowing links to known scholarly sources.
+ */
+const TRUSTED_CITATION_DOMAINS = [
+  'doi.org',
+  'dx.doi.org',
+  'pubmed.ncbi.nlm.nih.gov',
+  'ncbi.nlm.nih.gov',
+  'scholar.google.com',
+  'jstor.org',
+  'springer.com',
+  'link.springer.com',
+  'wiley.com',
+  'onlinelibrary.wiley.com',
+  'sciencedirect.com',
+  'elsevier.com',
+  'nature.com',
+  'science.org',
+  'ieee.org',
+  'ieeexplore.ieee.org',
+  'acm.org',
+  'dl.acm.org',
+  'arxiv.org',
+  'researchgate.net',
+  'academia.edu',
+  'semanticscholar.org',
+  'crossref.org',
+  'orcid.org',
+  'worldcat.org',
+] as const;
+
+/**
+ * Checks if a URL points to a trusted academic/citation domain.
+ * Returns true if the URL is safe AND the domain is whitelisted.
+ */
+export function isTrustedCitationUrl(url: string): boolean {
+  if (!isSafeUrl(url)) {
+    return false;
+  }
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+    return TRUSTED_CITATION_DOMAINS.some(domain => 
+      hostname === domain || hostname.endsWith(`.${domain}`)
+    );
+  } catch {
+    return false;
+  }
+}
+
 const BARE_DOI_PATTERN = /^10\.\d{4,9}\/\S+$/;
 
 export function isBareDoi(value: string): boolean {
