@@ -56,11 +56,12 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
 
   useEffect(() => {
     previousActiveElement.current = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
     closeButtonRef.current?.focus();
     document.body.style.overflow = 'hidden';
 
     return () => {
-      document.body.style.overflow = '';
+      document.body.style.overflow = previousOverflow;
       const prevElement = previousActiveElement.current;
       if (
         prevElement instanceof HTMLElement &&
