@@ -124,7 +124,12 @@ export function useParseCitation() {
         queryClient.refetchQueries({ queryKey: citationKeys.detail(citationId) }),
         queryClient.refetchQueries({ queryKey: citationKeys.components(citationId) }),
       ]);
-      await queryClient.invalidateQueries({ queryKey: citationKeys.all });
+
+      const cachedCitation = queryClient.getQueryData<Citation>(citationKeys.detail(citationId));
+      if (cachedCitation?.documentId) {
+        queryClient.invalidateQueries({ queryKey: citationKeys.byDocument(cachedCitation.documentId) });
+        queryClient.invalidateQueries({ queryKey: citationKeys.stats(cachedCitation.documentId) });
+      }
     },
   });
 }
