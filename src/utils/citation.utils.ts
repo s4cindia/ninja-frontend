@@ -1,5 +1,24 @@
 import { CONFIDENCE_THRESHOLDS } from '@/types/citation.types';
 
+/**
+ * Normalizes confidence values to a 0-100 percentage scale.
+ * 
+ * **When to use:**
+ * - Always call this before displaying confidence values to users
+ * - Always call this before comparing against CONFIDENCE_THRESHOLDS
+ * - Call once at the entry point of a component, not in nested functions
+ * 
+ * **Input handling:**
+ * - Values 0-1 (floats from ML models): multiplied by 100 → 0-100%
+ * - Values 0-100 (already percentages): kept as-is
+ * - Values outside 0-100: clamped to valid range
+ * 
+ * @example
+ * normalizeConfidence(0.85)  // → 85
+ * normalizeConfidence(85)    // → 85
+ * normalizeConfidence(0)     // → 0 (not treated as falsy)
+ * normalizeConfidence(1.5)   // → 100 (clamped)
+ */
 export function normalizeConfidence(confidence: number): number {
   const normalized = confidence <= 1 ? Math.round(confidence * 100) : Math.round(confidence);
   return Math.max(0, Math.min(100, normalized));

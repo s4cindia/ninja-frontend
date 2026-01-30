@@ -26,6 +26,13 @@ import {
 } from './badgeStyles';
 import type { Citation } from '@/types/citation.types';
 
+/**
+ * Panel header height for content area calculation.
+ * Matches the h-16 (64px) class on the header element.
+ * 
+ * Note: Could be measured dynamically via ref, but a constant is simpler
+ * and avoids layout thrashing. Update if header design changes.
+ */
 const HEADER_HEIGHT_PX = 64;
 
 interface CitationDetailProps {
@@ -68,7 +75,10 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
         ) {
           prevElement.focus();
         }
-      } catch {
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.warn('Focus restoration failed:', error);
+        }
         document.body.focus();
       }
       previousActiveElement.current = null;
