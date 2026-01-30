@@ -22,6 +22,28 @@ class CitationServiceError extends Error {
   }
 }
 
+const STATUS_CODE_MESSAGES: Record<number, string> = {
+  400: 'Invalid request. Please check your input and try again.',
+  401: 'Session expired. Please log in again.',
+  403: 'You do not have permission to perform this action.',
+  404: 'The requested resource was not found.',
+  409: 'This operation conflicts with existing data.',
+  413: 'The file is too large. Please use a smaller file.',
+  415: 'Unsupported file type. Please use a supported format.',
+  422: 'The data could not be processed. Please check the format.',
+  429: 'Too many requests. Please wait a moment and try again.',
+  500: 'Server error. Please try again later.',
+  502: 'Service temporarily unavailable. Please try again.',
+  503: 'Service is under maintenance. Please try again later.',
+};
+
+function getUserFriendlyMessage(statusCode?: number, fallback?: string): string {
+  if (statusCode && STATUS_CODE_MESSAGES[statusCode]) {
+    return STATUS_CODE_MESSAGES[statusCode];
+  }
+  return fallback || 'An unexpected error occurred. Please try again.';
+}
+
 function handleError(error: unknown, context: string): never {
   if (error instanceof CitationServiceError) {
     throw error;
@@ -29,7 +51,8 @@ function handleError(error: unknown, context: string): never {
   
   if (axios.isAxiosError(error)) {
     const statusCode = error.response?.status;
-    const message = error.response?.data?.message || error.message;
+    const serverMessage = error.response?.data?.message;
+    const message = serverMessage || getUserFriendlyMessage(statusCode, error.message);
     const err = new CitationServiceError(message, context, statusCode);
     err.stack = error.stack;
     throw err;

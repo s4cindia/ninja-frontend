@@ -45,6 +45,8 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
 
   const parseMutation = useParseCitation();
 
+  // React Query's mutate function is stable, but we include parseMutation
+  // in deps to satisfy exhaustive-deps and ensure correctness if implementation changes
   const handleParse = useCallback(() => {
     parseMutation.mutate(citation.id);
   }, [citation.id, parseMutation]);
@@ -131,7 +133,10 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
         </div>
 
         {/* Content */}
-        <div className={`p-4 overflow-y-auto h-[calc(100%-${HEADER_HEIGHT_PX}px)] space-y-6`}>
+        <div 
+          className="p-4 overflow-y-auto space-y-6"
+          style={{ height: `calc(100% - ${HEADER_HEIGHT_PX}px)` }}
+        >
           {/* Raw Citation Text */}
           <Card className="p-4">
             <h3 className="text-sm font-medium text-gray-700 mb-2">
@@ -216,14 +221,22 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
 
             {/* Success message */}
             {parseMutation.isSuccess && (
-              <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
+              <div 
+                role="status" 
+                aria-live="polite"
+                className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800"
+              >
                 Citation parsed successfully!
               </div>
             )}
 
             {/* Error message */}
             {parseMutation.isError && (
-              <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+              <div 
+                role="alert" 
+                aria-live="assertive"
+                className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800"
+              >
                 Failed to parse citation. Please try again.
               </div>
             )}
