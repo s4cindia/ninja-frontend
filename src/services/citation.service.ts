@@ -128,8 +128,8 @@ export const citationService = {
       if (filters?.minConfidence !== undefined) params.append('minConfidence', String(filters.minConfidence));
       if (filters?.maxConfidence !== undefined) params.append('maxConfidence', String(filters.maxConfidence));
       if (filters?.needsReview !== undefined) params.append('needsReview', String(filters.needsReview));
-      if (filters?.page) params.append('page', String(filters.page));
-      if (filters?.limit) params.append('limit', String(filters.limit));
+      if (filters?.page !== undefined) params.append('page', String(filters.page));
+      if (filters?.limit !== undefined) params.append('limit', String(filters.limit));
 
       const response = await api.get<ApiResponse<PaginatedCitations>>(
         `/citation/document/${documentId}?${params}`
@@ -159,8 +159,8 @@ export const citationService = {
       if (filters?.minConfidence !== undefined) params.append('minConfidence', String(filters.minConfidence));
       if (filters?.maxConfidence !== undefined) params.append('maxConfidence', String(filters.maxConfidence));
       if (filters?.needsReview !== undefined) params.append('needsReview', String(filters.needsReview));
-      if (filters?.page) params.append('page', String(filters.page));
-      if (filters?.limit) params.append('limit', String(filters.limit));
+      if (filters?.page !== undefined) params.append('page', String(filters.page));
+      if (filters?.limit !== undefined) params.append('limit', String(filters.limit));
 
       const response = await api.get<ApiResponse<PaginatedCitations>>(
         `/citation/job/${jobId}?${params}`
