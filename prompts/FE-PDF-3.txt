@@ -1,0 +1,60 @@
+```
+Implement FE-PDF-3: MatterhornSummary Component
+
+Create a component that displays Matterhorn Protocol compliance summary for PDF audits.
+
+File to create: src/components/pdf/MatterhornSummary.tsx
+
+Requirements:
+
+1. Display overall Matterhorn compliance:
+   - Total checkpoints evaluated
+   - Passed / Failed / Not Applicable counts
+   - Visual progress bar or donut chart
+
+2. Display by category (collapsible sections):
+   - 01: Document Structure
+   - 06: Headings
+   - 09: Reading Order
+   - 11: Natural Language
+   - 13: Graphics
+   - 14: Links
+   - And other Matterhorn categories as needed
+
+3. Each category shows:
+   - Category name and ID
+   - Passed/Failed/NA counts for that category
+   - Expandable list of individual checkpoints
+   - Each checkpoint shows: ID, description, status, issue count
+
+4. Visual indicators:
+   - Green checkmark for passed
+   - Red X for failed
+   - Gray dash for not applicable
+   - Badge showing issue count per checkpoint
+
+5. Props interface:
+   interface MatterhornSummaryProps {
+     summary: MatterhornSummary;  // From pdf.types.ts
+     onCheckpointClick?: (checkpointId: string) => void;  // Navigate to issues
+     collapsed?: boolean;  // Start collapsed
+   }
+
+6. Styling:
+   - Use Tailwind CSS
+   - Match existing Ninja UI patterns
+   - Responsive design (mobile-friendly)
+   - Use Radix UI Accordion for collapsible sections
+
+7. Export from index:
+   - Create src/components/pdf/index.ts if not exists
+   - Export MatterhornSummary
+
+Reference:
+- MatterhornSummary type from src/types/pdf.types.ts
+- Existing components in src/components/epub/ for styling patterns
+- Radix UI Accordion for collapsible sections
+
+Tests: Create MatterhornSummary.test.tsx with basic render tests
+```
+
