@@ -306,12 +306,12 @@ describe('useParseAllCitations', () => {
       wrapper: createWrapper(),
     });
 
-    result.current.mutate('doc-1');
+    result.current.mutate({ documentId: 'doc-1' });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(result.current.data).toEqual(mockResult);
-    expect(mockService.parseAll).toHaveBeenCalledWith('doc-1');
+    expect(mockService.parseAll).toHaveBeenCalledWith('doc-1', undefined);
   });
 });
 
@@ -335,11 +335,11 @@ describe('useDetectCitations', () => {
     });
 
     const file = new File(['test'], 'test.pdf', { type: 'application/pdf' });
-    result.current.mutate(file);
+    result.current.mutate({ file });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(result.current.data).toEqual(mockResult);
-    expect(mockService.detectFromFile).toHaveBeenCalledWith(file);
+    expect(mockService.detectFromFile).toHaveBeenCalledWith(file, undefined);
   });
 });

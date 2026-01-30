@@ -83,14 +83,25 @@ export function useCitationStats(documentId: string) {
 
 /**
  * Hook to detect citations from file upload
+ * 
+ * @example
+ * const { mutate, isPending } = useDetectCitations();
+ * const abortController = useRef<AbortController>();
+ * 
+ * const handleUpload = (file: File) => {
+ *   abortController.current = new AbortController();
+ *   mutate({ file, signal: abortController.current.signal });
+ * };
+ * 
+ * // Cleanup on unmount
+ * useEffect(() => () => abortController.current?.abort(), []);
  */
 export function useDetectCitations() {
   const queryClient = useQueryClient();
 
-  return useMutation<DetectionResult, Error, File>({
-    mutationFn: (file: File) => citationService.detectFromFile(file),
+  return useMutation<DetectionResult, Error, { file: File; signal?: AbortSignal }>({
+    mutationFn: ({ file, signal }) => citationService.detectFromFile(file, signal),
     onSuccess: (data) => {
-      // Invalidate related queries
       queryClient.invalidateQueries({ queryKey: citationKeys.byDocument(data.documentId) });
     },
   });
@@ -98,12 +109,24 @@ export function useDetectCitations() {
 
 /**
  * Hook to detect citations from existing job
+ * 
+ * @example
+ * const { mutate, isPending } = useDetectCitationsFromJob();
+ * const abortController = useRef<AbortController>();
+ * 
+ * const handleDetect = (jobId: string) => {
+ *   abortController.current = new AbortController();
+ *   mutate({ jobId, signal: abortController.current.signal });
+ * };
+ * 
+ * // Cleanup on unmount
+ * useEffect(() => () => abortController.current?.abort(), []);
  */
 export function useDetectCitationsFromJob() {
   const queryClient = useQueryClient();
 
-  return useMutation<DetectionResult, Error, string>({
-    mutationFn: (jobId: string) => citationService.detectFromJob(jobId),
+  return useMutation<DetectionResult, Error, { jobId: string; signal?: AbortSignal }>({
+    mutationFn: ({ jobId, signal }) => citationService.detectFromJob(jobId, signal),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: citationKeys.byDocument(data.documentId) });
     },
@@ -119,30 +142,39 @@ export function useParseCitation() {
   return useMutation<CitationComponent, Error, string>({
     mutationFn: (citationId: string) => citationService.parse(citationId),
     onSuccess: async (_data, citationId) => {
+      // Invalidate all citation-related queries to avoid race conditions
+      // where getQueryData might return stale data before refetch completes
       await Promise.all([
-        queryClient.refetchQueries({ queryKey: citationKeys.detail(citationId) }),
-        queryClient.refetchQueries({ queryKey: citationKeys.components(citationId) }),
+        queryClient.invalidateQueries({ queryKey: citationKeys.detail(citationId) }),
+        queryClient.invalidateQueries({ queryKey: citationKeys.components(citationId) }),
+        // Invalidate all document/job lists and stats since we don't know which document this belongs to
+        queryClient.invalidateQueries({ queryKey: citationKeys.all, exact: false }),
       ]);
-
-      const cachedCitation = queryClient.getQueryData<Citation>(citationKeys.detail(citationId));
-      if (cachedCitation?.documentId) {
-        queryClient.invalidateQueries({ queryKey: citationKeys.byDocument(cachedCitation.documentId) });
-        queryClient.invalidateQueries({ queryKey: citationKeys.stats(cachedCitation.documentId) });
-      }
     },
   });
 }
 
 /**
  * Hook to parse all citations in a document
+ * 
+ * @example
+ * const { mutate, isPending } = useParseAllCitations();
+ * const abortController = useRef<AbortController>();
+ * 
+ * const handleParseAll = (documentId: string) => {
+ *   abortController.current = new AbortController();
+ *   mutate({ documentId, signal: abortController.current.signal });
+ * };
+ * 
+ * // Cleanup on unmount
+ * useEffect(() => () => abortController.current?.abort(), []);
  */
 export function useParseAllCitations() {
   const queryClient = useQueryClient();
 
-  return useMutation<BulkParseResult, Error, string>({
-    mutationFn: (documentId: string) => citationService.parseAll(documentId),
+  return useMutation<BulkParseResult, Error, { documentId: string; signal?: AbortSignal }>({
+    mutationFn: ({ documentId, signal }) => citationService.parseAll(documentId, signal),
     onSuccess: (data) => {
-      // Invalidate all related queries
       queryClient.invalidateQueries({ queryKey: citationKeys.byDocument(data.documentId) });
       queryClient.invalidateQueries({ queryKey: citationKeys.stats(data.documentId) });
     },

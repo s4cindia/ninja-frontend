@@ -32,7 +32,7 @@ interface CitationListProps {
   isParsing?: string | null;
 }
 
-function ConfidenceBadge({ confidence }: { confidence: number }) {
+const ConfidenceBadge = memo(function ConfidenceBadge({ confidence }: { confidence: number }) {
   const percent = normalizeConfidence(confidence);
   const color = percent >= CONFIDENCE_THRESHOLDS.HIGH
     ? 'text-green-600'
@@ -45,7 +45,7 @@ function ConfidenceBadge({ confidence }: { confidence: number }) {
       {percent}%
     </span>
   );
-}
+});
 
 const CitationRow = memo(function CitationRow({
   citation,
