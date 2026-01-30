@@ -31,10 +31,11 @@ The application features a clean, responsive design built with Tailwind CSS. It 
 - **Branding**: Integrates S4Carlisle branding elements.
 
 #### Button Variant Guide
-- **`variant="default"`**: Primary actions (submit, save, confirm)
-- **`variant="outline"`**: Secondary actions (view details, edit, cancel)
+- **`variant="primary"`**: Main actions (submit, save, confirm)
+- **`variant="secondary"`**: Less-prominent actions (back, skip, alternative options)
+- **`variant="outline"`**: Bordered actions (view details, edit, cancel)
 - **`variant="ghost"`**: Subtle actions (close buttons, icon-only buttons, dismiss)
-- **`variant="destructive"`**: Destructive actions (delete, remove)
+- **`variant="danger"`**: Destructive actions (delete, remove)
 
 ### Technical Implementations
 - **Frontend Framework**: React 18.2 with Vite 5.0 for fast development and build times.
