@@ -147,11 +147,11 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
   onIssueSelect,
   className,
 }) => {
-  const [numPages, setNumPages] = useState<number | null>(null);
+  const [numPages, _setNumPages] = useState<number | null>(null); // eslint-disable-line @typescript-eslint/no-unused-vars
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>(100);
   const [showHighlights, setShowHighlights] = useState(true);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoading, _setIsLoading] = useState(true); // eslint-disable-line @typescript-eslint/no-unused-vars
+  const [error, _setError] = useState<string | null>(null); // eslint-disable-line @typescript-eslint/no-unused-vars
 
   // Filter issues for current page and create highlights
   const currentPageIssues = useMemo(() => {
@@ -165,19 +165,17 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
   }, [currentPageIssues]);
 
   // TODO: Uncomment when react-pdf is installed
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _handleDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
-    setNumPages(numPages);
-    setIsLoading(false);
-    setError(null);
-  }, []);
+  // const handleDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
+  //   _setNumPages(numPages);
+  //   _setIsLoading(false);
+  //   _setError(null);
+  // }, []);
 
   // TODO: Uncomment when react-pdf is installed
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _handleDocumentLoadError = useCallback((error: Error) => {
-    setError(error.message || 'Failed to load PDF');
-    setIsLoading(false);
-  }, []);
+  // const handleDocumentLoadError = useCallback((error: Error) => {
+  //   _setError(error.message || 'Failed to load PDF');
+  //   _setIsLoading(false);
+  // }, []);
 
   const handleZoomIn = useCallback(() => {
     if (typeof zoomLevel === 'number') {
