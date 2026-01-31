@@ -7,6 +7,18 @@
  * - Matterhorn Protocol compliance display
  * - Issue-page synchronization
  * - Download reports and other actions
+ *
+ * @important When adding this route to App.tsx, wrap it with ErrorBoundary:
+ * ```tsx
+ * import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
+ * import { PdfAuditResultsPage } from '@/pages/PdfAuditResultsPage';
+ *
+ * <Route path="/pdf/results/:jobId" element={
+ *   <ErrorBoundary>
+ *     <PdfAuditResultsPage />
+ *   </ErrorBoundary>
+ * } />
+ * ```
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -62,14 +74,6 @@ export const PdfAuditResultsPage: React.FC = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
 
-  // Validate jobId to prevent path traversal attacks
-  useEffect(() => {
-    if (!jobId || !/^[a-zA-Z0-9-_]+$/.test(jobId)) {
-      setError('Invalid job ID');
-      setIsLoading(false);
-    }
-  }, [jobId]);
-
   // State management
   const [auditResult, setAuditResult] = useState<PdfAuditResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -83,8 +87,9 @@ export const PdfAuditResultsPage: React.FC = () => {
 
   // Fetch audit result
   const fetchAuditResult = useCallback(async () => {
-    if (!jobId) {
-      setError('No job ID provided');
+    // Validate jobId to prevent path traversal attacks
+    if (!jobId || !/^[a-zA-Z0-9-_]+$/.test(jobId)) {
+      setError('Invalid job ID');
       setIsLoading(false);
       return;
     }
