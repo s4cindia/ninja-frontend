@@ -39,7 +39,8 @@ export function IssueCard({
 }: IssueCardProps) {
   const isPdf = isPdfIssue(issue);
   const getConfidenceBadge = () => {
-    if (!issue.confidence) return null;
+    // Only show confidence for non-PDF issues (AuditIssue type)
+    if (isPdf || !('confidence' in issue) || !issue.confidence) return null;
 
     const percentage = Math.round(issue.confidence * 100);
 
@@ -67,6 +68,9 @@ export function IssueCard({
   };
 
   const getFixTypeBadge = () => {
+    // Only show fix type for non-PDF issues (AuditIssue type)
+    if (isPdf || !('fixType' in issue) || !('status' in issue)) return null;
+
     if (issue.status === 'fixed' && issue.fixType === 'autofix') {
       return (
         <div className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">

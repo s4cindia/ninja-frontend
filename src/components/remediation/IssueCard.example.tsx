@@ -185,12 +185,12 @@ export const FilteredByCheckpointExample: React.FC<{
   );
 };
 
-// Example 10: Compact Mode (if implemented)
-export const CompactIssueCardExample: React.FC = () => {
+// Example 10: Multiple Issues in a List
+export const IssueListExample: React.FC = () => {
   return (
     <div className="space-y-2">
-      <IssueCard issue={epubIssue} compact={true} />
-      <IssueCard issue={pdfIssue} compact={true} showMatterhorn={true} />
+      <IssueCard issue={epubIssue} />
+      <IssueCard issue={pdfIssue} showMatterhorn={true} />
     </div>
   );
 };

@@ -55,11 +55,21 @@ describe('PdfAuditApiService', () => {
       };
       const onProgress = jest.fn();
 
-      mockApi.post.mockImplementation((url, data, config) => {
+      mockApi.post.mockImplementation((_url, _data, config) => {
         // Simulate progress
         if (config?.onUploadProgress) {
-          config.onUploadProgress({ loaded: 50, total: 100 });
-          config.onUploadProgress({ loaded: 100, total: 100 });
+          config.onUploadProgress({
+            loaded: 50,
+            total: 100,
+            bytes: 50,
+            lengthComputable: true
+          });
+          config.onUploadProgress({
+            loaded: 100,
+            total: 100,
+            bytes: 100,
+            lengthComputable: true
+          });
         }
         return Promise.resolve(mockResponse);
       });

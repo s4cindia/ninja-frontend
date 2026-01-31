@@ -4,10 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Progress } from '../ui/Progress';
 import { cn } from '@/utils/cn';
-import type { MatterhornSummary, MatterhornCategory, MatterhornCheckpoint, MatterhornCheckpointStatus } from '@/types/pdf.types';
+import type { MatterhornSummary as MatterhornSummaryType, MatterhornCategory, MatterhornCheckpoint, MatterhornCheckpointStatus } from '@/types/pdf.types';
 
 export interface MatterhornSummaryProps {
-  summary: MatterhornSummary;
+  summary: MatterhornSummaryType;
   onCheckpointClick?: (checkpointId: string) => void;
   collapsed?: boolean;
 }

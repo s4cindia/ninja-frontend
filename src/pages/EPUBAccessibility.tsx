@@ -244,6 +244,7 @@ export const EPUBAccessibility: React.FC = () => {
     
     const demoSummary: UploadSummary = {
       jobId: 'demo-' + Date.now(),
+      fileType: 'epub',
       epubVersion: 'EPUB 3.0',
       isValid: true,
       accessibilityScore: 72,

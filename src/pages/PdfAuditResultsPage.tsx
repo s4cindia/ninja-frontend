@@ -620,7 +620,7 @@ export const PdfAuditResultsPage: React.FC = () => {
               <div className="text-center py-12">
                 <p className="text-gray-500">No issues found</p>
                 {hasActiveFilters && (
-                  <Button variant="link" size="sm" onClick={clearFilters} className="mt-2">
+                  <Button variant="ghost" size="sm" onClick={clearFilters} className="mt-2">
                     Clear filters
                   </Button>
                 )}
@@ -632,7 +632,6 @@ export const PdfAuditResultsPage: React.FC = () => {
                   issue={issue}
                   onPageClick={handlePageClick}
                   showMatterhorn={true}
-                  compact={true}
                 />
               ))
             )}

@@ -234,7 +234,6 @@ export const AuditResultsPageExample: React.FC<{
       {/* Main content area */}
       <main className="flex-1">
         <h1 className="text-2xl font-bold mb-4">PDF Audit Results</h1>
-        <p className="text-gray-600 mb-6">{pdfAuditResult.fileName}</p>
 
         {/* Issues by page */}
         {Array.from(issuesByPage.entries()).map(([pageNum, issues]) => (

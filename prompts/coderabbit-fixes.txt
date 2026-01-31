@@ -1,22 +1,35 @@
-In `@prompts/coderabbit-fixes.txt`:
-- Around line 1-25: Fix three issues: (1) In PdfPreviewPanel.tsx update the
-Button that toggles showHighlights (the one calling setShowHighlights and using
-aria-label/showHighlights) to use a supported variant (e.g.,
-variant={showHighlights ? 'secondary' : 'outline'}) instead of the undefined
-'default'. (2) In PdfAuditResultsPage.tsx change the useMemo that builds
-issuesByPage (the map and auditResult.issues.forEach logic) so it does not force
-undefined/null issue.pageNumber into page 0; either skip those issues or place
-them into a separate bucket (e.g., "ungrouped" or NaN key) and ensure downstream
-code still expects pages 1..pageCount. (3) In pdfAuditApi.example.tsx inside the
-useEffect that calls pdfAuditApi.createCancellablePolling(jobId, 2000, 300000)
-reset prior state at the start of the effect by calling setResult(null),
-setError(null), and setIsLoading(true), while keeping the existing abortRef
-assignment and cleanup that calls abortRef.current().
+🔍 Issues and Recommendations
+1. CRITICAL: Incomplete PDF Highlighting
 
-In `@src/services/api/pdfAuditApi.example.tsx`:
-- Around line 193-195: The example assigns htmlReport from
-pdfAuditApi.getAcrReport(jobId, 'html') but never uses it; either use the value
-in the example (e.g., log or return it) or mark it as intentionally unused by
-renaming to _htmlReport, or remove the HTML fetch entirely. Update the snippet
-around the pdfAuditApi.getAcrReport call (htmlReport) to one of these three
-options so there is no unused variable warning.
+Location: src/components/pdf/PdfPreviewPanel.tsx:80-85
+parseIssueLocation function returns null (placeholder)
+Issue highlighting overlay won't work
+Recommendation: Add feature flag or clarify backend contract
+2. MEDIUM: Input Validation Race Condition
+
+Location: src/pages/PdfAuditResultsPage.tsx:67-93
+jobId validation in useEffect doesn't block API call
+Recommendation: Move validation into fetchAuditResult
+3. MEDIUM: Missing Error Boundary
+
+No error boundary around PdfAuditResultsPage
+Recommendation: Add error boundary to prevent crashes
+4. LOW: Type Guards Could Be Stricter
+
+isPdfAuditResult doesn't validate each array element
+Recommendation: Add deep validation with isPdfAuditIssue
+5. LOW: Development Artifacts
+
+FE-PDF-6.txt, FE-PDF-8.txt, prompts/ directory
+Recommendation: Remove or add to .gitignore
+6. LOW: Missing API Contract Tests
+
+Recommendation: Add integration tests when backend ready
+🔒 Security
+✅ No major concerns. Good practices for XSS prevention, path traversal, input validation.
+
+Minor suggestions:
+
+Consider CSP headers for PDF rendering
+Validate PDF magic bytes
+Ensure backend validates file content
