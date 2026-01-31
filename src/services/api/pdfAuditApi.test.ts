@@ -1,21 +1,22 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { pdfAuditApi, PdfApiError } from './pdfAuditApi';
 import { api } from '../api';
 import { AxiosError } from 'axios';
 import type { PdfAuditResult, PdfAuditListResponse } from '@/types/pdf.types';
 
 // Mock the api module
-jest.mock('../api');
+vi.mock('../api');
 
-const mockApi = api as jest.Mocked<typeof api>;
+const mockApi = api as vi.Mocked<typeof api>;
 
 describe('PdfAuditApiService', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    jest.clearAllTimers();
+    vi.clearAllMocks();
+    vi.clearAllTimers();
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   describe('uploadPdfForAudit', () => {
@@ -53,7 +54,7 @@ describe('PdfAuditApiService', () => {
           data: { jobId: 'job-123' },
         },
       };
-      const onProgress = jest.fn();
+      const onProgress = vi.fn();
 
       mockApi.post.mockImplementation((_url, _data, config) => {
         // Simulate progress
@@ -388,11 +389,11 @@ describe('PdfAuditApiService', () => {
 
   describe('pollForCompletion', () => {
     beforeEach(() => {
-      jest.useFakeTimers();
+      vi.useFakeTimers();
     });
 
     afterEach(() => {
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
 
     it('polls until completion', async () => {
@@ -438,9 +439,9 @@ describe('PdfAuditApiService', () => {
       const promise = pdfAuditApi.pollForCompletion('job-123', 1000, 10000);
 
       // Advance timers to trigger polls
-      await jest.advanceTimersByTimeAsync(1000); // First poll
-      await jest.advanceTimersByTimeAsync(1000); // Second poll
-      await jest.advanceTimersByTimeAsync(1000); // Third poll (completed)
+      await vi.advanceTimersByTimeAsync(1000); // First poll
+      await vi.advanceTimersByTimeAsync(1000); // Second poll
+      await vi.advanceTimersByTimeAsync(1000); // Third poll (completed)
 
       const result = await promise;
 
@@ -457,7 +458,7 @@ describe('PdfAuditApiService', () => {
 
       const promise = pdfAuditApi.pollForCompletion('job-123', 1000, 10000);
 
-      await jest.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(1000);
 
       await expect(promise).rejects.toThrow(PdfApiError);
       await expect(promise).rejects.toMatchObject({
@@ -474,7 +475,7 @@ describe('PdfAuditApiService', () => {
       const promise = pdfAuditApi.pollForCompletion('job-123', 1000, 5000);
 
       // Advance past timeout
-      await jest.advanceTimersByTimeAsync(6000);
+      await vi.advanceTimersByTimeAsync(6000);
 
       await expect(promise).rejects.toThrow(PdfApiError);
       await expect(promise).rejects.toMatchObject({
@@ -485,11 +486,11 @@ describe('PdfAuditApiService', () => {
 
   describe('createCancellablePolling', () => {
     beforeEach(() => {
-      jest.useFakeTimers();
+      vi.useFakeTimers();
     });
 
     afterEach(() => {
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
 
     it('creates cancellable polling operation', async () => {
@@ -500,7 +501,7 @@ describe('PdfAuditApiService', () => {
       const { promise, abort } = pdfAuditApi.createCancellablePolling('job-123', 1000, 10000);
 
       // Start polling
-      await jest.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(1000);
 
       // Cancel operation
       abort();
@@ -550,8 +551,8 @@ describe('PdfAuditApiService', () => {
 
       const { promise } = pdfAuditApi.createCancellablePolling('job-123', 1000, 10000);
 
-      await jest.advanceTimersByTimeAsync(1000); // First poll
-      await jest.advanceTimersByTimeAsync(1000); // Second poll (completed)
+      await vi.advanceTimersByTimeAsync(1000); // First poll
+      await vi.advanceTimersByTimeAsync(1000); // Second poll (completed)
 
       const result = await promise;
       expect(result).toEqual(mockResult);

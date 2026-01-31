@@ -1,3 +1,4 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PdfPageNavigator } from './PdfPageNavigator';
@@ -17,7 +18,7 @@ const createMockIssue = (
 });
 
 describe('PdfPageNavigator', () => {
-  const mockOnPageChange = jest.fn();
+  const mockOnPageChange = vi.fn();
 
   const createIssuesByPage = () => {
     const issuesByPage = new Map<number, PdfAuditIssue[]>();

@@ -1,3 +1,4 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
@@ -6,8 +7,8 @@ import { api } from '@/services/api';
 import type { PdfAuditResult, PdfAuditIssue, MatterhornSummary } from '@/types/pdf.types';
 
 // Mock dependencies
-jest.mock('@/services/api');
-jest.mock('@/components/pdf/PdfPreviewPanel', () => ({
+vi.mock('@/services/api');
+vi.mock('@/components/pdf/PdfPreviewPanel', () => ({
   PdfPreviewPanel: ({ pdfUrl, currentPage, onPageChange, onIssueSelect }: {
     pdfUrl: string;
     currentPage: number;
@@ -23,7 +24,7 @@ jest.mock('@/components/pdf/PdfPreviewPanel', () => ({
   ),
 }));
 
-jest.mock('@/components/pdf/PdfPageNavigator', () => ({
+vi.mock('@/components/pdf/PdfPageNavigator', () => ({
   PdfPageNavigator: ({ pageCount, currentPage, onPageChange }: {
     pageCount: number;
     currentPage: number;
@@ -37,7 +38,7 @@ jest.mock('@/components/pdf/PdfPageNavigator', () => ({
   ),
 }));
 
-jest.mock('@/components/pdf/MatterhornSummary', () => ({
+vi.mock('@/components/pdf/MatterhornSummary', () => ({
   MatterhornSummary: ({ summary, onCheckpointClick }: {
     summary: { totalCheckpoints: number };
     onCheckpointClick: (id: string) => void;
@@ -49,7 +50,7 @@ jest.mock('@/components/pdf/MatterhornSummary', () => ({
   ),
 }));
 
-jest.mock('@/components/remediation/IssueCard', () => ({
+vi.mock('@/components/remediation/IssueCard', () => ({
   IssueCard: ({ issue, onPageClick }: {
     issue: { id: string; message: string; pageNumber?: number };
     onPageClick?: (page: number) => void;
@@ -157,10 +158,10 @@ const renderWithRouter = (jobId: string = 'job-123') => {
 };
 
 describe('PdfAuditResultsPage', () => {
-  const mockApi = api as jest.Mocked<typeof api>;
+  const mockApi = api as vi.Mocked<typeof api>;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('Loading State', () => {
@@ -229,11 +230,11 @@ describe('PdfAuditResultsPage', () => {
 
   describe('Polling for Processing Jobs', () => {
     beforeEach(() => {
-      jest.useFakeTimers();
+      vi.useFakeTimers();
     });
 
     afterEach(() => {
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
 
     it('displays polling state when job is processing', async () => {
@@ -264,14 +265,14 @@ describe('PdfAuditResultsPage', () => {
       });
 
       // Fast-forward 5 seconds
-      jest.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(5000);
 
       await waitFor(() => {
         expect(mockApi.get).toHaveBeenCalledTimes(2);
       });
 
       // Fast-forward another 5 seconds
-      jest.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(5000);
 
       await waitFor(() => {
         expect(mockApi.get).toHaveBeenCalledTimes(3);
@@ -544,13 +545,13 @@ describe('PdfAuditResultsPage', () => {
 
       // Mock createElement and appendChild
       const mockLink = {
-        click: jest.fn(),
+        click: vi.fn(),
         href: '',
         download: '',
       } as unknown as HTMLAnchorElement;
-      jest.spyOn(document, 'createElement').mockReturnValue(mockLink);
-      jest.spyOn(document.body, 'appendChild').mockImplementation();
-      jest.spyOn(document.body, 'removeChild').mockImplementation();
+      vi.spyOn(document, 'createElement').mockReturnValue(mockLink);
+      vi.spyOn(document.body, 'appendChild').mockImplementation();
+      vi.spyOn(document.body, 'removeChild').mockImplementation();
 
       renderWithRouter('job-123');
 
@@ -573,10 +574,10 @@ describe('PdfAuditResultsPage', () => {
       // Mock clipboard API
       Object.assign(navigator, {
         clipboard: {
-          writeText: jest.fn(),
+          writeText: vi.fn(),
         },
       });
-      jest.spyOn(window, 'alert').mockImplementation();
+      vi.spyOn(window, 'alert').mockImplementation();
 
       renderWithRouter();
 

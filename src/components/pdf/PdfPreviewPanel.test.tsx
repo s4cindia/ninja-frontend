@@ -1,3 +1,4 @@
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PdfPreviewPanel } from './PdfPreviewPanel';
@@ -17,8 +18,8 @@ const createMockIssue = (
 });
 
 describe('PdfPreviewPanel', () => {
-  const mockOnPageChange = jest.fn();
-  const mockOnIssueSelect = jest.fn();
+  const mockOnPageChange = vi.fn();
+  const mockOnIssueSelect = vi.fn();
 
   const defaultProps = {
     pdfUrl: 'https://example.com/test.pdf',
