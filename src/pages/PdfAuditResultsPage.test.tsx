@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, type Mocked } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mocked } from 'vitest';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { PdfAuditResultsPage } from './PdfAuditResultsPage';
@@ -164,6 +164,11 @@ describe('PdfAuditResultsPage', () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
   describe('Loading State', () => {
     it('displays loading spinner initially', async () => {
       mockApi.get.mockImplementation(() => new Promise(() => {})); // Never resolves
@@ -263,15 +268,15 @@ describe('PdfAuditResultsPage', () => {
         expect(screen.getByText('Audit in progress...')).toBeInTheDocument();
       });
 
-      // Fast-forward 5 seconds
-      vi.advanceTimersByTime(5000);
+      // Fast-forward 5 seconds using async method
+      await vi.advanceTimersByTimeAsync(5000);
 
       await waitFor(() => {
         expect(mockApi.get).toHaveBeenCalledTimes(2);
       });
 
       // Fast-forward another 5 seconds
-      vi.advanceTimersByTime(5000);
+      await vi.advanceTimersByTimeAsync(5000);
 
       await waitFor(() => {
         expect(mockApi.get).toHaveBeenCalledTimes(3);
@@ -478,10 +483,13 @@ describe('PdfAuditResultsPage', () => {
         expect(screen.getByText('Current: 1')).toBeInTheDocument();
       });
 
-      const goToPageButton = screen.getByRole('button', { name: /go to page 3/i });
+      // Use getAllByRole since there might be multiple "Go to Page 3" buttons
+      const goToPageButton = screen.getAllByRole('button', { name: /go to page 3/i })[0];
       fireEvent.click(goToPageButton);
 
-      expect(screen.getByText('Current: 3')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('Current: 3')).toBeInTheDocument();
+      });
     });
 
     it('updates current page when preview panel changes page', async () => {
@@ -532,7 +540,9 @@ describe('PdfAuditResultsPage', () => {
       const goToPageButton = screen.getAllByRole('button', { name: /go to page/i })[2];
       fireEvent.click(goToPageButton);
 
-      expect(screen.getByText('Current: 3')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('Current: 3')).toBeInTheDocument();
+      });
     });
   });
 
@@ -542,7 +552,10 @@ describe('PdfAuditResultsPage', () => {
       mockApi.get.mockResolvedValueOnce({ data: { data: mockResult } });
       mockApi.get.mockResolvedValueOnce({ data: { report: 'data' } });
 
-      // Mock createElement and appendChild
+      // Render first, before mocking DOM methods
+      renderWithRouter('job-123');
+
+      // Mock createElement and appendChild after render
       const mockLink = {
         click: vi.fn(),
         href: '',
@@ -551,8 +564,6 @@ describe('PdfAuditResultsPage', () => {
       vi.spyOn(document, 'createElement').mockReturnValue(mockLink);
       vi.spyOn(document.body, 'appendChild').mockImplementation(() => mockLink);
       vi.spyOn(document.body, 'removeChild').mockImplementation(() => mockLink);
-
-      renderWithRouter('job-123');
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /download report/i })).toBeInTheDocument();
@@ -570,15 +581,16 @@ describe('PdfAuditResultsPage', () => {
       const mockResult = createMockAuditResult();
       mockApi.get.mockResolvedValueOnce({ data: { data: mockResult } });
 
-      // Mock clipboard API
+      // Render first
+      renderWithRouter();
+
+      // Mock clipboard API and alert after render
       Object.assign(navigator, {
         clipboard: {
           writeText: vi.fn(),
         },
       });
       vi.spyOn(window, 'alert').mockImplementation(() => {});
-
-      renderWithRouter();
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /share/i })).toBeInTheDocument();
