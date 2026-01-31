@@ -305,7 +305,7 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
         {/* Highlight toggle */}
         <div className="flex items-center gap-2">
           <Button
-            variant={showHighlights ? 'default' : 'outline'}
+            variant={showHighlights ? 'secondary' : 'outline'}
             size="sm"
             onClick={() => setShowHighlights(!showHighlights)}
             aria-label={showHighlights ? 'Hide issue highlights' : 'Show issue highlights'}

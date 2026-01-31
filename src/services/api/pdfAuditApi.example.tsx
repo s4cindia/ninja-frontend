@@ -5,6 +5,8 @@
  * for various PDF accessibility audit operations.
  */
 
+/* eslint-disable react-refresh/only-export-components */
+
 import React, { useState, useEffect, useRef } from 'react';
 import type { ChangeEvent } from 'react';
 import { pdfAuditApi, PdfApiError } from './pdfAuditApi';
@@ -100,6 +102,11 @@ export function useCancellablePolling(jobId: string) {
   const abortRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
+    // Reset state when jobId changes
+    setResult(null);
+    setError(null);
+    setIsLoading(true);
+
     const { promise, abort } = pdfAuditApi.createCancellablePolling(jobId, 2000, 300000);
     abortRef.current = abort;
 
@@ -192,9 +199,9 @@ export async function downloadAcrReportExample(jobId: string) {
 
     // Get HTML format
     const htmlReport = await pdfAuditApi.getAcrReport(jobId, 'html');
-    console.log('ACR Report (HTML) received');
+    console.log('ACR Report (HTML):', htmlReport);
 
-    return jsonReport;
+    return { json: jsonReport, html: htmlReport };
   } catch (error) {
     if (error instanceof PdfApiError) {
       console.error('Failed to get ACR report:', error.message);

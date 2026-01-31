@@ -134,7 +134,10 @@ export const PdfAuditResultsPage: React.FC = () => {
 
     const map = new Map<number, PdfAuditIssue[]>();
     auditResult.issues.forEach((issue) => {
-      const page = issue.pageNumber || 0;
+      // Skip issues without a valid page number
+      if (!issue.pageNumber || issue.pageNumber < 1) return;
+
+      const page = issue.pageNumber;
       if (!map.has(page)) {
         map.set(page, []);
       }
