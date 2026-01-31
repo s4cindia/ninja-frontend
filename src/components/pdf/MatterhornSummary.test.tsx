@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MatterhornSummary } from './MatterhornSummary';
 import type { MatterhornSummary as MatterhornSummaryType } from '@/types/pdf.types';

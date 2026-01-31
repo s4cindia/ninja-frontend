@@ -252,7 +252,7 @@ class PdfAuditApiService {
   async getAuditStatus(jobId: string): Promise<AuditStatusResponse> {
     try {
       const response = await withRetry(() =>
-        api.get<{ data: AuditStatusResponse }>(`/pdf/job/${jobId}/status`)
+        api.get<{ data: AuditStatusResponse }>(`/pdf/job/${encodeURIComponent(jobId)}/status`)
       );
 
       return response.data.data;
@@ -267,7 +267,7 @@ class PdfAuditApiService {
   async getAuditResult(jobId: string): Promise<PdfAuditResult> {
     try {
       const response = await withRetry(() =>
-        api.get<{ data: PdfAuditResult }>(`/pdf/job/${jobId}/audit/result`)
+        api.get<{ data: PdfAuditResult }>(`/pdf/job/${encodeURIComponent(jobId)}/audit/result`)
       );
 
       return response.data.data;
@@ -282,7 +282,7 @@ class PdfAuditApiService {
   async getAcrReport(jobId: string, format: 'json' | 'html' = 'json'): Promise<ACRReport> {
     try {
       const response = await withRetry(() =>
-        api.get<{ data: ACRReport }>(`/pdf/job/${jobId}/acr`, {
+        api.get<{ data: ACRReport }>(`/pdf/job/${encodeURIComponent(jobId)}/acr`, {
           params: { format },
         })
       );
@@ -299,7 +299,7 @@ class PdfAuditApiService {
   async downloadReport(jobId: string, format: 'pdf' | 'docx' = 'pdf'): Promise<Blob> {
     try {
       const response = await withRetry(() =>
-        api.get<Blob>(`/pdf/job/${jobId}/report`, {
+        api.get<Blob>(`/pdf/job/${encodeURIComponent(jobId)}/report`, {
           params: { format },
           responseType: 'blob',
         })
@@ -338,7 +338,7 @@ class PdfAuditApiService {
    */
   async deleteAudit(jobId: string): Promise<void> {
     try {
-      await withRetry(() => api.delete(`/pdf/job/${jobId}`));
+      await withRetry(() => api.delete(`/pdf/job/${encodeURIComponent(jobId)}`));
     } catch (error) {
       throw PdfApiError.fromAxiosError(error as AxiosError);
     }

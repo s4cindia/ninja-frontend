@@ -7,7 +7,7 @@
 
 /* eslint-disable react-refresh/only-export-components */
 
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { ChangeEvent } from 'react';
 import { pdfAuditApi, PdfApiError } from './pdfAuditApi';
 import type { PdfAuditResult } from '@/types/pdf.types';

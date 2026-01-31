@@ -62,6 +62,14 @@ export const PdfAuditResultsPage: React.FC = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
 
+  // Validate jobId to prevent path traversal attacks
+  useEffect(() => {
+    if (!jobId || !/^[a-zA-Z0-9-_]+$/.test(jobId)) {
+      setError('Invalid job ID');
+      setIsLoading(false);
+    }
+  }, [jobId]);
+
   // State management
   const [auditResult, setAuditResult] = useState<PdfAuditResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -82,7 +90,7 @@ export const PdfAuditResultsPage: React.FC = () => {
     }
 
     try {
-      const response = await api.get(`/pdf/job/${jobId}/audit/result`);
+      const response = await api.get(`/pdf/job/${encodeURIComponent(jobId)}/audit/result`);
       const data = response.data.data || response.data;
 
       // Check if still processing
@@ -244,7 +252,7 @@ export const PdfAuditResultsPage: React.FC = () => {
 
     setIsDownloading(true);
     try {
-      const response = await api.get(`/pdf/job/${jobId}/report`, {
+      const response = await api.get(`/pdf/job/${encodeURIComponent(jobId)}/report`, {
         params: { format },
         responseType: format === 'json' ? 'json' : 'blob',
       });
@@ -285,13 +293,28 @@ export const PdfAuditResultsPage: React.FC = () => {
     navigate('/pdf');
   };
 
-  const handleShareResults = () => {
+  const handleShareResults = async () => {
     const url = window.location.href;
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(url);
-      alert('Results link copied to clipboard!');
-    } else {
-      prompt('Copy this link to share results:', url);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(url);
+        // TODO: Replace with toast notification system
+        alert('Results link copied to clipboard!');
+      } else {
+        // Fallback: create a temporary input element
+        const input = document.createElement('input');
+        input.value = url;
+        input.style.position = 'fixed';
+        input.style.opacity = '0';
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+        alert('Results link copied to clipboard!');
+      }
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err);
+      alert('Failed to copy link. Please copy manually: ' + url);
     }
   };
 
@@ -363,7 +386,7 @@ export const PdfAuditResultsPage: React.FC = () => {
   }
 
   // Generate PDF URL (this would come from API in production)
-  const pdfUrl = `/api/pdf/job/${jobId}/file`;
+  const pdfUrl = `/api/pdf/job/${encodeURIComponent(jobId!)}/file`;
 
   return (
     <div className="min-h-screen bg-gray-50">
