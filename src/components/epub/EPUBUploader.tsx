@@ -229,6 +229,9 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
       if (uploadResult.uploadMethod === 'direct' && uploadResult.jobId) {
         jobId = uploadResult.jobId;
       } else {
+        if (!endpoint.auditFile) {
+          throw new Error(`Missing auditFile endpoint for ${fileType}`);
+        }
         const response = await api.post(endpoint.auditFile, {
           fileId: uploadResult.fileId,
         });

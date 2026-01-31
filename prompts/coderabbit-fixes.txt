@@ -1,35 +1,46 @@
-🔍 Issues and Recommendations
-1. CRITICAL: Incomplete PDF Highlighting
+In `@src/pages/PdfAuditResultsPage.test.tsx`:
+- Around line 214-217: The test is asserting the wrong error string; update the
+expectation in PdfAuditResultsPage.test (the waitFor block using
+screen.getByText) to look for the component's actual error text "Invalid job ID"
+(set in PdfAuditResultsPage) instead of "No job ID provided" so the assertion
+matches the component's behavior.
+- Around line 172-174: The test currently asserts a progressbar role that
+doesn't exist for the Loader2 SVG; update the PdfAuditResultsPage.test.tsx to
+either remove the failing assertion expect(screen.getByRole('progressbar', {
+hidden: true })) or modify the component that renders Loader2 (e.g., the loader
+in PdfAuditResultsPage) to add role="progressbar" and appropriate ARIA
+attributes to the Loader2 element; pick one approach and update the test or the
+Loader2 rendering accordingly so the loading-state test only checks elements
+that actually exist (e.g., keep expect(screen.getByText('Loading audit
+results...')).toBeInTheDocument()).
 
-Location: src/components/pdf/PdfPreviewPanel.tsx:80-85
-parseIssueLocation function returns null (placeholder)
-Issue highlighting overlay won't work
-Recommendation: Add feature flag or clarify backend contract
-2. MEDIUM: Input Validation Race Condition
-
-Location: src/pages/PdfAuditResultsPage.tsx:67-93
-jobId validation in useEffect doesn't block API call
-Recommendation: Move validation into fetchAuditResult
-3. MEDIUM: Missing Error Boundary
-
-No error boundary around PdfAuditResultsPage
-Recommendation: Add error boundary to prevent crashes
-4. LOW: Type Guards Could Be Stricter
-
-isPdfAuditResult doesn't validate each array element
-Recommendation: Add deep validation with isPdfAuditIssue
-5. LOW: Development Artifacts
-
-FE-PDF-6.txt, FE-PDF-8.txt, prompts/ directory
-Recommendation: Remove or add to .gitignore
-6. LOW: Missing API Contract Tests
-
-Recommendation: Add integration tests when backend ready
-🔒 Security
-✅ No major concerns. Good practices for XSS prevention, path traversal, input validation.
-
-Minor suggestions:
-
-Consider CSP headers for PDF rendering
-Validate PDF magic bytes
-Ensure backend validates file content
+In `@src/services/api/pdfAuditApi.test.ts`:
+- Around line 508-512: The test uses two separate rejected assertions on the
+same promise (await expect(promise).rejects.toThrow(PdfApiError) and await
+expect(promise).rejects.toMatchObject({ code: 'POLLING_ABORTED' })), which is
+unreliable; replace them with a single assertion that inspects the rejected
+error object (e.g., await expect(promise).rejects.toMatchObject({ name:
+'PdfApiError', code: 'POLLING_ABORTED' })) or capture the error via try/catch
+(const err = await promise.catch(e => e);
+expect(err).toBeInstanceOf(PdfApiError);
+expect(err.code).toBe('POLLING_ABORTED')), referencing the promise variable and
+PdfApiError and the code property to ensure both type and payload are asserted
+in one check.
+- Around line 462-467: The test currently asserts the same rejected promise
+twice (await expect(promise).rejects.toThrow and then .rejects.toMatchObject),
+which can be flaky; update the assertions around the promise variable so the
+rejection is asserted only once — either replace both with a single assertion
+like await expect(promise).rejects.toMatchObject({ message: 'Audit failed',
+code: 'AUDIT_FAILED' }) and separately assert the error class via a try/catch
+where you await promise, catch err and assert err instanceof PdfApiError, or use
+a single try/catch to capture the thrown error and assert both err instanceof
+PdfApiError and err.message/err.code; reference the promise variable and
+PdfApiError in the test to implement the chosen approach.
+- Around line 479-483: The test currently consumes the same rejected promise
+twice with two awaits (await expect(promise).rejects.toThrow(PdfApiError); await
+expect(promise).rejects.toMatchObject({ code: 'POLLING_TIMEOUT' });), which is
+invalid; replace these with a single consumption that asserts both the error
+type and the payload, e.g. await promise.catch(err => {
+expect(err).toBeInstanceOf(PdfApiError); expect(err).toMatchObject({ code:
+'POLLING_TIMEOUT' }); }); so you check instanceof PdfApiError and the error.code
+in one pass using the existing promise and PdfApiError symbol.
