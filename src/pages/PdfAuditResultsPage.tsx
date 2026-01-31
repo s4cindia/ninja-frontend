@@ -143,7 +143,7 @@ export const PdfAuditResultsPage: React.FC = () => {
 
   // Build issues by page map
   const issuesByPage = useMemo(() => {
-    if (!auditResult) return new Map<number, PdfAuditIssue[]>();
+    if (!auditResult || !auditResult.issues) return new Map<number, PdfAuditIssue[]>();
 
     const map = new Map<number, PdfAuditIssue[]>();
     auditResult.issues.forEach((issue) => {
@@ -161,7 +161,7 @@ export const PdfAuditResultsPage: React.FC = () => {
 
   // Filter issues
   const filteredIssues = useMemo(() => {
-    if (!auditResult) return [];
+    if (!auditResult || !auditResult.issues) return [];
 
     let issues = [...auditResult.issues];
 
@@ -205,7 +205,7 @@ export const PdfAuditResultsPage: React.FC = () => {
 
   // Get unique WCAG criteria
   const uniqueWcagCriteria = useMemo(() => {
-    if (!auditResult) return [];
+    if (!auditResult || !auditResult.issues) return [];
     const criteria = new Set<string>();
     auditResult.issues.forEach((issue) => {
       issue.wcagCriteria?.forEach((c) => criteria.add(c));
@@ -215,7 +215,7 @@ export const PdfAuditResultsPage: React.FC = () => {
 
   // Get unique Matterhorn categories
   const uniqueMatterhornCategories = useMemo(() => {
-    if (!auditResult) return [];
+    if (!auditResult || !auditResult.matterhornSummary?.categories) return [];
     return auditResult.matterhornSummary.categories.map((cat) => ({
       id: cat.id,
       name: cat.name,
