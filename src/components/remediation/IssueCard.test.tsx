@@ -1,3 +1,4 @@
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { IssueCard } from './IssueCard';
 import type { PdfAuditIssue } from '@/types/pdf.types';
@@ -65,7 +66,7 @@ describe('IssueCard', () => {
     });
 
     it('calls onClick when card is clicked', () => {
-      const onClick = jest.fn();
+      const onClick = vi.fn();
       render(<IssueCard issue={mockEpubIssue} onClick={onClick} />);
 
       const card = screen.getByRole('button');
@@ -75,7 +76,7 @@ describe('IssueCard', () => {
     });
 
     it('is keyboard accessible when onClick is provided', () => {
-      const onClick = jest.fn();
+      const onClick = vi.fn();
       render(<IssueCard issue={mockEpubIssue} onClick={onClick} />);
 
       const card = screen.getByRole('button');
@@ -126,7 +127,7 @@ describe('IssueCard', () => {
     });
 
     it('calls onPageClick when page badge is clicked', () => {
-      const onPageClick = jest.fn();
+      const onPageClick = vi.fn();
       render(<IssueCard issue={mockPdfIssue} onPageClick={onPageClick} />);
 
       const pageBadge = screen.getByText('Page 5');
@@ -136,7 +137,7 @@ describe('IssueCard', () => {
     });
 
     it('does not trigger onPageClick when page badge click is disabled', () => {
-      const onPageClick = jest.fn();
+      const onPageClick = vi.fn();
       render(<IssueCard issue={mockPdfIssue} />);
 
       const pageBadge = screen.getByText('Page 5');
@@ -176,8 +177,8 @@ describe('IssueCard', () => {
     });
 
     it('stops event propagation when page badge is clicked', () => {
-      const onClick = jest.fn();
-      const onPageClick = jest.fn();
+      const onClick = vi.fn();
+      const onPageClick = vi.fn();
       render(<IssueCard issue={mockPdfIssue} onClick={onClick} onPageClick={onPageClick} />);
 
       const pageBadge = screen.getByText('Page 5');
@@ -188,7 +189,7 @@ describe('IssueCard', () => {
     });
 
     it('stops event propagation when Matterhorn link is clicked', () => {
-      const onClick = jest.fn();
+      const onClick = vi.fn();
       render(<IssueCard issue={mockPdfIssue} onClick={onClick} showMatterhorn={true} />);
 
       const matterhornLink = screen.getByText('01-003');

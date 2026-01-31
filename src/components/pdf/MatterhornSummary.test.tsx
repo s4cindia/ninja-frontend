@@ -1,3 +1,4 @@
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MatterhornSummary } from './MatterhornSummary';
 import type { MatterhornSummary as MatterhornSummaryType } from '@/types/pdf.types';
@@ -105,7 +106,7 @@ describe('MatterhornSummary', () => {
   });
 
   it('calls onCheckpointClick when checkpoint with issues is clicked', () => {
-    const onCheckpointClick = jest.fn();
+    const onCheckpointClick = vi.fn();
     render(<MatterhornSummary summary={mockSummary} onCheckpointClick={onCheckpointClick} />);
 
     const failedCheckpoint = screen.getByText('Real content is tagged').closest('div');
@@ -115,7 +116,7 @@ describe('MatterhornSummary', () => {
   });
 
   it('does not call onCheckpointClick for passed checkpoints', () => {
-    const onCheckpointClick = jest.fn();
+    const onCheckpointClick = vi.fn();
     render(<MatterhornSummary summary={mockSummary} onCheckpointClick={onCheckpointClick} />);
 
     const passedCheckpoint = screen.getByText('Content is marked as Artifact').closest('div');
