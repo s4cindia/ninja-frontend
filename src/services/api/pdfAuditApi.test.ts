@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach, type Mock, type Mocked } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mocked } from 'vitest';
 import { pdfAuditApi, PdfApiError } from './pdfAuditApi';
 import { api } from '../api';
-import { AxiosError } from 'axios';
+import { AxiosError, type AxiosRequestConfig } from 'axios';
 import type { PdfAuditResult, PdfAuditListResponse } from '@/types/pdf.types';
 
 // Mock the api module
@@ -56,7 +56,7 @@ describe('PdfAuditApiService', () => {
       };
       const onProgress = vi.fn();
 
-      mockApi.post.mockImplementation((_url: string, _data: unknown, config?: any) => {
+      mockApi.post.mockImplementation((_url: string, _data: unknown, config?: AxiosRequestConfig) => {
         // Simulate progress
         if (config?.onUploadProgress) {
           config.onUploadProgress({
