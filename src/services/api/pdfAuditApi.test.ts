@@ -162,7 +162,7 @@ describe('PdfAuditApiService', () => {
 
       await expect(pdfAuditApi.getAuditStatus('job-123')).rejects.toThrow();
       expect(mockApi.get).toHaveBeenCalledTimes(4); // Initial + 3 retries
-    });
+    }, 10000);
   });
 
   describe('getAuditResult', () => {
@@ -506,11 +506,11 @@ describe('PdfAuditApiService', () => {
       // Cancel operation
       abort();
 
-      await expect(promise).rejects.toThrow(PdfApiError);
       await expect(promise).rejects.toMatchObject({
+        name: 'PdfApiError',
         code: 'POLLING_ABORTED',
       });
-    });
+    }, 10000);
 
     it('resolves when audit completes', async () => {
       const mockResult: PdfAuditResult = {

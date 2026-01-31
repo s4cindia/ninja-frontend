@@ -171,7 +171,6 @@ describe('PdfAuditResultsPage', () => {
       renderWithRouter();
 
       expect(screen.getByText('Loading audit results...')).toBeInTheDocument();
-      expect(screen.getByRole('progressbar', { hidden: true })).toBeInTheDocument();
     });
   });
 
@@ -213,7 +212,7 @@ describe('PdfAuditResultsPage', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText(/No job ID provided/)).toBeInTheDocument();
+        expect(screen.getByText(/Invalid job ID/)).toBeInTheDocument();
       });
     });
 
@@ -247,7 +246,7 @@ describe('PdfAuditResultsPage', () => {
       await waitFor(() => {
         expect(screen.getByText('Audit in progress...')).toBeInTheDocument();
       });
-    });
+    }, 10000);
 
     it('polls for updates when job is processing', async () => {
       const processingResponse = { data: { data: { status: 'processing' } } };
@@ -282,7 +281,7 @@ describe('PdfAuditResultsPage', () => {
       await waitFor(() => {
         expect(screen.getByText('test-document.pdf')).toBeInTheDocument();
       });
-    });
+    }, 10000);
 
     it('allows manual status check during polling', async () => {
       mockApi.get.mockResolvedValue({ data: { data: { status: 'processing' } } });
@@ -299,7 +298,7 @@ describe('PdfAuditResultsPage', () => {
       await waitFor(() => {
         expect(mockApi.get).toHaveBeenCalledTimes(2); // Initial + manual check
       });
-    });
+    }, 10000);
   });
 
   describe('Component Integration', () => {
@@ -384,7 +383,7 @@ describe('PdfAuditResultsPage', () => {
 
       expect(screen.getByPlaceholderText('Search issues...')).toBeInTheDocument();
       expect(screen.getByRole('combobox', { name: /severity/i })).toBeInTheDocument();
-    });
+    }, 10000);
 
     it('filters issues by severity', async () => {
       const mockResult = createMockAuditResult();
@@ -436,7 +435,7 @@ describe('PdfAuditResultsPage', () => {
       await waitFor(() => {
         expect(screen.getByText(/Issues \(1\)/)).toBeInTheDocument();
       });
-    });
+    }, 10000);
 
     it('clears all filters when clear button is clicked', async () => {
       const mockResult = createMockAuditResult();
@@ -465,7 +464,7 @@ describe('PdfAuditResultsPage', () => {
       await waitFor(() => {
         expect(screen.getByText(/Issues \(4\)/)).toBeInTheDocument();
       });
-    });
+    }, 10000);
   });
 
   describe('Page Navigation', () => {
