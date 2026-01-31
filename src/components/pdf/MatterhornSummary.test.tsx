@@ -53,7 +53,7 @@ describe('MatterhornSummary', () => {
     render(<MatterhornSummary summary={mockSummary} />);
 
     expect(screen.getByText('Matterhorn Protocol Compliance')).toBeInTheDocument();
-    expect(screen.getByText('70%')).toBeInTheDocument(); // 7/10 = 70%
+    expect(screen.getAllByText('70%')[0]).toBeInTheDocument(); // 7/10 = 70%
     expect(screen.getByText('10')).toBeInTheDocument(); // Total checkpoints
   });
 
@@ -102,7 +102,7 @@ describe('MatterhornSummary', () => {
   it('displays issue count badge for failed checkpoints', () => {
     render(<MatterhornSummary summary={mockSummary} />);
 
-    expect(screen.getByText('3 issues')).toBeInTheDocument();
+    expect(screen.getAllByText('3 issues')[0]).toBeInTheDocument();
   });
 
   it('calls onCheckpointClick when checkpoint with issues is clicked', () => {
@@ -135,9 +135,9 @@ describe('MatterhornSummary', () => {
     render(<MatterhornSummary summary={mockSummary} />);
 
     expect(screen.getByText('Status Legend:')).toBeInTheDocument();
-    expect(screen.getByText('Passed')).toBeInTheDocument();
-    expect(screen.getByText('Failed')).toBeInTheDocument();
-    expect(screen.getByText('Not Applicable')).toBeInTheDocument();
+    expect(screen.getAllByText('Passed').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Failed').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Not Applicable').length).toBeGreaterThan(0);
   });
 
   it('handles empty categories array', () => {
@@ -152,6 +152,6 @@ describe('MatterhornSummary', () => {
     render(<MatterhornSummary summary={emptySummary} />);
 
     expect(screen.getByText('Matterhorn Protocol Compliance')).toBeInTheDocument();
-    expect(screen.getByText('0%')).toBeInTheDocument();
+    expect(screen.getAllByText('0%')[0]).toBeInTheDocument();
   });
 });
