@@ -597,10 +597,16 @@ export const PdfAuditResultsPage: React.FC = () => {
                   value={filters.pageNumber === 'all' ? '' : filters.pageNumber}
                   onChange={(e) => {
                     const val = e.target.value;
-                    setFilters((prev) => ({
-                      ...prev,
-                      pageNumber: val === '' ? 'all' : parseInt(val, 10),
-                    }));
+                    if (val === '') {
+                      setFilters((prev) => ({ ...prev, pageNumber: 'all' }));
+                    } else {
+                      const parsed = parseInt(val, 10);
+                      // Only update if the parsed value is a valid integer
+                      if (!isNaN(parsed) && Number.isInteger(parsed)) {
+                        setFilters((prev) => ({ ...prev, pageNumber: parsed }));
+                      }
+                      // If invalid, keep the previous value by not calling setFilters
+                    }
                   }}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
