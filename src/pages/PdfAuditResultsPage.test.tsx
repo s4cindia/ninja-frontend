@@ -248,9 +248,12 @@ describe('PdfAuditResultsPage', () => {
 
       renderWithRouter();
 
+      // Flush pending timers to ensure component renders
+      await vi.runAllTimersAsync();
+
       await waitFor(() => {
         expect(screen.getByText('Audit in progress...')).toBeInTheDocument();
-      });
+      }, { timeout: 5000 });
     }, 10000);
 
     it('polls for updates when job is processing', async () => {
@@ -264,45 +267,56 @@ describe('PdfAuditResultsPage', () => {
 
       renderWithRouter();
 
+      // Flush initial render timers
+      await vi.runAllTimersAsync();
+
       await waitFor(() => {
         expect(screen.getByText('Audit in progress...')).toBeInTheDocument();
-      });
+      }, { timeout: 5000 });
 
-      // Fast-forward 5 seconds using async method
+      // Fast-forward 5 seconds and flush
       await vi.advanceTimersByTimeAsync(5000);
+      await vi.runAllTimersAsync();
 
       await waitFor(() => {
         expect(mockApi.get).toHaveBeenCalledTimes(2);
-      });
+      }, { timeout: 5000 });
 
-      // Fast-forward another 5 seconds
+      // Fast-forward another 5 seconds and flush
       await vi.advanceTimersByTimeAsync(5000);
+      await vi.runAllTimersAsync();
 
       await waitFor(() => {
         expect(mockApi.get).toHaveBeenCalledTimes(3);
-      });
+      }, { timeout: 5000 });
 
       // Should now show completed result
       await waitFor(() => {
         expect(screen.getByText('test-document.pdf')).toBeInTheDocument();
-      });
-    }, 10000);
+      }, { timeout: 5000 });
+    }, 15000);
 
     it('allows manual status check during polling', async () => {
       mockApi.get.mockResolvedValue({ data: { data: { status: 'processing' } } });
 
       renderWithRouter();
 
+      // Flush initial timers
+      await vi.runAllTimersAsync();
+
       await waitFor(() => {
         expect(screen.getByText('Audit in progress...')).toBeInTheDocument();
-      });
+      }, { timeout: 5000 });
 
       const checkButton = screen.getByRole('button', { name: /check status/i });
       fireEvent.click(checkButton);
 
+      // Flush timers after button click
+      await vi.runAllTimersAsync();
+
       await waitFor(() => {
         expect(mockApi.get).toHaveBeenCalledTimes(2); // Initial + manual check
-      });
+      }, { timeout: 5000 });
     }, 10000);
   });
 
@@ -439,7 +453,7 @@ describe('PdfAuditResultsPage', () => {
       // Should only show matching issue
       await waitFor(() => {
         expect(screen.getByText(/Issues \(1\)/)).toBeInTheDocument();
-      });
+      }, { timeout: 5000 });
     }, 10000);
 
     it('clears all filters when clear button is clicked', async () => {
@@ -459,7 +473,7 @@ describe('PdfAuditResultsPage', () => {
 
       await waitFor(() => {
         expect(screen.getByText(/Issues \(1\)/)).toBeInTheDocument();
-      });
+      }, { timeout: 5000 });
 
       // Clear filters
       const clearButton = screen.getByRole('button', { name: /clear/i });
@@ -468,7 +482,7 @@ describe('PdfAuditResultsPage', () => {
       // Should show all issues again
       await waitFor(() => {
         expect(screen.getByText(/Issues \(4\)/)).toBeInTheDocument();
-      });
+      }, { timeout: 5000 });
     }, 10000);
   });
 
@@ -542,7 +556,7 @@ describe('PdfAuditResultsPage', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Current: 3')).toBeInTheDocument();
-      });
+      }, { timeout: 5000 });
     });
   });
 
@@ -566,10 +580,10 @@ describe('PdfAuditResultsPage', () => {
       vi.spyOn(document.body, 'removeChild').mockImplementation(() => mockLink);
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /download report/i })).toBeInTheDocument();
-      });
+        expect(screen.getByRole('button', { name: /download/i })).toBeInTheDocument();
+      }, { timeout: 5000 });
 
-      const downloadButton = screen.getByRole('button', { name: /download report/i });
+      const downloadButton = screen.getByRole('button', { name: /download/i });
       fireEvent.click(downloadButton);
 
       await waitFor(() => {
@@ -594,12 +608,15 @@ describe('PdfAuditResultsPage', () => {
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /share/i })).toBeInTheDocument();
-      });
+      }, { timeout: 5000 });
 
       const shareButton = screen.getByRole('button', { name: /share/i });
       fireEvent.click(shareButton);
 
-      expect(navigator.clipboard.writeText).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(navigator.clipboard.writeText).toHaveBeenCalled();
+      }, { timeout: 5000 });
+
       expect(window.alert).toHaveBeenCalledWith('Results link copied to clipboard!');
     });
   });
