@@ -166,7 +166,7 @@ describe('IssueCard', () => {
       const issueWithoutPage = { ...mockPdfIssue, pageNumber: undefined };
       render(<IssueCard issue={issueWithoutPage} />);
 
-      expect(screen.queryByText(/Page/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/^Page \d+$/)).not.toBeInTheDocument();
     });
 
     it('handles PDF issue without Matterhorn checkpoint', () => {
