@@ -139,7 +139,7 @@ const IssueOverlay: React.FC<{
 };
 
 export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
-  pdfUrl,
+  pdfUrl: _pdfUrl, // TODO: Use when react-pdf is installed
   currentPage,
   issues,
   selectedIssueId,
@@ -164,13 +164,15 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
       .filter((h): h is IssueHighlight => h !== null);
   }, [currentPageIssues]);
 
-  const handleDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
+  // TODO: Uncomment when react-pdf is installed
+  const _handleDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
     setIsLoading(false);
     setError(null);
   }, []);
 
-  const handleDocumentLoadError = useCallback((error: Error) => {
+  // TODO: Uncomment when react-pdf is installed
+  const _handleDocumentLoadError = useCallback((error: Error) => {
     setError(error.message || 'Failed to load PDF');
     setIsLoading(false);
   }, []);
