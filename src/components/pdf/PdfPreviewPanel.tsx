@@ -20,20 +20,23 @@ import {
   EyeOff,
   Loader2,
   AlertCircle,
+  FileText,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '../ui/Button';
 import type { PdfAuditIssue } from '@/types/pdf.types';
 
-import { Document, Page, pdfjs } from 'react-pdf';
-import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
-import 'react-pdf/dist/esm/Page/TextLayer.css';
+// TODO: Uncomment when react-pdf is installed
+// import { Document, Page, pdfjs } from 'react-pdf';
+// import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
+// import 'react-pdf/dist/esm/Page/TextLayer.css';
 
+// TODO: Uncomment when react-pdf is installed
 // Use local worker for better compatibility and to avoid CDN/CSP issues
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.js',
-  import.meta.url
-).toString();
+// pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+//   'pdfjs-dist/build/pdf.worker.min.js',
+//   import.meta.url
+// ).toString();
 
 export interface PdfPreviewPanelProps {
   pdfUrl: string;
@@ -344,8 +347,9 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
           )}
 
           {!isLoading && !error && (
-            <div className="relative bg-white shadow-lg">
-              <Document
+            <div className="relative bg-white shadow-lg p-8">
+              {/* TODO: Uncomment when react-pdf is installed */}
+              {/* <Document
                 file={pdfUrl}
                 onLoadSuccess={handleDocumentLoadSuccess}
                 onLoadError={handleDocumentLoadError}
@@ -362,7 +366,15 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
                   renderTextLayer={true}
                   renderAnnotationLayer={true}
                 />
-              </Document>
+              </Document> */}
+
+              {/* Placeholder until react-pdf is installed */}
+              <div className="flex flex-col items-center justify-center py-20 bg-gray-100 rounded">
+                <FileText className="h-16 w-16 text-gray-400 mb-4" />
+                <p className="text-gray-600 font-medium mb-2">PDF Preview Not Available</p>
+                <p className="text-sm text-gray-500">Install react-pdf to enable PDF viewing</p>
+                <p className="text-xs text-gray-400 mt-2 font-mono">npm install react-pdf pdfjs-dist</p>
+              </div>
 
               {/* Issue highlights overlay */}
               {showHighlights && highlights.length > 0 && (
