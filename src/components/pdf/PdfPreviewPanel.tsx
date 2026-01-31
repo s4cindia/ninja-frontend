@@ -165,6 +165,7 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
   }, [currentPageIssues]);
 
   // TODO: Uncomment when react-pdf is installed
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _handleDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
     setIsLoading(false);
@@ -172,6 +173,7 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
   }, []);
 
   // TODO: Uncomment when react-pdf is installed
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _handleDocumentLoadError = useCallback((error: Error) => {
     setError(error.message || 'Failed to load PDF');
     setIsLoading(false);
