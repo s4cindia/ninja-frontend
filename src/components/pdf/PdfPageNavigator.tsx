@@ -110,7 +110,7 @@ const PageItem: React.FC<{
             : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50',
           'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1'
         )}
-        aria-label={`Page ${pageNumber}${issueSummary ? ` - ${issueSummary.total} ${issueSummary.total === 1 ? 'issue' : 'issues'}` : ''}`}
+        aria-label={`Page ${pageNumber}${issueSummary && issueSummary.total > 0 ? ` - ${issueSummary.total} ${issueSummary.total === 1 ? 'issue' : 'issues'}` : ''}`}
         aria-current={isActive ? 'page' : undefined}
       >
         {showThumbnails && thumbnail ? (

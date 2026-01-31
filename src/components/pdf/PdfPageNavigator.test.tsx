@@ -137,8 +137,8 @@ describe('PdfPageNavigator', () => {
         />
       );
 
-      const page2Label = screen.getByLabelText('Page 2');
-      expect(page2Label.textContent).not.toContain('issues');
+      const page2Button = screen.getByRole('button', { name: 'Page 2' });
+      expect(page2Button.textContent).not.toContain('issues');
     });
   });
 
@@ -154,7 +154,7 @@ describe('PdfPageNavigator', () => {
         />
       );
 
-      const page3Button = screen.getByLabelText('Page 3');
+      const page3Button = screen.getByRole('button', { name: 'Page 3' });
       fireEvent.click(page3Button);
 
       expect(mockOnPageChange).toHaveBeenCalledWith(3);
@@ -477,7 +477,7 @@ describe('PdfPageNavigator', () => {
         />
       );
 
-      const currentPageButton = screen.getByLabelText('Page 3');
+      const currentPageButton = screen.getByRole('button', { name: 'Page 3' });
       expect(currentPageButton).toHaveAttribute('aria-current', 'page');
     });
   });
