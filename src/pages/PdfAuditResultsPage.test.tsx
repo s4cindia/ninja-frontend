@@ -434,7 +434,7 @@ describe('PdfAuditResultsPage', () => {
 
       // Search for "alt text"
       const searchInput = screen.getByPlaceholderText('Search issues...');
-      await userEvent.type(searchInput, 'alt text');
+      fireEvent.change(searchInput, { target: { value: 'alt text' } });
 
       // Should only show matching issue
       await waitFor(() => {
