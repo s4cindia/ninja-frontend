@@ -86,7 +86,7 @@ describe('PdfPageNavigator', () => {
         />
       );
 
-      const page3Button = screen.getByLabelText('Page 3');
+      const page3Button = screen.getByRole('button', { name: 'Page 3' });
       expect(page3Button).toHaveClass('border-primary-500');
       expect(page3Button).toHaveAttribute('aria-current', 'page');
     });

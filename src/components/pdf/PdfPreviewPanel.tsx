@@ -302,7 +302,7 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
             variant="outline"
             size="sm"
             onClick={handleNextPage}
-            disabled={!numPages || currentPage >= numPages}
+            disabled={numPages !== null && currentPage >= numPages}
             aria-label="Next page"
           >
             <ChevronRight className="h-4 w-4" />

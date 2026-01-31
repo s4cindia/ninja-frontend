@@ -506,6 +506,9 @@ describe('PdfAuditApiService', () => {
       // Cancel operation
       abort();
 
+      // Flush all timers to ensure abort is processed
+      await vi.runAllTimersAsync();
+
       await expect(promise).rejects.toMatchObject({
         name: 'PdfApiError',
         code: 'POLLING_ABORTED',

@@ -149,8 +149,7 @@ describe('PdfPreviewPanel', () => {
       render(<PdfPreviewPanel {...defaultProps} currentPage={1} />);
 
       const pageInput = screen.getByLabelText('Current page');
-      await userEvent.clear(pageInput);
-      await userEvent.type(pageInput, '5');
+      fireEvent.change(pageInput, { target: { value: '5' } });
 
       expect(mockOnPageChange).toHaveBeenCalledWith(5);
     });
