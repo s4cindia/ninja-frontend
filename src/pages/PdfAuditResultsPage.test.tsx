@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mocked } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
@@ -158,7 +158,7 @@ const renderWithRouter = (jobId: string = 'job-123') => {
 };
 
 describe('PdfAuditResultsPage', () => {
-  const mockApi = api as vi.Mocked<typeof api>;
+  const mockApi = api as Mocked<typeof api>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -550,8 +550,8 @@ describe('PdfAuditResultsPage', () => {
         download: '',
       } as unknown as HTMLAnchorElement;
       vi.spyOn(document, 'createElement').mockReturnValue(mockLink);
-      vi.spyOn(document.body, 'appendChild').mockImplementation();
-      vi.spyOn(document.body, 'removeChild').mockImplementation();
+      vi.spyOn(document.body, 'appendChild').mockImplementation(() => mockLink);
+      vi.spyOn(document.body, 'removeChild').mockImplementation(() => mockLink);
 
       renderWithRouter('job-123');
 
@@ -577,7 +577,7 @@ describe('PdfAuditResultsPage', () => {
           writeText: vi.fn(),
         },
       });
-      vi.spyOn(window, 'alert').mockImplementation();
+      vi.spyOn(window, 'alert').mockImplementation(() => {});
 
       renderWithRouter();
 
