@@ -37,6 +37,8 @@ import { AcrWorkflowPage } from '@/pages/acr/AcrWorkflowPage';
 import { EPUBAccessibility } from '@/pages/EPUBAccessibility';
 import { EPUBRemediation } from '@/pages/EPUBRemediation';
 import { EPUBComparison } from '@/pages/EPUBComparison';
+import { PdfAccessibilityPage } from '@/pages/PdfAccessibilityPage';
+import { PdfAuditResultsPage } from '@/pages/PdfAuditResultsPage';
 import { FeedbackDashboard } from '@/pages/FeedbackDashboard';
 import { RemediationPage } from '@/pages/Remediation';
 import { ComparisonPage } from '@/pages/ComparisonPage';
@@ -157,6 +159,8 @@ function AppRoutes() {
           <Route path="/epub" element={<EPUBAccessibility />} />
           <Route path="/epub/remediate/:jobId" element={<EPUBRemediation />} />
           <Route path="/epub/compare/:jobId" element={<EPUBComparison />} />
+          <Route path="/pdf/accessibility" element={<PdfAccessibilityPage />} />
+          <Route path="/pdf/audit/:jobId" element={<PdfAuditResultsPage />} />
           <Route path="/feedback" element={<FeedbackDashboard />} />
           <Route path="/remediation" element={<RemediationPage />} />
           <Route path="/remediation/batch" element={<BatchRemediationPage />} />
