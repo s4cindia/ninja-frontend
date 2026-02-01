@@ -181,10 +181,18 @@ export function VisualComparisonPanel({
    * Validates and normalizes an EPUB asset path to prevent path traversal attacks
    * @param path - The path to validate
    * @returns Normalized safe path or null if invalid
-   * @security Prevents ../../../../etc/passwd style attacks
+   * @security Prevents ../../../../etc/passwd style attacks, javascript: URIs, etc.
    */
   const validateAssetPath = useCallback((path: string): string | null => {
     if (!path || path.length > 500) return null; // Reasonable length limit
+
+    // Reject dangerous URI schemes
+    const lowerPath = path.toLowerCase();
+    if (lowerPath.startsWith('javascript:') ||
+        lowerPath.startsWith('vbscript:') ||
+        lowerPath.startsWith('data:text/html')) {
+      return null;
+    }
 
     // Reject suspicious patterns
     if (path.includes('..\\') || path.includes('\\')) return null;
@@ -200,6 +208,9 @@ export function VisualComparisonPanel({
 
     // Ensure path stays within EPUB structure
     if (normalized.startsWith('/') || normalized.includes('://')) return null;
+
+    // Check if path still contains unresolved ../ (indicates escape attempt)
+    if (normalized.startsWith('../')) return null;
 
     return normalized;
   }, []);
@@ -258,6 +269,14 @@ export function VisualComparisonPanel({
             baseParts.pop();
           }
 
+          // If there are still ../ remaining, path escapes EPUB root - skip it
+          if (srcParts[0] === '..') {
+            if (import.meta.env.DEV) {
+              console.warn(`[VisualComparison] Path escapes EPUB root: ${src}`);
+            }
+            return;
+          }
+
           resolvedPath = [...baseParts, ...srcParts].join('/');
         } else if (src.startsWith('./')) {
           resolvedPath = baseDir + src.substring(2);
@@ -295,11 +314,21 @@ export function VisualComparisonPanel({
   /**
    * Resolves CSS background-image URLs
    * @param content - HTML content with potential CSS
+   * @param baseFilePath - The current file path for relative resolution
+   * @param actualBaseHref - The actual base href from spine item (fallback)
    * @returns Content with resolved CSS URLs
    * @security Validates paths and skips fragments/absolute URLs
    */
-  const resolveCSSImages = useCallback((content: string): string => {
+  const resolveCSSImages = useCallback((content: string, baseFilePath?: string, actualBaseHref?: string): string => {
     if (!content) return '';
+
+    // Determine base directory from filePath or fallback to baseHref
+    let baseDir = 'OEBPS/'; // Default fallback
+    if (baseFilePath && baseFilePath.includes('/')) {
+      baseDir = baseFilePath.substring(0, baseFilePath.lastIndexOf('/') + 1);
+    } else if (actualBaseHref && actualBaseHref.includes('/')) {
+      baseDir = actualBaseHref.substring(0, actualBaseHref.lastIndexOf('/') + 1);
+    }
 
     const cssPattern = /url\(['"]?([^'")\s]+)['"]?\)/gi;
 
@@ -314,17 +343,32 @@ export function VisualComparisonPanel({
         return match;
       }
 
-      // Normalize path - preserve package structure
+      // Resolve relative path using same logic as resolveImagePaths
       let resolvedPath = url;
 
-      // Remove only leading ./ and ../ but preserve internal structure
-      if (resolvedPath.startsWith('./')) {
-        resolvedPath = resolvedPath.substring(2);
-      }
+      if (url.startsWith('../')) {
+        const baseParts = baseDir.split('/').filter(Boolean);
+        const srcParts = url.split('/');
 
-      // Handle ../ by resolving relative to a base
-      // Note: Without baseFilePath context, we keep the path as-is for ../
-      // This is safer than stripping indiscriminately
+        while (srcParts[0] === '..' && baseParts.length > 0) {
+          srcParts.shift();
+          baseParts.pop();
+        }
+
+        // If there are still ../ remaining, path escapes EPUB root
+        if (srcParts[0] === '..') {
+          if (import.meta.env.DEV) {
+            console.warn(`[VisualComparison] CSS path escapes EPUB root: ${url}`);
+          }
+          return match;
+        }
+
+        resolvedPath = [...baseParts, ...srcParts].join('/');
+      } else if (url.startsWith('./')) {
+        resolvedPath = baseDir + url.substring(2);
+      } else if (!url.startsWith('OEBPS/') && !url.startsWith('OPS/')) {
+        resolvedPath = baseDir + url;
+      }
 
       // Validate the path
       const safePath = validateAssetPath(resolvedPath);
@@ -464,11 +508,13 @@ export function VisualComparisonPanel({
     if (!displayData) return null;
 
     // Resolve image paths for both before and after content
-    let beforeHtml = resolveImagePaths(displayData.beforeContent.html, filePath);
-    beforeHtml = resolveCSSImages(beforeHtml);
+    const beforeBaseHref = displayData.spineItem?.href || displayData.beforeContent.baseHref;
+    let beforeHtml = resolveImagePaths(displayData.beforeContent.html, filePath, beforeBaseHref);
+    beforeHtml = resolveCSSImages(beforeHtml, filePath, beforeBaseHref);
 
-    let afterHtml = resolveImagePaths(displayData.afterContent.html, filePath);
-    afterHtml = resolveCSSImages(afterHtml);
+    const afterBaseHref = displayData.spineItem?.href || displayData.afterContent.baseHref;
+    let afterHtml = resolveImagePaths(displayData.afterContent.html, filePath, afterBaseHref);
+    afterHtml = resolveCSSImages(afterHtml, filePath, afterBaseHref);
 
     return {
       before: {
