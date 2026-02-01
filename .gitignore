@@ -147,3 +147,11 @@ test-results/
 attached_assets/
 .replit
 
+# Development artifacts and prompts
+prompts/
+FE-PDF-*.txt
+
+# Development artifacts and task files
+prompts/
+FE-PDF-*.txt
+

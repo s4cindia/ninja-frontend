@@ -7,13 +7,16 @@ import { cn } from '@/utils/cn';
 import { api } from '@/services/api';
 import { uploadService } from '@/services/upload.service';
 import { useJobPolling, JobData } from '@/hooks/useJobPolling';
+import { detectFileType, getAcceptedMimeTypes, DocumentFileType } from '@/utils/fileUtils';
 
 type UploadState = 'idle' | 'uploading' | 'queued' | 'processing' | 'complete' | 'error';
 
 interface AuditSummary {
   jobId: string;
   fileName?: string;
-  epubVersion: string;
+  fileType: 'epub' | 'pdf';
+  epubVersion?: string;
+  pdfVersion?: string;
   isValid: boolean;
   accessibilityScore: number;
   issuesSummary: {
@@ -25,6 +28,22 @@ interface AuditSummary {
   };
 }
 
+interface DocumentUploaderProps {
+  acceptedFileTypes?: Array<'epub' | 'pdf'>;
+  endpoints?: {
+    epub?: {
+      directUpload?: string;
+      auditFile?: string;
+    };
+    pdf?: {
+      directUpload?: string;
+      auditFile?: string;
+    };
+  };
+  onUploadComplete?: (result: AuditSummary) => void;
+  onError?: (error: string) => void;
+}
+
 interface EPUBUploaderProps {
   onUploadComplete?: (result: AuditSummary) => void;
   onError?: (error: string) => void;
@@ -32,7 +51,9 @@ interface EPUBUploaderProps {
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
-export const EPUBUploader: React.FC<EPUBUploaderProps> = ({
+const DocumentUploader: React.FC<DocumentUploaderProps> = ({
+  acceptedFileTypes = ['epub', 'pdf'],
+  endpoints,
   onUploadComplete,
   onError,
 }) => {
@@ -43,16 +64,21 @@ export const EPUBUploader: React.FC<EPUBUploaderProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileNameRef = useRef<string>('');
+  const fileTypeRef = useRef<DocumentFileType>('epub');
 
   const handleJobComplete = useCallback((jobData: JobData) => {
     setState('complete');
     setProgress(100);
-    
+
     const output = jobData.output || {};
+    const fileType = fileTypeRef.current;
+
     const result: AuditSummary = {
       jobId: jobData.id,
       fileName: fileNameRef.current,
-      epubVersion: (output.epubVersion as string) || '3.0',
+      fileType,
+      epubVersion: fileType === 'epub' ? ((output.epubVersion as string) || '3.0') : undefined,
+      pdfVersion: fileType === 'pdf' ? ((output.pdfVersion as string) || '1.7') : undefined,
       isValid: (output.isValid as boolean) ?? true,
       accessibilityScore: (output.accessibilityScore as number) || (output.score as number) || 0,
       issuesSummary: (output.issuesSummary as AuditSummary['issuesSummary']) || {
@@ -88,15 +114,24 @@ export const EPUBUploader: React.FC<EPUBUploaderProps> = ({
     }
   }, [jobStatus]);
 
-  const validateFile = (file: File): string | null => {
-    if (!file.name.toLowerCase().endsWith('.epub')) {
-      return 'Only .epub files are accepted';
+  const validateFile = useCallback((file: File): string | null => {
+    const fileType = detectFileType(file);
+
+    if (!fileType) {
+      return 'Invalid file type';
     }
+
+    if (!acceptedFileTypes.includes(fileType)) {
+      const accepted = acceptedFileTypes.join(', ').toUpperCase();
+      return `Only ${accepted} files are accepted`;
+    }
+
     if (file.size > MAX_FILE_SIZE) {
       return `File size exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB limit`;
     }
+
     return null;
-  };
+  }, [acceptedFileTypes]);
 
   const handleFileSelect = useCallback((file: File) => {
     const validationError = validateFile(file);
@@ -107,7 +142,7 @@ export const EPUBUploader: React.FC<EPUBUploaderProps> = ({
     }
     setSelectedFile(file);
     setError(null);
-  }, [onError]);
+  }, [validateFile, onError]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -152,10 +187,39 @@ export const EPUBUploader: React.FC<EPUBUploaderProps> = ({
     setError(null);
     fileNameRef.current = selectedFile.name;
 
+    // Detect file type
+    const fileType = detectFileType(selectedFile);
+    if (!fileType) {
+      setError('Unable to determine file type');
+      setState('error');
+      return;
+    }
+
+    // Store file type for callback
+    fileTypeRef.current = fileType;
+
+    // Determine endpoints based on file type
+    const defaultEndpoints = {
+      epub: {
+        directUpload: '/epub/audit-upload',
+        auditFile: '/epub/audit-file',
+      },
+      pdf: {
+        directUpload: '/pdf/audit-upload',
+        auditFile: '/pdf/audit-file',
+      },
+    };
+
+    const endpoint = endpoints?.[fileType] || defaultEndpoints[fileType];
+
     try {
-      const uploadResult = await uploadService.uploadFile(selectedFile, (uploadProgress) => {
-        setProgress(Math.round(uploadProgress.percentage * 0.8));
-      });
+      const uploadResult = await uploadService.uploadFile(
+        selectedFile,
+        (uploadProgress) => {
+          setProgress(Math.round(uploadProgress.percentage * 0.8));
+        },
+        endpoint.directUpload
+      );
 
       setProgress(85);
       setState('queued');
@@ -165,7 +229,10 @@ export const EPUBUploader: React.FC<EPUBUploaderProps> = ({
       if (uploadResult.uploadMethod === 'direct' && uploadResult.jobId) {
         jobId = uploadResult.jobId;
       } else {
-        const response = await api.post('/epub/audit-file', {
+        if (!endpoint.auditFile) {
+          throw new Error(`Missing auditFile endpoint for ${fileType}`);
+        }
+        const response = await api.post(endpoint.auditFile, {
           fileId: uploadResult.fileId,
         });
         const responseData = response.data.data || response.data;
@@ -201,6 +268,28 @@ export const EPUBUploader: React.FC<EPUBUploaderProps> = ({
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const getUploadText = () => {
+    if (acceptedFileTypes.length === 1) {
+      const type = acceptedFileTypes[0].toUpperCase();
+      return {
+        title: `Upload ${type} for Accessibility Audit`,
+        description: `Drag and drop your .${acceptedFileTypes[0]} file here, or click to browse`,
+        acceptsText: `Accepts .${acceptedFileTypes[0]} files up to 100MB`
+      };
+    }
+
+    const types = acceptedFileTypes.map(t => `.${t}`).join(' or ');
+    const typesUpper = acceptedFileTypes.map(t => t.toUpperCase()).join(' or ');
+
+    return {
+      title: `Upload ${typesUpper} for Accessibility Audit`,
+      description: `Drag and drop your ${types} file here, or click to browse`,
+      acceptsText: `Accepts ${types} files up to 100MB`
+    };
+  };
+
+  const uploadText = getUploadText();
+
   return (
     <div className="space-y-4">
       <div
@@ -221,23 +310,23 @@ export const EPUBUploader: React.FC<EPUBUploaderProps> = ({
           <>
             <Upload className="h-12 w-12 mx-auto text-gray-400 mb-4" />
             <p className="text-lg font-medium text-gray-900 mb-2">
-              Upload EPUB for Accessibility Audit
+              {uploadText.title}
             </p>
             <p className="text-sm text-gray-500 mb-4">
-              Drag and drop your .epub file here, or click to browse
+              {uploadText.description}
             </p>
             <label className="cursor-pointer inline-flex items-center justify-center font-medium rounded-md transition-colors border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 text-sm">
               <input
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
-                accept=".epub"
+                accept={getAcceptedMimeTypes(acceptedFileTypes)}
                 onChange={handleInputChange}
               />
               Browse Files
             </label>
             <p className="text-xs text-gray-400 mt-3">
-              Accepts .epub files up to 100MB
+              {uploadText.acceptsText}
             </p>
           </>
         )}
@@ -269,7 +358,7 @@ export const EPUBUploader: React.FC<EPUBUploaderProps> = ({
           <div className="space-y-4">
             <Loader2 className="h-12 w-12 mx-auto text-primary-600 animate-spin" />
             <p className="font-medium text-gray-900">
-              {state === 'uploading' && 'Uploading EPUB...'}
+              {state === 'uploading' && 'Uploading file...'}
               {state === 'queued' && 'Audit queued...'}
               {state === 'processing' && 'Running accessibility audit...'}
             </p>
@@ -289,7 +378,7 @@ export const EPUBUploader: React.FC<EPUBUploaderProps> = ({
             <CheckCircle className="h-12 w-12 mx-auto text-green-600" />
             <p className="font-medium text-gray-900">Audit Complete!</p>
             <p className="text-sm text-gray-500">
-              Your EPUB has been analyzed. View the results below.
+              Your document has been analyzed. View the results below.
             </p>
           </div>
         )}
@@ -313,3 +402,13 @@ export const EPUBUploader: React.FC<EPUBUploaderProps> = ({
     </div>
   );
 };
+
+/**
+ * Backward-compatible wrapper for EPUBUploader that restricts to EPUB files only.
+ * This maintains existing behavior for components that only need EPUB support.
+ */
+export const EPUBUploader: React.FC<EPUBUploaderProps> = (props) => {
+  return <DocumentUploader {...props} acceptedFileTypes={['epub']} />;
+};
+
+export { DocumentUploader };

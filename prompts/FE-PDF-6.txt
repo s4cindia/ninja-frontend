@@ -1,0 +1,65 @@
+Implement FE-PDF-6: PdfPreviewPanel Component
+
+Create a component that displays PDF preview with issue highlighting.
+
+File to create: src/components/pdf/PdfPreviewPanel.tsx
+
+Requirements:
+
+1. PDF rendering:
+   - Use react-pdf or pdf.js for rendering
+   - Display single page at a time
+   - Zoom controls (fit width, fit page, 50%-200%)
+   - Page navigation (prev/next, jump to page)
+
+2. Issue highlighting:
+   - Overlay boxes/highlights on issue locations
+   - Color-coded by severity
+   - Click highlight to select issue
+   - Pulse animation on selected issue
+
+3. Issue overlay rendering:
+   - Parse issue.location for coordinates
+   - Draw semi-transparent rectangles
+   - Show issue number badge on each highlight
+
+4. Props interface:
+   interface PdfPreviewPanelProps {
+     pdfUrl: string;  // URL to PDF file
+     currentPage: number;
+     issues: PdfAuditIssue[];
+     selectedIssueId?: string;
+     onPageChange: (page: number) => void;
+     onIssueSelect: (issue: PdfAuditIssue) => void;
+   }
+
+5. Toolbar:
+   - Zoom in/out buttons
+   - Zoom level dropdown
+   - Page input and navigation arrows
+   - Toggle issue highlights on/off
+
+6. Performance:
+   - Lazy load pages
+   - Cache rendered pages
+   - Debounce zoom operations
+
+7. Styling:
+   - Use Tailwind CSS
+   - Responsive container
+   - Loading spinner during render
+   - Error state for failed PDF load
+
+8. Accessibility:
+   - Keyboard navigation for pages
+   - Screen reader announcements
+   - Focus management
+
+Reference:
+- react-pdf or pdfjs-dist for rendering
+- PdfAuditIssue from src/types/pdf.types.ts
+- Existing preview components for patterns
+
+Note: Install react-pdf if not present: npm install react-pdf
+
+Tests: Create PdfPreviewPanel.test.tsx
