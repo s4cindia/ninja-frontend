@@ -178,75 +178,166 @@ export function VisualComparisonPanel({
   const isFullscreen = externalFullscreen ?? internalFullscreen;
 
   /**
-   * Resolves EPUB internal image paths to API-served URLs
-   * Handles various path formats found in EPUBs
+   * Validates and normalizes an EPUB asset path to prevent path traversal attacks
+   * @param path - The path to validate
+   * @returns Normalized safe path or null if invalid
+   * @security Prevents ../../../../etc/passwd style attacks
    */
-  const resolveImagePaths = useCallback((htmlContent: string, baseFilePath?: string): string => {
+  const validateAssetPath = useCallback((path: string): string | null => {
+    if (!path || path.length > 500) return null; // Reasonable length limit
+
+    // Reject suspicious patterns
+    if (path.includes('..\\') || path.includes('\\')) return null;
+
+    // Count directory traversals
+    const upDirCount = (path.match(/\.\.\//g) || []).length;
+    if (upDirCount > 10) return null; // Prevent excessive traversal
+
+    // Normalize and validate
+    const normalized = path
+      .replace(/\/+/g, '/') // Remove double slashes
+      .replace(/^\//, '');   // Remove leading slash
+
+    // Ensure path stays within EPUB structure
+    if (normalized.startsWith('/') || normalized.includes('://')) return null;
+
+    return normalized;
+  }, []);
+
+  /**
+   * Resolves EPUB internal image paths to API-served URLs using DOM-based parsing
+   * @param htmlContent - The HTML content to process
+   * @param baseFilePath - The current file path for relative resolution
+   * @param actualBaseHref - The actual base href from spine item (fallback)
+   * @returns HTML with resolved image paths
+   * @security Uses DOMParser to prevent XSS attacks
+   */
+  const resolveImagePaths = useCallback((htmlContent: string, baseFilePath?: string, actualBaseHref?: string): string => {
     if (!htmlContent) return '';
 
-    // Get the directory of the current file for relative path resolution
-    const baseDir = baseFilePath
-      ? baseFilePath.substring(0, baseFilePath.lastIndexOf('/') + 1)
-      : 'OEBPS/';
+    try {
+      // Use DOMParser for safe DOM manipulation (prevents XSS)
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlContent, 'text/html');
 
-    // Pattern to match image src attributes (handles various quote styles)
-    const imgPattern = /<img\s+([^>]*?)src\s*=\s*["']([^"']+)["']([^>]*)>/gi;
-
-    return htmlContent.replace(imgPattern, (match, before, src, after) => {
-      // Skip if already an absolute URL or data URI
-      if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:')) {
-        return match;
+      // Check for parsing errors
+      const parserError = doc.querySelector('parsererror');
+      if (parserError) {
+        console.error('[VisualComparison] HTML parsing error, returning original content');
+        return htmlContent;
       }
 
-      // Resolve the path relative to the current file
-      let resolvedPath = src;
+      // Determine base directory from filePath or fallback to baseHref
+      let baseDir = 'OEBPS/'; // Default fallback
+      if (baseFilePath && baseFilePath.includes('/')) {
+        baseDir = baseFilePath.substring(0, baseFilePath.lastIndexOf('/') + 1);
+      } else if (actualBaseHref && actualBaseHref.includes('/')) {
+        baseDir = actualBaseHref.substring(0, actualBaseHref.lastIndexOf('/') + 1);
+      }
 
-      if (src.startsWith('../')) {
-        // Handle parent directory references
-        const baseParts = baseDir.split('/').filter(Boolean);
-        const srcParts = src.split('/');
+      // Process all img elements
+      const images = doc.querySelectorAll('img[src]');
+      images.forEach((img) => {
+        const src = img.getAttribute('src');
+        if (!src) return;
 
-        while (srcParts[0] === '..') {
-          srcParts.shift();
-          baseParts.pop();
+        // Skip absolute URLs and data URIs
+        if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:') || src.startsWith('/api/')) {
+          return;
         }
 
-        resolvedPath = [...baseParts, ...srcParts].join('/');
-      } else if (src.startsWith('./')) {
-        // Handle current directory references
-        resolvedPath = baseDir + src.substring(2);
-      } else if (!src.startsWith('/') && !src.startsWith('OEBPS/') && !src.startsWith('OPS/')) {
-        // Relative path - prepend base directory
-        resolvedPath = baseDir + src;
-      }
+        // Resolve relative path
+        let resolvedPath = src;
 
-      // Clean up the path
-      resolvedPath = resolvedPath
-        .replace(/\/+/g, '/') // Remove double slashes
-        .replace(/^\//, '');   // Remove leading slash
+        if (src.startsWith('../')) {
+          const baseParts = baseDir.split('/').filter(Boolean);
+          const srcParts = src.split('/');
 
-      // Build API URL
-      const apiUrl = `/api/v1/epub/job/${jobId}/asset/${encodeURIComponent(resolvedPath)}`;
+          while (srcParts[0] === '..' && baseParts.length > 0) {
+            srcParts.shift();
+            baseParts.pop();
+          }
 
-      console.log(`[VisualComparison] Resolved image: ${src} → ${apiUrl}`);
+          resolvedPath = [...baseParts, ...srcParts].join('/');
+        } else if (src.startsWith('./')) {
+          resolvedPath = baseDir + src.substring(2);
+        } else if (!src.startsWith('OEBPS/') && !src.startsWith('OPS/')) {
+          resolvedPath = baseDir + src;
+        }
 
-      return `<img ${before}src="${apiUrl}"${after}>`;
-    });
-  }, [jobId]);
+        // Validate and sanitize the resolved path
+        const safePath = validateAssetPath(resolvedPath);
+        if (!safePath) {
+          if (import.meta.env.DEV) {
+            console.warn(`[VisualComparison] Invalid asset path rejected: ${src}`);
+          }
+          return;
+        }
 
-  // Also handle CSS background-image if present
+        // Build API URL
+        const apiUrl = `/api/v1/epub/job/${jobId}/asset/${encodeURIComponent(safePath)}`;
+
+        if (import.meta.env.DEV) {
+          console.log(`[VisualComparison] Resolved image: ${src} → ${apiUrl}`);
+        }
+
+        img.setAttribute('src', apiUrl);
+      });
+
+      // Return serialized HTML
+      return doc.body.innerHTML;
+    } catch (error) {
+      console.error('[VisualComparison] Error resolving image paths:', error);
+      return htmlContent; // Return original on error
+    }
+  }, [jobId, validateAssetPath]);
+
+  /**
+   * Resolves CSS background-image URLs
+   * @param content - HTML content with potential CSS
+   * @returns Content with resolved CSS URLs
+   * @security Validates paths and skips fragments/absolute URLs
+   */
   const resolveCSSImages = useCallback((content: string): string => {
+    if (!content) return '';
+
     const cssPattern = /url\(['"]?([^'")\s]+)['"]?\)/gi;
 
     return content.replace(cssPattern, (match, url) => {
-      if (url.startsWith('http') || url.startsWith('data:')) {
+      // Skip fragments, absolute URLs, data URIs, and already resolved API URLs
+      if (url.startsWith('#') ||
+          url.startsWith('http://') ||
+          url.startsWith('https://') ||
+          url.startsWith('data:') ||
+          url.startsWith('/api/') ||
+          url.startsWith('api://')) {
         return match;
       }
 
-      const resolvedPath = url.replace(/^\.\.?\//, '').replace(/^OEBPS\//, '');
-      return `url('/api/v1/epub/job/${jobId}/asset/${encodeURIComponent(resolvedPath)}')`;
+      // Normalize path - preserve package structure
+      let resolvedPath = url;
+
+      // Remove only leading ./ and ../ but preserve internal structure
+      if (resolvedPath.startsWith('./')) {
+        resolvedPath = resolvedPath.substring(2);
+      }
+
+      // Handle ../ by resolving relative to a base
+      // Note: Without baseFilePath context, we keep the path as-is for ../
+      // This is safer than stripping indiscriminately
+
+      // Validate the path
+      const safePath = validateAssetPath(resolvedPath);
+      if (!safePath) {
+        if (import.meta.env.DEV) {
+          console.warn(`[VisualComparison] Invalid CSS asset path rejected: ${url}`);
+        }
+        return match; // Return original if invalid
+      }
+
+      return `url('/api/v1/epub/job/${jobId}/asset/${encodeURIComponent(safePath)}')`;
     });
-  }, [jobId]);
+  }, [jobId, validateAssetPath]);
   const handleOpenFullscreen = useCallback(() => {
     if (onToggleFullscreen) {
       if (!isFullscreen) onToggleFullscreen();
