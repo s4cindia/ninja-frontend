@@ -35,12 +35,13 @@ export function CitationsModule({ jobId }: CitationsModuleProps) {
     error
   } = useCitationsByJob(jobId, filters);
 
-  const documentId = citations?.items[0]?.documentId || '';
+  const documentId = citations?.items[0]?.documentId;
+  const isEmpty = !citations?.items || citations.items.length === 0;
 
   const {
     data: stats,
     isLoading: isLoadingStats
-  } = useCitationStats(documentId);
+  } = useCitationStats(documentId || '');
 
   const parseMutation = useParseCitation();
   const parseAllMutation = useParseAllCitations();
@@ -68,7 +69,7 @@ export function CitationsModule({ jobId }: CitationsModuleProps) {
   }, []);
 
   const handleParseAll = useCallback(() => {
-    if (documentId) {
+    if (documentId && !isEmpty) {
       abortControllerRef.current?.abort();
       abortControllerRef.current = new AbortController();
       parseAllMutation.mutate({ 
@@ -76,7 +77,7 @@ export function CitationsModule({ jobId }: CitationsModuleProps) {
         ...(abortControllerRef.current && { signal: abortControllerRef.current.signal })
       });
     }
-  }, [documentId, parseAllMutation]);
+  }, [documentId, isEmpty, parseAllMutation]);
 
   const handleCancelParseAll = useCallback(() => {
     abortControllerRef.current?.abort();
@@ -137,7 +138,29 @@ export function CitationsModule({ jobId }: CitationsModuleProps) {
     );
   }
 
-  const isEmpty = !citations?.items || citations.items.length === 0;
+  if (isEmpty) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900">
+            Citation Analysis
+          </h2>
+          <p className="text-sm text-gray-500">
+            Detected citations and parsed components
+          </p>
+        </div>
+        <Card className="p-8 text-center">
+          <Quote className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+          <h3 className="text-lg font-medium text-gray-900 mb-1">
+            No citations found
+          </h3>
+          <p className="text-sm text-gray-500">
+            No citations have been detected for this job yet.
+          </p>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -151,7 +174,7 @@ export function CitationsModule({ jobId }: CitationsModuleProps) {
           </p>
         </div>
 
-        {unparsedCount > 0 && !isEmpty && (
+        {unparsedCount > 0 && (
           parseAllMutation.isPending ? (
             <Button
               variant="outline"
@@ -212,33 +235,19 @@ export function CitationsModule({ jobId }: CitationsModuleProps) {
         </div>
       )}
 
-      {stats && !isEmpty && (
+      {stats && (
         <CitationStats stats={stats} isLoading={isLoadingStats} />
       )}
 
-      {!isEmpty && (
-        <CitationTypeFilter filters={filters} onFilterChange={setFilters} />
-      )}
+      <CitationTypeFilter filters={filters} onFilterChange={setFilters} />
 
-      {isEmpty ? (
-        <Card className="p-8 text-center">
-          <Quote className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-          <h3 className="text-lg font-medium text-gray-900 mb-1">
-            No citations found
-          </h3>
-          <p className="text-sm text-gray-500">
-            No citations have been detected for this job yet.
-          </p>
-        </Card>
-      ) : (
-        <CitationList
-          citations={citations?.items || []}
-          isLoading={false}
-          onParse={(id) => parseMutation.mutate(id)}
-          onViewDetail={setSelectedCitation}
-          isParsing={parseMutation.isPending ? parseMutation.variables : null}
-        />
-      )}
+      <CitationList
+        citations={citations?.items || []}
+        isLoading={false}
+        onParse={(id) => parseMutation.mutate(id)}
+        onViewDetail={setSelectedCitation}
+        isParsing={parseMutation.isPending ? parseMutation.variables : null}
+      />
 
       {citations && citations.totalPages > 1 && (
         <div className="flex items-center justify-between border-t pt-4">
