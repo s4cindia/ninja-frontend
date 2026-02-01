@@ -50,6 +50,7 @@ export function MainLayout() {
       title: 'Accessibility',
       items: [
         { to: '/epub', icon: BookOpen, label: 'EPUB Accessibility' },
+        { to: '/pdf', icon: FileText, label: 'PDF Accessibility' },
         { to: '/acr/workflow', icon: ClipboardCheck, label: 'ACR Workflow' },
         { to: '/test/alt-text-generator', icon: Image, label: 'Alt-Text Generator' },
       ],
