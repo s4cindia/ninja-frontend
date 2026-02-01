@@ -17,6 +17,7 @@ import type { Citation, CitationFilters } from '@/types/citation.types';
 
 interface CitationsModuleProps {
   jobId: string;
+  documentId?: string;
 }
 
 const AUTO_DISMISS_DELAY = 5000;
@@ -25,7 +26,7 @@ const DEFAULT_PAGE_LIMIT = 20;
 const SKELETON_STATS_COUNT = 4;
 const SKELETON_ITEMS_COUNT = 3;
 
-export function CitationsModule({ jobId }: CitationsModuleProps): JSX.Element {
+export function CitationsModule({ jobId, documentId: propDocumentId }: CitationsModuleProps): JSX.Element {
   const [filters, setFilters] = useState<CitationFilters>({ page: DEFAULT_PAGE, limit: DEFAULT_PAGE_LIMIT });
   const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
@@ -40,13 +41,14 @@ export function CitationsModule({ jobId }: CitationsModuleProps): JSX.Element {
     error
   } = useCitationsByJob(jobId, filters);
 
-  const documentId = citations?.items[0]?.documentId;
+  const derivedDocumentId = citations?.items[0]?.documentId;
+  const documentId = propDocumentId || derivedDocumentId;
   const isEmpty = !citations?.items || citations.items.length === 0;
 
   const {
     data: stats,
     isLoading: isLoadingStats
-  } = useCitationStats(documentId || '');
+  } = useCitationStats(documentId ?? '');
 
   const parseMutation = useParseCitation();
   const parseAllMutation = useParseAllCitations();
