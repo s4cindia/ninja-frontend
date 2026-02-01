@@ -299,7 +299,7 @@ Route: `/editorial/citations/:jobId`
 ## Summary
 
 | Task | Owner | Status |
-|------|-------|--------|
+| --- | --- | --- |
 | Citation components | AVR | ✅ Complete |
 | Citation hooks/service | AVR | ✅ Complete |
 | CitationsModule wrapper | **Sakthi** | ⏳ To create |
