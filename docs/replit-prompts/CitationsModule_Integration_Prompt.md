@@ -308,4 +308,4 @@ Route: `/editorial/citations/:jobId`
 
 ---
 
-*Created: February 1, 2026*
+Created: February 1, 2026
