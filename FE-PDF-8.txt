@@ -1,0 +1,29 @@
+In `@src/types/pdf.types.ts`:
+- Around line 267-282: The runtime guard is too permissive: update
+isPdfAuditResult to ensure nested structures are validated (not just
+Array.isArray or typeof object). Specifically, replace the loose checks on
+obj.issues and obj.matterhornSummary with proper validators—e.g., verify
+obj.issues is an array and every element passes a dedicated predicate (use or
+add isPdfIssue or similar) and verify obj.matterhornSummary !== null && typeof
+obj.matterhornSummary === 'object' and validate its shape via a new
+isMatterhornSummary function (or existing validator). Keep existing checks like
+isPdfAuditStatus(obj.status) and isPdfMetadata(obj.metadata) but tighten issues
+and matterhornSummary accordingly in isPdfAuditResult.
+- Around line 311-320: The isPdfAuditListResponse type guard currently only
+checks that obj.data is an array and obj.pagination is an object; tighten it by
+validating that pagination contains the required numeric fields (e.g., page,
+perPage/limit, total) and that each element in obj.data matches the expected
+PdfAuditListResponse item shape (use an existing isPdfAuditItem guard or
+implement one checking required properties and types). Update
+isPdfAuditListResponse to iterate obj.data and return false if any item fails
+the item guard, and check pagination.fieldName types (number) and presence
+before returning true.
+- Around line 252-261: Update the isPdfAuditIssue type guard to validate
+severity against the IssueSeverity union (accept only 'critical' | 'serious' |
+'moderate' | 'minor') rather than any string, and add conditional type checks
+for optional properties when present: pageNumber (number), elementPath (string),
+wcagCriteria (array of strings), matterhornCheckpoint (string), and suggestedFix
+(string). Either call a new isIssueSeverity helper in accessibility.types or
+inline the literal severity-check inside isPdfAuditIssue, and ensure you treat
+value being undefined/null as valid for optional fields but validate their types
+when they exist.

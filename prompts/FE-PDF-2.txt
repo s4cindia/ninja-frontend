@@ -1,0 +1,63 @@
+Implement FE-PDF-2: PdfAuditResultsPage
+
+Create the main page component for displaying PDF audit results.
+
+File to create: src/pages/PdfAuditResultsPage.tsx
+
+Requirements:
+
+1. Page layout (similar to EPUB audit results):
+   - Header with file name, score, status
+   - Three-column layout: Navigator | Preview | Issues
+   - Responsive: Stack on mobile
+
+2. Integrate components:
+   - MatterhornSummary (from FE-PDF-3)
+   - PdfPageNavigator (from FE-PDF-5)
+   - PdfPreviewPanel (from FE-PDF-6)
+   - IssueCard (enhanced in FE-PDF-4)
+
+3. Data fetching:
+   - Fetch audit results from /pdf/job/:jobId/audit/result
+   - Handle loading, error, and empty states
+   - Poll for results if job still processing
+
+4. Issue filtering:
+   - Filter by severity (critical/serious/moderate/minor)
+   - Filter by WCAG criterion
+   - Filter by Matterhorn category
+   - Filter by page number
+   - Search issues by text
+
+5. Issue-page synchronization:
+   - Click issue → Navigate to page and highlight
+   - Click page → Show issues for that page
+   - Selected issue highlighted in preview
+
+6. Actions:
+   - Download ACR report (PDF/DOCX)
+   - Download audit summary
+   - Re-run audit button
+   - Share results link
+
+7. Score display:
+   - Overall accessibility score (0-100)
+   - Score breakdown by category
+   - Pass/Fail indicator per WCAG level
+
+8. Props/Route:
+   - Route: /pdf/audit/:jobId
+   - Get jobId from URL params
+
+9. State management:
+   - Current page number
+   - Selected issue
+   - Active filters
+   - Audit results data
+
+Reference:
+- EPUBAccessibility.tsx for page patterns
+- All PDF components created in previous stories
+- PdfAuditResult type from pdf.types.ts
+
+Tests: Create PdfAuditResultsPage.test.tsx

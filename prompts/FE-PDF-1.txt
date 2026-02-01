@@ -1,0 +1,36 @@
+Implement FE-PDF-1: FileUpload Enhancement for PDF
+
+Update the existing FileUpload component to support PDF files alongside EPUB.
+
+File to update: src/components/shared/FileUpload.tsx (or similar location)
+
+Requirements:
+
+1. Add PDF MIME type to accepted files:
+   - application/pdf
+   - .pdf extension
+
+2. Update file type detection:
+   - Detect PDF vs EPUB based on MIME type or extension
+   - Set appropriate icon for PDF files
+
+3. Update validation:
+   - PDF max file size: 100MB (may be larger than EPUBs)
+   - Validate file is actually a PDF (check magic bytes if possible)
+
+4. Update UI text:
+   - "Upload EPUB or PDF file" (or similar)
+   - Update helper text to mention both formats
+   - Update error messages to be format-aware
+
+5. Pass file type to parent:
+   - Include fileType: 'epub' | 'pdf' in upload callback
+   - Parent component can route to appropriate audit endpoint
+
+6. Maintain backward compatibility:
+   - All existing EPUB functionality must continue working
+   - No breaking changes to component props
+
+Reference: Look at existing FileUpload implementation for patterns.
+
+Tests: Update FileUpload.test.tsx to include PDF upload scenarios.

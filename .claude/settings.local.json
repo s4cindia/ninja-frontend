@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: add PDF audit TypeScript type definitions\n\nImplement FE-PDF-8: Create comprehensive TypeScript types for PDF accessibility audit features including:\n- Core types: PdfAuditResult, PdfAuditIssue, MatterhornSummary, MatterhornCategory, MatterhornCheckpoint, PdfMetadata\n- API response types: PdfAuditResponse, PdfAuditListResponse with pagination\n- Filter types: PdfAuditFilters for status, severity, category, and page filtering\n- Type aliases for union types: PdfAuditStatus, PdfIssueSeverity, MatterhornCheckpointStatus\n\nFollows existing codebase patterns from accessibility.types.ts.\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)",
+      "Bash(git commit:*)",
+      "Bash(git checkout:*)",
+      "Bash(npm test:*)",
+      "Bash(npx vitest:*)",
+      "Bash(gh pr view:*)"
+    ]
+  }
+}
