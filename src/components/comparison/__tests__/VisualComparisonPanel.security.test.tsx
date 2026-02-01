@@ -196,6 +196,32 @@ describe('VisualComparisonPanel - Security Tests', () => {
         });
       }
     });
+
+    it('should reject URL-encoded path traversal attempts', async () => {
+      // %2e%2e%2f is URL-encoded ../
+      const mockData = createMockData('<img src="%2e%2e%2f%2e%2e%2fetc/passwd" />');
+      vi.mocked(comparisonService.getVisualComparison).mockResolvedValue(mockData);
+
+      render(
+        <VisualComparisonPanel jobId="test-job-123" changeId="change-17" />,
+        { wrapper: createWrapper() }
+      );
+
+      await waitFor(() => {
+        expect(comparisonService.getVisualComparison).toHaveBeenCalled();
+      });
+
+      await waitFor(() => {
+        const panel = document.querySelector('.visual-comparison-panel');
+        expect(panel).toBeTruthy();
+      });
+
+      const container = document.querySelector('.visual-comparison-panel');
+      if (container) {
+        const maliciousImg = container.querySelector('img[src*="etc/passwd"]');
+        expect(maliciousImg).toBeNull();
+      }
+    });
   });
 
   describe('XSS Prevention', () => {

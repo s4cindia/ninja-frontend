@@ -178,10 +178,52 @@ export function VisualComparisonPanel({
   const isFullscreen = externalFullscreen ?? internalFullscreen;
 
   /**
+   * Resolves a relative path against a base directory
+   * @param src - The source path to resolve
+   * @param baseDir - The base directory
+   * @returns Resolved path or null if path escapes EPUB root
+   */
+  const resolveRelativePath = useCallback((src: string, baseDir: string): string | null => {
+    // Skip absolute URLs and data URIs
+    if (src.startsWith('http://') || src.startsWith('https://') ||
+        src.startsWith('data:') || src.startsWith('/api/')) {
+      return null; // Signal to skip processing
+    }
+
+    let resolvedPath = src;
+
+    if (src.startsWith('../')) {
+      const baseParts = baseDir.split('/').filter(Boolean);
+      const srcParts = src.split('/');
+
+      while (srcParts[0] === '..' && baseParts.length > 0) {
+        srcParts.shift();
+        baseParts.pop();
+      }
+
+      // If there are still ../ remaining, path escapes EPUB root
+      if (srcParts[0] === '..') {
+        if (import.meta.env.DEV) {
+          console.warn(`[VisualComparison] Path escapes EPUB root: ${src}`);
+        }
+        return null;
+      }
+
+      resolvedPath = [...baseParts, ...srcParts].join('/');
+    } else if (src.startsWith('./')) {
+      resolvedPath = baseDir + src.substring(2);
+    } else if (!src.startsWith('OEBPS/') && !src.startsWith('OPS/')) {
+      resolvedPath = baseDir + src;
+    }
+
+    return resolvedPath;
+  }, []);
+
+  /**
    * Validates and normalizes an EPUB asset path to prevent path traversal attacks
    * @param path - The path to validate
    * @returns Normalized safe path or null if invalid
-   * @security Prevents ../../../../etc/passwd style attacks, javascript: URIs, etc.
+   * @security Prevents ../../../../etc/passwd style attacks, javascript: URIs, URL-encoded traversal, etc.
    */
   const validateAssetPath = useCallback((path: string): string | null => {
     if (!path || path.length > 500) return null; // Reasonable length limit
@@ -191,6 +233,12 @@ export function VisualComparisonPanel({
     if (lowerPath.startsWith('javascript:') ||
         lowerPath.startsWith('vbscript:') ||
         lowerPath.startsWith('data:text/html')) {
+      return null;
+    }
+
+    // Check for URL-encoded path traversal sequences (e.g., %2e%2e%2f = ../)
+    const urlEncodedTraversal = /%2e%2e(%2f|\/)|\.\.%2f/i;
+    if (urlEncodedTraversal.test(path)) {
       return null;
     }
 
@@ -209,7 +257,8 @@ export function VisualComparisonPanel({
     // Ensure path stays within EPUB structure
     if (normalized.startsWith('/') || normalized.includes('://')) return null;
 
-    // Check if path still contains unresolved ../ (indicates escape attempt)
+    // Defense-in-depth: Check if path still contains unresolved ../ after normalization
+    // This catches edge cases where normalization doesn't fully resolve the path
     if (normalized.startsWith('../')) return null;
 
     return normalized;
@@ -234,8 +283,8 @@ export function VisualComparisonPanel({
       // Check for parsing errors
       const parserError = doc.querySelector('parsererror');
       if (parserError) {
-        console.error('[VisualComparison] HTML parsing error, returning original content');
-        return htmlContent;
+        console.error('[VisualComparison] HTML parsing error, returning empty content for safety');
+        return ''; // Return empty string instead of potentially unsafe HTML
       }
 
       // Determine base directory from filePath or fallback to baseHref
@@ -252,37 +301,9 @@ export function VisualComparisonPanel({
         const src = img.getAttribute('src');
         if (!src) return;
 
-        // Skip absolute URLs and data URIs
-        if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:') || src.startsWith('/api/')) {
-          return;
-        }
-
-        // Resolve relative path
-        let resolvedPath = src;
-
-        if (src.startsWith('../')) {
-          const baseParts = baseDir.split('/').filter(Boolean);
-          const srcParts = src.split('/');
-
-          while (srcParts[0] === '..' && baseParts.length > 0) {
-            srcParts.shift();
-            baseParts.pop();
-          }
-
-          // If there are still ../ remaining, path escapes EPUB root - skip it
-          if (srcParts[0] === '..') {
-            if (import.meta.env.DEV) {
-              console.warn(`[VisualComparison] Path escapes EPUB root: ${src}`);
-            }
-            return;
-          }
-
-          resolvedPath = [...baseParts, ...srcParts].join('/');
-        } else if (src.startsWith('./')) {
-          resolvedPath = baseDir + src.substring(2);
-        } else if (!src.startsWith('OEBPS/') && !src.startsWith('OPS/')) {
-          resolvedPath = baseDir + src;
-        }
+        // Resolve relative path using shared helper
+        const resolvedPath = resolveRelativePath(src, baseDir);
+        if (resolvedPath === null) return; // Skip if absolute URL or path escapes root
 
         // Validate and sanitize the resolved path
         const safePath = validateAssetPath(resolvedPath);
@@ -307,9 +328,9 @@ export function VisualComparisonPanel({
       return doc.body.innerHTML;
     } catch (error) {
       console.error('[VisualComparison] Error resolving image paths:', error);
-      return htmlContent; // Return original on error
+      return ''; // Return empty string for safety instead of potentially unsafe HTML
     }
-  }, [jobId, validateAssetPath]);
+  }, [jobId, validateAssetPath, resolveRelativePath]);
 
   /**
    * Resolves CSS background-image URLs
@@ -330,45 +351,18 @@ export function VisualComparisonPanel({
       baseDir = actualBaseHref.substring(0, actualBaseHref.lastIndexOf('/') + 1);
     }
 
-    const cssPattern = /url\(['"]?([^'")\s]+)['"]?\)/gi;
+    // Updated pattern to handle whitespace inside url() consistently
+    const cssPattern = /url\(\s*['"]?([^'")\s]+)['"]?\s*\)/gi;
 
     return content.replace(cssPattern, (match, url) => {
-      // Skip fragments, absolute URLs, data URIs, and already resolved API URLs
-      if (url.startsWith('#') ||
-          url.startsWith('http://') ||
-          url.startsWith('https://') ||
-          url.startsWith('data:') ||
-          url.startsWith('/api/') ||
-          url.startsWith('api://')) {
+      // Skip fragments (they're SVG references, not paths)
+      if (url.startsWith('#') || url.startsWith('api://')) {
         return match;
       }
 
-      // Resolve relative path using same logic as resolveImagePaths
-      let resolvedPath = url;
-
-      if (url.startsWith('../')) {
-        const baseParts = baseDir.split('/').filter(Boolean);
-        const srcParts = url.split('/');
-
-        while (srcParts[0] === '..' && baseParts.length > 0) {
-          srcParts.shift();
-          baseParts.pop();
-        }
-
-        // If there are still ../ remaining, path escapes EPUB root
-        if (srcParts[0] === '..') {
-          if (import.meta.env.DEV) {
-            console.warn(`[VisualComparison] CSS path escapes EPUB root: ${url}`);
-          }
-          return match;
-        }
-
-        resolvedPath = [...baseParts, ...srcParts].join('/');
-      } else if (url.startsWith('./')) {
-        resolvedPath = baseDir + url.substring(2);
-      } else if (!url.startsWith('OEBPS/') && !url.startsWith('OPS/')) {
-        resolvedPath = baseDir + url;
-      }
+      // Resolve relative path using shared helper
+      const resolvedPath = resolveRelativePath(url, baseDir);
+      if (resolvedPath === null) return match; // Skip if absolute URL or path escapes root
 
       // Validate the path
       const safePath = validateAssetPath(resolvedPath);
@@ -381,7 +375,7 @@ export function VisualComparisonPanel({
 
       return `url('/api/v1/epub/job/${jobId}/asset/${encodeURIComponent(safePath)}')`;
     });
-  }, [jobId, validateAssetPath]);
+  }, [jobId, validateAssetPath, resolveRelativePath]);
   const handleOpenFullscreen = useCallback(() => {
     if (onToggleFullscreen) {
       if (!isFullscreen) onToggleFullscreen();
