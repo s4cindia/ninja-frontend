@@ -20,9 +20,13 @@ interface CitationsModuleProps {
 }
 
 const AUTO_DISMISS_DELAY = 5000;
+const DEFAULT_PAGE = 1;
+const DEFAULT_PAGE_LIMIT = 20;
+const SKELETON_STATS_COUNT = 4;
+const SKELETON_ITEMS_COUNT = 3;
 
-export function CitationsModule({ jobId }: CitationsModuleProps) {
-  const [filters, setFilters] = useState<CitationFilters>({ page: 1, limit: 20 });
+export function CitationsModule({ jobId }: CitationsModuleProps): JSX.Element {
+  const [filters, setFilters] = useState<CitationFilters>({ page: DEFAULT_PAGE, limit: DEFAULT_PAGE_LIMIT });
   const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [showErrorMessage, setShowErrorMessage] = useState(false);
@@ -120,7 +124,7 @@ export function CitationsModule({ jobId }: CitationsModuleProps) {
           </div>
         </div>
         <div className="grid grid-cols-4 gap-4">
-          {Array.from({ length: 4 }, (_, i) => (
+          {Array.from({ length: SKELETON_STATS_COUNT }, (_, i) => (
             <Card key={i} className="p-4 animate-pulse" aria-hidden="true">
               <div className="h-4 w-20 bg-gray-200 rounded mb-2" />
               <div className="h-8 w-12 bg-gray-200 rounded" />
@@ -128,7 +132,7 @@ export function CitationsModule({ jobId }: CitationsModuleProps) {
           ))}
         </div>
         <div className="space-y-3">
-          {Array.from({ length: 3 }, (_, i) => (
+          {Array.from({ length: SKELETON_ITEMS_COUNT }, (_, i) => (
             <Card key={i} className="p-4 animate-pulse" aria-hidden="true">
               <div className="h-4 w-3/4 bg-gray-200 rounded mb-2" />
               <div className="flex gap-2">
@@ -265,8 +269,8 @@ export function CitationsModule({ jobId }: CitationsModuleProps) {
               <Button
                 variant="outline"
                 size="sm"
-                disabled={citations.page <= 1}
-                onClick={() => setFilters(f => ({ ...f, page: (f.page || 1) - 1 }))}
+                disabled={citations.page <= DEFAULT_PAGE}
+                onClick={() => setFilters(f => ({ ...f, page: (f.page || DEFAULT_PAGE) - 1 }))}
               >
                 Previous
               </Button>
@@ -274,7 +278,7 @@ export function CitationsModule({ jobId }: CitationsModuleProps) {
                 variant="outline"
                 size="sm"
                 disabled={citations.page >= citations.totalPages}
-                onClick={() => setFilters(f => ({ ...f, page: (f.page || 1) + 1 }))}
+                onClick={() => setFilters(f => ({ ...f, page: (f.page || DEFAULT_PAGE) + 1 }))}
               >
                 Next
               </Button>
