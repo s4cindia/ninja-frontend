@@ -26,7 +26,8 @@ export function validateJobId(jobId: string | null | undefined): jobId is string
   }
 
   // Only allow alphanumeric characters, hyphens, and underscores
-  return /^[a-zA-Z0-9-_]+$/.test(jobId);
+  // Hyphen is placed last in character class to avoid being interpreted as a range
+  return /^[a-zA-Z0-9_-]+$/.test(jobId);
 }
 
 /**

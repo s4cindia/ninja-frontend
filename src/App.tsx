@@ -160,7 +160,11 @@ function AppRoutes() {
           <Route path="/epub" element={<EPUBAccessibility />} />
           <Route path="/epub/remediate/:jobId" element={<EPUBRemediation />} />
           <Route path="/epub/compare/:jobId" element={<EPUBComparison />} />
-          <Route path="/pdf" element={<PdfAccessibilityPage />} />
+          <Route path="/pdf" element={
+            <ErrorBoundary>
+              <PdfAccessibilityPage />
+            </ErrorBoundary>
+          } />
           <Route path="/pdf/audit/:jobId" element={
             <ErrorBoundary>
               <PdfAuditResultsPage />

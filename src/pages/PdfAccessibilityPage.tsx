@@ -15,7 +15,7 @@ export const PdfAccessibilityPage: React.FC = () => {
   const handleUploadComplete = (summary: AuditSummary) => {
     // Validate jobId format to prevent path traversal
     if (!validateJobId(summary.jobId)) {
-      setUploadError('Invalid job ID received from server');
+      setUploadError('Unable to process upload. Please try again or contact support.');
       return;
     }
     // Redirect to the PDF audit results page
@@ -63,6 +63,7 @@ export const PdfAccessibilityPage: React.FC = () => {
             endpoints={{
               pdf: {
                 directUpload: '/pdf/audit-upload',
+                auditFile: '/pdf/audit-file',
               },
             }}
           />
