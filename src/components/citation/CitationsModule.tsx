@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { CitationList } from './CitationList';
 import { CitationDetail } from './CitationDetail';
 import { CitationStats } from './CitationStats';
@@ -10,16 +10,23 @@ import {
   useParseAllCitations
 } from '@/hooks/useCitation';
 import { Button } from '@/components/ui/Button';
-import { Wand2, AlertCircle } from 'lucide-react';
+import { Card } from '@/components/ui/Card';
+import { Wand2, AlertCircle, X, Quote, StopCircle } from 'lucide-react';
 import type { Citation, CitationFilters } from '@/types/citation.types';
 
 interface CitationsModuleProps {
   jobId: string;
 }
 
+const AUTO_DISMISS_DELAY = 5000;
+
 export function CitationsModule({ jobId }: CitationsModuleProps) {
   const [filters, setFilters] = useState<CitationFilters>({ page: 1, limit: 20 });
   const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [showErrorMessage, setShowErrorMessage] = useState(false);
+  
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const {
     data: citations,
@@ -38,11 +45,43 @@ export function CitationsModule({ jobId }: CitationsModuleProps) {
   const parseMutation = useParseCitation();
   const parseAllMutation = useParseAllCitations();
 
-  const handleParseAll = () => {
-    if (documentId) {
-      parseAllMutation.mutate({ documentId });
+  useEffect(() => {
+    if (parseAllMutation.isSuccess) {
+      setShowSuccessMessage(true);
+      const timer = setTimeout(() => setShowSuccessMessage(false), AUTO_DISMISS_DELAY);
+      return () => clearTimeout(timer);
     }
-  };
+  }, [parseAllMutation.isSuccess]);
+
+  useEffect(() => {
+    if (parseAllMutation.isError) {
+      setShowErrorMessage(true);
+      const timer = setTimeout(() => setShowErrorMessage(false), AUTO_DISMISS_DELAY);
+      return () => clearTimeout(timer);
+    }
+  }, [parseAllMutation.isError]);
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
+  const handleParseAll = useCallback(() => {
+    if (documentId) {
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = new AbortController();
+      parseAllMutation.mutate({ 
+        documentId, 
+        signal: abortControllerRef.current.signal 
+      });
+    }
+  }, [documentId, parseAllMutation]);
+
+  const handleCancelParseAll = useCallback(() => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+  }, []);
 
   const unparsedCount = stats?.unparsed || 0;
 
@@ -60,6 +99,46 @@ export function CitationsModule({ jobId }: CitationsModuleProps) {
     );
   }
 
+  if (isLoading) {
+    return (
+      <div 
+        className="space-y-6" 
+        role="status" 
+        aria-label="Loading citation analysis"
+        aria-busy="true"
+      >
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-7 w-48 bg-gray-200 rounded animate-pulse" aria-hidden="true" />
+            <div className="h-4 w-64 bg-gray-200 rounded animate-pulse" aria-hidden="true" />
+          </div>
+        </div>
+        <div className="grid grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i} className="p-4 animate-pulse" aria-hidden="true">
+              <div className="h-4 w-20 bg-gray-200 rounded mb-2" />
+              <div className="h-8 w-12 bg-gray-200 rounded" />
+            </Card>
+          ))}
+        </div>
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="p-4 animate-pulse" aria-hidden="true">
+              <div className="h-4 w-3/4 bg-gray-200 rounded mb-2" />
+              <div className="flex gap-2">
+                <div className="h-5 w-20 bg-gray-200 rounded" />
+                <div className="h-5 w-16 bg-gray-200 rounded" />
+              </div>
+            </Card>
+          ))}
+        </div>
+        <span className="sr-only">Loading citation analysis, please wait...</span>
+      </div>
+    );
+  }
+
+  const isEmpty = !citations?.items || citations.items.length === 0;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -72,50 +151,94 @@ export function CitationsModule({ jobId }: CitationsModuleProps) {
           </p>
         </div>
 
-        {unparsedCount > 0 && (
-          <Button
-            onClick={handleParseAll}
-            disabled={parseAllMutation.isPending || !documentId}
-          >
-            <Wand2 className="h-4 w-4 mr-2" />
-            {parseAllMutation.isPending
-              ? 'Parsing...'
-              : `Parse All (${unparsedCount})`
-            }
-          </Button>
+        {unparsedCount > 0 && !isEmpty && (
+          parseAllMutation.isPending ? (
+            <Button
+              variant="outline"
+              onClick={handleCancelParseAll}
+              aria-label="Cancel parsing citations"
+            >
+              <StopCircle className="h-4 w-4 mr-2" />
+              Cancel
+            </Button>
+          ) : (
+            <Button
+              onClick={handleParseAll}
+              disabled={!documentId}
+            >
+              <Wand2 className="h-4 w-4 mr-2" />
+              Parse All ({unparsedCount})
+            </Button>
+          )
         )}
       </div>
 
-      {parseAllMutation.isSuccess && (
-        <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
-          Successfully parsed {parseAllMutation.data.parsed} citations.
-          {parseAllMutation.data.failed > 0 && (
-            <span className="ml-1">
-              ({parseAllMutation.data.failed} failed)
-            </span>
-          )}
+      {showSuccessMessage && parseAllMutation.data && (
+        <div 
+          className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800 flex items-center justify-between"
+          role="alert"
+        >
+          <span>
+            Successfully parsed {parseAllMutation.data.parsed} citations.
+            {parseAllMutation.data.failed > 0 && (
+              <span className="ml-1">
+                ({parseAllMutation.data.failed} failed)
+              </span>
+            )}
+          </span>
+          <button
+            onClick={() => setShowSuccessMessage(false)}
+            className="p-1 hover:bg-green-100 rounded"
+            aria-label="Dismiss success message"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
       )}
 
-      {parseAllMutation.isError && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
-          Failed to parse citations. Please try again.
+      {showErrorMessage && parseAllMutation.isError && (
+        <div 
+          className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800 flex items-center justify-between"
+          role="alert"
+        >
+          <span>Failed to parse citations. Please try again.</span>
+          <button
+            onClick={() => setShowErrorMessage(false)}
+            className="p-1 hover:bg-red-100 rounded"
+            aria-label="Dismiss error message"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
       )}
 
-      {stats && (
+      {stats && !isEmpty && (
         <CitationStats stats={stats} isLoading={isLoadingStats} />
       )}
 
-      <CitationTypeFilter filters={filters} onFilterChange={setFilters} />
+      {!isEmpty && (
+        <CitationTypeFilter filters={filters} onFilterChange={setFilters} />
+      )}
 
-      <CitationList
-        citations={citations?.items || []}
-        isLoading={isLoading}
-        onParse={(id) => parseMutation.mutate(id)}
-        onViewDetail={setSelectedCitation}
-        isParsing={parseMutation.isPending ? parseMutation.variables : null}
-      />
+      {isEmpty ? (
+        <Card className="p-8 text-center">
+          <Quote className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+          <h3 className="text-lg font-medium text-gray-900 mb-1">
+            No citations found
+          </h3>
+          <p className="text-sm text-gray-500">
+            No citations have been detected for this job yet.
+          </p>
+        </Card>
+      ) : (
+        <CitationList
+          citations={citations?.items || []}
+          isLoading={false}
+          onParse={(id) => parseMutation.mutate(id)}
+          onViewDetail={setSelectedCitation}
+          isParsing={parseMutation.isPending ? parseMutation.variables : null}
+        />
+      )}
 
       {citations && citations.totalPages > 1 && (
         <div className="flex items-center justify-between border-t pt-4">
