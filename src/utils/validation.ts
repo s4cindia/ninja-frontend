@@ -9,6 +9,7 @@
  * - Alphanumeric characters (a-z, A-Z, 0-9)
  * - Hyphens (-)
  * - Underscores (_)
+ * - Length between 1 and 255 characters
  *
  * @param jobId - The job ID to validate
  * @returns true if the job ID is valid, false otherwise
@@ -18,10 +19,16 @@
  * validateJobId('abc-123_def')  // true
  * validateJobId('../etc/passwd') // false
  * validateJobId('job@123')       // false
+ * validateJobId('')              // false (too short)
  * ```
  */
 export function validateJobId(jobId: string | null | undefined): jobId is string {
   if (!jobId) {
+    return false;
+  }
+
+  // Check length constraints (reasonable limits for job IDs)
+  if (jobId.length < 1 || jobId.length > 255) {
     return false;
   }
 

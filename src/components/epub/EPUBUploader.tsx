@@ -8,25 +8,9 @@ import { api } from '@/services/api';
 import { uploadService } from '@/services/upload.service';
 import { useJobPolling, JobData } from '@/hooks/useJobPolling';
 import { detectFileType, getAcceptedMimeTypes, DocumentFileType } from '@/utils/fileUtils';
+import type { AuditSummary } from '@/types/audit.types';
 
 type UploadState = 'idle' | 'uploading' | 'queued' | 'processing' | 'complete' | 'error';
-
-interface AuditSummary {
-  jobId: string;
-  fileName?: string;
-  fileType: 'epub' | 'pdf';
-  epubVersion?: string;
-  pdfVersion?: string;
-  isValid: boolean;
-  accessibilityScore: number;
-  issuesSummary: {
-    total: number;
-    critical: number;
-    serious: number;
-    moderate: number;
-    minor: number;
-  };
-}
 
 interface DocumentUploaderProps {
   acceptedFileTypes?: Array<'epub' | 'pdf'>;
@@ -412,4 +396,5 @@ export const EPUBUploader: React.FC<EPUBUploaderProps> = (props) => {
 };
 
 export { DocumentUploader };
-export type { AuditSummary };
+// Re-export AuditSummary for backward compatibility
+export type { AuditSummary } from '@/types/audit.types';

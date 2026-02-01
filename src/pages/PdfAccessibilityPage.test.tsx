@@ -239,8 +239,14 @@ describe('PdfAccessibilityPage', () => {
         expect(screen.getByText('Upload failed')).toBeInTheDocument();
       });
 
-      // Note: This assumes the Alert component has a close button
-      // The actual implementation may vary based on Alert component
+      // Close the alert using the close button
+      const closeButton = screen.getByLabelText('Close alert');
+      await user.click(closeButton);
+
+      // Alert should be dismissed
+      await waitFor(() => {
+        expect(screen.queryByText('Upload failed')).not.toBeInTheDocument();
+      });
     });
   });
 

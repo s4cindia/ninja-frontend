@@ -6,7 +6,7 @@ import { Alert } from '@/components/ui/Alert';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { DocumentUploader } from '@/components/epub/EPUBUploader';
 import { validateJobId } from '@/utils/validation';
-import type { AuditSummary } from '@/components/epub/EPUBUploader';
+import type { AuditSummary } from '@/types/audit.types';
 
 export const PdfAccessibilityPage: React.FC = () => {
   const navigate = useNavigate();

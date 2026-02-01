@@ -124,6 +124,31 @@ describe('validateJobId', () => {
     });
   });
 
+  describe('invalid job IDs - length constraints', () => {
+    it('should reject job IDs that are too long', () => {
+      const tooLong = 'a'.repeat(256); // 256 characters
+      expect(validateJobId(tooLong)).toBe(false);
+    });
+
+    it('should accept job IDs at maximum length', () => {
+      const maxLength = 'a'.repeat(255); // 255 characters
+      expect(validateJobId(maxLength)).toBe(true);
+    });
+
+    it('should accept single character job IDs', () => {
+      expect(validateJobId('a')).toBe(true);
+      expect(validateJobId('1')).toBe(true);
+      expect(validateJobId('_')).toBe(true);
+      expect(validateJobId('-')).toBe(true);
+    });
+
+    it('should accept typical UUID length (36 characters)', () => {
+      const uuid = '550e8400-e29b-41d4-a716-446655440000';
+      expect(validateJobId(uuid)).toBe(true);
+      expect(uuid.length).toBe(36);
+    });
+  });
+
   describe('type narrowing', () => {
     it('should narrow type from string | undefined to string', () => {
       const jobId: string | undefined = 'test-job-123';
@@ -159,6 +184,11 @@ describe('assertValidJobId', () => {
 
   it('should throw for empty string', () => {
     expect(() => assertValidJobId('')).toThrow('Invalid job ID format');
+  });
+
+  it('should throw for job IDs that are too long', () => {
+    const tooLong = 'a'.repeat(256);
+    expect(() => assertValidJobId(tooLong)).toThrow('Invalid job ID format');
   });
 
   it('should assert type to string', () => {
