@@ -21,7 +21,7 @@
  * ```
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FileText, Loader2, Download, Share2, RotateCw, Filter, X, ChevronDown } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -70,9 +70,15 @@ const getScoreBgColor = (score: number): string => {
   return 'bg-red-50 border-red-200';
 };
 
+// Constants
+const POLLING_INTERVAL_MS = 5000; // Poll every 5 seconds
+
 export const PdfAuditResultsPage: React.FC = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
+
+  // Track component mount status to prevent setState on unmounted component
+  const isMountedRef = useRef(true);
 
   // State management
   const [auditResult, setAuditResult] = useState<PdfAuditResult | null>(null);
@@ -89,14 +95,20 @@ export const PdfAuditResultsPage: React.FC = () => {
   const fetchAuditResult = useCallback(async () => {
     // Validate jobId to prevent path traversal attacks
     if (!jobId || !/^[a-zA-Z0-9-_]+$/.test(jobId)) {
-      setError('Invalid job ID');
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setError('Invalid job ID');
+        setIsLoading(false);
+      }
       return;
     }
 
     try {
+      // encodeURIComponent provides defense-in-depth despite regex validation
       const response = await api.get(`/pdf/job/${encodeURIComponent(jobId)}/audit/result`);
       const data = response.data.data || response.data;
+
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return;
 
       // Check if still processing
       if (data.status === 'processing' || data.status === 'pending') {
@@ -118,12 +130,22 @@ export const PdfAuditResultsPage: React.FC = () => {
       setIsPolling(false);
       setError(null);
     } catch (err) {
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return;
+
       const message = err instanceof Error ? err.message : 'Failed to load audit results';
       setError(message);
       setIsLoading(false);
       setIsPolling(false);
     }
   }, [jobId]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Initial load
   useEffect(() => {
@@ -136,7 +158,7 @@ export const PdfAuditResultsPage: React.FC = () => {
 
     const pollInterval = setInterval(() => {
       fetchAuditResult();
-    }, 5000); // Poll every 5 seconds
+    }, POLLING_INTERVAL_MS);
 
     return () => clearInterval(pollInterval);
   }, [isPolling, fetchAuditResult]);
@@ -276,7 +298,12 @@ export const PdfAuditResultsPage: React.FC = () => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch {
+    } catch (err) {
+      console.warn('Failed to download report in requested format, falling back to JSON:', err);
+
+      // Notify user about fallback (TODO: Replace with toast notification)
+      alert(`Unable to generate ${format.toUpperCase()} report. Downloading as JSON instead.`);
+
       // Fallback: download JSON
       const blob = new Blob([JSON.stringify(auditResult, null, 2)], {
         type: 'application/json',
@@ -602,8 +629,8 @@ export const PdfAuditResultsPage: React.FC = () => {
                       setFilters((prev) => ({ ...prev, pageNumber: 'all' }));
                     } else {
                       const parsed = parseInt(val, 10);
-                      // Only update if the parsed value is a valid integer
-                      if (!isNaN(parsed) && Number.isInteger(parsed)) {
+                      // Validate range instead of checking isInteger (parseInt always returns integers)
+                      if (!isNaN(parsed) && parsed >= 1 && parsed <= auditResult.pageCount) {
                         setFilters((prev) => ({ ...prev, pageNumber: parsed }));
                       }
                       // If invalid, keep the previous value by not calling setFilters

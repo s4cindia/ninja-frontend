@@ -79,6 +79,9 @@ interface IssueHighlight {
  * Format examples:
  * - "Page 5, x:100 y:200 w:300 h:50"
  * - "x:100, y:200, width:300, height:50"
+ *
+ * @param _issue - Prefixed with underscore to indicate intentionally unused.
+ *                 Reserved for future implementation when backend provides location data.
  */
 function parseIssueLocation(_issue: PdfAuditIssue): IssueHighlight | null {
   // This is a placeholder - actual implementation would parse
