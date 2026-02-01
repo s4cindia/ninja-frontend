@@ -51,16 +51,20 @@ export function CitationsModule({ jobId }: CitationsModuleProps) {
       setShowSuccessMessage(true);
       const timer = setTimeout(() => setShowSuccessMessage(false), AUTO_DISMISS_DELAY);
       return () => clearTimeout(timer);
+    } else {
+      setShowSuccessMessage(false);
     }
-  }, [parseAllMutation.isSuccess]);
+  }, [parseAllMutation.isSuccess, parseAllMutation.data?.parsed]);
 
   useEffect(() => {
     if (parseAllMutation.isError) {
       setShowErrorMessage(true);
       const timer = setTimeout(() => setShowErrorMessage(false), AUTO_DISMISS_DELAY);
       return () => clearTimeout(timer);
+    } else {
+      setShowErrorMessage(false);
     }
-  }, [parseAllMutation.isError]);
+  }, [parseAllMutation.isError, parseAllMutation.error?.message]);
 
   useEffect(() => {
     return () => {
