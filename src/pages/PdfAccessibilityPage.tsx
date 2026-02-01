@@ -5,18 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Alert } from '@/components/ui/Alert';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { DocumentUploader } from '@/components/epub/EPUBUploader';
-
-interface UploadResult {
-  jobId: string;
-}
+import { validateJobId } from '@/utils/validation';
+import type { AuditSummary } from '@/components/epub/EPUBUploader';
 
 export const PdfAccessibilityPage: React.FC = () => {
   const navigate = useNavigate();
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  const handleUploadComplete = (summary: UploadResult) => {
+  const handleUploadComplete = (summary: AuditSummary) => {
     // Validate jobId format to prevent path traversal
-    if (!summary.jobId || !/^[a-zA-Z0-9-_]+$/.test(summary.jobId)) {
+    if (!validateJobId(summary.jobId)) {
       setUploadError('Invalid job ID received from server');
       return;
     }

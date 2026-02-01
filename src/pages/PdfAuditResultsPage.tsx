@@ -35,6 +35,7 @@ import { PdfPreviewPanel } from '@/components/pdf/PdfPreviewPanel';
 import { IssueCard } from '@/components/remediation/IssueCard';
 import { api } from '@/services/api';
 import { cn } from '@/utils/cn';
+import { validateJobId } from '@/utils/validation';
 import type { PdfAuditResult, PdfAuditIssue } from '@/types/pdf.types';
 import type { IssueSeverity } from '@/types/accessibility.types';
 
@@ -94,7 +95,7 @@ export const PdfAuditResultsPage: React.FC = () => {
   // Fetch audit result
   const fetchAuditResult = useCallback(async () => {
     // Validate jobId to prevent path traversal attacks
-    if (!jobId || !/^[a-zA-Z0-9-_]+$/.test(jobId)) {
+    if (!validateJobId(jobId)) {
       if (isMountedRef.current) {
         setError('Invalid job ID');
         setIsLoading(false);

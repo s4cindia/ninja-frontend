@@ -412,3 +412,4 @@ export const EPUBUploader: React.FC<EPUBUploaderProps> = (props) => {
 };
 
 export { DocumentUploader };
+export type { AuditSummary };
