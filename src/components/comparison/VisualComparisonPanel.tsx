@@ -176,6 +176,77 @@ export function VisualComparisonPanel({
   const [layout, setLayout] = useState<'side-by-side' | 'stacked'>('side-by-side');
   const [internalFullscreen, setInternalFullscreen] = useState(false);
   const isFullscreen = externalFullscreen ?? internalFullscreen;
+
+  /**
+   * Resolves EPUB internal image paths to API-served URLs
+   * Handles various path formats found in EPUBs
+   */
+  const resolveImagePaths = useCallback((htmlContent: string, baseFilePath?: string): string => {
+    if (!htmlContent) return '';
+
+    // Get the directory of the current file for relative path resolution
+    const baseDir = baseFilePath
+      ? baseFilePath.substring(0, baseFilePath.lastIndexOf('/') + 1)
+      : 'OEBPS/';
+
+    // Pattern to match image src attributes (handles various quote styles)
+    const imgPattern = /<img\s+([^>]*?)src\s*=\s*["']([^"']+)["']([^>]*)>/gi;
+
+    return htmlContent.replace(imgPattern, (match, before, src, after) => {
+      // Skip if already an absolute URL or data URI
+      if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:')) {
+        return match;
+      }
+
+      // Resolve the path relative to the current file
+      let resolvedPath = src;
+
+      if (src.startsWith('../')) {
+        // Handle parent directory references
+        const baseParts = baseDir.split('/').filter(Boolean);
+        const srcParts = src.split('/');
+
+        while (srcParts[0] === '..') {
+          srcParts.shift();
+          baseParts.pop();
+        }
+
+        resolvedPath = [...baseParts, ...srcParts].join('/');
+      } else if (src.startsWith('./')) {
+        // Handle current directory references
+        resolvedPath = baseDir + src.substring(2);
+      } else if (!src.startsWith('/') && !src.startsWith('OEBPS/') && !src.startsWith('OPS/')) {
+        // Relative path - prepend base directory
+        resolvedPath = baseDir + src;
+      }
+
+      // Clean up the path
+      resolvedPath = resolvedPath
+        .replace(/\/+/g, '/') // Remove double slashes
+        .replace(/^\//, '');   // Remove leading slash
+
+      // Build API URL
+      const apiUrl = `/api/v1/epub/job/${jobId}/asset/${encodeURIComponent(resolvedPath)}`;
+
+      console.log(`[VisualComparison] Resolved image: ${src} → ${apiUrl}`);
+
+      return `<img ${before}src="${apiUrl}"${after}>`;
+    });
+  }, [jobId]);
+
+  // Also handle CSS background-image if present
+  const resolveCSSImages = useCallback((content: string): string => {
+    const cssPattern = /url\(['"]?([^'")\s]+)['"]?\)/gi;
+
+    return content.replace(cssPattern, (match, url) => {
+      if (url.startsWith('http') || url.startsWith('data:')) {
+        return match;
+      }
+
+      const resolvedPath = url.replace(/^\.\.?\//, '').replace(/^OEBPS\//, '');
+      return `url('/api/v1/epub/job/${jobId}/asset/${encodeURIComponent(resolvedPath)}')`;
+    });
+  }, [jobId]);
   const handleOpenFullscreen = useCallback(() => {
     if (onToggleFullscreen) {
       if (!isFullscreen) onToggleFullscreen();
@@ -301,21 +372,28 @@ export function VisualComparisonPanel({
   const rendererProps = useMemo(() => {
     if (!displayData) return null;
 
+    // Resolve image paths for both before and after content
+    let beforeHtml = resolveImagePaths(displayData.beforeContent.html, filePath);
+    beforeHtml = resolveCSSImages(beforeHtml);
+
+    let afterHtml = resolveImagePaths(displayData.afterContent.html, filePath);
+    afterHtml = resolveCSSImages(afterHtml);
+
     return {
       before: {
-        html: displayData.beforeContent.html,
+        html: beforeHtml,
         css: displayData.beforeContent.css,
         baseUrl: displayData.beforeContent.baseHref,
         highlights: effectiveHighlights
       },
       after: {
-        html: displayData.afterContent.html,
+        html: afterHtml,
         css: displayData.afterContent.css,
         baseUrl: displayData.afterContent.baseHref,
         highlights: effectiveHighlights
       }
     };
-  }, [displayData, effectiveHighlights]);
+  }, [displayData, effectiveHighlights, resolveImagePaths, resolveCSSImages, filePath]);
 
   const beforeRenderer = useMemo(() => {
     if (!rendererProps) return null;
@@ -878,7 +956,7 @@ export function VisualComparisonPanel({
               <div className="h-full overflow-auto">
                 <EPUBRenderer
                   key={`fullscreen-before-${changeId}`}
-                  html={displayData.beforeContent.html}
+                  html={rendererProps?.before.html || displayData.beforeContent.html}
                   css={displayData.beforeContent.css}
                   baseUrl={displayData.beforeContent.baseHref}
                   highlights={effectiveHighlights}
@@ -891,7 +969,7 @@ export function VisualComparisonPanel({
               <div className="h-full overflow-auto">
                 <EPUBRenderer
                   key={`fullscreen-after-${changeId}`}
-                  html={displayData.afterContent.html}
+                  html={rendererProps?.after.html || displayData.afterContent.html}
                   css={displayData.afterContent.css}
                   baseUrl={displayData.afterContent.baseHref}
                   highlights={effectiveHighlights}
@@ -913,7 +991,7 @@ export function VisualComparisonPanel({
                   </div>
                   <EPUBRenderer
                     key={`compare-before-${changeId}`}
-                    html={displayData.beforeContent.html}
+                    html={rendererProps?.before.html || displayData.beforeContent.html}
                     css={displayData.beforeContent.css}
                     baseUrl={displayData.beforeContent.baseHref}
                     highlights={effectiveHighlights}
@@ -933,7 +1011,7 @@ export function VisualComparisonPanel({
                   </div>
                   <EPUBRenderer
                     key={`compare-after-${changeId}`}
-                    html={displayData.afterContent.html}
+                    html={rendererProps?.after.html || displayData.afterContent.html}
                     css={displayData.afterContent.css}
                     baseUrl={displayData.afterContent.baseHref}
                     highlights={effectiveHighlights}
