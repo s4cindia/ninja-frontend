@@ -47,7 +47,7 @@ AVR has implemented all citation components in `src/components/citation/`:
 
 ## Prompt for Replit
 
-```
+````text
 Create a wrapper component that combines all citation components into a single entry point.
 
 Create file: src/components/citation/CitationsModule.tsx
@@ -233,7 +233,7 @@ Add this export:
 ```typescript
 export { CitationsModule } from './CitationsModule';
 ```
-```
+````
 
 ---
 
