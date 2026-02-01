@@ -65,13 +65,24 @@ export function CitationsModule({ jobId, documentId: propDocumentId }: Citations
 
   useEffect(() => {
     if (parseAllMutation.isError) {
+      const error = parseAllMutation.error;
+      const isAbortError = 
+        error?.name === 'AbortError' || 
+        error?.message?.includes('aborted') ||
+        (error instanceof DOMException && error.name === 'AbortError');
+      
+      if (isAbortError) {
+        setShowErrorMessage(false);
+        return;
+      }
+      
       setShowErrorMessage(true);
       const timer = setTimeout(() => setShowErrorMessage(false), AUTO_DISMISS_DELAY);
       return () => clearTimeout(timer);
     } else {
       setShowErrorMessage(false);
     }
-  }, [parseAllMutation.isError, parseAllMutation.error?.message]);
+  }, [parseAllMutation.isError, parseAllMutation.error]);
 
   useEffect(() => {
     return () => {
