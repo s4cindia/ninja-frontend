@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { Dashboard } from '@/pages/Dashboard';
 import { Login } from '@/pages/Login';
 import { Register } from '@/pages/Register';
@@ -159,8 +160,12 @@ function AppRoutes() {
           <Route path="/epub" element={<EPUBAccessibility />} />
           <Route path="/epub/remediate/:jobId" element={<EPUBRemediation />} />
           <Route path="/epub/compare/:jobId" element={<EPUBComparison />} />
-          <Route path="/pdf/accessibility" element={<PdfAccessibilityPage />} />
-          <Route path="/pdf/audit/:jobId" element={<PdfAuditResultsPage />} />
+          <Route path="/pdf" element={<PdfAccessibilityPage />} />
+          <Route path="/pdf/audit/:jobId" element={
+            <ErrorBoundary>
+              <PdfAuditResultsPage />
+            </ErrorBoundary>
+          } />
           <Route path="/feedback" element={<FeedbackDashboard />} />
           <Route path="/remediation" element={<RemediationPage />} />
           <Route path="/remediation/batch" element={<BatchRemediationPage />} />

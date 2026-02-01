@@ -6,28 +6,20 @@ import { Alert } from '@/components/ui/Alert';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { DocumentUploader } from '@/components/epub/EPUBUploader';
 
-interface UploadSummary {
+interface UploadResult {
   jobId: string;
-  fileName?: string;
-  fileType: 'epub' | 'pdf';
-  epubVersion?: string;
-  pdfVersion?: string;
-  isValid: boolean;
-  accessibilityScore: number;
-  issuesSummary: {
-    total: number;
-    critical: number;
-    serious: number;
-    moderate: number;
-    minor: number;
-  };
 }
 
 export const PdfAccessibilityPage: React.FC = () => {
   const navigate = useNavigate();
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  const handleUploadComplete = (summary: UploadSummary) => {
+  const handleUploadComplete = (summary: UploadResult) => {
+    // Validate jobId format to prevent path traversal
+    if (!summary.jobId || !/^[a-zA-Z0-9-_]+$/.test(summary.jobId)) {
+      setUploadError('Invalid job ID received from server');
+      return;
+    }
     // Redirect to the PDF audit results page
     navigate(`/pdf/audit/${summary.jobId}`);
   };
