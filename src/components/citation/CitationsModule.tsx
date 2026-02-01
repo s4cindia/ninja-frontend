@@ -115,7 +115,7 @@ export function CitationsModule({ jobId }: CitationsModuleProps) {
           </div>
         </div>
         <div className="grid grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
+          {Array.from({ length: 4 }, (_, i) => (
             <Card key={i} className="p-4 animate-pulse" aria-hidden="true">
               <div className="h-4 w-20 bg-gray-200 rounded mb-2" />
               <div className="h-8 w-12 bg-gray-200 rounded" />
@@ -123,7 +123,7 @@ export function CitationsModule({ jobId }: CitationsModuleProps) {
           ))}
         </div>
         <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
+          {Array.from({ length: 3 }, (_, i) => (
             <Card key={i} className="p-4 animate-pulse" aria-hidden="true">
               <div className="h-4 w-3/4 bg-gray-200 rounded mb-2" />
               <div className="flex gap-2">
