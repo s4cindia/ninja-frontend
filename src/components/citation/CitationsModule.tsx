@@ -72,8 +72,8 @@ export function CitationsModule({ jobId }: CitationsModuleProps) {
       abortControllerRef.current?.abort();
       abortControllerRef.current = new AbortController();
       parseAllMutation.mutate({ 
-        documentId, 
-        signal: abortControllerRef.current.signal 
+        documentId,
+        ...(abortControllerRef.current && { signal: abortControllerRef.current.signal })
       });
     }
   }, [documentId, parseAllMutation]);
