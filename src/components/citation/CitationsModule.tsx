@@ -11,6 +11,7 @@ import {
 } from '@/hooks/useCitation';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { Wand2, AlertCircle, X, Quote, StopCircle } from 'lucide-react';
 import type { Citation, CitationFilters } from '@/types/citation.types';
 
@@ -239,53 +240,55 @@ export function CitationsModule({ jobId }: CitationsModuleProps) {
         </div>
       )}
 
-      {stats && (
-        <CitationStats stats={stats} isLoading={isLoadingStats} />
-      )}
+      <ErrorBoundary>
+        {stats && (
+          <CitationStats stats={stats} isLoading={isLoadingStats} />
+        )}
 
-      <CitationTypeFilter filters={filters} onFilterChange={setFilters} />
+        <CitationTypeFilter filters={filters} onFilterChange={setFilters} />
 
-      <CitationList
-        citations={citations?.items || []}
-        isLoading={false}
-        onParse={(id) => parseMutation.mutate(id)}
-        onViewDetail={setSelectedCitation}
-        isParsing={parseMutation.isPending ? parseMutation.variables : null}
-      />
-
-      {citations && citations.totalPages > 1 && (
-        <div className="flex items-center justify-between border-t pt-4">
-          <p className="text-sm text-gray-500">
-            Page {citations.page} of {citations.totalPages}
-            <span className="ml-1">({citations.total} total citations)</span>
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={citations.page <= 1}
-              onClick={() => setFilters(f => ({ ...f, page: (f.page || 1) - 1 }))}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={citations.page >= citations.totalPages}
-              onClick={() => setFilters(f => ({ ...f, page: (f.page || 1) + 1 }))}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {selectedCitation && (
-        <CitationDetail
-          citation={selectedCitation}
-          onClose={() => setSelectedCitation(null)}
+        <CitationList
+          citations={citations?.items || []}
+          isLoading={false}
+          onParse={(id) => parseMutation.mutate(id)}
+          onViewDetail={setSelectedCitation}
+          isParsing={parseMutation.isPending ? parseMutation.variables : null}
         />
-      )}
+
+        {citations && citations.totalPages > 1 && (
+          <div className="flex items-center justify-between border-t pt-4">
+            <p className="text-sm text-gray-500">
+              Page {citations.page} of {citations.totalPages}
+              <span className="ml-1">({citations.total} total citations)</span>
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={citations.page <= 1}
+                onClick={() => setFilters(f => ({ ...f, page: (f.page || 1) - 1 }))}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={citations.page >= citations.totalPages}
+                onClick={() => setFilters(f => ({ ...f, page: (f.page || 1) + 1 }))}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {selectedCitation && (
+          <CitationDetail
+            citation={selectedCitation}
+            onClose={() => setSelectedCitation(null)}
+          />
+        )}
+      </ErrorBoundary>
     </div>
   );
 }
