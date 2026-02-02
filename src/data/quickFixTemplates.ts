@@ -1,4 +1,4 @@
-import type { QuickFixTemplate, QuickFix } from '@/types/quickfix.types';
+import type { QuickFixTemplate, QuickFix, FileChange } from '@/types/quickfix.types';
 
 const metadataAccessModeTemplate: QuickFixTemplate = {
   id: 'metadata-accessmode',
@@ -915,6 +915,14 @@ const colorContrastTemplate: QuickFixTemplate = {
   },
 };
 
+// Interface for parsed context structure (Type Safety)
+interface ParsedContextData {
+  images?: Array<{ fullPath: string; html: string; src: string }>;
+}
+
+// Constant for fallback image path (avoid magic strings)
+const FALLBACK_IMAGE_PATH = 'unknown-image';
+
 // Helper function to sanitize HTML ID values (prevent attribute injection)
 function sanitizeHtmlId(id: string): string {
   // Only allow alphanumeric characters, hyphens, and underscores
@@ -930,27 +938,48 @@ function escapeHtml(text: string): string {
     .replace(/>/g, '&gt;');
 }
 
+// Helper function to escape/sanitize image src attributes (prevent XSS in src)
+function sanitizeImageSrc(src: string): string {
+  // Escape special characters and encode URI components
+  return escapeHtml(src);
+}
+
 // Helper function to find matching context image by path
 function findContextImageByPath(
   imagePath: string,
   contextImages: Array<{ fullPath: string; html: string; src: string }>
 ): { fullPath: string; html: string; src: string } | undefined {
-  return contextImages.find(ctxImg => {
-    // Try exact match first
-    if (ctxImg.fullPath === imagePath || ctxImg.src === imagePath) {
-      return true;
+  // Try exact match first
+  const exactMatch = contextImages.find(ctxImg =>
+    ctxImg.fullPath === imagePath || ctxImg.src === imagePath
+  );
+  if (exactMatch) return exactMatch;
+
+  // Try matching if the HTML contains the image path
+  const htmlMatch = contextImages.find(ctxImg =>
+    ctxImg.html && ctxImg.html.includes(imagePath)
+  );
+  if (htmlMatch) return htmlMatch;
+
+  // Try matching just the filename (with warning in DEV mode)
+  const imgFilename = imagePath.split('/').pop();
+  if (imgFilename) {
+    const filenameMatch = contextImages.find(ctxImg =>
+      ctxImg.fullPath.includes(imgFilename) || ctxImg.src.includes(imgFilename)
+    );
+    if (filenameMatch) {
+      // Log warning about ambiguous filename matching
+      if (import.meta.env.DEV) {
+        console.warn(
+          `[QuickFix] Using filename fallback matching for "${imagePath}" - found "${filenameMatch.fullPath}". ` +
+          'This may match unintended images if multiple files share the same name.'
+        );
+      }
+      return filenameMatch;
     }
-    // Try matching if the HTML contains the image path
-    if (ctxImg.html && ctxImg.html.includes(imagePath)) {
-      return true;
-    }
-    // Try matching just the filename
-    const imgFilename = imagePath.split('/').pop();
-    if (imgFilename && (ctxImg.fullPath.includes(imgFilename) || ctxImg.src.includes(imgFilename))) {
-      return true;
-    }
-    return false;
-  });
+  }
+
+  return undefined;
 }
 
 // Type guard for context image validation
@@ -978,13 +1007,7 @@ function generateImageAltChange(
   descriptionMethod: string,
   issueId: string,
   index: number
-): {
-  type: 'insert' | 'replace' | 'delete';
-  filePath: string;
-  oldContent?: string;
-  content?: string;
-  description: string;
-} | null {
+): FileChange | null {
   const escapedAlt = escapeHtml(altText);
 
   if (imageType === 'decorative') {
@@ -1112,13 +1135,7 @@ const imageAltTemplate: QuickFixTemplate = {
     },
   ],
   generateFix: (inputs, context): QuickFix => {
-    const changes: Array<{
-      type: 'insert' | 'replace' | 'delete';
-      filePath: string;
-      oldContent?: string;
-      content?: string;
-      description: string;
-    }> = [];
+    const changes: FileChange[] = [];
 
     // NEW FORMAT: Check if images array is provided (from ImageAltTemplate)
     const imagesArray = inputs.images as Array<{
@@ -1135,10 +1152,10 @@ const imageAltTemplate: QuickFixTemplate = {
       let contextImages: Array<{ fullPath: string; html: string; src: string }> = [];
       if (context.context && typeof context.context === 'string') {
         try {
-          const ctx = JSON.parse(context.context);
+          const ctx = JSON.parse(context.context) as ParsedContextData;
           if (ctx && typeof ctx === 'object' && Array.isArray(ctx.images)) {
             // Validate each image object has the expected structure
-            contextImages = (ctx.images as unknown[]).filter(isValidContextImage);
+            contextImages = ctx.images.filter(isValidContextImage);
           }
         } catch (err) {
           // Log parse error for debugging
@@ -1161,15 +1178,17 @@ const imageAltTemplate: QuickFixTemplate = {
         const descriptionMethod = (inputs.descriptionMethod as string) || 'aria-describedby';
 
         // Find the current element HTML for this image by matching path
-        let currentElement: string | undefined;
+        let currentElement: string;
 
         // Try to find matching context image by path instead of using index
         const matchedContextImage = findContextImageByPath(img.imagePath, contextImages);
         if (matchedContextImage?.html) {
           currentElement = matchedContextImage.html;
         } else {
-          // Fallback: use context.currentContent or generate a placeholder
-          currentElement = context.currentContent || `<img src="${img.imagePath}">`;
+          // Fallback: use context.currentContent or generate a sanitized placeholder
+          // XSS Prevention: Sanitize img.imagePath before using in template
+          const sanitizedPath = sanitizeImageSrc(img.imagePath);
+          currentElement = context.currentContent || `<img src="${sanitizedPath}">`;
         }
 
         // Generate change using helper function
@@ -1219,7 +1238,7 @@ const imageAltTemplate: QuickFixTemplate = {
       longDescription,
       currentElement,
       context.filePath || 'content.xhtml',
-      'image', // Generic image path for legacy format
+      FALLBACK_IMAGE_PATH, // Use constant instead of magic string
       descriptionMethod,
       context.issueId,
       0
