@@ -7,6 +7,7 @@ import { Loader2, ZoomIn, ZoomOut, Info, Code, AlertTriangle, Columns, Rows, Max
 /**
  * Decodes HTML entities back to their original characters.
  * This handles cases where the API returns already-encoded content.
+ * React will automatically escape text content when rendered, so no manual escaping needed.
  */
 function decodeHtmlEntities(text: string): string {
   const entityMap: Record<string, string> = {
@@ -19,23 +20,6 @@ function decodeHtmlEntities(text: string): string {
     '&apos;': "'",
   };
   return text.replace(/&(?:amp|lt|gt|quot|#39|#x27|apos);/g, match => entityMap[match] ?? match);
-}
-
-/**
- * Escapes HTML special characters to prevent XSS when displaying HTML source code as text.
- * Unlike sanitizeText which strips tags, this preserves the markup for viewing in code preview.
- * First decodes any pre-existing entities to avoid double-encoding.
- */
-function escapeHtml(text: string): string {
-  const decoded = decodeHtmlEntities(text);
-  const htmlEntities: Record<string, string> = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
-  };
-  return decoded.replace(/[&<>"']/g, char => htmlEntities[char] ?? char);
 }
 
 interface ChangeExplanation {
@@ -1084,13 +1068,12 @@ export function VisualComparisonPanel({
                     </div>
                     <pre className="text-red-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all">
 {(() => {
-  // Escape HTML entities to show source code as text (XSS prevention)
-  const rawHtml = displayData.beforeContent?.html || '';
+  // Decode any pre-encoded entities, then let React handle escaping for display
+  const rawHtml = decodeHtmlEntities(displayData.beforeContent?.html || '');
   if (!rawHtml) return 'No content available';
   const truncated = rawHtml.slice(0, 1000);
   const lastClosingTag = truncated.lastIndexOf('>');
-  const displayText = lastClosingTag > 0 ? truncated.slice(0, lastClosingTag + 1) + (rawHtml.length > 1000 ? '...' : '') : truncated;
-  return escapeHtml(displayText);
+  return lastClosingTag > 0 ? truncated.slice(0, lastClosingTag + 1) + (rawHtml.length > 1000 ? '...' : '') : truncated;
 })()}
                     </pre>
                   </div>
@@ -1101,9 +1084,9 @@ export function VisualComparisonPanel({
                     </div>
                     <div className="text-green-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all font-mono">
 {(() => {
-  // Escape HTML entities to show source code as text (XSS prevention)
-  const beforeHtml = displayData.beforeContent?.html || '';
-  const afterHtml = displayData.afterContent?.html || '';
+  // Decode any pre-encoded entities for proper comparison and display
+  const beforeHtml = decodeHtmlEntities(displayData.beforeContent?.html || '');
+  const afterHtml = decodeHtmlEntities(displayData.afterContent?.html || '');
   if (!afterHtml) return <span>No content available</span>;
   
   const truncateHtml = (html: string) => {
@@ -1119,16 +1102,16 @@ export function VisualComparisonPanel({
     const beforeLine = beforeLines[idx] || '';
     const isNewLine = idx >= beforeLines.length;
     const isChanged = line !== beforeLine;
-    // Escape each line for safe display
-    const escapedLine = escapeHtml(line) || ' ';
+    // React automatically escapes text content - no manual escaping needed
+    const displayLine = line || ' ';
     
     if (isNewLine) {
-      return <div key={idx} className="bg-green-200 text-green-900 px-1 -mx-1 rounded">{escapedLine}</div>;
+      return <div key={idx} className="bg-green-200 text-green-900 px-1 -mx-1 rounded">{displayLine}</div>;
     }
     if (isChanged) {
-      return <div key={idx} className="bg-yellow-200 text-yellow-900 px-1 -mx-1 rounded border-l-2 border-yellow-500">{escapedLine}</div>;
+      return <div key={idx} className="bg-yellow-200 text-yellow-900 px-1 -mx-1 rounded border-l-2 border-yellow-500">{displayLine}</div>;
     }
-    return <div key={idx}>{escapedLine}</div>;
+    return <div key={idx}>{displayLine}</div>;
   });
 })()}
                     </div>
