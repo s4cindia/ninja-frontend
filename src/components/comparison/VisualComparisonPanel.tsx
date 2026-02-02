@@ -1068,13 +1068,13 @@ export function VisualComparisonPanel({
                     </div>
                     <pre className="text-red-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all">
 {(() => {
-  // Decode and compare by lines to find changes
-  const beforeHtml = decodeHtmlEntities(displayData.beforeContent?.html || '');
-  const afterHtml = decodeHtmlEntities(displayData.afterContent?.html || '');
-  if (!beforeHtml) return 'No content available';
+  // Use sourceHtml for code diff (readable paths) instead of html (base64 images)
+  const beforeSource = decodeHtmlEntities(displayData.beforeContent?.sourceHtml || displayData.beforeContent?.html || '');
+  const afterSource = decodeHtmlEntities(displayData.afterContent?.sourceHtml || displayData.afterContent?.html || '');
+  if (!beforeSource) return 'No content available';
   
-  const beforeLines = beforeHtml.split('\n');
-  const afterLines = afterHtml.split('\n');
+  const beforeLines = beforeSource.split('\n');
+  const afterLines = afterSource.split('\n');
   
   // Find first different line index
   let firstDiffLine = -1;
@@ -1109,13 +1109,13 @@ export function VisualComparisonPanel({
                     </div>
                     <div className="text-green-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all font-mono">
 {(() => {
-  // Decode and compare by lines with diff highlighting
-  const beforeHtml = decodeHtmlEntities(displayData.beforeContent?.html || '');
-  const afterHtml = decodeHtmlEntities(displayData.afterContent?.html || '');
-  if (!afterHtml) return <span>No content available</span>;
+  // Use sourceHtml for code diff (readable paths) instead of html (base64 images)
+  const beforeSource = decodeHtmlEntities(displayData.beforeContent?.sourceHtml || displayData.beforeContent?.html || '');
+  const afterSource = decodeHtmlEntities(displayData.afterContent?.sourceHtml || displayData.afterContent?.html || '');
+  if (!afterSource) return <span>No content available</span>;
   
-  const beforeLines = beforeHtml.split('\n');
-  const afterLines = afterHtml.split('\n');
+  const beforeLines = beforeSource.split('\n');
+  const afterLines = afterSource.split('\n');
   
   // Find first different line index
   let firstDiffLine = 0;
