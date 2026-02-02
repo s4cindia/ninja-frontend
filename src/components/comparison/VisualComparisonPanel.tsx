@@ -184,8 +184,8 @@ export function VisualComparisonPanel({
    * @returns Resolved path or null if path escapes EPUB root
    */
   const resolveRelativePath = useCallback((src: string, baseDir: string): string | null => {
-    // Skip absolute URLs and data URIs
-    if (src.startsWith('http://') || src.startsWith('https://') ||
+    // Skip absolute URLs, protocol-relative URLs, and data URIs
+    if (src.startsWith('//') || src.startsWith('http://') || src.startsWith('https://') ||
         src.startsWith('data:') || src.startsWith('/api/')) {
       return null; // Signal to skip processing
     }
@@ -305,8 +305,22 @@ export function VisualComparisonPanel({
         const src = img.getAttribute('src');
         if (!src) return;
 
-        // Resolve relative path using shared helper
-        const resolvedPath = resolveRelativePath(src, baseDir);
+        // Split path from query string and fragment to preserve them
+        const queryIndex = src.indexOf('?');
+        const fragmentIndex = src.indexOf('#');
+        let pathname = src;
+        let suffix = '';
+
+        if (queryIndex !== -1) {
+          pathname = src.substring(0, queryIndex);
+          suffix = src.substring(queryIndex);
+        } else if (fragmentIndex !== -1) {
+          pathname = src.substring(0, fragmentIndex);
+          suffix = src.substring(fragmentIndex);
+        }
+
+        // Resolve relative path using shared helper (only the pathname)
+        const resolvedPath = resolveRelativePath(pathname, baseDir);
         if (resolvedPath === null) return; // Skip if absolute URL or path escapes root
 
         // Validate and sanitize the resolved path
@@ -318,8 +332,8 @@ export function VisualComparisonPanel({
           return;
         }
 
-        // Build API URL
-        const apiUrl = `/api/v1/epub/job/${jobId}/asset/${encodeURIComponent(safePath)}`;
+        // Build API URL with encoded path and preserved query/fragment
+        const apiUrl = `/api/v1/epub/job/${jobId}/asset/${encodeURIComponent(safePath)}${suffix}`;
 
         if (import.meta.env.DEV) {
           console.log(`[VisualComparison] Resolved image: ${src} → ${apiUrl}`);
@@ -368,8 +382,22 @@ export function VisualComparisonPanel({
         return match;
       }
 
-      // Resolve relative path using shared helper (handles /api/, http://, data: etc)
-      const resolvedPath = resolveRelativePath(url, baseDir);
+      // Split path from query string and fragment to preserve them
+      const queryIndex = url.indexOf('?');
+      const fragmentIndex = url.indexOf('#');
+      let pathname = url;
+      let suffix = '';
+
+      if (queryIndex !== -1) {
+        pathname = url.substring(0, queryIndex);
+        suffix = url.substring(queryIndex);
+      } else if (fragmentIndex !== -1) {
+        pathname = url.substring(0, fragmentIndex);
+        suffix = url.substring(fragmentIndex);
+      }
+
+      // Resolve relative path using shared helper (only the pathname)
+      const resolvedPath = resolveRelativePath(pathname, baseDir);
       if (resolvedPath === null) return match; // Skip if absolute URL or path escapes root
 
       // Validate the path
@@ -381,7 +409,8 @@ export function VisualComparisonPanel({
         return match; // Return original if invalid
       }
 
-      return `url('/api/v1/epub/job/${jobId}/asset/${encodeURIComponent(safePath)}')`;
+      // Build API URL with encoded path and preserved query/fragment
+      return `url('/api/v1/epub/job/${jobId}/asset/${encodeURIComponent(safePath)}${suffix}')`;
     });
   }, [jobId, validateAssetPath, resolveRelativePath]);
   const handleOpenFullscreen = useCallback(() => {
