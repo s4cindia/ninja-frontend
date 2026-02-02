@@ -973,25 +973,148 @@ const imageAltTemplate: QuickFixTemplate = {
     },
   ],
   generateFix: (inputs, context): QuickFix => {
+    const changes: Array<{
+      type: 'insert' | 'replace' | 'delete';
+      filePath: string;
+      oldContent?: string;
+      content?: string;
+      description: string;
+    }> = [];
+
+    // NEW FORMAT: Check if images array is provided (from ImageAltTemplate)
+    const imagesArray = inputs.images as Array<{
+      imagePath: string;
+      imageType: string;
+      altText: string;
+      longDescription?: string;
+    }> | undefined;
+
+    if (imagesArray && imagesArray.length > 0) {
+      // Multi-image support: process each image separately
+
+      // Try to parse context.context to get image HTML
+      let contextImages: Array<{ fullPath: string; html: string; src: string }> = [];
+      if (context.context && typeof context.context === 'string') {
+        try {
+          const ctx = JSON.parse(context.context);
+          if (ctx && typeof ctx === 'object' && Array.isArray(ctx.images)) {
+            contextImages = ctx.images as Array<{ fullPath: string; html: string; src: string }>;
+          }
+        } catch {
+          // Context is not JSON, continue
+        }
+      }
+
+      imagesArray.forEach((img, index) => {
+        const imageType = img.imageType || 'informative';
+        const altText = img.altText || '';
+        const longDescription = img.longDescription || '';
+        const descriptionMethod = (inputs.descriptionMethod as string) || 'aria-describedby';
+
+        // Find the current element HTML for this image
+        let currentElement: string;
+        if (contextImages.length > index && contextImages[index].html) {
+          currentElement = contextImages[index].html;
+        } else {
+          // Fallback: use context.currentContent or generate a placeholder
+          currentElement = context.currentContent || `<img src="${img.imagePath}">`;
+        }
+
+        const escapedAlt = altText
+          .replace(/&/g, '&amp;')
+          .replace(/"/g, '&quot;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+
+        if (imageType === 'decorative') {
+          const newElement = currentElement.includes('alt=')
+            ? currentElement.replace(/alt="[^"]*"/, 'alt="" role="presentation"')
+            : currentElement.replace(/<img/, '<img alt="" role="presentation"');
+
+          changes.push({
+            type: 'replace' as const,
+            filePath: context.filePath || 'content.xhtml',
+            oldContent: currentElement,
+            content: newElement,
+            description: `Mark image as decorative: ${img.imagePath}`,
+          });
+        } else if (imageType === 'informative') {
+          const newElement = currentElement.includes('alt=')
+            ? currentElement.replace(/alt="[^"]*"/, `alt="${escapedAlt}"`)
+            : currentElement.replace(/<img/, `<img alt="${escapedAlt}"`);
+
+          changes.push({
+            type: 'replace' as const,
+            filePath: context.filePath || 'content.xhtml',
+            oldContent: currentElement,
+            content: newElement,
+            description: `Add alt text to ${img.imagePath}`,
+          });
+        } else if (imageType === 'complex') {
+          const descId = `desc-${context.issueId.replace(/[^a-zA-Z0-9]/g, '-')}-${index}`;
+          const escapedLongDesc = (longDescription || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+
+          let newElement: string;
+          let descriptionElement: string;
+
+          if (descriptionMethod === 'aria-describedby') {
+            newElement = currentElement.includes('alt=')
+              ? currentElement.replace(/alt="[^"]*"/, `alt="${escapedAlt}" aria-describedby="${descId}"`)
+              : currentElement.replace(/<img/, `<img alt="${escapedAlt}" aria-describedby="${descId}"`);
+            descriptionElement = `<div id="${descId}" class="visually-hidden">${escapedLongDesc}</div>`;
+          } else if (descriptionMethod === 'figcaption') {
+            newElement = `<figure>\n  ${currentElement.includes('alt=')
+              ? currentElement.replace(/alt="[^"]*"/, `alt="${escapedAlt}"`)
+              : currentElement.replace(/<img/, `<img alt="${escapedAlt}"`)}\n  <figcaption>${escapedLongDesc}</figcaption>\n</figure>`;
+            descriptionElement = '';
+          } else {
+            newElement = currentElement.includes('alt=')
+              ? currentElement.replace(/alt="[^"]*"/, `alt="${escapedAlt}"`)
+              : currentElement.replace(/<img/, `<img alt="${escapedAlt}"`);
+            descriptionElement = `<details>\n  <summary>Image description</summary>\n  <p>${escapedLongDesc}</p>\n</details>`;
+          }
+
+          changes.push({
+            type: 'replace' as const,
+            filePath: context.filePath || 'content.xhtml',
+            oldContent: currentElement,
+            content: descriptionElement ? `${newElement}\n${descriptionElement}` : newElement,
+            description: `Add alt text and long description to ${img.imagePath}`,
+          });
+        }
+      });
+
+      const totalAltTextLength = imagesArray.reduce((sum, img) => sum + (img.altText?.length || 0), 0);
+      return {
+        issueId: context.issueId,
+        targetFile: context.filePath || 'content.xhtml',
+        changes,
+        summary: `Added alt text to ${imagesArray.length} image(s) (${totalAltTextLength} chars total)`,
+      };
+    }
+
+    // OLD FORMAT FALLBACK: For backward compatibility with legacy single-image input
     const imageType = (inputs.imageType as string) || 'informative';
     const altText = (inputs.altText as string) || '';
     const longDescription = (inputs.longDescription as string) || '';
     const descriptionMethod = (inputs.descriptionMethod as string) || 'aria-describedby';
-    
-    const changes = [];
+
     const currentElement = context.currentContent || '<img src="image.jpg">';
-    
+
     const escapedAlt = altText
       .replace(/&/g, '&amp;')
       .replace(/"/g, '&quot;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
-    
+
     if (imageType === 'decorative') {
       const newElement = currentElement.includes('alt=')
         ? currentElement.replace(/alt="[^"]*"/, 'alt="" role="presentation"')
         : currentElement.replace(/<img/, '<img alt="" role="presentation"');
-      
+
       changes.push({
         type: 'replace' as const,
         filePath: context.filePath || 'content.xhtml',
@@ -1003,7 +1126,7 @@ const imageAltTemplate: QuickFixTemplate = {
       const newElement = currentElement.includes('alt=')
         ? currentElement.replace(/alt="[^"]*"/, `alt="${escapedAlt}"`)
         : currentElement.replace(/<img/, `<img alt="${escapedAlt}"`);
-      
+
       changes.push({
         type: 'replace' as const,
         filePath: context.filePath || 'content.xhtml',
@@ -1017,17 +1140,17 @@ const imageAltTemplate: QuickFixTemplate = {
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
-      
+
       let newElement: string;
       let descriptionElement: string;
-      
+
       if (descriptionMethod === 'aria-describedby') {
         newElement = currentElement.includes('alt=')
           ? currentElement.replace(/alt="[^"]*"/, `alt="${escapedAlt}" aria-describedby="${descId}"`)
           : currentElement.replace(/<img/, `<img alt="${escapedAlt}" aria-describedby="${descId}"`);
         descriptionElement = `<div id="${descId}" class="visually-hidden">${escapedLongDesc}</div>`;
       } else if (descriptionMethod === 'figcaption') {
-        newElement = `<figure>\n  ${currentElement.includes('alt=') 
+        newElement = `<figure>\n  ${currentElement.includes('alt=')
           ? currentElement.replace(/alt="[^"]*"/, `alt="${escapedAlt}"`)
           : currentElement.replace(/<img/, `<img alt="${escapedAlt}"`)}\n  <figcaption>${escapedLongDesc}</figcaption>\n</figure>`;
         descriptionElement = '';
@@ -1037,7 +1160,7 @@ const imageAltTemplate: QuickFixTemplate = {
           : currentElement.replace(/<img/, `<img alt="${escapedAlt}"`);
         descriptionElement = `<details>\n  <summary>Image description</summary>\n  <p>${escapedLongDesc}</p>\n</details>`;
       }
-      
+
       changes.push({
         type: 'replace' as const,
         filePath: context.filePath || 'content.xhtml',
@@ -1046,13 +1169,13 @@ const imageAltTemplate: QuickFixTemplate = {
         description: 'Add alt text and long description for complex image',
       });
     }
-    
+
     return {
       issueId: context.issueId,
       targetFile: context.filePath || 'content.xhtml',
       changes,
-      summary: imageType === 'decorative' 
-        ? 'Marked image as decorative' 
+      summary: imageType === 'decorative'
+        ? 'Marked image as decorative'
         : `Added alt text (${altText.length} chars)${longDescription ? ' with extended description' : ''}`,
     };
   },
