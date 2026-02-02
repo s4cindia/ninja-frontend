@@ -5,10 +5,29 @@ import { EPUBRenderer } from '../epub/EPUBRenderer';
 import { Loader2, ZoomIn, ZoomOut, Info, Code, AlertTriangle, Columns, Rows, Maximize2, X } from 'lucide-react';
 
 /**
+ * Decodes HTML entities back to their original characters.
+ * This handles cases where the API returns already-encoded content.
+ */
+function decodeHtmlEntities(text: string): string {
+  const entityMap: Record<string, string> = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&#x27;': "'",
+    '&apos;': "'",
+  };
+  return text.replace(/&(?:amp|lt|gt|quot|#39|#x27|apos);/g, match => entityMap[match] ?? match);
+}
+
+/**
  * Escapes HTML special characters to prevent XSS when displaying HTML source code as text.
  * Unlike sanitizeText which strips tags, this preserves the markup for viewing in code preview.
+ * First decodes any pre-existing entities to avoid double-encoding.
  */
 function escapeHtml(text: string): string {
+  const decoded = decodeHtmlEntities(text);
   const htmlEntities: Record<string, string> = {
     '&': '&amp;',
     '<': '&lt;',
@@ -16,7 +35,7 @@ function escapeHtml(text: string): string {
     '"': '&quot;',
     "'": '&#39;',
   };
-  return text.replace(/[&<>"']/g, char => htmlEntities[char] ?? char);
+  return decoded.replace(/[&<>"']/g, char => htmlEntities[char] ?? char);
 }
 
 interface ChangeExplanation {
