@@ -211,9 +211,13 @@ export function VisualComparisonPanel({
 
       resolvedPath = [...baseParts, ...srcParts].join('/');
     } else if (src.startsWith('./')) {
-      resolvedPath = baseDir + src.substring(2);
+      // Ensure baseDir ends with / before concatenation
+      const normalizedBase = baseDir.endsWith('/') ? baseDir : baseDir + '/';
+      resolvedPath = normalizedBase + src.substring(2);
     } else if (!src.startsWith('OEBPS/') && !src.startsWith('OPS/')) {
-      resolvedPath = baseDir + src;
+      // Ensure baseDir ends with / before concatenation
+      const normalizedBase = baseDir.endsWith('/') ? baseDir : baseDir + '/';
+      resolvedPath = normalizedBase + src;
     }
 
     return resolvedPath;
@@ -283,8 +287,8 @@ export function VisualComparisonPanel({
       // Check for parsing errors
       const parserError = doc.querySelector('parsererror');
       if (parserError) {
-        console.error('[VisualComparison] HTML parsing error, returning empty content for safety');
-        return ''; // Return empty string instead of potentially unsafe HTML
+        console.error('[VisualComparison] HTML parsing error, falling back to original content');
+        return htmlContent; // Show original content (backend HTML is trusted, just unresolved paths)
       }
 
       // Determine base directory from filePath or fallback to baseHref
@@ -328,7 +332,7 @@ export function VisualComparisonPanel({
       return doc.body.innerHTML;
     } catch (error) {
       console.error('[VisualComparison] Error resolving image paths:', error);
-      return ''; // Return empty string for safety instead of potentially unsafe HTML
+      return htmlContent; // Return original content for better UX (backend HTML is trusted)
     }
   }, [jobId, validateAssetPath, resolveRelativePath]);
 
@@ -351,16 +355,20 @@ export function VisualComparisonPanel({
       baseDir = actualBaseHref.substring(0, actualBaseHref.lastIndexOf('/') + 1);
     }
 
-    // Updated pattern to handle whitespace inside url() consistently
-    const cssPattern = /url\(\s*['"]?([^'")\s]+)['"]?\s*\)/gi;
+    // Pattern handles both quoted URLs (with spaces) and unquoted URLs
+    // Group 1: quoted URL with potential spaces, Group 2: unquoted URL without spaces
+    const cssPattern = /url\(\s*['"]([^'"]+)['"]\s*\)|url\(\s*([^)\s]+)\s*\)/gi;
 
-    return content.replace(cssPattern, (match, url) => {
+    return content.replace(cssPattern, (match, quotedUrl, unquotedUrl) => {
+      const url = quotedUrl || unquotedUrl;
+      if (!url) return match;
+
       // Skip fragments (they're SVG references, not paths)
-      if (url.startsWith('#') || url.startsWith('api://')) {
+      if (url.startsWith('#')) {
         return match;
       }
 
-      // Resolve relative path using shared helper
+      // Resolve relative path using shared helper (handles /api/, http://, data: etc)
       const resolvedPath = resolveRelativePath(url, baseDir);
       if (resolvedPath === null) return match; // Skip if absolute URL or path escapes root
 

@@ -12,6 +12,9 @@ export default defineConfig({
     // Suppress expected test errors from failing the build
     dangerouslyIgnoreUnhandledErrors: true,
   },
+  define: {
+    'import.meta.env.DEV': true, // Enable DEV mode in tests for console.log assertions
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
