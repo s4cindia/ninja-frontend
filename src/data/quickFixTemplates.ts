@@ -1169,8 +1169,9 @@ const imageAltTemplate: QuickFixTemplate = {
   generateFix: (inputs, context): QuickFix => {
     const changes: FileChange[] = [];
 
-    // NEW FORMAT: Check if images array is provided (from ImageAltTemplate) with validation
-    if (Array.isArray(inputs.images) && inputs.images.every(isValidImageInput)) {
+    // NEW FORMAT: Check if images array is provided (from ImageAltTemplate)
+    // Process valid images individually rather than rejecting entire batch if one is invalid
+    if (Array.isArray(inputs.images) && inputs.images.length > 0) {
       const imagesArray = inputs.images as ImageInput[];
 
       // Multi-image support: process each image separately
@@ -1199,15 +1200,19 @@ const imageAltTemplate: QuickFixTemplate = {
         }
       }
 
-      // Log mismatch between arrays for debugging
-      if (import.meta.env.DEV && contextImages.length > 0 && contextImages.length !== imagesArray.length) {
-        console.warn(`[QuickFix] Context images count (${contextImages.length}) != images array count (${imagesArray.length})`);
-      }
-
       let skippedCount = 0;
       let totalAltTextLength = 0; // Track only processed alt text lengths
 
       imagesArray.forEach((img, index) => {
+        // Validate each image individually - skip invalid ones instead of rejecting entire batch
+        if (!isValidImageInput(img)) {
+          if (import.meta.env.DEV) {
+            console.warn(`[QuickFix] Skipping invalid image at index ${index}:`, img);
+          }
+          skippedCount++;
+          return;
+        }
+
         // Skip images with no imagePath to prevent runtime errors
         if (!img.imagePath || img.imagePath.trim() === '') {
           if (import.meta.env.DEV) {
