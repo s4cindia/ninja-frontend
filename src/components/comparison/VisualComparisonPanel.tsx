@@ -1086,19 +1086,9 @@ export function VisualComparisonPanel({
     }
   }
   
-  // Debug: Log if no differences found
+  // If no diff found, show from beginning
   if (firstDiffLine === -1) {
-    console.warn('[VisualComparisonPanel] NO DIFF FOUND - before/after content identical', {
-      beforeLength: beforeHtml.length,
-      afterLength: afterHtml.length,
-      areIdentical: beforeHtml === afterHtml
-    });
     firstDiffLine = 0;
-  } else {
-    console.log('[VisualComparisonPanel] Diff found at line:', firstDiffLine, {
-      beforeLine: beforeLines[firstDiffLine]?.substring(0, 100),
-      afterLine: afterLines[firstDiffLine]?.substring(0, 100)
-    });
   }
   
   // Show 3 lines before and after the change
