@@ -1068,12 +1068,32 @@ export function VisualComparisonPanel({
                     </div>
                     <pre className="text-red-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all">
 {(() => {
-  // Decode any pre-encoded entities, then let React handle escaping for display
-  const rawHtml = decodeHtmlEntities(displayData.beforeContent?.html || '');
-  if (!rawHtml) return 'No content available';
-  const truncated = rawHtml.slice(0, 1000);
-  const lastClosingTag = truncated.lastIndexOf('>');
-  return lastClosingTag > 0 ? truncated.slice(0, lastClosingTag + 1) + (rawHtml.length > 1000 ? '...' : '') : truncated;
+  // Decode and extract relevant portion around the change
+  const beforeHtml = decodeHtmlEntities(displayData.beforeContent?.html || '');
+  const afterHtml = decodeHtmlEntities(displayData.afterContent?.html || '');
+  if (!beforeHtml) return 'No content available';
+  
+  // Find first difference position
+  let diffPos = 0;
+  const minLen = Math.min(beforeHtml.length, afterHtml.length);
+  for (let i = 0; i < minLen; i++) {
+    if (beforeHtml[i] !== afterHtml[i]) {
+      diffPos = i;
+      break;
+    }
+    if (i === minLen - 1) diffPos = minLen;
+  }
+  
+  // Find a good starting point (back up to a tag boundary)
+  let startPos = Math.max(0, diffPos - 200);
+  const tagStart = beforeHtml.lastIndexOf('<', startPos + 50);
+  if (tagStart > startPos - 100) startPos = tagStart;
+  
+  // Extract ~800 chars around the change
+  const excerpt = beforeHtml.slice(startPos, startPos + 800);
+  const prefix = startPos > 0 ? '...' : '';
+  const suffix = startPos + 800 < beforeHtml.length ? '...' : '';
+  return prefix + excerpt + suffix;
 })()}
                     </pre>
                   </div>
@@ -1084,25 +1104,41 @@ export function VisualComparisonPanel({
                     </div>
                     <div className="text-green-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all font-mono">
 {(() => {
-  // Decode any pre-encoded entities for proper comparison and display
+  // Decode and find relevant portion with diff highlighting
   const beforeHtml = decodeHtmlEntities(displayData.beforeContent?.html || '');
   const afterHtml = decodeHtmlEntities(displayData.afterContent?.html || '');
   if (!afterHtml) return <span>No content available</span>;
   
-  const truncateHtml = (html: string) => {
-    const truncated = html.slice(0, 1000);
-    const lastClosingTag = truncated.lastIndexOf('>');
-    return lastClosingTag > 0 ? truncated.slice(0, lastClosingTag + 1) + (html.length > 1000 ? '...' : '') : truncated;
-  };
+  // Find first difference position
+  let diffPos = 0;
+  const minLen = Math.min(beforeHtml.length, afterHtml.length);
+  for (let i = 0; i < minLen; i++) {
+    if (beforeHtml[i] !== afterHtml[i]) {
+      diffPos = i;
+      break;
+    }
+    if (i === minLen - 1) diffPos = minLen;
+  }
   
-  const beforeLines = truncateHtml(beforeHtml).split('\n');
-  const afterLines = truncateHtml(afterHtml).split('\n');
+  // Find a good starting point (back up to a tag boundary)
+  let startPos = Math.max(0, diffPos - 200);
+  const tagStart = afterHtml.lastIndexOf('<', startPos + 50);
+  if (tagStart > startPos - 100) startPos = tagStart;
   
-  return afterLines.map((line, idx) => {
+  // Extract excerpts from both
+  const beforeExcerpt = beforeHtml.slice(startPos, startPos + 800);
+  const afterExcerpt = afterHtml.slice(startPos, startPos + 800);
+  
+  const beforeLines = beforeExcerpt.split('\n');
+  const afterLines = afterExcerpt.split('\n');
+  
+  const prefix = startPos > 0 ? <div key="prefix" className="text-gray-400">...</div> : null;
+  const suffix = startPos + 800 < afterHtml.length ? <div key="suffix" className="text-gray-400">...</div> : null;
+  
+  const diffLines = afterLines.map((line, idx) => {
     const beforeLine = beforeLines[idx] || '';
     const isNewLine = idx >= beforeLines.length;
     const isChanged = line !== beforeLine;
-    // React automatically escapes text content - no manual escaping needed
     const displayLine = line || ' ';
     
     if (isNewLine) {
@@ -1113,6 +1149,8 @@ export function VisualComparisonPanel({
     }
     return <div key={idx}>{displayLine}</div>;
   });
+  
+  return <>{prefix}{diffLines}{suffix}</>;
 })()}
                     </div>
                   </div>
