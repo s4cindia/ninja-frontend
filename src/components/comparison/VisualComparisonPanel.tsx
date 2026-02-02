@@ -1068,32 +1068,32 @@ export function VisualComparisonPanel({
                     </div>
                     <pre className="text-red-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all">
 {(() => {
-  // Decode and extract relevant portion around the change
+  // Decode and compare by lines to find changes
   const beforeHtml = decodeHtmlEntities(displayData.beforeContent?.html || '');
   const afterHtml = decodeHtmlEntities(displayData.afterContent?.html || '');
   if (!beforeHtml) return 'No content available';
   
-  // Find first difference position
-  let diffPos = 0;
-  const minLen = Math.min(beforeHtml.length, afterHtml.length);
-  for (let i = 0; i < minLen; i++) {
-    if (beforeHtml[i] !== afterHtml[i]) {
-      diffPos = i;
+  const beforeLines = beforeHtml.split('\n');
+  const afterLines = afterHtml.split('\n');
+  
+  // Find first different line index
+  let firstDiffLine = 0;
+  const maxLines = Math.max(beforeLines.length, afterLines.length);
+  for (let i = 0; i < maxLines; i++) {
+    if (beforeLines[i] !== afterLines[i]) {
+      firstDiffLine = i;
       break;
     }
-    if (i === minLen - 1) diffPos = minLen;
   }
   
-  // Find a good starting point (back up to a tag boundary)
-  let startPos = Math.max(0, diffPos - 200);
-  const tagStart = beforeHtml.lastIndexOf('<', startPos + 50);
-  if (tagStart > startPos - 100) startPos = tagStart;
+  // Show 3 lines before and after the change
+  const startLine = Math.max(0, firstDiffLine - 3);
+  const endLine = Math.min(beforeLines.length, firstDiffLine + 10);
+  const displayLines = beforeLines.slice(startLine, endLine);
   
-  // Extract ~800 chars around the change
-  const excerpt = beforeHtml.slice(startPos, startPos + 800);
-  const prefix = startPos > 0 ? '...' : '';
-  const suffix = startPos + 800 < beforeHtml.length ? '...' : '';
-  return prefix + excerpt + suffix;
+  const prefix = startLine > 0 ? '...\n' : '';
+  const suffix = endLine < beforeLines.length ? '\n...' : '';
+  return prefix + displayLines.join('\n') + suffix;
 })()}
                     </pre>
                   </div>
@@ -1104,40 +1104,36 @@ export function VisualComparisonPanel({
                     </div>
                     <div className="text-green-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all font-mono">
 {(() => {
-  // Decode and find relevant portion with diff highlighting
+  // Decode and compare by lines with diff highlighting
   const beforeHtml = decodeHtmlEntities(displayData.beforeContent?.html || '');
   const afterHtml = decodeHtmlEntities(displayData.afterContent?.html || '');
   if (!afterHtml) return <span>No content available</span>;
   
-  // Find first difference position
-  let diffPos = 0;
-  const minLen = Math.min(beforeHtml.length, afterHtml.length);
-  for (let i = 0; i < minLen; i++) {
-    if (beforeHtml[i] !== afterHtml[i]) {
-      diffPos = i;
+  const beforeLines = beforeHtml.split('\n');
+  const afterLines = afterHtml.split('\n');
+  
+  // Find first different line index
+  let firstDiffLine = 0;
+  const maxLines = Math.max(beforeLines.length, afterLines.length);
+  for (let i = 0; i < maxLines; i++) {
+    if (beforeLines[i] !== afterLines[i]) {
+      firstDiffLine = i;
       break;
     }
-    if (i === minLen - 1) diffPos = minLen;
   }
   
-  // Find a good starting point (back up to a tag boundary)
-  let startPos = Math.max(0, diffPos - 200);
-  const tagStart = afterHtml.lastIndexOf('<', startPos + 50);
-  if (tagStart > startPos - 100) startPos = tagStart;
+  // Show 3 lines before and more after the change
+  const startLine = Math.max(0, firstDiffLine - 3);
+  const endLine = Math.min(afterLines.length, firstDiffLine + 10);
+  const displayAfterLines = afterLines.slice(startLine, endLine);
+  const displayBeforeLines = beforeLines.slice(startLine, endLine);
   
-  // Extract excerpts from both
-  const beforeExcerpt = beforeHtml.slice(startPos, startPos + 800);
-  const afterExcerpt = afterHtml.slice(startPos, startPos + 800);
+  const prefix = startLine > 0 ? <div key="prefix" className="text-gray-400">...</div> : null;
+  const suffix = endLine < afterLines.length ? <div key="suffix" className="text-gray-400">...</div> : null;
   
-  const beforeLines = beforeExcerpt.split('\n');
-  const afterLines = afterExcerpt.split('\n');
-  
-  const prefix = startPos > 0 ? <div key="prefix" className="text-gray-400">...</div> : null;
-  const suffix = startPos + 800 < afterHtml.length ? <div key="suffix" className="text-gray-400">...</div> : null;
-  
-  const diffLines = afterLines.map((line, idx) => {
-    const beforeLine = beforeLines[idx] || '';
-    const isNewLine = idx >= beforeLines.length;
+  const diffLines = displayAfterLines.map((line, idx) => {
+    const beforeLine = displayBeforeLines[idx] || '';
+    const isNewLine = idx + startLine >= beforeLines.length;
     const isChanged = line !== beforeLine;
     const displayLine = line || ' ';
     
