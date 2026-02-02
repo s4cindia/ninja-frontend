@@ -539,13 +539,13 @@ export function VisualComparisonPanel({
     if (!displayData) return null;
 
     // Resolve image paths for both before and after content
-    const beforeBaseHref = displayData.spineItem?.href || displayData.beforeContent.baseHref;
-    let beforeHtml = resolveImagePaths(displayData.beforeContent.html, filePath, beforeBaseHref);
-    beforeHtml = resolveCSSImages(beforeHtml, filePath, beforeBaseHref);
+    const beforeBaseHref = displayData.spineItem?.href || displayData.beforeContent?.baseHref || "";
+    let beforeHtml = resolveImagePaths(displayData.beforeContent?.html || "", filePath, beforeBaseHref);
+    beforeHtml = resolveCSSImages(beforeHtml || "", filePath, beforeBaseHref);
 
-    const afterBaseHref = displayData.spineItem?.href || displayData.afterContent.baseHref;
-    let afterHtml = resolveImagePaths(displayData.afterContent.html, filePath, afterBaseHref);
-    afterHtml = resolveCSSImages(afterHtml, filePath, afterBaseHref);
+    const afterBaseHref = displayData.spineItem?.href || displayData.afterContent?.baseHref || "";
+    let afterHtml = resolveImagePaths(displayData.afterContent?.html || "", filePath, afterBaseHref);
+    afterHtml = resolveCSSImages(afterHtml || "", filePath, afterBaseHref);
 
     return {
       before: {
