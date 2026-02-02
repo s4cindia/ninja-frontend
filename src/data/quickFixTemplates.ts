@@ -920,8 +920,17 @@ interface ParsedContextData {
   images?: Array<{ fullPath: string; html: string; src: string }>;
 }
 
-// Constant for fallback image path (avoid magic strings)
+// Interface for image input (Type Safety)
+interface ImageInput {
+  imagePath: string;
+  imageType: string;
+  altText: string;
+  longDescription?: string;
+}
+
+// Constants
 const FALLBACK_IMAGE_PATH = 'unknown-image';
+const MAX_CONTEXT_IMAGES = 100; // Prevent DoS from extremely large arrays
 
 // Helper function to sanitize HTML ID values (prevent attribute injection)
 function sanitizeHtmlId(id: string): string {
@@ -940,7 +949,15 @@ function escapeHtml(text: string): string {
 
 // Helper function to escape/sanitize image src attributes (prevent XSS in src)
 function sanitizeImageSrc(src: string): string {
-  // Escape special characters and encode URI components
+  // Block dangerous protocols that can lead to XSS
+  const dangerous = /^(javascript|data|vbscript):/i;
+  if (dangerous.test(src.trim())) {
+    if (import.meta.env.DEV) {
+      console.warn('[QuickFix] Blocked dangerous protocol in image src:', src);
+    }
+    return ''; // Return empty string for dangerous protocols
+  }
+  // Escape special characters
   return escapeHtml(src);
 }
 
@@ -962,10 +979,11 @@ function findContextImageByPath(
   if (htmlMatch) return htmlMatch;
 
   // Try matching just the filename (with warning in DEV mode)
+  // Use endsWith instead of includes for more precise matching
   const imgFilename = imagePath.split('/').pop();
   if (imgFilename) {
     const filenameMatch = contextImages.find(ctxImg =>
-      ctxImg.fullPath.includes(imgFilename) || ctxImg.src.includes(imgFilename)
+      ctxImg.fullPath.endsWith(imgFilename) || ctxImg.src.endsWith(imgFilename)
     );
     if (filenameMatch) {
       // Log warning about ambiguous filename matching
@@ -993,6 +1011,20 @@ function isValidContextImage(img: unknown): img is { fullPath: string; html: str
     typeof (img as { fullPath: unknown }).fullPath === 'string' &&
     typeof (img as { html: unknown }).html === 'string' &&
     typeof (img as { src: unknown }).src === 'string'
+  );
+}
+
+// Type guard for image input validation
+function isValidImageInput(img: unknown): img is ImageInput {
+  return (
+    typeof img === 'object' &&
+    img !== null &&
+    'imagePath' in img &&
+    'imageType' in img &&
+    'altText' in img &&
+    typeof (img as ImageInput).imagePath === 'string' &&
+    typeof (img as ImageInput).imageType === 'string' &&
+    typeof (img as ImageInput).altText === 'string'
   );
 }
 
@@ -1137,15 +1169,10 @@ const imageAltTemplate: QuickFixTemplate = {
   generateFix: (inputs, context): QuickFix => {
     const changes: FileChange[] = [];
 
-    // NEW FORMAT: Check if images array is provided (from ImageAltTemplate)
-    const imagesArray = inputs.images as Array<{
-      imagePath: string;
-      imageType: string;
-      altText: string;
-      longDescription?: string;
-    }> | undefined;
+    // NEW FORMAT: Check if images array is provided (from ImageAltTemplate) with validation
+    if (Array.isArray(inputs.images) && inputs.images.every(isValidImageInput)) {
+      const imagesArray = inputs.images as ImageInput[];
 
-    if (imagesArray && imagesArray.length > 0) {
       // Multi-image support: process each image separately
 
       // Try to parse context.context to get image HTML with validation
@@ -1154,8 +1181,15 @@ const imageAltTemplate: QuickFixTemplate = {
         try {
           const ctx = JSON.parse(context.context) as ParsedContextData;
           if (ctx && typeof ctx === 'object' && Array.isArray(ctx.images)) {
+            // Prevent DoS from extremely large arrays
+            const imagesToProcess = ctx.images.slice(0, MAX_CONTEXT_IMAGES);
+
+            if (ctx.images.length > MAX_CONTEXT_IMAGES && import.meta.env.DEV) {
+              console.warn(`[QuickFix] Context images truncated from ${ctx.images.length} to ${MAX_CONTEXT_IMAGES}`);
+            }
+
             // Validate each image object has the expected structure
-            contextImages = ctx.images.filter(isValidContextImage);
+            contextImages = imagesToProcess.filter(isValidContextImage);
           }
         } catch (err) {
           // Log parse error for debugging
@@ -1171,11 +1205,23 @@ const imageAltTemplate: QuickFixTemplate = {
       }
 
       let skippedCount = 0;
+      let totalAltTextLength = 0; // Track only processed alt text lengths
+
       imagesArray.forEach((img, index) => {
-        const imageType = img.imageType || 'informative';
-        const altText = img.altText || '';
-        const longDescription = img.longDescription || '';
-        const descriptionMethod = (inputs.descriptionMethod as string) || 'aria-describedby';
+        // Skip images with no imagePath to prevent runtime errors
+        if (!img.imagePath || img.imagePath.trim() === '') {
+          if (import.meta.env.DEV) {
+            console.warn(`[QuickFix] Skipping image with missing imagePath at index ${index}`);
+          }
+          skippedCount++;
+          return;
+        }
+
+        // Use nullish coalescing for clarity and consistency
+        const imageType = img.imageType ?? 'informative';
+        const altText = img.altText ?? '';
+        const longDescription = img.longDescription ?? '';
+        const descriptionMethod = (inputs.descriptionMethod as string) ?? 'aria-describedby';
 
         // Find the current element HTML for this image by matching path
         let currentElement: string;
@@ -1188,7 +1234,7 @@ const imageAltTemplate: QuickFixTemplate = {
           // Fallback: use context.currentContent or generate a sanitized placeholder
           // XSS Prevention: Sanitize img.imagePath before using in template
           const sanitizedPath = sanitizeImageSrc(img.imagePath);
-          currentElement = context.currentContent || `<img src="${sanitizedPath}">`;
+          currentElement = context.currentContent ?? `<img src="${sanitizedPath}">`;
         }
 
         // Generate change using helper function
@@ -1206,13 +1252,16 @@ const imageAltTemplate: QuickFixTemplate = {
 
         if (change) {
           changes.push(change);
+          // Only count alt text length for non-decorative images that were actually processed
+          if (imageType !== 'decorative' && altText) {
+            totalAltTextLength += altText.length;
+          }
         } else {
           skippedCount++;
         }
       });
 
       const processedCount = imagesArray.length - skippedCount;
-      const totalAltTextLength = imagesArray.reduce((sum, img) => sum + (img.altText?.length || 0), 0);
       return {
         issueId: context.issueId,
         targetFile: context.filePath || 'content.xhtml',
