@@ -407,7 +407,7 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
         const current = prev[imageIdx];
         if (!current) return prev;
         
-        return {
+        const updated = {
           ...prev,
           [imageIdx]: {
             ...current,
@@ -418,6 +418,27 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
               : current.longDescription,
           },
         };
+        
+        // Immediate sync to parent (don't wait for debounce)
+        const images = allImagePaths.length === 0
+          ? [{
+              imagePath: '',
+              imageType: updated[0]?.imageType || 'informative',
+              altText: updated[0]?.altText || '',
+              longDescription: updated[0]?.longDescription || '',
+            }]
+          : allImagePaths.map((path, idx) => {
+              const data = updated[idx] || { imageType: 'informative', altText: '', longDescription: '' };
+              return {
+                imagePath: path,
+                imageType: data.imageType,
+                altText: data.altText,
+                longDescription: data.longDescription,
+              };
+            });
+        onChangeRef.current({ images });
+        
+        return updated;
       });
     } catch (err) {
       // Guard against unmounted component and stale errors
