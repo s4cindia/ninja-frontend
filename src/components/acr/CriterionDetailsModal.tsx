@@ -276,15 +276,18 @@ export function CriterionDetailsModal({
             </TabsContent>
 
             <TabsContent value="issues" className="space-y-4 mt-0">
-              {/* Summary Banner */}
-              {((relatedIssues && relatedIssues.length > 0) || (remediatedIssues && remediatedIssues.length > 0)) && (() => {
+              {/* Summary Banner - Only show if there are actual issues */}
+              {(() => {
+                const pendingCount = relatedIssues?.length || 0;
                 const fixedCount = remediatedIssues?.filter(
                   i => i.remediationInfo?.status === 'REMEDIATED' || !i.remediationInfo?.status
                 ).length || 0;
                 const failedCount = remediatedIssues?.filter(
                   i => i.remediationInfo?.status === 'FAILED'
                 ).length || 0;
-                const pendingCount = relatedIssues?.length || 0;
+                const totalIssueCount = pendingCount + fixedCount + failedCount;
+                
+                if (totalIssueCount === 0) return null;
                 
                 return (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -294,9 +297,11 @@ export function CriterionDetailsModal({
                         <>{pendingCount} pending, {fixedCount} fixed{failedCount > 0 ? `, ${failedCount} failed` : ''}</>
                       ) : pendingCount > 0 ? (
                         <>Found {pendingCount} issue{pendingCount !== 1 ? 's' : ''} that need attention</>
-                      ) : (
+                      ) : fixedCount > 0 ? (
                         <>{fixedCount} issue{fixedCount !== 1 ? 's' : ''} fixed{failedCount > 0 ? `, ${failedCount} failed` : ''}</>
-                      )}
+                      ) : failedCount > 0 ? (
+                        <>{failedCount} issue{failedCount !== 1 ? 's' : ''} failed remediation</>
+                      ) : null}
                     </p>
                   </div>
                 );
