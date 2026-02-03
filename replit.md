@@ -80,7 +80,15 @@ The application features a clean, responsive design built with Tailwind CSS. It 
 
 ## Recent Changes (February 2026)
 
-### ACR Post-Remediation Display Enhancements
+### ACR Post-Remediation Integration Complete
+The ACR AI Analysis step now correctly displays remediated data from the backend after EPUB remediation. Verified integration includes:
+- **Confidence Scores**: Backend returns deterministic scores (80-92%) based on remediation status. Example: criterion 1.1.1 shows `confidenceScore: 80` after full remediation.
+- **Verification Status**: `needsVerification: false` for fully remediated criteria (where `remainingIssues: 0`).
+- **Remediation Summary**: `remediationSummary` object with `totalIssues`, `fixedIssues`, `remainingIssues` counts.
+- **Remediated Issues Details**: `remediatedIssues` array with issue details including `ruleId`, `impact`, `message`, `status: "remediated"`.
+- **Other Issues (Non-WCAG)**: Shows `pending`, `fixed`, `failed`, `skipped` status with counts (`pendingCount`, `fixedCount`, etc.).
+
+### Previous ACR Enhancements
 - **Remediated Issues Bug Fix**: Fixed display of remediated issues in ACR AI Analysis step. Green badges now correctly appear on criteria rows that have fixed issues. Filter conditions updated to recognize both 'REMEDIATED' and 'completed' status formats.
 - **Other Issues (Non-WCAG) Status**: Enhanced to show fixed issues in green with "Fixed" badge, remediation details, and pending/fixed summary counts. Type definitions updated in `api.ts` and `ConfidenceDashboard.tsx`.
 - **Confidence Score Enhancement**: Frontend now provides minimum confidence boost (85%) for fully remediated criteria if backend returns 0. "Needs Verification" count excludes fully remediated criteria.
