@@ -714,6 +714,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     fetchAcrAnalysis(jobId)
       .then((response) => {
         if (!cancelled) {
+          console.log('[DEBUG API otherIssues]', JSON.stringify(response.otherIssues, null, 2));
           const normalizedCriteria = (response.criteria || []).map((c, i) => normalizeCriterion(c, i));
           setCriteria(normalizedCriteria);
           if (response.otherIssues) {
