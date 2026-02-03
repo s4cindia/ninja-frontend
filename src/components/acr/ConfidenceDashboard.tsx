@@ -724,6 +724,9 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
           );
           console.log('[ACR Step 3] Criteria with remediated/fixed issues:', criteriaWithRemediated.length, criteriaWithRemediated);
           const normalizedCriteria = (response.criteria || []).map((c, i) => normalizeCriterion(c, i));
+          // Debug: Log criterion 1.1.1 to verify criterionId is set correctly
+          const criterion111 = normalizedCriteria.find(c => c.criterionId === '1.1.1' || c.id === '1.1.1');
+          console.log('[ACR Step 3] Normalized criterion 1.1.1:', criterion111);
           setCriteria(normalizedCriteria);
           if (response.otherIssues) {
             setOtherIssues(response.otherIssues);
