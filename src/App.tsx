@@ -51,6 +51,15 @@ import BatchResultsPage from '@/pages/BatchResultsPage';
 import BatchFileDetailsPage from '@/pages/BatchFileDetailsPage';
 import BatchListPage from '@/pages/BatchListPage';
 import Settings from '@/pages/Settings';
+import { EditorialLayout } from '@/components/editorial';
+import { 
+  EditorialOverview, 
+  EditorialUpload, 
+  CitationsPage, 
+  PlagiarismPage, 
+  StylePage, 
+  ReportsPage 
+} from '@/pages/editorial';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -184,6 +193,16 @@ function AppRoutes() {
           <Route path="/batches" element={<BatchListPage />} />
           <Route path="/batches/new" element={<BatchCreationPage />} />
           <Route path="/settings" element={<Settings />} />
+
+          {/* Editorial Services Routes */}
+          <Route path="/editorial" element={<EditorialLayout />}>
+            <Route index element={<EditorialOverview />} />
+            <Route path="upload" element={<EditorialUpload />} />
+            <Route path="citations" element={<CitationsPage />} />
+            <Route path="plagiarism" element={<PlagiarismPage />} />
+            <Route path="style" element={<StylePage />} />
+            <Route path="reports" element={<ReportsPage />} />
+          </Route>
         </Route>
 
         <Route path="/unauthorized" element={<Unauthorized />} />

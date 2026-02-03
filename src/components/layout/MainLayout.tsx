@@ -13,7 +13,8 @@ import {
   Image,
   Wrench,
   Layers,
-  MessageSquare
+  MessageSquare,
+  PenTool
 } from 'lucide-react';
 
 type NavItem = {
@@ -53,6 +54,12 @@ export function MainLayout() {
         { to: '/pdf', icon: FileText, label: 'PDF Accessibility' },
         { to: '/acr/workflow', icon: ClipboardCheck, label: 'ACR Workflow' },
         { to: '/test/alt-text-generator', icon: Image, label: 'Alt-Text Generator' },
+      ],
+    },
+    {
+      title: 'Editorial',
+      items: [
+        { to: '/editorial', icon: PenTool, label: 'Editorial Services' },
       ],
     },
     {
