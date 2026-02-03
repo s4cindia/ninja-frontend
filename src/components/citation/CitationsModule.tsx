@@ -41,8 +41,7 @@ export function CitationsModule({ jobId, documentId: propDocumentId }: Citations
     error
   } = useCitationsByJob(jobId, filters);
 
-  const derivedDocumentId = citations?.items?.[0]?.documentId;
-  const documentId = propDocumentId || derivedDocumentId;
+  const documentId = propDocumentId || citations?.documentId;
   const isEmpty = !citations?.items || citations.items.length === 0;
 
   const {

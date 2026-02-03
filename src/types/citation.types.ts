@@ -201,6 +201,8 @@ export interface PaginatedCitations {
   page: number;
   limit: number;
   totalPages: number;
+  documentId?: string;
+  jobId?: string;
 }
 
 // Statistics for dashboard

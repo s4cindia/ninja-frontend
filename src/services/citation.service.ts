@@ -189,6 +189,8 @@ export const citationService = {
         page,
         limit,
         totalPages: Math.ceil(backendData.totalCount / limit),
+        documentId: backendData.documentId,
+        jobId: backendData.jobId,
       };
     } catch (error) {
       handleError(error, 'CITATION_GET_BY_JOB');
