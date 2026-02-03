@@ -37,6 +37,17 @@ export function CriterionDetailsModal({
   const navigate = useNavigate();
   const wcagDocs = wcagDocumentationService.getDocumentation(criterion.criterionId);
 
+  // Debug: Log incoming props to trace data flow
+  useEffect(() => {
+    console.log('[CriterionDetailsModal] Props received:', {
+      criterionId: criterion.criterionId,
+      jobId,
+      relatedIssuesCount: relatedIssues?.length || 0,
+      remediatedIssuesCount: remediatedIssues?.length || 0,
+      remediatedIssues: remediatedIssues,
+    });
+  }, [criterion.criterionId, jobId, relatedIssues, remediatedIssues]);
+
   useEffect(() => {
     const fetchJobData = async () => {
       if (!jobId) return;
