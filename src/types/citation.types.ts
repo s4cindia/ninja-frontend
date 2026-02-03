@@ -173,8 +173,17 @@ export interface DetectionResult {
 // Bulk parse result
 export interface BulkParseResult {
   documentId: string;
+  /** Backend-generated message describing the result (e.g., "All 11 citations parsed successfully") */
+  message: string;
   parsed: number;
+  skipped: number;
   failed: number;
+  averageConfidence: number;
+  stats: {
+    total: number;
+    parsed: number;
+    unparsed: number;
+  };
   results: Array<{
     citationId: string;
     componentId: string;

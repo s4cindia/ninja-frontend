@@ -222,14 +222,7 @@ export function CitationsModule({ jobId, documentId: propDocumentId }: Citations
           className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800 flex items-center justify-between"
           role="alert"
         >
-          <span>
-            Successfully parsed {parseAllMutation.data.parsed} citations.
-            {parseAllMutation.data.failed > 0 && (
-              <span className="ml-1">
-                ({parseAllMutation.data.failed} failed)
-              </span>
-            )}
-          </span>
+          <span>{parseAllMutation.data.message}</span>
           <button
             onClick={() => setShowSuccessMessage(false)}
             className="p-1 hover:bg-green-100 rounded"
