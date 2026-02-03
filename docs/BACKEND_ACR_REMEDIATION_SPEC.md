@@ -18,7 +18,8 @@ After EPUB remediation is complete, the ACR analysis endpoint (`/api/acr/analysi
 After remediation, update the `confidenceScore` for criteria that have been remediated.
 
 ### Logic
-```
+
+```text
 For each criterion with remediated issues:
   - If ALL issues for that criterion are fixed:
     confidenceScore = 85-95% (based on fix quality/AI confidence)
@@ -44,6 +45,7 @@ For each criterion with remediated issues:
 ```
 
 ### Calculation Guidelines
+
 | Scenario | Confidence Score |
 |----------|------------------|
 | All issues auto-fixed, high AI confidence | 85-92% |
@@ -60,7 +62,8 @@ For each criterion with remediated issues:
 After remediation, set `needsVerification: false` for criteria that are now compliant.
 
 ### Logic
-```
+
+```text
 For each criterion:
   if (allIssuesFixed && noRemainingIssues):
     needsVerification = false
