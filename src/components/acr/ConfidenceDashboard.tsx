@@ -805,6 +805,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   });
 
   // Calculate counts for each status group (use filteredCriteria for display)
+  // Consider fully remediated criteria as "pass" even if needsVerification is still true
   const statusCounts: Record<StatusGroup, number> = {
     pass: 0,
     fail: 0,
@@ -813,8 +814,17 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   };
 
   filteredCriteria.forEach(c => {
-    const statusGroup = getStatusGroup(c);
-    statusCounts[statusGroup]++;
+    const issueInfo = issuesByCriterion.get(c.criterionId);
+    const isFullyRemediated = issueInfo?.remediatedCount && 
+                              issueInfo.remediatedCount > 0 && 
+                              issueInfo.count === 0;
+    
+    if (isFullyRemediated) {
+      statusCounts.pass++;
+    } else {
+      const statusGroup = getStatusGroup(c);
+      statusCounts[statusGroup]++;
+    }
   });
 
   // Calculate overall confidence - boost score for remediated criteria if backend hasn't updated
