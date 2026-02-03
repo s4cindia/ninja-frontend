@@ -368,12 +368,16 @@ function normalizeCriterion(c: Partial<CriterionConfidence>, index: number): Nor
     };
   }
   
+  // Handle both 'confidence' and 'confidenceScore' field names from backend
+  const rawConfidence = (rawData.confidence as number) ?? c.confidenceScore;
+  const confidenceScore = typeof rawConfidence === 'number' && !isNaN(rawConfidence) ? rawConfidence : 0;
+  
   return {
     id: c.id || `criterion-${index}`,
     criterionId,
     name: c.name || 'Unknown Criterion',
     level: c.level || 'A',
-    confidenceScore: typeof c.confidenceScore === 'number' && !isNaN(c.confidenceScore) ? c.confidenceScore : 0,
+    confidenceScore,
     status: c.status || 'not_tested',
     needsVerification: c.needsVerification ?? true,
     remarks: c.remarks,
@@ -656,15 +660,21 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     }>();
     if (confidenceData?.criteria) {
       for (const c of confidenceData.criteria) {
+        // Handle both 'fixedIssues' and 'remediatedIssues' field names from backend
+        const rawCriterion = c as unknown as Record<string, unknown>;
+        const fixedIssuesFromBackend = rawCriterion.fixedIssues as RemediatedIssue[] | undefined;
+        const remediatedIssues = c.remediatedIssues || fixedIssuesFromBackend;
+        const fixedCount = (rawCriterion.fixedCount as number) ?? c.remediatedCount ?? remediatedIssues?.length ?? 0;
+        
         const hasRelatedIssues = c.relatedIssues && c.relatedIssues.length > 0;
-        const hasRemediatedIssues = c.remediatedIssues && c.remediatedIssues.length > 0;
+        const hasRemediatedIssues = remediatedIssues && remediatedIssues.length > 0;
         
         if (hasRelatedIssues || hasRemediatedIssues) {
           map.set(c.criterionId, {
             issues: c.relatedIssues || [],
             count: c.issueCount || c.relatedIssues?.length || 0,
-            remediatedIssues: c.remediatedIssues,
-            remediatedCount: c.remediatedCount || c.remediatedIssues?.length || 0,
+            remediatedIssues: remediatedIssues,
+            remediatedCount: fixedCount,
           });
         }
       }
