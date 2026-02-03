@@ -23,6 +23,11 @@ type StatusGroup = 'pass' | 'fail' | 'needs_review' | 'not_applicable';
 
 type ConfidenceGroup = 'high' | 'medium' | 'low' | 'manual';
 
+/** Confidence boost for partially remediated criteria (some issues remain) */
+const CONFIDENCE_BOOST_PARTIAL = 50;
+/** Confidence boost for fully remediated criteria (all issues fixed) */
+const CONFIDENCE_BOOST_COMPLETE = 85;
+
 interface CriterionAnalysisEvidence {
   source: string;
   description: string;
@@ -651,13 +656,14 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
 
   const { data: confidenceData } = useConfidenceWithIssues(jobId, undefined, { enabled: !isDemoJob(jobId) });
 
-  const issuesByCriterion = useMemo(() => {
+  const { issuesByCriterion, remediatedCriteriaCount } = useMemo(() => {
     const map = new Map<string, { 
       issues: IssueMapping[]; 
       count: number;
       remediatedIssues?: RemediatedIssue[];
       remediatedCount?: number;
     }>();
+    let remediatedCount = 0;
     if (confidenceData?.criteria) {
       for (const c of confidenceData.criteria) {
         const remediatedIssues = c.remediatedIssues || c.fixedIssues;
@@ -673,10 +679,13 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
             remediatedIssues: remediatedIssues,
             remediatedCount: fixedCount,
           });
+          if (fixedCount > 0) {
+            remediatedCount++;
+          }
         }
       }
     }
-    return map;
+    return { issuesByCriterion: map, remediatedCriteriaCount: remediatedCount };
   }, [confidenceData]);
 
   const toggleRow = (id: string) => {
@@ -710,11 +719,15 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
 
     Promise.all([
       fetchAcrAnalysis(jobId).catch(err => { 
-        console.error('[ACR Step 3] ACR analysis failed:', err);
+        if (import.meta.env.DEV) {
+          console.error('[ACR Step 3] ACR analysis failed:', err);
+        }
         throw err;
       }),
       confidenceService.getConfidenceWithIssues(jobId).catch(err => {
-        console.warn('[ACR Step 3] Confidence service failed, continuing with ACR data only:', err);
+        if (import.meta.env.DEV) {
+          console.warn('[ACR Step 3] Confidence service failed, continuing with ACR data only:', err);
+        }
         return null;
       })
     ])
@@ -733,7 +746,9 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
       })
       .catch((err) => {
         if (!cancelled) {
-          console.error('[ACR Step 3] API error, falling back to mock data:', err);
+          if (import.meta.env.DEV) {
+            console.error('[ACR Step 3] API error, falling back to mock data:', err);
+          }
           setError('Failed to load analysis data. Showing demo data.');
           setCriteria(mockCriteria.map((c, i) => normalizeCriterion(c, i)));
           setIsLoading(false);
@@ -837,7 +852,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
         const issueInfo = issuesByCriterion.get(c.criterionId);
         if (issueInfo?.remediatedCount && issueInfo.remediatedCount > 0 && c.confidenceScore === 0) {
           const hasRemainingIssues = issueInfo.count > 0;
-          return sum + (hasRemainingIssues ? 50 : 85);
+          return sum + (hasRemainingIssues ? CONFIDENCE_BOOST_PARTIAL : CONFIDENCE_BOOST_COMPLETE);
         }
         return sum + c.confidenceScore;
       }, 0) / criteria.length)
@@ -853,9 +868,6 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     return c.needsVerification;
   }).length;
 
-  // Count remediated criteria for display
-  const remediatedCriteriaCount = Array.from(issuesByCriterion.values())
-    .filter(info => info.remediatedCount && info.remediatedCount > 0).length;
 
   const handleViewDetails = (criterionRow: CriterionRow) => {
     const analysis = transformed.find(c => c.id === criterionRow.id);
@@ -1412,6 +1424,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                       'text-sm mb-2',
                       isFixed ? 'text-gray-600 line-through' : 'text-gray-900'
                     )}>
+                      <span className="sr-only">{isFixed ? 'Fixed: ' : ''}</span>
                       {issue.message}
                     </p>
                     {issue.location && (
@@ -1425,7 +1438,9 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                         <p className="text-sm text-green-800">
                           <span className="font-medium">Fix applied:</span> {issue.remediationInfo.description}
                         </p>
-                        {issue.remediationInfo.details && Object.keys(issue.remediationInfo.details).length > 0 && (
+                        {issue.remediationInfo.details && 
+                         typeof issue.remediationInfo.details === 'object' &&
+                         Object.keys(issue.remediationInfo.details).length > 0 && (
                           <div className="mt-2 text-xs text-green-700 bg-green-100/50 p-2 rounded font-mono">
                             {Object.entries(issue.remediationInfo.details).map(([key, value]) => (
                               <div key={key}>
