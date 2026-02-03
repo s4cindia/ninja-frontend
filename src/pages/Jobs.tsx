@@ -32,7 +32,7 @@ const TYPE_OPTIONS = [
   ...Object.entries(JOB_TYPE_LABELS).map(([value, label]) => ({ value, label })),
 ];
 
-const CITATION_JOB_TYPES = ['CITATION_DETECTION', 'EDITORIAL'];
+const CITATION_JOB_TYPES = ['CITATION_DETECTION', 'CITATION_VALIDATION', 'EDITORIAL'];
 
 function getJobDetailPath(job: Job): string {
   if (CITATION_JOB_TYPES.includes(job.type)) {

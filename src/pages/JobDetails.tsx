@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const CITATION_JOB_TYPES = ['CITATION_DETECTION', 'EDITORIAL'];
+const CITATION_JOB_TYPES = ['CITATION_DETECTION', 'CITATION_VALIDATION', 'EDITORIAL'];
 
 export function JobDetails() {
   const { jobId } = useParams<{ jobId: string }>();
