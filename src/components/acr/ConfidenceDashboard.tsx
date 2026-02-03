@@ -8,7 +8,7 @@ import { CriteriaTable, CriterionRow } from './CriteriaTable';
 import { WcagDocumentationModal } from './WcagDocumentationModal';
 import { CriterionDetailsModal } from './CriterionDetailsModal';
 import { useConfidenceWithIssues } from '@/hooks/useConfidence';
-import { IssueMapping } from '@/types/confidence.types';
+import { IssueMapping, RemediatedIssue } from '@/types/confidence.types';
 
 interface ConfidenceDashboardProps {
   jobId: string;
@@ -639,13 +639,23 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   const { data: confidenceData } = useConfidenceWithIssues(jobId, undefined, { enabled: !isDemoJob(jobId) });
 
   const issuesByCriterion = useMemo(() => {
-    const map = new Map<string, { issues: IssueMapping[]; count: number }>();
+    const map = new Map<string, { 
+      issues: IssueMapping[]; 
+      count: number;
+      remediatedIssues?: RemediatedIssue[];
+      remediatedCount?: number;
+    }>();
     if (confidenceData?.criteria) {
       for (const c of confidenceData.criteria) {
-        if (c.relatedIssues && c.relatedIssues.length > 0) {
+        const hasRelatedIssues = c.relatedIssues && c.relatedIssues.length > 0;
+        const hasRemediatedIssues = c.remediatedIssues && c.remediatedIssues.length > 0;
+        
+        if (hasRelatedIssues || hasRemediatedIssues) {
           map.set(c.criterionId, {
-            issues: c.relatedIssues,
-            count: c.issueCount || c.relatedIssues.length,
+            issues: c.relatedIssues || [],
+            count: c.issueCount || c.relatedIssues?.length || 0,
+            remediatedIssues: c.remediatedIssues,
+            remediatedCount: c.remediatedCount || c.remediatedIssues?.length || 0,
           });
         }
       }
@@ -1310,6 +1320,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
         <CriterionDetailsModal
           criterion={detailsCriterion}
           relatedIssues={issuesByCriterion.get(detailsCriterion.criterionId)?.issues}
+          remediatedIssues={issuesByCriterion.get(detailsCriterion.criterionId)?.remediatedIssues}
           jobId={jobId}
           isOpen={!!detailsCriterion}
           onClose={() => setDetailsCriterion(null)}

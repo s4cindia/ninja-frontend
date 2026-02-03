@@ -117,12 +117,16 @@ export const CodeComparisonPanel: React.FC<CodeComparisonPanelProps> = ({ change
     retry: 1
   });
 
-  const beforeContent = visualData?.beforeContent?.html
-    ? extractRelevantHtml(visualData.beforeContent.html, change.description)
+  // Use sourceHtml for code view (readable paths) instead of html (base64 images)
+  const beforeHtml = visualData?.beforeContent?.sourceHtml || visualData?.beforeContent?.html;
+  const afterHtml = visualData?.afterContent?.sourceHtml || visualData?.afterContent?.html;
+
+  const beforeContent = beforeHtml
+    ? extractRelevantHtml(beforeHtml, change.description)
     : change.beforeContent || change.contextBefore;
 
-  const afterContent = visualData?.afterContent?.html
-    ? extractRelevantHtml(visualData.afterContent.html, change.description)
+  const afterContent = afterHtml
+    ? extractRelevantHtml(afterHtml, change.description)
     : change.afterContent || change.contextAfter;
 
   return (

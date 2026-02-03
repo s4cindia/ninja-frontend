@@ -16,16 +16,33 @@ export interface IssueMapping {
   xpath?: string;
 }
 
+export interface RemediationInfo {
+  status: 'REMEDIATED' | 'FAILED' | 'SKIPPED';
+  completedAt: string;
+  method: 'autofix' | 'quickfix' | 'manual';
+  description?: string;
+}
+
+export interface RemediatedIssue {
+  ruleId: string;
+  message: string;
+  filePath: string;
+  status: 'remediated';
+  remediationInfo: RemediationInfo;
+}
+
 export interface CriterionConfidenceWithIssues {
   criterionId: string;
   name: string;
   level: 'A' | 'AA' | 'AAA';
-  status: 'pass' | 'fail' | 'not_applicable' | 'not_tested';
+  status: 'pass' | 'fail' | 'not_applicable' | 'not_tested' | 'needs_review';
   confidenceScore: number;
   remarks: string;
   relatedIssues?: IssueMapping[];
   issueCount?: number;
   hasIssues?: boolean;
+  remediatedIssues?: RemediatedIssue[];
+  remediatedCount?: number;
 }
 
 export interface ConfidenceSummary {

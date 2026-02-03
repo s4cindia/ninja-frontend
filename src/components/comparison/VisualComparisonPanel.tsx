@@ -5,18 +5,21 @@ import { EPUBRenderer } from '../epub/EPUBRenderer';
 import { Loader2, ZoomIn, ZoomOut, Info, Code, AlertTriangle, Columns, Rows, Maximize2, X } from 'lucide-react';
 
 /**
- * Escapes HTML special characters to prevent XSS when displaying HTML source code as text.
- * Unlike sanitizeText which strips tags, this preserves the markup for viewing in code preview.
+ * Decodes HTML entities back to their original characters.
+ * This handles cases where the API returns already-encoded content.
+ * React will automatically escape text content when rendered, so no manual escaping needed.
  */
-function escapeHtml(text: string): string {
-  const htmlEntities: Record<string, string> = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
+function decodeHtmlEntities(text: string): string {
+  const entityMap: Record<string, string> = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&#x27;': "'",
+    '&apos;': "'",
   };
-  return text.replace(/[&<>"']/g, char => htmlEntities[char] ?? char);
+  return text.replace(/&(?:amp|lt|gt|quot|#39|#x27|apos);/g, match => entityMap[match] ?? match);
 }
 
 interface ChangeExplanation {
@@ -539,13 +542,13 @@ export function VisualComparisonPanel({
     if (!displayData) return null;
 
     // Resolve image paths for both before and after content
-    const beforeBaseHref = displayData.spineItem?.href || displayData.beforeContent.baseHref;
-    let beforeHtml = resolveImagePaths(displayData.beforeContent.html, filePath, beforeBaseHref);
-    beforeHtml = resolveCSSImages(beforeHtml, filePath, beforeBaseHref);
+    const beforeBaseHref = displayData.spineItem?.href || displayData.beforeContent?.baseHref || "";
+    let beforeHtml = resolveImagePaths(displayData.beforeContent?.html || "", filePath, beforeBaseHref);
+    beforeHtml = resolveCSSImages(beforeHtml || "", filePath, beforeBaseHref);
 
-    const afterBaseHref = displayData.spineItem?.href || displayData.afterContent.baseHref;
-    let afterHtml = resolveImagePaths(displayData.afterContent.html, filePath, afterBaseHref);
-    afterHtml = resolveCSSImages(afterHtml, filePath, afterBaseHref);
+    const afterBaseHref = displayData.spineItem?.href || displayData.afterContent?.baseHref || "";
+    let afterHtml = resolveImagePaths(displayData.afterContent?.html || "", filePath, afterBaseHref);
+    afterHtml = resolveCSSImages(afterHtml || "", filePath, afterBaseHref);
 
     return {
       before: {
@@ -1065,13 +1068,37 @@ export function VisualComparisonPanel({
                     </div>
                     <pre className="text-red-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all">
 {(() => {
-  // Escape HTML entities to show source code as text (XSS prevention)
-  const rawHtml = displayData.beforeContent?.html || '';
-  if (!rawHtml) return 'No content available';
-  const truncated = rawHtml.slice(0, 1000);
-  const lastClosingTag = truncated.lastIndexOf('>');
-  const displayText = lastClosingTag > 0 ? truncated.slice(0, lastClosingTag + 1) + (rawHtml.length > 1000 ? '...' : '') : truncated;
-  return escapeHtml(displayText);
+  // Use sourceHtml for code diff (readable paths) instead of html (base64 images)
+  const beforeSource = decodeHtmlEntities(displayData.beforeContent?.sourceHtml || displayData.beforeContent?.html || '');
+  const afterSource = decodeHtmlEntities(displayData.afterContent?.sourceHtml || displayData.afterContent?.html || '');
+  if (!beforeSource) return 'No content available';
+  
+  const beforeLines = beforeSource.split('\n');
+  const afterLines = afterSource.split('\n');
+  
+  // Find first different line index
+  let firstDiffLine = -1;
+  const maxLines = Math.max(beforeLines.length, afterLines.length);
+  for (let i = 0; i < maxLines; i++) {
+    if (beforeLines[i] !== afterLines[i]) {
+      firstDiffLine = i;
+      break;
+    }
+  }
+  
+  // If no diff found, show from beginning
+  if (firstDiffLine === -1) {
+    firstDiffLine = 0;
+  }
+  
+  // Show 3 lines before and after the change
+  const startLine = Math.max(0, firstDiffLine - 3);
+  const endLine = Math.min(beforeLines.length, firstDiffLine + 10);
+  const displayLines = beforeLines.slice(startLine, endLine);
+  
+  const prefix = startLine > 0 ? '...\n' : '';
+  const suffix = endLine < beforeLines.length ? '\n...' : '';
+  return prefix + displayLines.join('\n') + suffix;
 })()}
                     </pre>
                   </div>
@@ -1082,35 +1109,49 @@ export function VisualComparisonPanel({
                     </div>
                     <div className="text-green-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all font-mono">
 {(() => {
-  // Escape HTML entities to show source code as text (XSS prevention)
-  const beforeHtml = displayData.beforeContent?.html || '';
-  const afterHtml = displayData.afterContent?.html || '';
-  if (!afterHtml) return <span>No content available</span>;
+  // Use sourceHtml for code diff (readable paths) instead of html (base64 images)
+  const beforeSource = decodeHtmlEntities(displayData.beforeContent?.sourceHtml || displayData.beforeContent?.html || '');
+  const afterSource = decodeHtmlEntities(displayData.afterContent?.sourceHtml || displayData.afterContent?.html || '');
+  if (!afterSource) return <span>No content available</span>;
   
-  const truncateHtml = (html: string) => {
-    const truncated = html.slice(0, 1000);
-    const lastClosingTag = truncated.lastIndexOf('>');
-    return lastClosingTag > 0 ? truncated.slice(0, lastClosingTag + 1) + (html.length > 1000 ? '...' : '') : truncated;
-  };
+  const beforeLines = beforeSource.split('\n');
+  const afterLines = afterSource.split('\n');
   
-  const beforeLines = truncateHtml(beforeHtml).split('\n');
-  const afterLines = truncateHtml(afterHtml).split('\n');
+  // Find first different line index
+  let firstDiffLine = 0;
+  const maxLines = Math.max(beforeLines.length, afterLines.length);
+  for (let i = 0; i < maxLines; i++) {
+    if (beforeLines[i] !== afterLines[i]) {
+      firstDiffLine = i;
+      break;
+    }
+  }
   
-  return afterLines.map((line, idx) => {
-    const beforeLine = beforeLines[idx] || '';
-    const isNewLine = idx >= beforeLines.length;
+  // Show 3 lines before and more after the change
+  const startLine = Math.max(0, firstDiffLine - 3);
+  const endLine = Math.min(afterLines.length, firstDiffLine + 10);
+  const displayAfterLines = afterLines.slice(startLine, endLine);
+  const displayBeforeLines = beforeLines.slice(startLine, endLine);
+  
+  const prefix = startLine > 0 ? <div key="prefix" className="text-gray-400">...</div> : null;
+  const suffix = endLine < afterLines.length ? <div key="suffix" className="text-gray-400">...</div> : null;
+  
+  const diffLines = displayAfterLines.map((line, idx) => {
+    const beforeLine = displayBeforeLines[idx] || '';
+    const isNewLine = idx + startLine >= beforeLines.length;
     const isChanged = line !== beforeLine;
-    // Escape each line for safe display
-    const escapedLine = escapeHtml(line) || ' ';
+    const displayLine = line || ' ';
     
     if (isNewLine) {
-      return <div key={idx} className="bg-green-200 text-green-900 px-1 -mx-1 rounded">{escapedLine}</div>;
+      return <div key={idx} className="bg-green-200 text-green-900 px-1 -mx-1 rounded">{displayLine}</div>;
     }
     if (isChanged) {
-      return <div key={idx} className="bg-yellow-200 text-yellow-900 px-1 -mx-1 rounded border-l-2 border-yellow-500">{escapedLine}</div>;
+      return <div key={idx} className="bg-yellow-200 text-yellow-900 px-1 -mx-1 rounded border-l-2 border-yellow-500">{displayLine}</div>;
     }
-    return <div key={idx}>{escapedLine}</div>;
+    return <div key={idx}>{displayLine}</div>;
   });
+  
+  return <>{prefix}{diffLines}{suffix}</>;
 })()}
                     </div>
                   </div>

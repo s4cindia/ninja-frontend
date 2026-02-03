@@ -265,6 +265,9 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
   // Debounce timer ref for onChange
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
+  // Flag for immediate sync (avoids calling onChange inside setState which causes React warning)
+  const pendingImmediateSyncRef = useRef(false);
+  
   useEffect(() => {
     // Skip first render to avoid setState during mount
     if (!isMounted.current) {
@@ -307,6 +310,37 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
         clearTimeout(debounceTimerRef.current);
       }
     };
+  }, [imageData, allImagePaths]);
+
+  // Immediate sync effect - triggered by AI generation (bypasses debounce)
+  useEffect(() => {
+    if (!pendingImmediateSyncRef.current) return;
+    pendingImmediateSyncRef.current = false;
+    
+    // Cancel any pending debounce
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    // Immediate sync to parent
+    const images = allImagePaths.length === 0
+      ? [{
+          imagePath: '',
+          imageType: imageData[0]?.imageType || 'informative',
+          altText: imageData[0]?.altText || '',
+          longDescription: imageData[0]?.longDescription || '',
+        }]
+      : allImagePaths.map((path, idx) => {
+          const data = imageData[idx] || { imageType: 'informative', altText: '', longDescription: '' };
+          return {
+            imagePath: path,
+            imageType: data.imageType,
+            altText: data.altText,
+            longDescription: data.longDescription,
+          };
+        });
+    
+    onChangeRef.current({ images });
   }, [imageData, allImagePaths]);
 
   // Validate all images have required data
@@ -419,6 +453,9 @@ export const ImageAltTemplate: React.FC<ImageAltTemplateProps> = ({
           },
         };
       });
+      
+      // Flag for immediate sync (will be handled by useEffect, not during render)
+      pendingImmediateSyncRef.current = true;
     } catch (err) {
       // Guard against unmounted component and stale errors
       if (!isComponentMountedRef.current || currentIssueId !== issueIdRef.current) {
