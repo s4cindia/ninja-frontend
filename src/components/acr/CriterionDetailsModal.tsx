@@ -287,6 +287,16 @@ export function CriterionDetailsModal({
             </TabsContent>
 
             <TabsContent value="issues" className="space-y-4 mt-0">
+              {/* Debug: Log what data the Issues tab receives */}
+              {(() => {
+                console.log('[CriterionDetailsModal Issues Tab]', {
+                  relatedIssuesCount: relatedIssues?.length || 0,
+                  remediatedIssuesCount: remediatedIssues?.length || 0,
+                  remediatedIssues: remediatedIssues,
+                  firstRemediatedIssue: remediatedIssues?.[0],
+                });
+                return null;
+              })()}
               {/* Summary Banner - Only show if there are actual issues */}
               {(() => {
                 const pendingCount = relatedIssues?.length || 0;
