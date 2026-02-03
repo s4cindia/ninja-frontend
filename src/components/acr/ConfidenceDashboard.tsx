@@ -638,6 +638,18 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
 
   const { data: confidenceData } = useConfidenceWithIssues(jobId, undefined, { enabled: !isDemoJob(jobId) });
 
+  // Debug: Log confidence data to trace remediated issues flow
+  useEffect(() => {
+    if (confidenceData) {
+      console.log('[ACR AI Analysis] confidenceData received:', {
+        jobId: confidenceData.jobId,
+        criteriaCount: confidenceData.criteria?.length,
+        criteriaWithRemediatedIssues: confidenceData.criteria?.filter(c => c.remediatedIssues && c.remediatedIssues.length > 0).length,
+        sampleCriterion: confidenceData.criteria?.[0],
+      });
+    }
+  }, [confidenceData]);
+
   const issuesByCriterion = useMemo(() => {
     const map = new Map<string, { 
       issues: IssueMapping[]; 
@@ -657,9 +669,17 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
             remediatedIssues: c.remediatedIssues,
             remediatedCount: c.remediatedCount || c.remediatedIssues?.length || 0,
           });
+          // Debug: Log each criterion with issues
+          console.log('[ACR AI Analysis] issuesByCriterion entry:', {
+            criterionId: c.criterionId,
+            pendingCount: c.relatedIssues?.length || 0,
+            remediatedCount: c.remediatedIssues?.length || 0,
+            remediatedIssues: c.remediatedIssues,
+          });
         }
       }
     }
+    console.log('[ACR AI Analysis] issuesByCriterion map size:', map.size);
     return map;
   }, [confidenceData]);
 
@@ -847,7 +867,12 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     onVerifyClick?: (criterionId: string) => void;
     onViewDocs?: (criterionId: string, name: string) => void;
     onCriterionClick?: (criterion: CriterionConfidence) => void;
-    issueData?: { issues: IssueMapping[]; count: number };
+    issueData?: { 
+      issues: IssueMapping[]; 
+      count: number;
+      remediatedIssues?: RemediatedIssue[];
+      remediatedCount?: number;
+    };
   }) => {
     const levelColors: Record<string, string> = {
       A: 'bg-blue-100 text-blue-700',
@@ -873,15 +898,30 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
               {criterion.level}
             </span>
             <span className="font-medium text-gray-900">{criterion.criterionId}</span>
-            {issueData && issueData.count > 0 && (
-              <span title={`${issueData.count} issue${issueData.count !== 1 ? 's' : ''}`}>
-                <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+            {/* Show icon if there are any issues (pending or remediated) */}
+            {issueData && (issueData.count > 0 || (issueData.remediatedCount && issueData.remediatedCount > 0)) && (
+              <span title={`${issueData.count} pending, ${issueData.remediatedCount || 0} fixed`}>
+                {issueData.count > 0 ? (
+                  <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                ) : (
+                  <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                )}
               </span>
             )}
             <span className="text-gray-600">{criterion.name}</span>
-            {issueData && issueData.count > 0 && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                {issueData.count} issue{issueData.count !== 1 ? 's' : ''}
+            {/* Issue count badges - show both pending and remediated */}
+            {issueData && (issueData.count > 0 || (issueData.remediatedCount && issueData.remediatedCount > 0)) && (
+              <span className="inline-flex items-center gap-1">
+                {issueData.count > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                    {issueData.count} pending
+                  </span>
+                )}
+                {issueData.remediatedCount && issueData.remediatedCount > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    {issueData.remediatedCount} fixed
+                  </span>
+                )}
               </span>
             )}
           </span>
