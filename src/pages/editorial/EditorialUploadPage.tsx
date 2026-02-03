@@ -69,7 +69,7 @@ export function EditorialUploadPage() {
       if (selectedAnalyses.has('citations')) {
         const file = uploadedFiles[0].file;
         const result = await citationService.detectFromFile(file);
-        navigate(`/editorial/citations/${result.documentId}`);
+        navigate(`/editorial/citations/${result.jobId}`);
       } else {
         navigate('/editorial');
       }

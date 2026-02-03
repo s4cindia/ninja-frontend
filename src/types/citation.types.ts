@@ -162,6 +162,7 @@ export const REVIEW_REASON_LABELS: Record<string, string> = {
 
 // Detection result summary
 export interface DetectionResult {
+  jobId: string;
   documentId: string;
   citations: Citation[];
   totalCount: number;

@@ -322,6 +322,7 @@ describe('useDetectCitations', () => {
 
   it('should detect citations from file', async () => {
     const mockResult: DetectionResult = {
+      jobId: 'job-1',
       documentId: 'doc-1',
       citations: [],
       totalCount: 0,
