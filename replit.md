@@ -82,11 +82,11 @@ The application features a clean, responsive design built with Tailwind CSS. It 
 
 ### ACR Post-Remediation Integration Complete
 The ACR AI Analysis step now correctly displays remediated data from the backend after EPUB remediation. Verified integration includes:
-- **Confidence Scores**: Backend returns deterministic scores (80-92%) based on remediation status. Example: criterion 1.1.1 shows `confidenceScore: 80` after full remediation.
+- **Confidence Scores**: Backend returns deterministic scores (80-95%) based on remediation status. Frontend handles both `confidence` and `confidenceScore` field names.
 - **Verification Status**: `needsVerification: false` for fully remediated criteria (where `remainingIssues: 0`).
 - **Remediation Summary**: `remediationSummary` object with `totalIssues`, `fixedIssues`, `remainingIssues` counts.
-- **Remediated Issues Details**: `remediatedIssues` array with issue details including `ruleId`, `impact`, `message`, `status: "remediated"`.
-- **Other Issues (Non-WCAG)**: Shows `pending`, `fixed`, `failed`, `skipped` status with counts (`pendingCount`, `fixedCount`, etc.).
+- **Remediated Issues Details**: Frontend handles both `remediatedIssues` and `fixedIssues` field names from backend. Includes `ruleId`, `impact`, `message`, `status`.
+- **Other Issues (Non-WCAG)**: Each issue now includes `status` field (`pending`, `fixed`, `failed`, `skipped`). Fixed issues show green background with "Fixed" badge and `remediationInfo.description`.
 
 ### Previous ACR Enhancements
 - **Remediated Issues Bug Fix**: Fixed display of remediated issues in ACR AI Analysis step. Green badges now correctly appear on criteria rows that have fixed issues. Filter conditions updated to recognize both 'REMEDIATED' and 'completed' status formats.
