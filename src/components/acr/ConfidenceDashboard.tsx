@@ -1352,6 +1352,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
 
           <div className="space-y-3">
             {otherIssues.issues.map((issue, idx) => {
+              console.log('[DEBUG Other Issue]', idx, issue.code, 'status:', issue.status, 'isFixed:', issue.status === 'fixed');
               const isFixed = issue.status === 'fixed';
               return (
               <div
