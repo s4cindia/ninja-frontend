@@ -1273,7 +1273,18 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                             {/* Criteria Rows */}
                             {isConfidenceExpanded && (
                               <div>
-                                {items.map((criterion) => (
+                                {items.map((criterion) => {
+                                  const issueData = issuesByCriterion.get(criterion.criterionId);
+                                  // Debug: Log ID lookup for criteria with issues
+                                  if (criterion.criterionId === '1.1.1' || issueData) {
+                                    console.log('[ACR AI Analysis] Row lookup:', {
+                                      criterionId: criterion.criterionId,
+                                      id: criterion.id,
+                                      hasIssueData: !!issueData,
+                                      issueData
+                                    });
+                                  }
+                                  return (
                                   <CriterionRowDisplay
                                     key={criterion.id}
                                     criterion={criterion}
@@ -1282,9 +1293,10 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                                     onVerifyClick={onVerifyClick}
                                     onViewDocs={(id, name) => setDocsCriterion({ id, name })}
                                     onCriterionClick={(crit) => setDetailsCriterion(crit)}
-                                    issueData={issuesByCriterion.get(criterion.criterionId)}
+                                    issueData={issueData}
                                   />
-                                ))}
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
