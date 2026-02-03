@@ -37,17 +37,6 @@ export function CriterionDetailsModal({
   const navigate = useNavigate();
   const wcagDocs = wcagDocumentationService.getDocumentation(criterion.criterionId);
 
-  // Debug: Log incoming props to trace data flow
-  useEffect(() => {
-    console.log('[CriterionDetailsModal] Props received:', {
-      criterionId: criterion.criterionId,
-      jobId,
-      relatedIssuesCount: relatedIssues?.length || 0,
-      remediatedIssuesCount: remediatedIssues?.length || 0,
-      remediatedIssues: remediatedIssues,
-    });
-  }, [criterion.criterionId, jobId, relatedIssues, remediatedIssues]);
-
   useEffect(() => {
     const fetchJobData = async () => {
       if (!jobId) return;
@@ -60,8 +49,6 @@ export function CriterionDetailsModal({
         // Check if the job has remediation data (remediated file exists)
         const hasRemediated = Boolean(job.remediatedFile);
         setHasRemediationData(hasRemediated);
-
-        console.log('[CriterionDetailsModal] Has remediation:', hasRemediated);
       } catch (error) {
         console.error('Failed to fetch job data:', error);
       }
@@ -290,30 +277,15 @@ export function CriterionDetailsModal({
             </TabsContent>
 
             <TabsContent value="issues" className="space-y-4 mt-0">
-              {/* Debug: Log what data the Issues tab receives */}
-              {(() => {
-                console.log('[CriterionDetailsModal Issues Tab]', {
-                  relatedIssuesCount: relatedIssues?.length || 0,
-                  remediatedIssuesCount: remediatedIssues?.length || 0,
-                  remediatedIssues: remediatedIssues,
-                  firstRemediatedIssue: remediatedIssues?.[0],
-                });
-                return null;
-              })()}
               {/* Summary Banner - Only show if there are actual issues */}
               {(() => {
                 const pendingCount = relatedIssues?.length || 0;
-                // Debug: Check remediationInfo structure
-                console.log('[CriterionDetailsModal] remediatedIssues with remediationInfo:', 
-                  remediatedIssues?.map(i => ({ ruleId: i.ruleId, remediationInfo: i.remediationInfo, status: i.remediationInfo?.status, issueStatus: (i as { status?: string }).status }))
-                );
                 const fixedCount = remediatedIssues?.filter(
                   i => i.remediationInfo?.status === 'REMEDIATED' || 
                        i.remediationInfo?.status === 'completed' ||
                        (i as { status?: string }).status === 'completed' ||
                        !i.remediationInfo?.status
                 ).length || 0;
-                console.log('[CriterionDetailsModal] Issue counts:', { pendingCount, fixedCount, totalRemediated: remediatedIssues?.length });
                 const failedCount = remediatedIssues?.filter(
                   i => i.remediationInfo?.status === 'FAILED'
                 ).length || 0;

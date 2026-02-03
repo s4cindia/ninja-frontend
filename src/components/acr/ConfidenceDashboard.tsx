@@ -638,18 +638,6 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
 
   const { data: confidenceData } = useConfidenceWithIssues(jobId, undefined, { enabled: !isDemoJob(jobId) });
 
-  // Debug: Log confidence data to trace remediated issues flow
-  useEffect(() => {
-    if (confidenceData) {
-      console.log('[ACR AI Analysis] confidenceData received:', {
-        jobId: confidenceData.jobId,
-        criteriaCount: confidenceData.criteria?.length,
-        criteriaWithRemediatedIssues: confidenceData.criteria?.filter(c => c.remediatedIssues && c.remediatedIssues.length > 0).length,
-        sampleCriterion: confidenceData.criteria?.[0],
-      });
-    }
-  }, [confidenceData]);
-
   const issuesByCriterion = useMemo(() => {
     const map = new Map<string, { 
       issues: IssueMapping[]; 
@@ -669,17 +657,9 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
             remediatedIssues: c.remediatedIssues,
             remediatedCount: c.remediatedCount || c.remediatedIssues?.length || 0,
           });
-          // Debug: Log each criterion with issues
-          console.log('[ACR AI Analysis] issuesByCriterion entry:', {
-            criterionId: c.criterionId,
-            pendingCount: c.relatedIssues?.length || 0,
-            remediatedCount: c.remediatedIssues?.length || 0,
-            remediatedIssues: c.remediatedIssues,
-          });
         }
       }
     }
-    console.log('[ACR AI Analysis] issuesByCriterion map size:', map.size);
     return map;
   }, [confidenceData]);
 
@@ -715,18 +695,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     fetchAcrAnalysis(jobId)
       .then((response) => {
         if (!cancelled) {
-          console.log('[ACR Step 3] Analysis data from API:', response);
-          // Debug: Check for remediated issues in API response
-          const criteriaWithRemediated = (response.criteria || []).filter(
-            (c: { remediatedIssues?: unknown[]; fixedIssues?: unknown[] }) => 
-              (c.remediatedIssues && c.remediatedIssues.length > 0) || 
-              (c.fixedIssues && c.fixedIssues.length > 0)
-          );
-          console.log('[ACR Step 3] Criteria with remediated/fixed issues:', criteriaWithRemediated.length, criteriaWithRemediated);
           const normalizedCriteria = (response.criteria || []).map((c, i) => normalizeCriterion(c, i));
-          // Debug: Log criterion 1.1.1 to verify criterionId is set correctly
-          const criterion111 = normalizedCriteria.find(c => c.criterionId === '1.1.1' || c.id === '1.1.1');
-          console.log('[ACR Step 3] Normalized criterion 1.1.1:', criterion111);
           setCriteria(normalizedCriteria);
           if (response.otherIssues) {
             setOtherIssues(response.otherIssues);
@@ -1278,15 +1247,6 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                               <div>
                                 {items.map((criterion) => {
                                   const issueData = issuesByCriterion.get(criterion.criterionId);
-                                  // Debug: Log ID lookup for criteria with issues
-                                  if (criterion.criterionId === '1.1.1' || issueData) {
-                                    console.log('[ACR AI Analysis] Row lookup:', {
-                                      criterionId: criterion.criterionId,
-                                      id: criterion.id,
-                                      hasIssueData: !!issueData,
-                                      issueData
-                                    });
-                                  }
                                   return (
                                   <CriterionRowDisplay
                                     key={criterion.id}
