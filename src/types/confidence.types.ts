@@ -17,9 +17,9 @@ export interface IssueMapping {
 }
 
 export interface RemediationInfo {
-  status: 'REMEDIATED' | 'FAILED' | 'SKIPPED';
-  completedAt: string;
-  method: 'autofix' | 'quickfix' | 'manual';
+  status: 'REMEDIATED' | 'FAILED' | 'SKIPPED' | 'completed';
+  completedAt?: string;
+  method?: 'autofix' | 'quickfix' | 'manual';
   description?: string;
 }
 
@@ -27,8 +27,11 @@ export interface RemediatedIssue {
   ruleId: string;
   message: string;
   filePath: string;
-  status: 'remediated';
-  remediationInfo: RemediationInfo;
+  status?: 'remediated' | 'completed';
+  remediationInfo?: RemediationInfo;
+  issueId?: string;
+  impact?: string;
+  xpath?: string;
 }
 
 export interface CriterionConfidenceWithIssues {

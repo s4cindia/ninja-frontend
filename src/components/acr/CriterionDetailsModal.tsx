@@ -140,7 +140,10 @@ export function CriterionDetailsModal({
               {(() => {
                 const pendingCount = relatedIssues?.length || 0;
                 const fixedCount = remediatedIssues?.filter(
-                  i => i.remediationInfo?.status === 'REMEDIATED' || !i.remediationInfo?.status
+                  i => i.remediationInfo?.status === 'REMEDIATED' || 
+                       i.remediationInfo?.status === 'completed' ||
+                       (i as { status?: string }).status === 'completed' ||
+                       !i.remediationInfo?.status
                 ).length || 0;
                 const failedCount = remediatedIssues?.filter(
                   i => i.remediationInfo?.status === 'FAILED'
@@ -302,10 +305,13 @@ export function CriterionDetailsModal({
                 const pendingCount = relatedIssues?.length || 0;
                 // Debug: Check remediationInfo structure
                 console.log('[CriterionDetailsModal] remediatedIssues with remediationInfo:', 
-                  remediatedIssues?.map(i => ({ ruleId: i.ruleId, remediationInfo: i.remediationInfo, status: i.remediationInfo?.status }))
+                  remediatedIssues?.map(i => ({ ruleId: i.ruleId, remediationInfo: i.remediationInfo, status: i.remediationInfo?.status, issueStatus: (i as { status?: string }).status }))
                 );
                 const fixedCount = remediatedIssues?.filter(
-                  i => i.remediationInfo?.status === 'REMEDIATED' || !i.remediationInfo?.status
+                  i => i.remediationInfo?.status === 'REMEDIATED' || 
+                       i.remediationInfo?.status === 'completed' ||
+                       (i as { status?: string }).status === 'completed' ||
+                       !i.remediationInfo?.status
                 ).length || 0;
                 console.log('[CriterionDetailsModal] Issue counts:', { pendingCount, fixedCount, totalRemediated: remediatedIssues?.length });
                 const failedCount = remediatedIssues?.filter(
@@ -403,7 +409,10 @@ export function CriterionDetailsModal({
                 if (!remediatedIssues || remediatedIssues.length === 0) return null;
                 
                 const fixedIssues = remediatedIssues.filter(
-                  i => i.remediationInfo?.status === 'REMEDIATED' || !i.remediationInfo?.status
+                  i => i.remediationInfo?.status === 'REMEDIATED' || 
+                       i.remediationInfo?.status === 'completed' ||
+                       (i as { status?: string }).status === 'completed' ||
+                       !i.remediationInfo?.status
                 );
                 const failedIssues = remediatedIssues.filter(
                   i => i.remediationInfo?.status === 'FAILED'
