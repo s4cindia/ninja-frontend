@@ -142,17 +142,16 @@ export function useParseCitation() {
   return useMutation<CitationComponent, CitationServiceError, string>({
     mutationFn: (citationId: string) => citationService.parse(citationId),
     onSuccess: async (_data, citationId) => {
-      // Invalidate all citation-related queries
-      // Use refetchType: 'all' to ensure immediate refetch even if stale
-      await queryClient.invalidateQueries({ 
+      // Force refetch all citation-related queries to get updated data from backend
+      await queryClient.refetchQueries({ 
         queryKey: citationKeys.all, 
         exact: false,
-        refetchType: 'all'
+        type: 'active'
       });
-      // Also invalidate specific detail and components queries
+      // Also refetch specific detail and components queries
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: citationKeys.detail(citationId) }),
-        queryClient.invalidateQueries({ queryKey: citationKeys.components(citationId) }),
+        queryClient.refetchQueries({ queryKey: citationKeys.detail(citationId) }),
+        queryClient.refetchQueries({ queryKey: citationKeys.components(citationId) }),
       ]);
     },
   });
