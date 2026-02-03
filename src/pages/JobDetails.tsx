@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, Navigate } from 'react-router-dom';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { Button } from '@/components/ui/Button';
 import { ErrorBoundary } from '@/components/ui';
@@ -28,10 +28,16 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+const CITATION_JOB_TYPES = ['CITATION_DETECTION', 'EDITORIAL'];
+
 export function JobDetails() {
   const { jobId } = useParams<{ jobId: string }>();
   const { data: job, isLoading, isError, error, refetch } = useJob(jobId || null);
   const cancelJob = useCancelJob();
+
+  if (job && CITATION_JOB_TYPES.includes(job.type)) {
+    return <Navigate to={`/editorial/citations/${job.id}`} replace />;
+  }
 
   const { parsedOutput, parseError } = useMemo(() => {
     if (!job?.output) {
