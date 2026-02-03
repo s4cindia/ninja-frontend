@@ -77,3 +77,12 @@ The application features a clean, responsive design built with Tailwind CSS. It 
 - **React Router DOM**: For client-side routing.
 - **Lucide React**: Icon library for UI elements.
 - **DOMPurify**: Used for sanitizing HTML content to prevent XSS vulnerabilities.
+
+## Recent Changes (February 2026)
+
+### ACR Post-Remediation Display Enhancements
+- **Remediated Issues Bug Fix**: Fixed display of remediated issues in ACR AI Analysis step. Green badges now correctly appear on criteria rows that have fixed issues. Filter conditions updated to recognize both 'REMEDIATED' and 'completed' status formats.
+- **Other Issues (Non-WCAG) Status**: Enhanced to show fixed issues in green with "Fixed" badge, remediation details, and pending/fixed summary counts. Type definitions updated in `api.ts` and `ConfidenceDashboard.tsx`.
+- **Confidence Score Enhancement**: Frontend now provides minimum confidence boost (85%) for fully remediated criteria if backend returns 0. "Needs Verification" count excludes fully remediated criteria.
+- **Remediated Summary Card**: New dashboard card shows count of criteria with fixed issues when remediation has occurred.
+- **Backend API Specification**: Comprehensive spec created at `docs/BACKEND_ACR_REMEDIATION_SPEC.md` documenting required backend updates for confidence scores, verification status, and detailed remediation info (including alt-text values).
