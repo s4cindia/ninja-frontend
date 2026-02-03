@@ -704,6 +704,12 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     fetchAcrAnalysis(jobId)
       .then((response) => {
         if (!cancelled) {
+          console.log('[DEBUG ACR API Response]', {
+            overallConfidence: response.overallConfidence,
+            criteriaCount: response.criteria?.length,
+            sample111: response.criteria?.find((c: { criterionId?: string; id?: string }) => c.criterionId === '1.1.1' || c.id === '1.1.1'),
+            otherIssues: response.otherIssues,
+          });
           const normalizedCriteria = (response.criteria || []).map((c, i) => normalizeCriterion(c, i));
           setCriteria(normalizedCriteria);
           if (response.otherIssues) {
