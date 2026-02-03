@@ -82,4 +82,10 @@ describe('Editorial Services Shell', () => {
     expect(screen.getByText('Style Validation')).toBeInTheDocument();
     expect(screen.getByText(/Sprint E3/)).toBeInTheDocument();
   });
+
+  it('renders reports page with jobId', () => {
+    renderWithRouter('/editorial/reports/job-report-456');
+    expect(screen.getByText('Editorial Report')).toBeInTheDocument();
+    expect(screen.getByText('job-report-456')).toBeInTheDocument();
+  });
 });

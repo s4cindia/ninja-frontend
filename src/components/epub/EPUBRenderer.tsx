@@ -181,7 +181,6 @@ const EPUBRendererComponent = function EPUBRenderer({
 
     const iframe = document.createElement('iframe');
     iframe.sandbox.add('allow-same-origin');
-    iframe.sandbox.add('allow-scripts');
     iframe.className = 'w-full h-full border-0';
     iframe.title = `EPUB ${version}`;
 

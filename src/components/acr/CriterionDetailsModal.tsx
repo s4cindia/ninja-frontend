@@ -504,7 +504,7 @@ export function CriterionDetailsModal({
               })()}
 
               {/* View Remediation Changes CTA */}
-              {(relatedIssues && relatedIssues.length > 0) && jobId && (hasRemediationData ? (
+              {jobId && (hasRemediationData || (relatedIssues && relatedIssues.length > 0)) && (hasRemediationData ? (
                 <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
                   <div className="flex items-start gap-3">
                     <FileText className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />

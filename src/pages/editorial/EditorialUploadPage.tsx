@@ -39,6 +39,7 @@ export function EditorialUploadPage() {
     new Set(['citations'])
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleFilesSelected = (files: UploadedFile[]) => {
     setUploadedFiles(files);
@@ -59,11 +60,14 @@ export function EditorialUploadPage() {
   const handleSubmit = async () => {
     if (uploadedFiles.length === 0 || selectedAnalyses.size === 0) return;
     setIsSubmitting(true);
+    setSubmitError(null);
 
     try {
       console.log('Would submit:', uploadedFiles.map(f => f.name), Array.from(selectedAnalyses));
       navigate('/editorial');
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setSubmitError(`Failed to submit analysis: ${errorMessage}`);
       console.error('Upload failed:', error);
     } finally {
       setIsSubmitting(false);
@@ -132,6 +136,12 @@ export function EditorialUploadPage() {
               </label>
             ))}
           </div>
+        </div>
+      )}
+
+      {submitError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-sm text-red-700">{submitError}</p>
         </div>
       )}
 

@@ -206,7 +206,7 @@ export function QuickFixPanel({
     setToast(null);
 
     try {
-      console.log('[DEBUG] inputValues at apply time:', JSON.stringify(inputValues)); console.log('[DEBUG] inputValues.images:', inputValues.images); const fix = applyQuickFix(template, inputValues, context);
+      const fix = applyQuickFix(template, inputValues, context);
       console.log('Applying fix with payload:', {
         ...fix,
         taskId: issue.id,
