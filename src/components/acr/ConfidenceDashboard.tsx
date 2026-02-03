@@ -628,11 +628,20 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   const otherIssuesRef = useRef<HTMLDivElement>(null);
   const [otherIssues, setOtherIssues] = useState<{
     count: number;
+    pendingCount?: number;
+    fixedCount?: number;
     issues: Array<{
       code: string;
       message: string;
       severity: string;
       location?: string;
+      status?: 'pending' | 'fixed' | 'failed' | 'skipped';
+      remediationInfo?: {
+        description: string;
+        fixedAt?: string;
+        fixType?: 'auto' | 'manual';
+        details?: Record<string, unknown>;
+      };
     }>;
   } | null>(null);
 
@@ -791,13 +800,33 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     statusCounts[statusGroup]++;
   });
 
-  // Calculate overall confidence
+  // Calculate overall confidence - boost score for remediated criteria if backend hasn't updated
   const overallConfidence = criteria.length > 0
-    ? Math.round(criteria.reduce((sum, c) => sum + c.confidenceScore, 0) / criteria.length)
+    ? Math.round(criteria.reduce((sum, c) => {
+        // If this criterion has remediated issues but still shows 0 confidence,
+        // give it a minimum boost since remediation occurred
+        const issueInfo = issuesByCriterion.get(c.criterionId);
+        if (issueInfo?.remediatedCount && issueInfo.remediatedCount > 0 && c.confidenceScore === 0) {
+          const hasRemainingIssues = issueInfo.count > 0;
+          return sum + (hasRemainingIssues ? 50 : 85);
+        }
+        return sum + c.confidenceScore;
+      }, 0) / criteria.length)
     : 0;
 
-  // Count criteria needing verification
-  const needsVerificationCount = statusCounts.needs_review;
+  // Count criteria needing verification - exclude fully remediated criteria
+  const needsVerificationCount = criteria.filter(c => {
+    const issueInfo = issuesByCriterion.get(c.criterionId);
+    const isFullyRemediated = issueInfo?.remediatedCount && 
+                              issueInfo.remediatedCount > 0 && 
+                              issueInfo.count === 0;
+    if (isFullyRemediated) return false;
+    return c.needsVerification;
+  }).length;
+
+  // Count remediated criteria for display
+  const remediatedCriteriaCount = Array.from(issuesByCriterion.values())
+    .filter(info => info.remediatedCount && info.remediatedCount > 0).length;
 
   const handleViewDetails = (criterionRow: CriterionRow) => {
     const analysis = transformed.find(c => c.id === criterionRow.id);
@@ -1024,6 +1053,14 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
           <p className="text-2xl font-semibold text-orange-600">{needsVerificationCount}</p>
           <p className="text-xs text-gray-500 mt-1">criteria require human review</p>
         </div>
+
+        {remediatedCriteriaCount > 0 && (
+          <div className="bg-white rounded-lg border p-4 border-green-200 bg-green-50">
+            <p className="text-sm text-gray-500 mb-1">Remediated</p>
+            <p className="text-2xl font-semibold text-green-600">{remediatedCriteriaCount}</p>
+            <p className="text-xs text-gray-500 mt-1">criteria with fixed issues</p>
+          </div>
+        )}
       </div>
 
       {/* View Mode Toggle */}
@@ -1287,16 +1324,44 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
             </span>
           </div>
 
+          {/* Summary counts if available */}
+          {(otherIssues.pendingCount !== undefined || otherIssues.fixedCount !== undefined) && (
+            <div className="flex gap-4 mb-4">
+              {(otherIssues.pendingCount ?? 0) > 0 && (
+                <span className="text-sm text-orange-700 bg-orange-100 px-3 py-1 rounded-full">
+                  {otherIssues.pendingCount} pending
+                </span>
+              )}
+              {(otherIssues.fixedCount ?? 0) > 0 && (
+                <span className="text-sm text-green-700 bg-green-100 px-3 py-1 rounded-full">
+                  {otherIssues.fixedCount} fixed
+                </span>
+              )}
+            </div>
+          )}
+
           <div className="space-y-3">
-            {otherIssues.issues.map((issue, idx) => (
+            {otherIssues.issues.map((issue, idx) => {
+              const isFixed = issue.status === 'fixed';
+              return (
               <div
                 key={idx}
-                className="p-4 bg-orange-50 border border-orange-200 rounded-lg"
+                className={cn(
+                  'p-4 rounded-lg',
+                  isFixed 
+                    ? 'bg-green-50 border border-green-200' 
+                    : 'bg-orange-50 border border-orange-200'
+                )}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-sm font-mono text-orange-700 bg-orange-100 px-2 py-0.5 rounded">
+                      <span className={cn(
+                        'text-sm font-mono px-2 py-0.5 rounded',
+                        isFixed 
+                          ? 'text-green-700 bg-green-100' 
+                          : 'text-orange-700 bg-orange-100'
+                      )}>
                         {issue.code}
                       </span>
                       <span className={cn(
@@ -1307,17 +1372,50 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                       )}>
                         {issue.severity}
                       </span>
+                      {isFixed && (
+                        <span className="flex items-center gap-1 text-xs text-green-700 bg-green-100 px-2 py-0.5 rounded">
+                          <CheckCircle className="h-3 w-3" />
+                          Fixed
+                        </span>
+                      )}
                     </div>
-                    <p className="text-sm text-gray-900 mb-2">{issue.message}</p>
+                    <p className={cn(
+                      'text-sm mb-2',
+                      isFixed ? 'text-gray-600 line-through' : 'text-gray-900'
+                    )}>
+                      {issue.message}
+                    </p>
                     {issue.location && (
                       <p className="text-xs text-gray-500 font-mono">
                         Location: {issue.location}
                       </p>
                     )}
+                    {/* Show remediation details for fixed issues */}
+                    {isFixed && issue.remediationInfo && (
+                      <div className="mt-3 pt-3 border-t border-green-200">
+                        <p className="text-sm text-green-800">
+                          <span className="font-medium">Fix applied:</span> {issue.remediationInfo.description}
+                        </p>
+                        {issue.remediationInfo.details && Object.keys(issue.remediationInfo.details).length > 0 && (
+                          <div className="mt-2 text-xs text-green-700 bg-green-100/50 p-2 rounded font-mono">
+                            {Object.entries(issue.remediationInfo.details).map(([key, value]) => (
+                              <div key={key}>
+                                <span className="font-medium">{key}:</span> {String(value)}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {issue.remediationInfo.fixedAt && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Fixed at: {new Date(issue.remediationInfo.fixedAt).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-            ))}
+            );})}
           </div>
         </div>
       )}

@@ -204,11 +204,20 @@ export interface AcrAnalysisResponse {
   };
   otherIssues?: {
     count: number;
+    pendingCount?: number;
+    fixedCount?: number;
     issues: Array<{
       code: string;
       message: string;
       severity: string;
       location?: string;
+      status?: 'pending' | 'fixed' | 'failed' | 'skipped';
+      remediationInfo?: {
+        description: string;
+        fixedAt?: string;
+        fixType?: 'auto' | 'manual';
+        details?: Record<string, unknown>;
+      };
     }>;
   };
 }
