@@ -32,6 +32,15 @@ const TYPE_OPTIONS = [
   ...Object.entries(JOB_TYPE_LABELS).map(([value, label]) => ({ value, label })),
 ];
 
+const CITATION_JOB_TYPES = ['CITATION_DETECTION', 'EDITORIAL'];
+
+function getJobDetailPath(job: Job): string {
+  if (CITATION_JOB_TYPES.includes(job.type)) {
+    return `/editorial/citations/${job.id}`;
+  }
+  return `/jobs/${job.id}`;
+}
+
 export function Jobs() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('');
@@ -260,7 +269,7 @@ export function Jobs() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <Link to={`/jobs/${job.id}`}>
+                          <Link to={getJobDetailPath(job)}>
                             <Button variant="ghost" size="sm">
                               <Eye className="w-4 h-4 mr-1" />
                               View
