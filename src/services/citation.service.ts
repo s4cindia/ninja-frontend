@@ -169,10 +169,27 @@ export const citationService = {
     try {
       validateId(jobId, 'job ID');
       const params = buildFilterParams(filters);
-      const response = await api.get<ApiResponse<PaginatedCitations>>(
+      interface BackendJobResponse {
+        documentId: string;
+        jobId: string;
+        citations: Citation[];
+        totalCount: number;
+        byType: Record<string, number>;
+        byStyle: Record<string, number>;
+      }
+      const response = await api.get<ApiResponse<BackendJobResponse>>(
         `/citation/job/${jobId}?${params}`
       );
-      return response.data.data;
+      const backendData = response.data.data;
+      const page = filters?.page ?? 1;
+      const limit = filters?.limit ?? 20;
+      return {
+        items: backendData.citations,
+        total: backendData.totalCount,
+        page,
+        limit,
+        totalPages: Math.ceil(backendData.totalCount / limit),
+      };
     } catch (error) {
       handleError(error, 'CITATION_GET_BY_JOB');
     }
