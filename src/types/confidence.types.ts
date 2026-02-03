@@ -40,12 +40,15 @@ export interface CriterionConfidenceWithIssues {
   level: 'A' | 'AA' | 'AAA';
   status: 'pass' | 'fail' | 'not_applicable' | 'not_tested' | 'needs_review';
   confidenceScore: number;
+  confidence?: number;
   remarks: string;
   relatedIssues?: IssueMapping[];
   issueCount?: number;
   hasIssues?: boolean;
   remediatedIssues?: RemediatedIssue[];
   remediatedCount?: number;
+  fixedIssues?: RemediatedIssue[];
+  fixedCount?: number;
 }
 
 export interface ConfidenceSummary {
@@ -59,12 +62,14 @@ export interface ConfidenceSummary {
   criteriaWithIssuesCount?: number;
 }
 
+export type RemediationStatusType = 'pending' | 'fixed' | 'failed' | 'skipped';
+
 export interface OtherIssue {
   code: string;
   message: string;
   location?: string;
   severity: 'critical' | 'serious' | 'moderate' | 'minor';
-  status?: 'pending' | 'fixed';
+  status?: RemediationStatusType;
   remediationInfo?: {
     status: string;
     method: string;

@@ -8,7 +8,7 @@ import { CriteriaTable, CriterionRow } from './CriteriaTable';
 import { WcagDocumentationModal } from './WcagDocumentationModal';
 import { CriterionDetailsModal } from './CriterionDetailsModal';
 import { useConfidenceWithIssues } from '@/hooks/useConfidence';
-import { IssueMapping, RemediatedIssue, OtherIssuesData } from '@/types/confidence.types';
+import { IssueMapping, RemediatedIssue } from '@/types/confidence.types';
 import { confidenceService } from '@/services/confidence.service';
 
 interface ConfidenceDashboardProps {
@@ -369,8 +369,7 @@ function normalizeCriterion(c: Partial<CriterionConfidence>, index: number): Nor
     };
   }
   
-  // Handle both 'confidence' and 'confidenceScore' field names from backend
-  const rawConfidence = (rawData.confidence as number) ?? c.confidenceScore;
+  const rawConfidence = c.confidence ?? c.confidenceScore;
   const confidenceScore = typeof rawConfidence === 'number' && !isNaN(rawConfidence) ? rawConfidence : 0;
   
   return {
@@ -661,11 +660,8 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     }>();
     if (confidenceData?.criteria) {
       for (const c of confidenceData.criteria) {
-        // Handle both 'fixedIssues' and 'remediatedIssues' field names from backend
-        const rawCriterion = c as unknown as Record<string, unknown>;
-        const fixedIssuesFromBackend = rawCriterion.fixedIssues as RemediatedIssue[] | undefined;
-        const remediatedIssues = c.remediatedIssues || fixedIssuesFromBackend;
-        const fixedCount = (rawCriterion.fixedCount as number) ?? c.remediatedCount ?? remediatedIssues?.length ?? 0;
+        const remediatedIssues = c.remediatedIssues || c.fixedIssues;
+        const fixedCount = c.fixedCount ?? c.remediatedCount ?? remediatedIssues?.length ?? 0;
         
         const hasRelatedIssues = c.relatedIssues && c.relatedIssues.length > 0;
         const hasRemediatedIssues = remediatedIssues && remediatedIssues.length > 0;
@@ -713,8 +709,14 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     setError(null);
 
     Promise.all([
-      fetchAcrAnalysis(jobId),
-      confidenceService.getConfidenceWithIssues(jobId).catch(() => null)
+      fetchAcrAnalysis(jobId).catch(err => { 
+        console.error('[ACR Step 3] ACR analysis failed:', err);
+        throw err;
+      }),
+      confidenceService.getConfidenceWithIssues(jobId).catch(err => {
+        console.warn('[ACR Step 3] Confidence service failed, continuing with ACR data only:', err);
+        return null;
+      })
     ])
       .then(([acrResponse, confidenceResponse]) => {
         if (!cancelled) {
@@ -722,7 +724,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
           setCriteria(normalizedCriteria);
           
           if (confidenceResponse?.otherIssues) {
-            setOtherIssues(confidenceResponse.otherIssues as OtherIssuesData);
+            setOtherIssues(confidenceResponse.otherIssues);
           } else if (acrResponse.otherIssues) {
             setOtherIssues(acrResponse.otherIssues);
           }

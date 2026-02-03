@@ -178,6 +178,7 @@ export interface CriterionConfidence {
   name: string;
   level: 'A' | 'AA' | 'AAA';
   confidenceScore: number;
+  confidence?: number;
   status: 'pass' | 'fail' | 'not_applicable' | 'not_tested';
   needsVerification: boolean;
   remarks?: string;
@@ -186,7 +187,9 @@ export interface CriterionConfidence {
   relatedIssues?: CriterionIssue[];
   issueCount?: number;
   fixedIssues?: FixedIssue[];
+  remediatedIssues?: FixedIssue[];
   fixedCount?: number;
+  remediatedCount?: number;
   remainingCount?: number;
   hasIssues?: boolean;
 }

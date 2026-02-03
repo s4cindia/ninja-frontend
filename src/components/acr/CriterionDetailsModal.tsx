@@ -10,6 +10,19 @@ import { wcagDocumentationService } from '@/services/wcag-documentation.service'
 import type { CriterionConfidence } from '@/services/api';
 import type { IssueMapping, RemediatedIssue } from '@/types/confidence.types';
 
+function isFixedStatus(issue: RemediatedIssue): boolean {
+  const status = issue.remediationInfo?.status ?? issue.status;
+  return status === 'REMEDIATED' || status === 'completed' || status === 'remediated';
+}
+
+function isFailedStatus(issue: RemediatedIssue): boolean {
+  return issue.remediationInfo?.status === 'FAILED';
+}
+
+function isSkippedStatus(issue: RemediatedIssue): boolean {
+  return issue.remediationInfo?.status === 'SKIPPED';
+}
+
 interface CriterionDetailsModalProps {
   criterion: CriterionConfidence;
   relatedIssues?: IssueMapping[];
@@ -126,15 +139,8 @@ export function CriterionDetailsModal({
               Issues
               {(() => {
                 const pendingCount = relatedIssues?.length || 0;
-                const fixedCount = remediatedIssues?.filter(
-                  i => i.remediationInfo?.status === 'REMEDIATED' || 
-                       i.remediationInfo?.status === 'completed' ||
-                       (i as { status?: string }).status === 'completed' ||
-                       !i.remediationInfo?.status
-                ).length || 0;
-                const failedCount = remediatedIssues?.filter(
-                  i => i.remediationInfo?.status === 'FAILED'
-                ).length || 0;
+                const fixedCount = remediatedIssues?.filter(isFixedStatus).length || 0;
+                const failedCount = remediatedIssues?.filter(isFailedStatus).length || 0;
                 
                 if (pendingCount === 0 && fixedCount === 0 && failedCount === 0) return null;
                 
@@ -280,15 +286,8 @@ export function CriterionDetailsModal({
               {/* Summary Banner - Only show if there are actual issues */}
               {(() => {
                 const pendingCount = relatedIssues?.length || 0;
-                const fixedCount = remediatedIssues?.filter(
-                  i => i.remediationInfo?.status === 'REMEDIATED' || 
-                       i.remediationInfo?.status === 'completed' ||
-                       (i as { status?: string }).status === 'completed' ||
-                       !i.remediationInfo?.status
-                ).length || 0;
-                const failedCount = remediatedIssues?.filter(
-                  i => i.remediationInfo?.status === 'FAILED'
-                ).length || 0;
+                const fixedCount = remediatedIssues?.filter(isFixedStatus).length || 0;
+                const failedCount = remediatedIssues?.filter(isFailedStatus).length || 0;
                 const totalIssueCount = pendingCount + fixedCount + failedCount;
                 
                 if (totalIssueCount === 0) return null;
@@ -380,18 +379,9 @@ export function CriterionDetailsModal({
               {(() => {
                 if (!remediatedIssues || remediatedIssues.length === 0) return null;
                 
-                const fixedIssues = remediatedIssues.filter(
-                  i => i.remediationInfo?.status === 'REMEDIATED' || 
-                       i.remediationInfo?.status === 'completed' ||
-                       (i as { status?: string }).status === 'completed' ||
-                       !i.remediationInfo?.status
-                );
-                const failedIssues = remediatedIssues.filter(
-                  i => i.remediationInfo?.status === 'FAILED'
-                );
-                const skippedIssues = remediatedIssues.filter(
-                  i => i.remediationInfo?.status === 'SKIPPED'
-                );
+                const fixedIssues = remediatedIssues.filter(isFixedStatus);
+                const failedIssues = remediatedIssues.filter(isFailedStatus);
+                const skippedIssues = remediatedIssues.filter(isSkippedStatus);
 
                 const formatDate = (dateStr?: string) => {
                   if (!dateStr) return 'Date unknown';
