@@ -60,7 +60,7 @@ export function CitationDetail({ citation: initialCitation, onClose }: CitationD
     parseCitation(initialCitation.id);
   }, [initialCitation.id, parseCitation]);
 
-  const hasParsedComponent = !!citation.primaryComponent;
+  const hasParsedComponent = !!citation.primaryComponent || !!citation.primaryComponentId;
 
   useEffect(() => {
     previousActiveElement.current = document.activeElement;
