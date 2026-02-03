@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import { FileUploader, UploadedFile } from '@/components/shared';
+import { citationService } from '@/services/citation.service';
 
 type AnalysisType = 'citations' | 'plagiarism' | 'style';
 
@@ -46,6 +48,7 @@ export function EditorialUploadPage() {
   };
 
   const toggleAnalysis = (id: AnalysisType) => {
+    if (isSubmitting) return;
     const option = ANALYSIS_OPTIONS.find(opt => opt.id === id);
     if (!option?.available) return;
     
@@ -63,12 +66,16 @@ export function EditorialUploadPage() {
     setSubmitError(null);
 
     try {
-      console.log('Would submit:', uploadedFiles.map(f => f.name), Array.from(selectedAnalyses));
-      navigate('/editorial');
+      if (selectedAnalyses.has('citations')) {
+        const file = uploadedFiles[0].file;
+        const result = await citationService.detectFromFile(file);
+        navigate(`/editorial/citations/${result.documentId}`);
+      } else {
+        navigate('/editorial');
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      setSubmitError(`Failed to submit analysis: ${errorMessage}`);
-      console.error('Upload failed:', error);
+      setSubmitError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -105,7 +112,7 @@ export function EditorialUploadPage() {
               <label
                 key={option.id}
                 className={`flex items-start p-3 rounded-lg border cursor-pointer transition-colors ${
-                  !option.available
+                  !option.available || isSubmitting
                     ? 'opacity-50 cursor-not-allowed bg-gray-50'
                     : selectedAnalyses.has(option.id)
                     ? 'border-blue-300 bg-blue-50'
@@ -116,7 +123,7 @@ export function EditorialUploadPage() {
                   type="checkbox"
                   checked={selectedAnalyses.has(option.id)}
                   onChange={() => toggleAnalysis(option.id)}
-                  disabled={!option.available}
+                  disabled={!option.available || isSubmitting}
                   className="mt-1 mr-3"
                   aria-label={option.label}
                 />
@@ -140,7 +147,7 @@ export function EditorialUploadPage() {
       )}
 
       {submitError && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4" role="alert">
           <p className="text-sm text-red-700">{submitError}</p>
         </div>
       )}
@@ -150,11 +157,16 @@ export function EditorialUploadPage() {
           <button
             onClick={handleSubmit}
             disabled={isSubmitting || selectedAnalyses.size === 0}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+            className="inline-flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
           >
-            {isSubmitting
-              ? 'Processing...'
-              : `Run ${selectedAnalyses.size} Analysis${selectedAnalyses.size !== 1 ? 'es' : ''}`}
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                <span>Detecting citations...</span>
+              </>
+            ) : (
+              `Run ${selectedAnalyses.size} Analysis${selectedAnalyses.size !== 1 ? 'es' : ''}`
+            )}
           </button>
         </div>
       )}
