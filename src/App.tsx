@@ -53,8 +53,8 @@ import BatchListPage from '@/pages/BatchListPage';
 import Settings from '@/pages/Settings';
 import { EditorialLayout } from '@/components/editorial';
 import { 
-  EditorialOverview, 
-  EditorialUpload, 
+  EditorialDashboardPage, 
+  EditorialUploadPage, 
   CitationsPage, 
   PlagiarismPage, 
   StylePage, 
@@ -196,12 +196,16 @@ function AppRoutes() {
 
           {/* Editorial Services Routes */}
           <Route path="/editorial" element={<EditorialLayout />}>
-            <Route index element={<EditorialOverview />} />
-            <Route path="upload" element={<EditorialUpload />} />
+            <Route index element={<EditorialDashboardPage />} />
+            <Route path="upload" element={<EditorialUploadPage />} />
             <Route path="citations" element={<CitationsPage />} />
+            <Route path="citations/:jobId" element={<CitationsPage />} />
             <Route path="plagiarism" element={<PlagiarismPage />} />
+            <Route path="plagiarism/:jobId" element={<PlagiarismPage />} />
             <Route path="style" element={<StylePage />} />
+            <Route path="style/:jobId" element={<StylePage />} />
             <Route path="reports" element={<ReportsPage />} />
+            <Route path="reports/:jobId" element={<ReportsPage />} />
           </Route>
         </Route>
 

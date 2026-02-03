@@ -1,5 +1,5 @@
-export { EditorialOverview } from './EditorialOverview';
-export { EditorialUpload } from './EditorialUpload';
+export { EditorialDashboardPage } from './EditorialDashboardPage';
+export { EditorialUploadPage } from './EditorialUploadPage';
 export { CitationsPage } from './CitationsPage';
 export { PlagiarismPage } from './PlagiarismPage';
 export { StylePage } from './StylePage';
