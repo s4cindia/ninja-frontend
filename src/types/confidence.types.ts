@@ -59,9 +59,32 @@ export interface ConfidenceSummary {
   criteriaWithIssuesCount?: number;
 }
 
+export interface OtherIssue {
+  code: string;
+  message: string;
+  location?: string;
+  severity: 'critical' | 'serious' | 'moderate' | 'minor';
+  status?: 'pending' | 'fixed';
+  remediationInfo?: {
+    status: string;
+    method: string;
+    completedAt: string;
+    description: string;
+    details?: Record<string, unknown>;
+  };
+}
+
+export interface OtherIssuesData {
+  count: number;
+  pendingCount?: number;
+  fixedCount?: number;
+  issues: OtherIssue[];
+}
+
 export interface ConfidenceWithIssuesResponse {
   jobId: string;
   edition: string;
   summary: ConfidenceSummary;
   criteria: CriterionConfidenceWithIssues[];
+  otherIssues?: OtherIssuesData;
 }

@@ -8,7 +8,8 @@ import { CriteriaTable, CriterionRow } from './CriteriaTable';
 import { WcagDocumentationModal } from './WcagDocumentationModal';
 import { CriterionDetailsModal } from './CriterionDetailsModal';
 import { useConfidenceWithIssues } from '@/hooks/useConfidence';
-import { IssueMapping, RemediatedIssue } from '@/types/confidence.types';
+import { IssueMapping, RemediatedIssue, OtherIssuesData } from '@/types/confidence.types';
+import { confidenceService } from '@/services/confidence.service';
 
 interface ConfidenceDashboardProps {
   jobId: string;
@@ -711,13 +712,19 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     setIsLoading(true);
     setError(null);
 
-    fetchAcrAnalysis(jobId)
-      .then((response) => {
+    Promise.all([
+      fetchAcrAnalysis(jobId),
+      confidenceService.getConfidenceWithIssues(jobId).catch(() => null)
+    ])
+      .then(([acrResponse, confidenceResponse]) => {
         if (!cancelled) {
-          const normalizedCriteria = (response.criteria || []).map((c, i) => normalizeCriterion(c, i));
+          const normalizedCriteria = (acrResponse.criteria || []).map((c, i) => normalizeCriterion(c, i));
           setCriteria(normalizedCriteria);
-          if (response.otherIssues) {
-            setOtherIssues(response.otherIssues);
+          
+          if (confidenceResponse?.otherIssues) {
+            setOtherIssues(confidenceResponse.otherIssues as OtherIssuesData);
+          } else if (acrResponse.otherIssues) {
+            setOtherIssues(acrResponse.otherIssues);
           }
           setIsLoading(false);
         }
