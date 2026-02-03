@@ -1,18 +1,19 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { X, ExternalLink, CheckCircle, AlertCircle, Book, Wrench, FileText, BookOpen } from 'lucide-react';
+import { X, ExternalLink, CheckCircle, AlertCircle, Book, Wrench, FileText, BookOpen, Check } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/services/api';
 import { cn } from '@/lib/utils';
 import { wcagDocumentationService } from '@/services/wcag-documentation.service';
 import type { CriterionConfidence } from '@/services/api';
-import type { IssueMapping } from '@/types/confidence.types';
+import type { IssueMapping, RemediatedIssue } from '@/types/confidence.types';
 
 interface CriterionDetailsModalProps {
   criterion: CriterionConfidence;
   relatedIssues?: IssueMapping[];
+  remediatedIssues?: RemediatedIssue[];
   jobId?: string;
   isOpen: boolean;
   onClose: () => void;
@@ -23,6 +24,7 @@ interface CriterionDetailsModalProps {
 export function CriterionDetailsModal({
   criterion,
   relatedIssues,
+  remediatedIssues,
   jobId,
   isOpen,
   onClose,
@@ -124,9 +126,18 @@ export function CriterionDetailsModal({
             <TabsTrigger value="issues" className="flex items-center gap-1.5">
               <AlertCircle className="h-4 w-4" />
               Issues
-              {relatedIssues && relatedIssues.length > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 rounded-full text-xs bg-red-100 text-red-800">
-                  {relatedIssues.length}
+              {((relatedIssues && relatedIssues.length > 0) || (remediatedIssues && remediatedIssues.length > 0)) && (
+                <span className="ml-1 flex gap-1">
+                  {relatedIssues && relatedIssues.length > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full text-xs bg-red-100 text-red-800">
+                      {relatedIssues.length}
+                    </span>
+                  )}
+                  {remediatedIssues && remediatedIssues.length > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full text-xs bg-green-100 text-green-800">
+                      {remediatedIssues.length}
+                    </span>
+                  )}
                 </span>
               )}
             </TabsTrigger>
@@ -248,19 +259,34 @@ export function CriterionDetailsModal({
             </TabsContent>
 
             <TabsContent value="issues" className="space-y-4 mt-0">
-              {relatedIssues && relatedIssues.length > 0 ? (
-                <>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h3 className="font-semibold text-blue-900 mb-2">EPUB Audit Issues</h3>
-                    <p className="text-sm text-blue-800">
-                      Found {relatedIssues.length} issue{relatedIssues.length !== 1 ? 's' : ''} in the EPUB that relate to this criterion.
-                      These issues were automatically mapped from the accessibility audit.
-                    </p>
-                  </div>
+              {/* Summary Banner */}
+              {((relatedIssues && relatedIssues.length > 0) || (remediatedIssues && remediatedIssues.length > 0)) && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h3 className="font-semibold text-blue-900 mb-2">EPUB Audit Issues</h3>
+                  <p className="text-sm text-blue-800">
+                    {relatedIssues && relatedIssues.length > 0 && remediatedIssues && remediatedIssues.length > 0 ? (
+                      <>{relatedIssues.length} pending, {remediatedIssues.length} fixed</>
+                    ) : relatedIssues && relatedIssues.length > 0 ? (
+                      <>Found {relatedIssues.length} issue{relatedIssues.length !== 1 ? 's' : ''} that need attention</>
+                    ) : (
+                      <>{remediatedIssues?.length} issue{remediatedIssues?.length !== 1 ? 's' : ''} fixed</>
+                    )}
+                  </p>
+                </div>
+              )}
 
+              {/* Pending Issues Section */}
+              {relatedIssues && relatedIssues.length > 0 && (
+                <>
+                  <div className="border-l-4 border-orange-400 pl-4">
+                    <h4 className="font-semibold text-orange-900 mb-3 flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4" />
+                      Pending Issues ({relatedIssues.length})
+                    </h4>
+                  </div>
                   <div className="space-y-3">
                     {relatedIssues.map((issue) => (
-                      <div key={issue.issueId} className="border rounded-lg p-4 bg-white">
+                      <div key={issue.issueId} className="border border-orange-200 rounded-lg p-4 bg-orange-50">
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
@@ -279,7 +305,7 @@ export function CriterionDetailsModal({
                           </div>
                         </div>
 
-                        <div className="mt-3 bg-gray-50 rounded p-2">
+                        <div className="mt-3 bg-white rounded p-2">
                           <p className="text-xs text-gray-600 font-medium">Location:</p>
                           <p className="text-xs text-gray-800 font-mono">{issue.filePath}</p>
                           {issue.location && (
@@ -311,43 +337,95 @@ export function CriterionDetailsModal({
                       </div>
                     ))}
                   </div>
-
-                  {/* View Remediation Changes CTA - Only show if remediation completed */}
-                  {jobId && (hasRemediationData ? (
-                    <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
-                      <div className="flex items-start gap-3">
-                        <FileText className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-blue-900 mb-1">View Remediation Changes</h4>
-                          <p className="text-sm text-blue-800 mb-3">
-                            See the actual before/after code changes made during EPUB remediation for issues related to this criterion.
-                          </p>
-                          <Button
-                            variant="outline"
-                            onClick={() => navigate(`/epub/compare/${jobId}?criterion=${criterion.criterionId}`)}
-                            className="w-full sm:w-auto"
-                          >
-                            <FileText className="h-4 w-4 mr-2" />
-                            View All Remediation Changes
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                      <div className="flex items-start gap-3">
-                        <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-yellow-900 mb-1">Remediation Pending</h4>
-                          <p className="text-sm text-yellow-800">
-                            These issues have not been remediated yet. Complete the EPUB remediation workflow first to see before/after code changes.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
                 </>
+              )}
+
+              {/* Remediated Issues Section */}
+              {remediatedIssues && remediatedIssues.length > 0 && (
+                <>
+                  <div className="border-l-4 border-green-400 pl-4 mt-6">
+                    <h4 className="font-semibold text-green-900 mb-3 flex items-center gap-2">
+                      <Check className="h-4 w-4" />
+                      Fixed Issues ({remediatedIssues.length})
+                    </h4>
+                  </div>
+                  <div className="space-y-3">
+                    {remediatedIssues.map((issue, idx) => (
+                      <div key={`${issue.ruleId}-${idx}`} className="border border-green-200 rounded-lg p-4 bg-green-50">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-sm text-gray-600">{issue.ruleId}</span>
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 flex items-center gap-1">
+                                <Check className="h-3 w-3" />
+                                Fixed
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {issue.remediationInfo.method}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-700 mt-2">{issue.message}</p>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 bg-white rounded p-2">
+                          <p className="text-xs text-gray-600 font-medium">Location:</p>
+                          <p className="text-xs text-gray-800 font-mono">{issue.filePath}</p>
+                        </div>
+
+                        {issue.remediationInfo.description && (
+                          <div className="mt-3 bg-green-100 rounded p-2">
+                            <p className="text-xs text-green-800 font-medium mb-1">What was fixed:</p>
+                            <p className="text-xs text-green-900">{issue.remediationInfo.description}</p>
+                          </div>
+                        )}
+
+                        <div className="mt-2 text-xs text-gray-500">
+                          Fixed on {new Date(issue.remediationInfo.completedAt).toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* View Remediation Changes CTA */}
+              {(relatedIssues && relatedIssues.length > 0) && jobId && (hasRemediationData ? (
+                <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <FileText className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-blue-900 mb-1">View Remediation Changes</h4>
+                      <p className="text-sm text-blue-800 mb-3">
+                        See the actual before/after code changes made during EPUB remediation for issues related to this criterion.
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={() => navigate(`/epub/compare/${jobId}?criterion=${criterion.criterionId}`)}
+                        className="w-full sm:w-auto"
+                      >
+                        <FileText className="h-4 w-4 mr-2" />
+                        View All Remediation Changes
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               ) : (
+                <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-yellow-900 mb-1">Remediation Pending</h4>
+                      <p className="text-sm text-yellow-800">
+                        These issues have not been remediated yet. Complete the EPUB remediation workflow first to see before/after code changes.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* No Issues State */}
+              {(!relatedIssues || relatedIssues.length === 0) && (!remediatedIssues || remediatedIssues.length === 0) && (
                 <div className="text-center py-12 text-gray-500">
                   <p className="text-lg font-medium mb-2">No Issues Found</p>
                   <p className="text-sm">
