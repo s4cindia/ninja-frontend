@@ -5,18 +5,21 @@ import { EPUBRenderer } from '../epub/EPUBRenderer';
 import { Loader2, ZoomIn, ZoomOut, Info, Code, AlertTriangle, Columns, Rows, Maximize2, X } from 'lucide-react';
 
 /**
- * Escapes HTML special characters to prevent XSS when displaying HTML source code as text.
- * Unlike sanitizeText which strips tags, this preserves the markup for viewing in code preview.
+ * Decodes HTML entities back to their original characters.
+ * This handles cases where the API returns already-encoded content.
+ * React will automatically escape text content when rendered, so no manual escaping needed.
  */
-function escapeHtml(text: string): string {
-  const htmlEntities: Record<string, string> = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
+function decodeHtmlEntities(text: string): string {
+  const entityMap: Record<string, string> = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&#x27;': "'",
+    '&apos;': "'",
   };
-  return text.replace(/[&<>"']/g, char => htmlEntities[char] ?? char);
+  return text.replace(/&(?:amp|lt|gt|quot|#39|#x27|apos);/g, match => entityMap[match] ?? match);
 }
 
 interface ChangeExplanation {
@@ -176,6 +179,243 @@ export function VisualComparisonPanel({
   const [layout, setLayout] = useState<'side-by-side' | 'stacked'>('side-by-side');
   const [internalFullscreen, setInternalFullscreen] = useState(false);
   const isFullscreen = externalFullscreen ?? internalFullscreen;
+
+  /**
+   * Resolves a relative path against a base directory
+   * @param src - The source path to resolve
+   * @param baseDir - The base directory
+   * @returns Resolved path or null if path escapes EPUB root
+   */
+  const resolveRelativePath = useCallback((src: string, baseDir: string): string | null => {
+    // Skip absolute URLs, protocol-relative URLs, and data URIs
+    if (src.startsWith('//') || src.startsWith('http://') || src.startsWith('https://') ||
+        src.startsWith('data:') || src.startsWith('/api/')) {
+      return null; // Signal to skip processing
+    }
+
+    let resolvedPath = src;
+
+    if (src.startsWith('../')) {
+      const baseParts = baseDir.split('/').filter(Boolean);
+      const srcParts = src.split('/');
+
+      while (srcParts[0] === '..' && baseParts.length > 0) {
+        srcParts.shift();
+        baseParts.pop();
+      }
+
+      // If there are still ../ remaining, path escapes EPUB root
+      if (srcParts[0] === '..') {
+        if (import.meta.env.DEV) {
+          console.warn(`[VisualComparison] Path escapes EPUB root: ${src}`);
+        }
+        return null;
+      }
+
+      resolvedPath = [...baseParts, ...srcParts].join('/');
+    } else if (src.startsWith('./')) {
+      // Ensure baseDir ends with / before concatenation
+      const normalizedBase = baseDir.endsWith('/') ? baseDir : baseDir + '/';
+      resolvedPath = normalizedBase + src.substring(2);
+    } else if (!src.startsWith('OEBPS/') && !src.startsWith('OPS/')) {
+      // Ensure baseDir ends with / before concatenation
+      const normalizedBase = baseDir.endsWith('/') ? baseDir : baseDir + '/';
+      resolvedPath = normalizedBase + src;
+    }
+
+    return resolvedPath;
+  }, []);
+
+  /**
+   * Validates and normalizes an EPUB asset path to prevent path traversal attacks
+   * @param path - The path to validate
+   * @returns Normalized safe path or null if invalid
+   * @security Prevents ../../../../etc/passwd style attacks, javascript: URIs, URL-encoded traversal, etc.
+   */
+  const validateAssetPath = useCallback((path: string): string | null => {
+    if (!path || path.length > 500) return null; // Reasonable length limit
+
+    // Reject dangerous URI schemes
+    const lowerPath = path.toLowerCase();
+    if (lowerPath.startsWith('javascript:') ||
+        lowerPath.startsWith('vbscript:') ||
+        lowerPath.startsWith('data:text/html')) {
+      return null;
+    }
+
+    // Check for URL-encoded path traversal sequences (e.g., %2e%2e%2f = ../)
+    const urlEncodedTraversal = /%2e%2e(%2f|\/)|\.\.%2f/i;
+    if (urlEncodedTraversal.test(path)) {
+      return null;
+    }
+
+    // Reject suspicious patterns
+    if (path.includes('..\\') || path.includes('\\')) return null;
+
+    // Count directory traversals
+    const upDirCount = (path.match(/\.\.\//g) || []).length;
+    if (upDirCount > 10) return null; // Prevent excessive traversal
+
+    // Normalize and validate
+    const normalized = path
+      .replace(/\/+/g, '/') // Remove double slashes
+      .replace(/^\//, '');   // Remove leading slash
+
+    // Ensure path stays within EPUB structure
+    if (normalized.startsWith('/') || normalized.includes('://')) return null;
+
+    // Defense-in-depth: Check if path still contains unresolved ../ after normalization
+    // This catches edge cases where normalization doesn't fully resolve the path
+    if (normalized.startsWith('../')) return null;
+
+    return normalized;
+  }, []);
+
+  /**
+   * Resolves EPUB internal image paths to API-served URLs using DOM-based parsing
+   * @param htmlContent - The HTML content to process
+   * @param baseFilePath - The current file path for relative resolution
+   * @param actualBaseHref - The actual base href from spine item (fallback)
+   * @returns HTML with resolved image paths
+   * @security Uses DOMParser to prevent XSS attacks
+   */
+  const resolveImagePaths = useCallback((htmlContent: string, baseFilePath?: string, actualBaseHref?: string): string => {
+    if (!htmlContent) return '';
+
+    try {
+      // Use DOMParser for safe DOM manipulation (prevents XSS)
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlContent, 'text/html');
+
+      // Check for parsing errors
+      const parserError = doc.querySelector('parsererror');
+      if (parserError) {
+        console.error('[VisualComparison] HTML parsing error, falling back to original content');
+        return htmlContent; // Show original content (backend HTML is trusted, just unresolved paths)
+      }
+
+      // Determine base directory from filePath or fallback to baseHref
+      let baseDir = 'OEBPS/'; // Default fallback
+      if (baseFilePath && baseFilePath.includes('/')) {
+        baseDir = baseFilePath.substring(0, baseFilePath.lastIndexOf('/') + 1);
+      } else if (actualBaseHref && actualBaseHref.includes('/')) {
+        baseDir = actualBaseHref.substring(0, actualBaseHref.lastIndexOf('/') + 1);
+      }
+
+      // Process all img elements
+      const images = doc.querySelectorAll('img[src]');
+      images.forEach((img) => {
+        const src = img.getAttribute('src');
+        if (!src) return;
+
+        // Split path from query string and fragment to preserve them
+        const queryIndex = src.indexOf('?');
+        const fragmentIndex = src.indexOf('#');
+        let pathname = src;
+        let suffix = '';
+
+        if (queryIndex !== -1) {
+          pathname = src.substring(0, queryIndex);
+          suffix = src.substring(queryIndex);
+        } else if (fragmentIndex !== -1) {
+          pathname = src.substring(0, fragmentIndex);
+          suffix = src.substring(fragmentIndex);
+        }
+
+        // Resolve relative path using shared helper (only the pathname)
+        const resolvedPath = resolveRelativePath(pathname, baseDir);
+        if (resolvedPath === null) return; // Skip if absolute URL or path escapes root
+
+        // Validate and sanitize the resolved path
+        const safePath = validateAssetPath(resolvedPath);
+        if (!safePath) {
+          if (import.meta.env.DEV) {
+            console.warn(`[VisualComparison] Invalid asset path rejected: ${src}`);
+          }
+          return;
+        }
+
+        // Build API URL with encoded path and preserved query/fragment
+        const apiUrl = `/api/v1/epub/job/${jobId}/asset/${encodeURIComponent(safePath)}${suffix}`;
+
+        if (import.meta.env.DEV) {
+          console.log(`[VisualComparison] Resolved image: ${src} → ${apiUrl}`);
+        }
+
+        img.setAttribute('src', apiUrl);
+      });
+
+      // Return serialized HTML
+      return doc.body.innerHTML;
+    } catch (error) {
+      console.error('[VisualComparison] Error resolving image paths:', error);
+      return htmlContent; // Return original content for better UX (backend HTML is trusted)
+    }
+  }, [jobId, validateAssetPath, resolveRelativePath]);
+
+  /**
+   * Resolves CSS background-image URLs
+   * @param content - HTML content with potential CSS
+   * @param baseFilePath - The current file path for relative resolution
+   * @param actualBaseHref - The actual base href from spine item (fallback)
+   * @returns Content with resolved CSS URLs
+   * @security Validates paths and skips fragments/absolute URLs
+   */
+  const resolveCSSImages = useCallback((content: string, baseFilePath?: string, actualBaseHref?: string): string => {
+    if (!content) return '';
+
+    // Determine base directory from filePath or fallback to baseHref
+    let baseDir = 'OEBPS/'; // Default fallback
+    if (baseFilePath && baseFilePath.includes('/')) {
+      baseDir = baseFilePath.substring(0, baseFilePath.lastIndexOf('/') + 1);
+    } else if (actualBaseHref && actualBaseHref.includes('/')) {
+      baseDir = actualBaseHref.substring(0, actualBaseHref.lastIndexOf('/') + 1);
+    }
+
+    // Pattern handles both quoted URLs (with spaces) and unquoted URLs
+    // Group 1: quoted URL with potential spaces, Group 2: unquoted URL without spaces
+    const cssPattern = /url\(\s*['"]([^'"]+)['"]\s*\)|url\(\s*([^)\s]+)\s*\)/gi;
+
+    return content.replace(cssPattern, (match, quotedUrl, unquotedUrl) => {
+      const url = quotedUrl || unquotedUrl;
+      if (!url) return match;
+
+      // Skip fragments (they're SVG references, not paths)
+      if (url.startsWith('#')) {
+        return match;
+      }
+
+      // Split path from query string and fragment to preserve them
+      const queryIndex = url.indexOf('?');
+      const fragmentIndex = url.indexOf('#');
+      let pathname = url;
+      let suffix = '';
+
+      if (queryIndex !== -1) {
+        pathname = url.substring(0, queryIndex);
+        suffix = url.substring(queryIndex);
+      } else if (fragmentIndex !== -1) {
+        pathname = url.substring(0, fragmentIndex);
+        suffix = url.substring(fragmentIndex);
+      }
+
+      // Resolve relative path using shared helper (only the pathname)
+      const resolvedPath = resolveRelativePath(pathname, baseDir);
+      if (resolvedPath === null) return match; // Skip if absolute URL or path escapes root
+
+      // Validate the path
+      const safePath = validateAssetPath(resolvedPath);
+      if (!safePath) {
+        if (import.meta.env.DEV) {
+          console.warn(`[VisualComparison] Invalid CSS asset path rejected: ${url}`);
+        }
+        return match; // Return original if invalid
+      }
+
+      // Build API URL with encoded path and preserved query/fragment
+      return `url('/api/v1/epub/job/${jobId}/asset/${encodeURIComponent(safePath)}${suffix}')`;
+    });
+  }, [jobId, validateAssetPath, resolveRelativePath]);
   const handleOpenFullscreen = useCallback(() => {
     if (onToggleFullscreen) {
       if (!isFullscreen) onToggleFullscreen();
@@ -301,21 +541,30 @@ export function VisualComparisonPanel({
   const rendererProps = useMemo(() => {
     if (!displayData) return null;
 
+    // Resolve image paths for both before and after content
+    const beforeBaseHref = displayData.spineItem?.href || displayData.beforeContent?.baseHref || "";
+    let beforeHtml = resolveImagePaths(displayData.beforeContent?.html || "", filePath, beforeBaseHref);
+    beforeHtml = resolveCSSImages(beforeHtml || "", filePath, beforeBaseHref);
+
+    const afterBaseHref = displayData.spineItem?.href || displayData.afterContent?.baseHref || "";
+    let afterHtml = resolveImagePaths(displayData.afterContent?.html || "", filePath, afterBaseHref);
+    afterHtml = resolveCSSImages(afterHtml || "", filePath, afterBaseHref);
+
     return {
       before: {
-        html: displayData.beforeContent.html,
+        html: beforeHtml,
         css: displayData.beforeContent.css,
         baseUrl: displayData.beforeContent.baseHref,
         highlights: effectiveHighlights
       },
       after: {
-        html: displayData.afterContent.html,
+        html: afterHtml,
         css: displayData.afterContent.css,
         baseUrl: displayData.afterContent.baseHref,
         highlights: effectiveHighlights
       }
     };
-  }, [displayData, effectiveHighlights]);
+  }, [displayData, effectiveHighlights, resolveImagePaths, resolveCSSImages, filePath]);
 
   const beforeRenderer = useMemo(() => {
     if (!rendererProps) return null;
@@ -819,13 +1068,37 @@ export function VisualComparisonPanel({
                     </div>
                     <pre className="text-red-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all">
 {(() => {
-  // Escape HTML entities to show source code as text (XSS prevention)
-  const rawHtml = displayData.beforeContent?.html || '';
-  if (!rawHtml) return 'No content available';
-  const truncated = rawHtml.slice(0, 1000);
-  const lastClosingTag = truncated.lastIndexOf('>');
-  const displayText = lastClosingTag > 0 ? truncated.slice(0, lastClosingTag + 1) + (rawHtml.length > 1000 ? '...' : '') : truncated;
-  return escapeHtml(displayText);
+  // Use sourceHtml for code diff (readable paths) instead of html (base64 images)
+  const beforeSource = decodeHtmlEntities(displayData.beforeContent?.sourceHtml || displayData.beforeContent?.html || '');
+  const afterSource = decodeHtmlEntities(displayData.afterContent?.sourceHtml || displayData.afterContent?.html || '');
+  if (!beforeSource) return 'No content available';
+  
+  const beforeLines = beforeSource.split('\n');
+  const afterLines = afterSource.split('\n');
+  
+  // Find first different line index
+  let firstDiffLine = -1;
+  const maxLines = Math.max(beforeLines.length, afterLines.length);
+  for (let i = 0; i < maxLines; i++) {
+    if (beforeLines[i] !== afterLines[i]) {
+      firstDiffLine = i;
+      break;
+    }
+  }
+  
+  // If no diff found, show from beginning
+  if (firstDiffLine === -1) {
+    firstDiffLine = 0;
+  }
+  
+  // Show 3 lines before and after the change
+  const startLine = Math.max(0, firstDiffLine - 3);
+  const endLine = Math.min(beforeLines.length, firstDiffLine + 10);
+  const displayLines = beforeLines.slice(startLine, endLine);
+  
+  const prefix = startLine > 0 ? '...\n' : '';
+  const suffix = endLine < beforeLines.length ? '\n...' : '';
+  return prefix + displayLines.join('\n') + suffix;
 })()}
                     </pre>
                   </div>
@@ -836,35 +1109,49 @@ export function VisualComparisonPanel({
                     </div>
                     <div className="text-green-900 p-3 overflow-x-auto max-h-48 text-xs whitespace-pre-wrap break-all font-mono">
 {(() => {
-  // Escape HTML entities to show source code as text (XSS prevention)
-  const beforeHtml = displayData.beforeContent?.html || '';
-  const afterHtml = displayData.afterContent?.html || '';
-  if (!afterHtml) return <span>No content available</span>;
+  // Use sourceHtml for code diff (readable paths) instead of html (base64 images)
+  const beforeSource = decodeHtmlEntities(displayData.beforeContent?.sourceHtml || displayData.beforeContent?.html || '');
+  const afterSource = decodeHtmlEntities(displayData.afterContent?.sourceHtml || displayData.afterContent?.html || '');
+  if (!afterSource) return <span>No content available</span>;
   
-  const truncateHtml = (html: string) => {
-    const truncated = html.slice(0, 1000);
-    const lastClosingTag = truncated.lastIndexOf('>');
-    return lastClosingTag > 0 ? truncated.slice(0, lastClosingTag + 1) + (html.length > 1000 ? '...' : '') : truncated;
-  };
+  const beforeLines = beforeSource.split('\n');
+  const afterLines = afterSource.split('\n');
   
-  const beforeLines = truncateHtml(beforeHtml).split('\n');
-  const afterLines = truncateHtml(afterHtml).split('\n');
+  // Find first different line index
+  let firstDiffLine = 0;
+  const maxLines = Math.max(beforeLines.length, afterLines.length);
+  for (let i = 0; i < maxLines; i++) {
+    if (beforeLines[i] !== afterLines[i]) {
+      firstDiffLine = i;
+      break;
+    }
+  }
   
-  return afterLines.map((line, idx) => {
-    const beforeLine = beforeLines[idx] || '';
-    const isNewLine = idx >= beforeLines.length;
+  // Show 3 lines before and more after the change
+  const startLine = Math.max(0, firstDiffLine - 3);
+  const endLine = Math.min(afterLines.length, firstDiffLine + 10);
+  const displayAfterLines = afterLines.slice(startLine, endLine);
+  const displayBeforeLines = beforeLines.slice(startLine, endLine);
+  
+  const prefix = startLine > 0 ? <div key="prefix" className="text-gray-400">...</div> : null;
+  const suffix = endLine < afterLines.length ? <div key="suffix" className="text-gray-400">...</div> : null;
+  
+  const diffLines = displayAfterLines.map((line, idx) => {
+    const beforeLine = displayBeforeLines[idx] || '';
+    const isNewLine = idx + startLine >= beforeLines.length;
     const isChanged = line !== beforeLine;
-    // Escape each line for safe display
-    const escapedLine = escapeHtml(line) || ' ';
+    const displayLine = line || ' ';
     
     if (isNewLine) {
-      return <div key={idx} className="bg-green-200 text-green-900 px-1 -mx-1 rounded">{escapedLine}</div>;
+      return <div key={idx} className="bg-green-200 text-green-900 px-1 -mx-1 rounded">{displayLine}</div>;
     }
     if (isChanged) {
-      return <div key={idx} className="bg-yellow-200 text-yellow-900 px-1 -mx-1 rounded border-l-2 border-yellow-500">{escapedLine}</div>;
+      return <div key={idx} className="bg-yellow-200 text-yellow-900 px-1 -mx-1 rounded border-l-2 border-yellow-500">{displayLine}</div>;
     }
-    return <div key={idx}>{escapedLine}</div>;
+    return <div key={idx}>{displayLine}</div>;
   });
+  
+  return <>{prefix}{diffLines}{suffix}</>;
 })()}
                     </div>
                   </div>
@@ -878,7 +1165,7 @@ export function VisualComparisonPanel({
               <div className="h-full overflow-auto">
                 <EPUBRenderer
                   key={`fullscreen-before-${changeId}`}
-                  html={displayData.beforeContent.html}
+                  html={rendererProps?.before.html || displayData.beforeContent.html}
                   css={displayData.beforeContent.css}
                   baseUrl={displayData.beforeContent.baseHref}
                   highlights={effectiveHighlights}
@@ -891,7 +1178,7 @@ export function VisualComparisonPanel({
               <div className="h-full overflow-auto">
                 <EPUBRenderer
                   key={`fullscreen-after-${changeId}`}
-                  html={displayData.afterContent.html}
+                  html={rendererProps?.after.html || displayData.afterContent.html}
                   css={displayData.afterContent.css}
                   baseUrl={displayData.afterContent.baseHref}
                   highlights={effectiveHighlights}
@@ -913,7 +1200,7 @@ export function VisualComparisonPanel({
                   </div>
                   <EPUBRenderer
                     key={`compare-before-${changeId}`}
-                    html={displayData.beforeContent.html}
+                    html={rendererProps?.before.html || displayData.beforeContent.html}
                     css={displayData.beforeContent.css}
                     baseUrl={displayData.beforeContent.baseHref}
                     highlights={effectiveHighlights}
@@ -933,7 +1220,7 @@ export function VisualComparisonPanel({
                   </div>
                   <EPUBRenderer
                     key={`compare-after-${changeId}`}
-                    html={displayData.afterContent.html}
+                    html={rendererProps?.after.html || displayData.afterContent.html}
                     css={displayData.afterContent.css}
                     baseUrl={displayData.afterContent.baseHref}
                     highlights={effectiveHighlights}

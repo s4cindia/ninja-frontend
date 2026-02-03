@@ -12,6 +12,7 @@ export interface SpineItem {
 export interface SpineItemContent {
   spineItem: SpineItem;
   html: string;
+  sourceHtml?: string; // Original HTML with readable paths (for code diff view)
   css: string[];
   baseHref: string;
 }

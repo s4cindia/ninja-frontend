@@ -1,0 +1,61 @@
+/**
+ * Validation utilities for user input and server responses
+ */
+
+/**
+ * Validates a job ID format to prevent path traversal and injection attacks.
+ *
+ * Job IDs should only contain:
+ * - Alphanumeric characters (a-z, A-Z, 0-9)
+ * - Hyphens (-)
+ * - Underscores (_)
+ * - Length between 1 and 255 characters
+ *
+ * @param jobId - The job ID to validate
+ * @returns true if the job ID is valid, false otherwise
+ *
+ * @example
+ * ```ts
+ * validateJobId('abc-123_def')  // true
+ * validateJobId('../etc/passwd') // false
+ * validateJobId('job@123')       // false
+ * validateJobId('')              // false (too short)
+ * ```
+ */
+export function validateJobId(jobId: string | null | undefined): jobId is string {
+  if (!jobId) {
+    return false;
+  }
+
+  // Check length constraints (reasonable limits for job IDs)
+  if (jobId.length < 1 || jobId.length > 255) {
+    return false;
+  }
+
+  // Only allow alphanumeric characters, hyphens, and underscores
+  // Hyphen is placed last in character class to avoid being interpreted as a range
+  return /^[a-zA-Z0-9_-]+$/.test(jobId);
+}
+
+/**
+ * Validates a job ID and throws an error if invalid.
+ * Useful for defensive programming in critical paths.
+ *
+ * @param jobId - The job ID to validate
+ * @throws {Error} If the job ID is invalid
+ *
+ * @example
+ * ```ts
+ * try {
+ *   assertValidJobId(jobId);
+ *   // Proceed with jobId
+ * } catch (error) {
+ *   // Handle invalid jobId
+ * }
+ * ```
+ */
+export function assertValidJobId(jobId: string | null | undefined): asserts jobId is string {
+  if (!validateJobId(jobId)) {
+    throw new Error('Invalid job ID format');
+  }
+}

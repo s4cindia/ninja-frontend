@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { Dashboard } from '@/pages/Dashboard';
 import { Login } from '@/pages/Login';
 import { Register } from '@/pages/Register';
@@ -37,6 +38,8 @@ import { AcrWorkflowPage } from '@/pages/acr/AcrWorkflowPage';
 import { EPUBAccessibility } from '@/pages/EPUBAccessibility';
 import { EPUBRemediation } from '@/pages/EPUBRemediation';
 import { EPUBComparison } from '@/pages/EPUBComparison';
+import { PdfAccessibilityPage } from '@/pages/PdfAccessibilityPage';
+import { PdfAuditResultsPage } from '@/pages/PdfAuditResultsPage';
 import { FeedbackDashboard } from '@/pages/FeedbackDashboard';
 import { RemediationPage } from '@/pages/Remediation';
 import { ComparisonPage } from '@/pages/ComparisonPage';
@@ -48,6 +51,15 @@ import BatchResultsPage from '@/pages/BatchResultsPage';
 import BatchFileDetailsPage from '@/pages/BatchFileDetailsPage';
 import BatchListPage from '@/pages/BatchListPage';
 import Settings from '@/pages/Settings';
+import { EditorialLayout } from '@/components/editorial';
+import { 
+  EditorialDashboardPage, 
+  EditorialUploadPage, 
+  CitationsPage, 
+  PlagiarismPage, 
+  StylePage, 
+  ReportsPage 
+} from '@/pages/editorial';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -157,6 +169,16 @@ function AppRoutes() {
           <Route path="/epub" element={<EPUBAccessibility />} />
           <Route path="/epub/remediate/:jobId" element={<EPUBRemediation />} />
           <Route path="/epub/compare/:jobId" element={<EPUBComparison />} />
+          <Route path="/pdf" element={
+            <ErrorBoundary>
+              <PdfAccessibilityPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/pdf/audit/:jobId" element={
+            <ErrorBoundary>
+              <PdfAuditResultsPage />
+            </ErrorBoundary>
+          } />
           <Route path="/feedback" element={<FeedbackDashboard />} />
           <Route path="/remediation" element={<RemediationPage />} />
           <Route path="/remediation/batch" element={<BatchRemediationPage />} />
@@ -171,6 +193,20 @@ function AppRoutes() {
           <Route path="/batches" element={<BatchListPage />} />
           <Route path="/batches/new" element={<BatchCreationPage />} />
           <Route path="/settings" element={<Settings />} />
+
+          {/* Editorial Services Routes */}
+          <Route path="/editorial" element={<EditorialLayout />}>
+            <Route index element={<EditorialDashboardPage />} />
+            <Route path="upload" element={<EditorialUploadPage />} />
+            <Route path="citations" element={<CitationsPage />} />
+            <Route path="citations/:jobId" element={<CitationsPage />} />
+            <Route path="plagiarism" element={<PlagiarismPage />} />
+            <Route path="plagiarism/:jobId" element={<PlagiarismPage />} />
+            <Route path="style" element={<StylePage />} />
+            <Route path="style/:jobId" element={<StylePage />} />
+            <Route path="reports" element={<ReportsPage />} />
+            <Route path="reports/:jobId" element={<ReportsPage />} />
+          </Route>
         </Route>
 
         <Route path="/unauthorized" element={<Unauthorized />} />

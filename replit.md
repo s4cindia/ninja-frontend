@@ -59,6 +59,7 @@ The application features a clean, responsive design built with Tailwind CSS. It 
 - **User Authentication**: Secure login, registration, and user management with protected routes.
 - **File Management**: Upload, list, and delete files.
 - **Color Contrast Configuration**: Settings page (`/settings`) with toggle to control color contrast issue handling during remediation. Users can choose between auto-fix mode (automatic WCAG 2.1 AA correction) or manual review mode. Setting indicator displayed in RemediationPlanView with quick access to settings. Implements optimistic updates with React Query for instant UI feedback.
+- **Editorial Services Section**: Dedicated editorial services area (`/editorial`) with sub-navigation for Citation Management, Plagiarism Detection, and Style Validation. Features EditorialLayout component with tabbed navigation and nested routes for Overview, Upload, Citations, Plagiarism, Style, and Reports pages. Integration slots are prepared for Dev2's module implementations (CitationsModule, PlagiarismModule, StyleModule).
 - **Backend-Handled Quick Fixes**: Quick Fix Panel now recognizes fix codes that are handled directly by the backend (EPUB-STRUCT-002, EPUB-META-002, EPUB-META-004, EPUB-NAV-001, EPUB-STRUCT-004). These display a streamlined "Apply Fix" button that calls the backend API directly, with proper code normalization to handle variations in case and underscores.
 
 ### System Design Choices
