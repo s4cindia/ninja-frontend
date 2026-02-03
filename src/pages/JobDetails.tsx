@@ -294,7 +294,7 @@ export function JobDetails() {
                   )}
                 </div>
 
-                <IssuesTable issues={parsedOutput.combinedIssues} />
+                <IssuesTable issues={parsedOutput.combinedIssues} isAccessible={parsedOutput.isAccessible} />
 
                 <div data-testid="job-actions">
                   <JobActions jobId={job.id} />
