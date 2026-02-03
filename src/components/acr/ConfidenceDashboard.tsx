@@ -716,6 +716,13 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
       .then((response) => {
         if (!cancelled) {
           console.log('[ACR Step 3] Analysis data from API:', response);
+          // Debug: Check for remediated issues in API response
+          const criteriaWithRemediated = (response.criteria || []).filter(
+            (c: { remediatedIssues?: unknown[]; fixedIssues?: unknown[] }) => 
+              (c.remediatedIssues && c.remediatedIssues.length > 0) || 
+              (c.fixedIssues && c.fixedIssues.length > 0)
+          );
+          console.log('[ACR Step 3] Criteria with remediated/fixed issues:', criteriaWithRemediated.length, criteriaWithRemediated);
           const normalizedCriteria = (response.criteria || []).map((c, i) => normalizeCriterion(c, i));
           setCriteria(normalizedCriteria);
           if (response.otherIssues) {
