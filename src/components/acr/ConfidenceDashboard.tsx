@@ -10,6 +10,7 @@ import { CriterionDetailsModal } from './CriterionDetailsModal';
 import { useConfidenceWithIssues } from '@/hooks/useConfidence';
 import { IssueMapping, RemediatedIssue, OtherIssuesData, NaSuggestion } from '@/types/confidence.types';
 import { confidenceService } from '@/services/confidence.service';
+import { ConfidenceBadge } from './ConfidenceBadge';
 
 interface ConfidenceDashboardProps {
   jobId: string;
@@ -270,6 +271,51 @@ const SECTION_CONFIG: Record<ConfidenceGroup, {
   },
 };
 
+const MANUAL_VERIFICATION_CRITERIA: Record<string, { requiresManualVerification: boolean; automationCapability: number }> = {
+  '1.1.1': { requiresManualVerification: true, automationCapability: 30 },
+  '1.2.1': { requiresManualVerification: true, automationCapability: 40 },
+  '1.2.2': { requiresManualVerification: true, automationCapability: 30 },
+  '1.2.3': { requiresManualVerification: true, automationCapability: 30 },
+  '1.2.4': { requiresManualVerification: true, automationCapability: 20 },
+  '1.2.5': { requiresManualVerification: true, automationCapability: 30 },
+  '1.3.1': { requiresManualVerification: true, automationCapability: 60 },
+  '1.3.2': { requiresManualVerification: true, automationCapability: 50 },
+  '1.3.3': { requiresManualVerification: true, automationCapability: 20 },
+  '1.4.1': { requiresManualVerification: true, automationCapability: 40 },
+  '1.4.3': { requiresManualVerification: false, automationCapability: 95 },
+  '1.4.4': { requiresManualVerification: false, automationCapability: 90 },
+  '1.4.5': { requiresManualVerification: true, automationCapability: 60 },
+  '2.1.1': { requiresManualVerification: true, automationCapability: 50 },
+  '2.1.2': { requiresManualVerification: true, automationCapability: 50 },
+  '2.2.1': { requiresManualVerification: true, automationCapability: 40 },
+  '2.2.2': { requiresManualVerification: true, automationCapability: 60 },
+  '2.3.1': { requiresManualVerification: true, automationCapability: 50 },
+  '2.4.1': { requiresManualVerification: true, automationCapability: 70 },
+  '2.4.2': { requiresManualVerification: false, automationCapability: 90 },
+  '2.4.3': { requiresManualVerification: true, automationCapability: 50 },
+  '2.4.4': { requiresManualVerification: false, automationCapability: 85 },
+  '2.4.5': { requiresManualVerification: true, automationCapability: 40 },
+  '2.4.6': { requiresManualVerification: false, automationCapability: 80 },
+  '2.4.7': { requiresManualVerification: true, automationCapability: 60 },
+  '3.1.1': { requiresManualVerification: false, automationCapability: 90 },
+  '3.1.2': { requiresManualVerification: true, automationCapability: 50 },
+  '3.2.1': { requiresManualVerification: true, automationCapability: 40 },
+  '3.2.2': { requiresManualVerification: true, automationCapability: 40 },
+  '3.2.3': { requiresManualVerification: true, automationCapability: 60 },
+  '3.2.4': { requiresManualVerification: true, automationCapability: 50 },
+  '3.3.1': { requiresManualVerification: true, automationCapability: 60 },
+  '3.3.2': { requiresManualVerification: false, automationCapability: 80 },
+  '3.3.3': { requiresManualVerification: true, automationCapability: 40 },
+  '3.3.4': { requiresManualVerification: true, automationCapability: 50 },
+  '4.1.1': { requiresManualVerification: false, automationCapability: 95 },
+  '4.1.2': { requiresManualVerification: true, automationCapability: 70 },
+  '4.1.3': { requiresManualVerification: true, automationCapability: 60 },
+};
+
+function getManualVerificationInfo(criterionId: string): { requiresManualVerification: boolean; automationCapability: number } {
+  return MANUAL_VERIFICATION_CRITERIA[criterionId] || { requiresManualVerification: false, automationCapability: 90 };
+}
+
 function getConfidenceColor(confidence: number): string {
   if (confidence >= 80) return 'bg-green-500';
   if (confidence >= 50) return 'bg-yellow-500';
@@ -377,6 +423,8 @@ function normalizeCriterion(c: Partial<CriterionConfidence>, index: number): Nor
   const rawConfidence = c.confidence ?? c.confidenceScore;
   const confidenceScore = typeof rawConfidence === 'number' && !isNaN(rawConfidence) ? rawConfidence : 0;
   
+  const manualVerificationInfo = getManualVerificationInfo(criterionId);
+  
   return {
     id: c.id || `criterion-${index}`,
     criterionId,
@@ -390,6 +438,8 @@ function normalizeCriterion(c: Partial<CriterionConfidence>, index: number): Nor
     manualChecks: Array.isArray(c.manualChecks) ? c.manualChecks : [],
     evidence,
     naSuggestion: c.naSuggestion,
+    requiresManualVerification: c.requiresManualVerification ?? manualVerificationInfo.requiresManualVerification,
+    automationCapability: c.automationCapability ?? manualVerificationInfo.automationCapability,
   };
 }
 
@@ -637,6 +687,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   const [showOtherIssues, setShowOtherIssues] = useState(false);
   const otherIssuesRef = useRef<HTMLDivElement>(null);
   const [otherIssues, setOtherIssues] = useState<OtherIssuesData | null>(null);
+  const [confidenceFilter, setConfidenceFilter] = useState<'all' | 'high' | 'medium' | 'manual'>('all');
 
   const { data: confidenceData } = useConfidenceWithIssues(jobId, undefined, { enabled: !isDemoJob(jobId) });
 
@@ -1027,24 +1078,14 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                 N/A
               </span>
             )}
-            {/* Issue count badges - show both pending and remediated */}
-            {issueData && (issueData.count > 0 || (issueData.remediatedCount && issueData.remediatedCount > 0)) && (
-              <span className="inline-flex items-center gap-1">
-                {issueData.count > 0 && (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                    {issueData.count} pending
-                  </span>
-                )}
-                {issueData.remediatedCount && issueData.remediatedCount > 0 && (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    {issueData.remediatedCount} fixed
-                  </span>
-                )}
-              </span>
-            )}
           </span>
           <span className="flex items-center gap-3">
-            <span className="text-sm text-gray-500">{criterion.confidenceScore}%</span>
+            <ConfidenceBadge
+              confidence={criterion.confidenceScore}
+              requiresManualVerification={criterion.requiresManualVerification}
+              automationCapability={criterion.automationCapability}
+              size="sm"
+            />
             <ChevronDown className={cn('h-4 w-4 text-gray-400 transition-transform', isExpanded && 'rotate-180')} />
           </span>
         </button>

@@ -194,6 +194,8 @@ export interface CriterionConfidence {
   remainingCount?: number;
   hasIssues?: boolean;
   naSuggestion?: ApplicabilitySuggestion;
+  requiresManualVerification?: boolean;
+  automationCapability?: number;
 }
 
 export interface AcrAnalysisResponse {
