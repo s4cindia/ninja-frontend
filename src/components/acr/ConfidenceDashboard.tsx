@@ -654,12 +654,14 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
         
         const hasRelatedIssues = c.relatedIssues && c.relatedIssues.length > 0;
         const hasRemediatedIssues = remediatedIssues && remediatedIssues.length > 0;
+        // Also include criteria with only counts (no arrays) for status boosting
+        const hasCountsOnly = fixedCount > 0 || (c.fixedCount != null) || (c.remediatedCount != null);
         
-        if (hasRelatedIssues || hasRemediatedIssues) {
+        if (hasRelatedIssues || hasRemediatedIssues || hasCountsOnly) {
           map.set(c.criterionId, {
             issues: c.relatedIssues || [],
             count: c.issueCount || c.relatedIssues?.length || 0,
-            remediatedIssues: remediatedIssues,
+            remediatedIssues: remediatedIssues || [],
             remediatedCount: fixedCount,
           });
           if (fixedCount > 0) {
