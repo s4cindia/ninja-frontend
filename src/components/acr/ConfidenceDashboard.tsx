@@ -389,6 +389,7 @@ function normalizeCriterion(c: Partial<CriterionConfidence>, index: number): Nor
     automatedChecks: Array.isArray(c.automatedChecks) ? c.automatedChecks : [],
     manualChecks: Array.isArray(c.manualChecks) ? c.manualChecks : [],
     evidence,
+    naSuggestion: c.naSuggestion,
   };
 }
 
