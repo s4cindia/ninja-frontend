@@ -44,6 +44,7 @@ export interface CriterionConfidenceWithIssues {
   remarks: string;
   relatedIssues?: IssueMapping[];
   issueCount?: number;
+  remainingCount?: number;
   hasIssues?: boolean;
   remediatedIssues?: RemediatedIssue[];
   remediatedCount?: number;

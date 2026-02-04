@@ -651,20 +651,24 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
       for (const c of confidenceData.criteria) {
         const remediatedIssues = c.remediatedIssues || c.fixedIssues;
         const fixedCount = c.fixedCount ?? c.remediatedCount ?? remediatedIssues?.length ?? 0;
+        // Use remainingCount to accurately track pending issues
+        const remainingIssueCount = c.issueCount ?? c.remainingCount ?? c.relatedIssues?.length ?? 0;
         
         const hasRelatedIssues = c.relatedIssues && c.relatedIssues.length > 0;
         const hasRemediatedIssues = remediatedIssues && remediatedIssues.length > 0;
         // Also include criteria with only counts (no arrays) for status boosting
-        const hasCountsOnly = fixedCount > 0 || (c.fixedCount != null) || (c.remediatedCount != null);
+        // Include remainingCount check to properly track criteria with pending issues
+        const hasCountsOnly = fixedCount > 0 || (c.fixedCount != null) || (c.remediatedCount != null) || (c.remainingCount != null);
         
         if (hasRelatedIssues || hasRemediatedIssues || hasCountsOnly) {
           map.set(c.criterionId, {
             issues: c.relatedIssues || [],
-            count: c.issueCount || c.relatedIssues?.length || 0,
+            count: remainingIssueCount,
             remediatedIssues: remediatedIssues || [],
             remediatedCount: fixedCount,
           });
-          if (fixedCount > 0) {
+          // Only count as remediated if there are fixes AND no remaining issues
+          if (fixedCount > 0 && remainingIssueCount === 0) {
             remediatedCount++;
           }
         }
