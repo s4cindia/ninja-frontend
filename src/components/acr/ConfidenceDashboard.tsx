@@ -724,21 +724,43 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     Promise.all([acrPromise, confidencePromise])
       .then(([acrResponse, confidenceResponse]) => {
         if (!cancelled) {
-          // Build a map of naSuggestion data from confidence response
-          const naSuggestionMap = new Map<string, NaSuggestion>();
+          // Build a map of confidence data (including naSuggestion and confidenceScore) from confidence response
+          const confidenceDataMap = new Map<string, {
+            naSuggestion?: NaSuggestion;
+            confidenceScore?: number;
+            issueCount?: number;
+            remainingCount?: number;
+          }>();
           if (confidenceResponse?.criteria) {
+            const naSuggestionCriteria: string[] = [];
             for (const c of confidenceResponse.criteria) {
+              confidenceDataMap.set(c.criterionId, {
+                naSuggestion: c.naSuggestion,
+                confidenceScore: c.confidenceScore ?? c.confidence,
+                issueCount: c.issueCount,
+                remainingCount: c.remainingCount,
+              });
               if (c.naSuggestion) {
-                naSuggestionMap.set(c.criterionId, c.naSuggestion);
+                naSuggestionCriteria.push(c.criterionId);
               }
+            }
+            if (import.meta.env.DEV && naSuggestionCriteria.length > 0) {
+              console.log('[ACR Step 3] Criteria with N/A suggestions from confidence API:', naSuggestionCriteria);
             }
           }
           
-          // Merge naSuggestion into criteria during normalization
+          // Merge confidence data into criteria during normalization
           const normalizedCriteria = (acrResponse.criteria || []).map((c, i) => {
             const criterionId = extractCriterionId(c, i);
-            const naSuggestion = naSuggestionMap.get(criterionId) || c.naSuggestion;
-            return normalizeCriterion({ ...c, naSuggestion: naSuggestion as CriterionConfidence['naSuggestion'] }, i);
+            const confidenceData = confidenceDataMap.get(criterionId);
+            // Prefer confidence response data over ACR response data
+            const mergedData = {
+              ...c,
+              naSuggestion: confidenceData?.naSuggestion || c.naSuggestion,
+              confidenceScore: confidenceData?.confidenceScore ?? c.confidenceScore ?? c.confidence,
+              confidence: confidenceData?.confidenceScore ?? c.confidence ?? c.confidenceScore,
+            };
+            return normalizeCriterion(mergedData as CriterionConfidence, i);
           });
           setCriteria(normalizedCriteria);
           
