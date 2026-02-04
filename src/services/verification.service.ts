@@ -205,7 +205,7 @@ export const verificationService = {
     criterionId: string;
     jobId: string;
     status: 'not_applicable';
-    method: 'ai_suggested';
+    method: 'quick_accept';
     notes: string;
   }): Promise<void> {
     await api.post('/verification/submit', data);

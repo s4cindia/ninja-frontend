@@ -12,7 +12,7 @@ interface NaSuggestionBannerProps {
     criterionId: string;
     jobId: string;
     status: 'not_applicable';
-    method: 'ai_suggested';
+    method: 'quick_accept';
     notes: string;
   }) => Promise<void>;
   onAcceptSuccess?: () => void;
@@ -66,7 +66,7 @@ export function NaSuggestionBanner({
         criterionId,
         jobId,
         status: 'not_applicable',
-        method: 'ai_suggested',
+        method: 'quick_accept',
         notes: `AI-suggested Not Applicable (${naSuggestion.confidence}% confidence): ${naSuggestion.rationale}`,
       });
       onAcceptSuccess?.();

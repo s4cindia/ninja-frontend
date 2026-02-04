@@ -57,7 +57,7 @@ export function CriterionDetailsModal({
     criterionId: string;
     jobId: string;
     status: 'not_applicable';
-    method: 'ai_suggested';
+    method: 'quick_accept';
     notes: string;
   }) => {
     await verificationService.submitNaVerification(data);
