@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronDown, ChevronRight, CheckCircle, AlertTriangle, Sparkles } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
+import { NA_QUICK_ACCEPT_THRESHOLD } from '@/constants/verification';
 import type { ApplicabilitySuggestion } from '@/types/acr.types';
 
 interface NASuggestionBannerProps {
@@ -59,7 +60,7 @@ export function NASuggestionBanner({ suggestion, onAccept, isAccepting }: NASugg
   };
 
   // Only show "Quick Accept" for high-confidence N/A suggestions
-  const showQuickAccept = suggestion.suggestedStatus === 'not_applicable' && suggestion.confidence >= 80;
+  const showQuickAccept = suggestion.suggestedStatus === 'not_applicable' && suggestion.confidence >= NA_QUICK_ACCEPT_THRESHOLD;
 
   return (
     <div className={cn(
@@ -103,6 +104,7 @@ export function NASuggestionBanner({ suggestion, onAccept, isAccepting }: NASugg
             onClick={() => setShowDetails(!showDetails)}
             className={cn(
               'flex items-center gap-1 text-xs font-medium hover:underline',
+              'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 rounded',
               config.textClass
             )}
           >

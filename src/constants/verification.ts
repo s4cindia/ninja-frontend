@@ -25,3 +25,9 @@ export const SEVERITY_THRESHOLDS = {
   SERIOUS: 50,
   MODERATE: 70,
 } as const;
+
+/**
+ * N/A Suggestion confidence threshold for "Quick Accept" feature.
+ * Only suggestions with confidence >= this threshold show the quick accept button.
+ */
+export const NA_QUICK_ACCEPT_THRESHOLD = 80;

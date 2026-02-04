@@ -6,7 +6,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { VerificationItem } from './VerificationItem';
 import { CriterionDetailsModal } from './CriterionDetailsModal';
 import { useVerificationQueue, useSubmitVerification, useBulkVerification } from '@/hooks/useVerification';
-import { CONFIDENCE_THRESHOLD_HIGH, CONFIDENCE_THRESHOLDS } from '@/constants/verification';
+import { CONFIDENCE_THRESHOLD_HIGH, CONFIDENCE_THRESHOLDS, NA_QUICK_ACCEPT_THRESHOLD } from '@/constants/verification';
 import { MOCK_VERIFICATION_ITEMS } from '@/constants/mockVerificationData';
 import type { CriterionConfidence } from '@/services/api';
 import type { 
@@ -311,7 +311,7 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
     return items.filter(item =>
       selectedItems.has(item.id) &&
       item.naSuggestion?.suggestedStatus === 'not_applicable' &&
-      item.naSuggestion.confidence >= 80
+      item.naSuggestion.confidence >= NA_QUICK_ACCEPT_THRESHOLD
     ).length;
   }, [items, selectedItems]);
 
@@ -476,7 +476,7 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
     const highConfidenceNAItems = items.filter(item =>
       selectedItems.has(item.id) &&
       item.naSuggestion?.suggestedStatus === 'not_applicable' &&
-      item.naSuggestion.confidence >= 80
+      item.naSuggestion.confidence >= NA_QUICK_ACCEPT_THRESHOLD
     );
 
     if (highConfidenceNAItems.length === 0) return;
@@ -507,15 +507,25 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
         onVerificationUpdate?.(item.id, 'verified_pass', 'Manual Review', naNote);
       });
     } else {
-      // For API-based flow, submit each with its specific N/A note
-      for (const item of highConfidenceNAItems) {
-        const naNote = `AI-suggested Not Applicable (${item.naSuggestion?.confidence}% confidence): ${item.naSuggestion?.rationale}`;
-        await submitMutation.mutateAsync({
-          itemId: item.id,
-          status: 'verified_pass',
-          method: 'Manual Review',
-          notes: naNote
-        });
+      // For API-based flow, submit all with proper error handling
+      const results = await Promise.allSettled(
+        highConfidenceNAItems.map(item => {
+          const naNote = `AI-suggested Not Applicable (${item.naSuggestion?.confidence}% confidence): ${item.naSuggestion?.rationale}`;
+          return submitMutation.mutateAsync({
+            itemId: item.id,
+            status: 'verified_pass',
+            method: 'Manual Review',
+            notes: naNote
+          });
+        })
+      );
+
+      const succeeded = results.filter(r => r.status === 'fulfilled').length;
+      const failed = results.filter(r => r.status === 'rejected').length;
+
+      if (failed > 0) {
+        console.warn(`[Bulk N/A Accept] ${succeeded} succeeded, ${failed} failed out of ${highConfidenceNAItems.length} items`);
+        // TODO: Show toast notification with success/failure counts
       }
     }
     setSelectedItems(new Set());
