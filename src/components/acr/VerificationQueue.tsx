@@ -702,7 +702,7 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
                 {selectedHighConfidenceNACount > 0 && (
                   <Button
                     size="sm"
-                    variant="default"
+                    variant="primary"
                     onClick={handleBulkAcceptNA}
                     disabled={isSubmitting}
                     isLoading={isSubmitting}

@@ -146,7 +146,7 @@ export function NASuggestionBanner({ suggestion, onAccept, isAccepting }: NASugg
           <div className="flex-shrink-0">
             <Button
               size="sm"
-              variant="default"
+              variant="primary"
               onClick={onAccept}
               disabled={isAccepting}
               isLoading={isAccepting}

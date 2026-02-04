@@ -1,5 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '@/stores/auth.store';
+import type { ApplicabilitySuggestion } from '@/types/acr.types';
 
 // Use environment variable for production, fallback to proxy path for development
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
@@ -192,6 +193,7 @@ export interface CriterionConfidence {
   remediatedCount?: number;
   remainingCount?: number;
   hasIssues?: boolean;
+  naSuggestion?: ApplicabilitySuggestion;
 }
 
 export interface AcrAnalysisResponse {
