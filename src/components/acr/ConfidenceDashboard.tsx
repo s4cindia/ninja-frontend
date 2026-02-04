@@ -650,8 +650,11 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     if (confidenceData?.criteria) {
       for (const c of confidenceData.criteria) {
         const remediatedIssues = c.remediatedIssues || c.fixedIssues;
+        // Field priority for fixed count: explicit count > array length > 0
+        // Backend may send fixedCount, remediatedCount, or just the issues array
         const fixedCount = c.fixedCount ?? c.remediatedCount ?? remediatedIssues?.length ?? 0;
-        // Use remainingCount to accurately track pending issues
+        // Field priority for remaining issues: issueCount > remainingCount > array length > 0
+        // Backend may update issueCount after remediation, or provide remainingCount separately
         const remainingIssueCount = c.issueCount ?? c.remainingCount ?? c.relatedIssues?.length ?? 0;
         
         const hasRelatedIssues = c.relatedIssues && c.relatedIssues.length > 0;
@@ -706,20 +709,18 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     setIsLoading(true);
     setError(null);
 
-    Promise.all([
-      fetchAcrAnalysis(jobId).catch(err => { 
-        if (import.meta.env.DEV) {
-          console.error('[ACR Step 3] ACR analysis failed:', err);
-        }
-        throw err;
-      }),
-      confidenceService.getConfidenceWithIssues(jobId).catch(err => {
-        if (import.meta.env.DEV) {
-          console.warn('[ACR Step 3] Confidence service failed, continuing with ACR data only:', err);
-        }
-        return null;
-      })
-    ])
+    // Fetch ACR analysis (required) and confidence data (optional enhancement)
+    // ACR analysis failure is critical and will show error state
+    // Confidence service failure is graceful - we continue with ACR data only
+    const acrPromise = fetchAcrAnalysis(jobId);
+    const confidencePromise = confidenceService.getConfidenceWithIssues(jobId).catch(err => {
+      if (import.meta.env.DEV) {
+        console.warn('[ACR Step 3] Confidence service failed, continuing with ACR data only:', err);
+      }
+      return null;
+    });
+
+    Promise.all([acrPromise, confidencePromise])
       .then(([acrResponse, confidenceResponse]) => {
         if (!cancelled) {
           const normalizedCriteria = (acrResponse.criteria || []).map((c, i) => normalizeCriterion(c, i));

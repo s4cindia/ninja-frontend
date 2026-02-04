@@ -16,8 +16,11 @@ export interface IssueMapping {
   xpath?: string;
 }
 
+// Shared status type for remediation across all interfaces
+export type RemediationStatusValue = 'REMEDIATED' | 'FAILED' | 'SKIPPED' | 'completed' | 'remediated';
+
 export interface RemediationInfo {
-  status: 'REMEDIATED' | 'FAILED' | 'SKIPPED' | 'completed';
+  status: RemediationStatusValue;
   completedAt?: string;
   method?: 'autofix' | 'quickfix' | 'manual';
   description?: string;
@@ -72,10 +75,10 @@ export interface OtherIssue {
   severity: 'critical' | 'serious' | 'moderate' | 'minor';
   status?: RemediationStatusType;
   remediationInfo?: {
-    status: string;
-    method: string;
-    completedAt: string;
-    description: string;
+    status?: RemediationStatusValue;
+    method?: 'auto' | 'manual';
+    completedAt?: string;
+    description?: string;
     details?: Record<string, unknown>;
   };
 }
