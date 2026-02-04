@@ -8,7 +8,7 @@ import { CriteriaTable, CriterionRow } from './CriteriaTable';
 import { WcagDocumentationModal } from './WcagDocumentationModal';
 import { CriterionDetailsModal } from './CriterionDetailsModal';
 import { useConfidenceWithIssues } from '@/hooks/useConfidence';
-import { IssueMapping, RemediatedIssue } from '@/types/confidence.types';
+import { IssueMapping, RemediatedIssue, OtherIssuesData } from '@/types/confidence.types';
 import { confidenceService } from '@/services/confidence.service';
 
 interface ConfidenceDashboardProps {
@@ -635,24 +635,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   const [showOnlyWithIssues, setShowOnlyWithIssues] = useState(false);
   const [showOtherIssues, setShowOtherIssues] = useState(false);
   const otherIssuesRef = useRef<HTMLDivElement>(null);
-  const [otherIssues, setOtherIssues] = useState<{
-    count: number;
-    pendingCount?: number;
-    fixedCount?: number;
-    issues: Array<{
-      code: string;
-      message: string;
-      severity: string;
-      location?: string;
-      status?: 'pending' | 'fixed' | 'failed' | 'skipped';
-      remediationInfo?: {
-        description: string;
-        fixedAt?: string;
-        fixType?: 'auto' | 'manual';
-        details?: Record<string, unknown>;
-      };
-    }>;
-  } | null>(null);
+  const [otherIssues, setOtherIssues] = useState<OtherIssuesData | null>(null);
 
   const { data: confidenceData } = useConfidenceWithIssues(jobId, undefined, { enabled: !isDemoJob(jobId) });
 
@@ -739,7 +722,8 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
           if (confidenceResponse?.otherIssues) {
             setOtherIssues(confidenceResponse.otherIssues);
           } else if (acrResponse.otherIssues) {
-            setOtherIssues(acrResponse.otherIssues);
+            // Normalize legacy format to canonical OtherIssuesData
+            setOtherIssues(acrResponse.otherIssues as OtherIssuesData);
           }
           setIsLoading(false);
         }
@@ -1457,11 +1441,17 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                             ))}
                           </div>
                         )}
-                        {issue.remediationInfo.fixedAt && (
-                          <p className="text-xs text-gray-500 mt-1">
-                            Fixed at: {new Date(issue.remediationInfo.fixedAt).toLocaleString()}
-                          </p>
-                        )}
+                        {(() => {
+                          const dateStr = issue.remediationInfo.completedAt;
+                          if (!dateStr) return null;
+                          const date = new Date(dateStr);
+                          if (isNaN(date.getTime())) return null;
+                          return (
+                            <p className="text-xs text-gray-500 mt-1">
+                              Fixed at: {date.toLocaleString()}
+                            </p>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
