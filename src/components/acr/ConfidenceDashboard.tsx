@@ -729,8 +729,33 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
           if (confidenceResponse?.otherIssues) {
             setOtherIssues(confidenceResponse.otherIssues);
           } else if (acrResponse.otherIssues) {
-            // Normalize legacy format to canonical OtherIssuesData
-            setOtherIssues(acrResponse.otherIssues as OtherIssuesData);
+            // Validate and normalize legacy format to canonical OtherIssuesData
+            const legacy = acrResponse.otherIssues;
+            if (
+              typeof legacy === 'object' &&
+              legacy !== null &&
+              Array.isArray((legacy as { issues?: unknown }).issues)
+            ) {
+              const issues = (legacy as { issues: unknown[] }).issues;
+              setOtherIssues({
+                count: (legacy as { count?: number }).count ?? issues.length,
+                pendingCount: (legacy as { pendingCount?: number }).pendingCount,
+                fixedCount: (legacy as { fixedCount?: number }).fixedCount,
+                issues: issues.map(issue => {
+                  const i = issue as Record<string, unknown>;
+                  return {
+                    code: String(i.code ?? ''),
+                    message: String(i.message ?? ''),
+                    location: i.location ? String(i.location) : undefined,
+                    severity: (['critical', 'serious', 'moderate', 'minor'].includes(String(i.severity)) 
+                      ? String(i.severity) 
+                      : 'moderate') as 'critical' | 'serious' | 'moderate' | 'minor',
+                    status: i.status as 'pending' | 'fixed' | 'failed' | 'skipped' | undefined,
+                    remediationInfo: i.remediationInfo as OtherIssuesData['issues'][0]['remediationInfo'],
+                  };
+                }),
+              });
+            }
           }
           setIsLoading(false);
         }

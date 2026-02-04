@@ -74,6 +74,9 @@ export interface OtherIssue {
   location?: string;
   severity: 'critical' | 'serious' | 'moderate' | 'minor';
   status?: RemediationStatusType;
+  // Note: OtherIssue.remediationInfo uses 'auto' | 'manual' from the legacy ACR endpoint,
+  // while RemediationInfo.method uses 'autofix' | 'quickfix' | 'manual' from the confidence API.
+  // These differ because they originate from different backend endpoints.
   remediationInfo?: {
     status?: RemediationStatusValue;
     method?: 'auto' | 'manual';
