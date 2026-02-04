@@ -473,7 +473,6 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
   };
 
   const handleBulkAcceptNA = async () => {
-    const itemIds = Array.from(selectedItems);
     const highConfidenceNAItems = items.filter(item =>
       selectedItems.has(item.id) &&
       item.naSuggestion?.suggestedStatus === 'not_applicable' &&

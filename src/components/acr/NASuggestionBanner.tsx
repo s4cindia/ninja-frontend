@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, CheckCircle, AlertTriangle, Info, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronRight, CheckCircle, AlertTriangle, Sparkles } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import type { ApplicabilitySuggestion } from '@/types/acr.types';
@@ -56,15 +56,6 @@ export function NASuggestionBanner({ suggestion, onAccept, isAccepting }: NASugg
       return 'AI Suggests: Uncertain - Review Required';
     }
     return 'AI Suggestion Available';
-  };
-
-  const getSuggestionIcon = () => {
-    if (suggestion.suggestedStatus === 'not_applicable' && suggestion.confidence >= 90) {
-      return <CheckCircle className="h-5 w-5" />;
-    } else if (suggestion.suggestedStatus === 'uncertain') {
-      return <AlertTriangle className="h-5 w-5" />;
-    }
-    return <Info className="h-5 w-5" />;
   };
 
   // Only show "Quick Accept" for high-confidence N/A suggestions
