@@ -1236,12 +1236,12 @@ const imageAltTemplate: QuickFixTemplate = {
         if (matchedContextImage?.html) {
           currentElement = matchedContextImage.html;
         } else {
-          // For multi-image issues, generate image-specific placeholder from the path
-          // This ensures each change targets the correct <img> tag in the source file
-          // DO NOT use context.currentContent here as it's the same for all images
-          // XSS Prevention: Sanitize img.imagePath before using in template
           const sanitizedPath = sanitizeImageSrc(img.imagePath);
-          currentElement = `<img src="${sanitizedPath}"/>`; 
+          if (!sanitizedPath) {
+            skippedCount++;
+            return;
+          }
+          currentElement = `<img src="${sanitizedPath}"/>`;
         }
 
         // Generate change using helper function

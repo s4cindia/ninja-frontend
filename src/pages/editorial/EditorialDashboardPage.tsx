@@ -1,3 +1,4 @@
+import type { ComponentType } from 'react';
 import { Link } from 'react-router-dom';
 import { BookOpen, Search, CheckSquare } from 'lucide-react';
 
@@ -6,7 +7,7 @@ interface ModuleCard {
   description: string;
   path: string;
   jobCount: number;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
   color: string;
 }
 
