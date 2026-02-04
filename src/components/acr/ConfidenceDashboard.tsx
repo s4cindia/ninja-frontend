@@ -8,7 +8,7 @@ import { CriteriaTable, CriterionRow } from './CriteriaTable';
 import { WcagDocumentationModal } from './WcagDocumentationModal';
 import { CriterionDetailsModal } from './CriterionDetailsModal';
 import { useConfidenceWithIssues } from '@/hooks/useConfidence';
-import { IssueMapping, RemediatedIssue, OtherIssuesData } from '@/types/confidence.types';
+import { IssueMapping, RemediatedIssue, OtherIssuesData, NaSuggestion } from '@/types/confidence.types';
 import { confidenceService } from '@/services/confidence.service';
 
 interface ConfidenceDashboardProps {
@@ -724,7 +724,22 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     Promise.all([acrPromise, confidencePromise])
       .then(([acrResponse, confidenceResponse]) => {
         if (!cancelled) {
-          const normalizedCriteria = (acrResponse.criteria || []).map((c, i) => normalizeCriterion(c, i));
+          // Build a map of naSuggestion data from confidence response
+          const naSuggestionMap = new Map<string, NaSuggestion>();
+          if (confidenceResponse?.criteria) {
+            for (const c of confidenceResponse.criteria) {
+              if (c.naSuggestion) {
+                naSuggestionMap.set(c.criterionId, c.naSuggestion);
+              }
+            }
+          }
+          
+          // Merge naSuggestion into criteria during normalization
+          const normalizedCriteria = (acrResponse.criteria || []).map((c, i) => {
+            const criterionId = extractCriterionId(c, i);
+            const naSuggestion = naSuggestionMap.get(criterionId) || c.naSuggestion;
+            return normalizeCriterion({ ...c, naSuggestion: naSuggestion as CriterionConfidence['naSuggestion'] }, i);
+          });
           setCriteria(normalizedCriteria);
           
           if (confidenceResponse?.otherIssues) {
