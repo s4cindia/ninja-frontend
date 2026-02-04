@@ -882,7 +882,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   const { tableRows, transformed } = analysisData;
 
   /**
-   * Filter criteria for "Has Issues" view.
+   * Filter criteria for "Has Issues" view and confidence level filtering.
    * Priority order (first match wins):
    * 1. issuesByCriterion - Most reliable, derived from audit issue mapping
    * 2. issueCount/remainingCount - Direct counts from criterion data
@@ -890,27 +890,50 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
    * 4. needsVerification - Items requiring human verification
    * 5. status === 'fail' - Failing criteria status
    */
-  const filteredCriteria = showOnlyWithIssues
-    ? criteria.filter(c => {
-        // Priority 1: Check issuesByCriterion (most reliable source)
-        const issueInfo = issuesByCriterion.get(c.criterionId);
-        if (issueInfo && issueInfo.count > 0) return true;
-        
-        // Priority 2: Check issueCount/remainingCount from criterion
-        if ((c.issueCount || 0) > 0 || (c.remainingCount || 0) > 0) return true;
-        
-        // Priority 3: Check hasIssues flag from backend
-        if (c.hasIssues === true) return true;
-        
-        // Priority 4: Include items needing verification
-        if (c.needsVerification === true) return true;
-        
-        // Priority 5: Check for failing status
-        if (c.status === 'fail') return true;
-        
-        return false;
-      })
-    : criteria;
+  const filteredCriteria = criteria.filter(c => {
+    // First apply confidence filter
+    if (confidenceFilter !== 'all') {
+      const isManual = c.requiresManualVerification || c.confidenceScore === 0;
+      const isHigh = c.confidenceScore >= 90 && !c.requiresManualVerification;
+      const isMedium = c.confidenceScore >= 60 && c.confidenceScore < 90;
+      
+      if (confidenceFilter === 'manual' && !isManual) return false;
+      if (confidenceFilter === 'high' && !isHigh) return false;
+      if (confidenceFilter === 'medium' && !isMedium) return false;
+    }
+    
+    // Then apply "has issues" filter if enabled
+    if (showOnlyWithIssues) {
+      // Priority 1: Check issuesByCriterion (most reliable source)
+      const issueInfo = issuesByCriterion.get(c.criterionId);
+      if (issueInfo && issueInfo.count > 0) return true;
+      
+      // Priority 2: Check issueCount/remainingCount from criterion
+      if ((c.issueCount || 0) > 0 || (c.remainingCount || 0) > 0) return true;
+      
+      // Priority 3: Check hasIssues flag from backend
+      if (c.hasIssues === true) return true;
+      
+      // Priority 4: Include items needing verification
+      if (c.needsVerification === true) return true;
+      
+      // Priority 5: Check for failing status
+      if (c.status === 'fail') return true;
+      
+      return false;
+    }
+    
+    return true;
+  });
+  
+  // Calculate confidence category counts for filter buttons
+  const confidenceCounts = useMemo(() => ({
+    all: criteria.length,
+    high: criteria.filter(c => c.confidenceScore >= 90 && !c.requiresManualVerification).length,
+    medium: criteria.filter(c => c.confidenceScore >= 60 && c.confidenceScore < 90).length,
+    manual: criteria.filter(c => c.requiresManualVerification || c.confidenceScore === 0).length,
+    low: criteria.filter(c => c.confidenceScore < 60 && c.confidenceScore > 0 && !c.requiresManualVerification).length,
+  }), [criteria]);
 
   // Group by status first, then by confidence within each status
   const hybridGroupedCriteria: Record<StatusGroup, Record<ConfidenceGroup, CriterionConfidence[]>> = {
@@ -1212,6 +1235,102 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
             <p className="text-xs text-gray-500 mt-1">criteria with fixed issues</p>
           </div>
         )}
+      </div>
+
+      {/* Confidence Analysis Summary */}
+      <div className="bg-white rounded-lg border shadow-sm p-6">
+        <h2 className="text-lg font-bold mb-4 text-gray-900">Confidence Analysis Summary</h2>
+        
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
+            <div className="text-3xl font-bold text-green-600">{confidenceCounts.high}</div>
+            <div className="text-sm text-gray-600">High Confidence (90%+)</div>
+            <div className="text-xs text-gray-500 mt-1">Reliably automated</div>
+          </div>
+          
+          <div className="text-center p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+            <div className="text-3xl font-bold text-yellow-600">{confidenceCounts.medium}</div>
+            <div className="text-sm text-gray-600">Medium Confidence (60-89%)</div>
+            <div className="text-xs text-gray-500 mt-1">Partial automation</div>
+          </div>
+          
+          <div className="text-center p-4 bg-orange-50 rounded-lg border border-orange-200">
+            <div className="text-3xl font-bold text-orange-600">{confidenceCounts.low}</div>
+            <div className="text-sm text-gray-600">Low Confidence (&lt;60%)</div>
+            <div className="text-xs text-gray-500 mt-1">Limited automation</div>
+          </div>
+          
+          <div className="text-center p-4 bg-amber-50 rounded-lg border border-amber-300">
+            <div className="text-3xl font-bold text-amber-600">{confidenceCounts.manual}</div>
+            <div className="text-sm text-gray-600">Manual Review Required</div>
+            <div className="text-xs text-gray-500 mt-1">Human verification needed</div>
+          </div>
+        </div>
+        
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-semibold text-blue-900">Overall Automation Confidence</div>
+              <div className="text-sm text-blue-700">
+                Based on {criteria.length} WCAG 2.1 Level A & AA criteria
+              </div>
+            </div>
+            <div className="text-4xl font-bold text-blue-600">{overallConfidence}%</div>
+          </div>
+          {confidenceCounts.manual > 0 && (
+            <div className="mt-2 text-sm text-blue-800">
+              Note: {confidenceCounts.manual} criteria require manual human verification for complete conformance assessment
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Confidence Filter Buttons */}
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => setConfidenceFilter('all')}
+          className={cn(
+            'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+            confidenceFilter === 'all'
+              ? 'bg-blue-500 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          )}
+        >
+          All Criteria ({confidenceCounts.all})
+        </button>
+        <button
+          onClick={() => setConfidenceFilter('high')}
+          className={cn(
+            'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+            confidenceFilter === 'high'
+              ? 'bg-green-500 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          )}
+        >
+          High Confidence ({confidenceCounts.high})
+        </button>
+        <button
+          onClick={() => setConfidenceFilter('medium')}
+          className={cn(
+            'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+            confidenceFilter === 'medium'
+              ? 'bg-yellow-500 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          )}
+        >
+          Medium Confidence ({confidenceCounts.medium})
+        </button>
+        <button
+          onClick={() => setConfidenceFilter('manual')}
+          className={cn(
+            'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+            confidenceFilter === 'manual'
+              ? 'bg-amber-500 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          )}
+        >
+          Manual Review Required ({confidenceCounts.manual})
+        </button>
       </div>
 
       {/* View Mode Toggle */}
