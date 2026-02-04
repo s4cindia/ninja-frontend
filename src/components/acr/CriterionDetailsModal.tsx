@@ -7,8 +7,10 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '@/services/api';
 import { cn } from '@/lib/utils';
 import { wcagDocumentationService } from '@/services/wcag-documentation.service';
+import { verificationService } from '@/services/verification.service';
+import { NaSuggestionBanner } from './NaSuggestionBanner';
 import type { CriterionConfidence } from '@/services/api';
-import type { IssueMapping, RemediatedIssue } from '@/types/confidence.types';
+import type { IssueMapping, RemediatedIssue, NaSuggestion } from '@/types/confidence.types';
 
 function isFixedStatus(issue: RemediatedIssue): boolean {
   const status = issue.remediationInfo?.status ?? issue.status;
@@ -31,6 +33,7 @@ interface CriterionDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onVerifyClick?: (criterionId: string) => void;
+  onStatusChange?: (criterionId: string, newStatus: string) => void;
   mode?: 'preview' | 'interactive';
 }
 
@@ -42,11 +45,28 @@ export function CriterionDetailsModal({
   isOpen,
   onClose,
   onVerifyClick,
+  onStatusChange,
   mode = 'interactive'
 }: CriterionDetailsModalProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'issues' | 'testing' | 'remediation' | 'wcag'>('overview');
   const [epubTitle, setEpubTitle] = useState<string>('');
   const [hasRemediationData, setHasRemediationData] = useState<boolean>(false);
+  const [naAccepted, setNaAccepted] = useState<boolean>(false);
+
+  const handleQuickAcceptNa = async (data: {
+    criterionId: string;
+    jobId: string;
+    status: 'not_applicable';
+    method: 'ai_suggested';
+    notes: string;
+  }) => {
+    await verificationService.submitNaVerification(data);
+  };
+
+  const handleNaAcceptSuccess = () => {
+    setNaAccepted(true);
+    onStatusChange?.(criterion.criterionId, 'not_applicable');
+  };
   const navigate = useNavigate();
   const wcagDocs = wcagDocumentationService.getDocumentation(criterion.criterionId);
 
@@ -181,6 +201,27 @@ export function CriterionDetailsModal({
 
           <div className="flex-1 overflow-y-auto mt-4">
             <TabsContent value="overview" className="space-y-4 mt-0">
+              {criterion.naSuggestion?.suggestedStatus === 'not_applicable' && jobId && !naAccepted && (
+                <NaSuggestionBanner
+                  naSuggestion={criterion.naSuggestion as NaSuggestion}
+                  criterionId={criterion.criterionId}
+                  jobId={jobId}
+                  onQuickAccept={handleQuickAcceptNa}
+                  onAcceptSuccess={handleNaAcceptSuccess}
+                />
+              )}
+
+              {naAccepted && (
+                <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-4 rounded-r-lg">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <span className="text-green-800 font-medium">
+                      Not Applicable status accepted and saved
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div className="bg-white border rounded-lg p-4">
                 <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                   {criterion.status === 'pass' ? (
