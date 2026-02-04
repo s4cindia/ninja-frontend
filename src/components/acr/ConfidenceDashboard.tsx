@@ -1444,7 +1444,10 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                           <div className="mt-2 text-xs text-green-700 bg-green-100/50 p-2 rounded font-mono">
                             {Object.entries(issue.remediationInfo.details).map(([key, value]) => (
                               <div key={key}>
-                                <span className="font-medium">{key}:</span> {String(value)}
+                                <span className="font-medium">{key}:</span>{' '}
+                                {typeof value === 'object' && value !== null
+                                  ? JSON.stringify(value, null, 2)
+                                  : String(value)}
                               </div>
                             ))}
                           </div>
@@ -1459,7 +1462,8 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                   </div>
                 </div>
               </div>
-            );})}
+            );
+          })}
           </div>
         </div>
       )}
