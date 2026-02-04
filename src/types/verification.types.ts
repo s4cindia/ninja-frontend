@@ -1,3 +1,5 @@
+import type { ApplicabilitySuggestion } from './acr.types';
+
 export type VerificationStatus = 'pending' | 'verified_pass' | 'verified_fail' | 'verified_partial' | 'deferred';
 export type Severity = 'critical' | 'serious' | 'moderate' | 'minor';
 export type ConfidenceLevel = 'high' | 'medium' | 'low' | 'manual';
@@ -47,6 +49,7 @@ export interface VerificationItem {
   fixedIssues?: FixedVerificationIssue[];
   fixedCount?: number;
   remainingCount?: number;
+  naSuggestion?: ApplicabilitySuggestion;
 }
 
 export interface VerificationQueueData {
