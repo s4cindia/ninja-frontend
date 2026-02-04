@@ -822,7 +822,11 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   });
 
   // Calculate counts for each status group (use filteredCriteria for display)
-  // Consider fully remediated criteria as "pass" even if needsVerification is still true
+  // Status count calculation with frontend boost for remediated criteria
+  // NOTE: This is a temporary UX improvement until backend updates status to 'pass'.
+  // When all issues for a criterion are remediated (remediatedCount > 0, count === 0),
+  // we display it as "pass" even if backend hasn't updated yet.
+  // See: docs/BACKEND_ACR_REMEDIATION_SPEC.md for backend sync requirements.
   const statusCounts: Record<StatusGroup, number> = {
     pass: 0,
     fail: 0,
@@ -837,6 +841,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                               issueInfo.count === 0;
     
     if (isFullyRemediated) {
+      // Temporary boost: treat fully remediated as pass until backend sync
       statusCounts.pass++;
     } else {
       const statusGroup = getStatusGroup(c);
