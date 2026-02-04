@@ -317,15 +317,15 @@ function getManualVerificationInfo(criterionId: string): { requiresManualVerific
 }
 
 function getConfidenceColor(confidence: number): string {
-  if (confidence >= 80) return 'bg-green-500';
-  if (confidence >= 50) return 'bg-yellow-500';
+  if (confidence >= 90) return 'bg-green-500';
+  if (confidence >= 60) return 'bg-yellow-500';
   if (confidence > 0) return 'bg-orange-500';
   return 'bg-gray-400';
 }
 
 function getConfidenceLabel(confidence: number): string {
-  if (confidence >= 80) return 'High';
-  if (confidence >= 50) return 'Medium';
+  if (confidence >= 90) return 'High';
+  if (confidence >= 60) return 'Medium';
   if (confidence > 0) return 'Low';
   return 'Manual';
 }
@@ -344,10 +344,10 @@ function getStatusGroup(criterion: CriterionConfidence): StatusGroup {
 }
 
 function getConfidenceGroup(criterion: CriterionConfidence): ConfidenceGroup {
-  if (criterion.confidenceScore >= 80) return 'high';
-  if (criterion.confidenceScore >= 50) return 'medium';
-  if (criterion.confidenceScore > 0) return 'low';
-  return 'manual';
+  if (criterion.requiresManualVerification || criterion.confidenceScore === 0) return 'manual';
+  if (criterion.confidenceScore >= 90) return 'high';
+  if (criterion.confidenceScore >= 60) return 'medium';
+  return 'low';
 }
 
 function isDemoJob(jobId: string): boolean {
@@ -927,13 +927,17 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   });
   
   // Calculate confidence category counts for filter buttons
-  const confidenceCounts = useMemo(() => ({
-    all: criteria.length,
-    high: criteria.filter(c => c.confidenceScore >= 90 && !c.requiresManualVerification).length,
-    medium: criteria.filter(c => c.confidenceScore >= 60 && c.confidenceScore < 90).length,
-    manual: criteria.filter(c => c.requiresManualVerification || c.confidenceScore === 0).length,
-    low: criteria.filter(c => c.confidenceScore < 60 && c.confidenceScore > 0 && !c.requiresManualVerification).length,
-  }), [criteria]);
+  // Manual verification overrides all other categories
+  const confidenceCounts = useMemo(() => {
+    const isManual = (c: CriterionConfidence) => c.requiresManualVerification || c.confidenceScore === 0;
+    return {
+      all: criteria.length,
+      high: criteria.filter(c => !isManual(c) && c.confidenceScore >= 90).length,
+      medium: criteria.filter(c => !isManual(c) && c.confidenceScore >= 60 && c.confidenceScore < 90).length,
+      low: criteria.filter(c => !isManual(c) && c.confidenceScore < 60 && c.confidenceScore > 0).length,
+      manual: criteria.filter(c => isManual(c)).length,
+    };
+  }, [criteria]);
 
   // Group by status first, then by confidence within each status
   const hybridGroupedCriteria: Record<StatusGroup, Record<ConfidenceGroup, CriterionConfidence[]>> = {
@@ -1286,9 +1290,10 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
       </div>
 
       {/* Confidence Filter Buttons */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by confidence level">
         <button
           onClick={() => setConfidenceFilter('all')}
+          aria-pressed={confidenceFilter === 'all'}
           className={cn(
             'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
             confidenceFilter === 'all'
@@ -1300,6 +1305,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
         </button>
         <button
           onClick={() => setConfidenceFilter('high')}
+          aria-pressed={confidenceFilter === 'high'}
           className={cn(
             'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
             confidenceFilter === 'high'
@@ -1311,6 +1317,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
         </button>
         <button
           onClick={() => setConfidenceFilter('medium')}
+          aria-pressed={confidenceFilter === 'medium'}
           className={cn(
             'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
             confidenceFilter === 'medium'
@@ -1322,6 +1329,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
         </button>
         <button
           onClick={() => setConfidenceFilter('manual')}
+          aria-pressed={confidenceFilter === 'manual'}
           className={cn(
             'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
             confidenceFilter === 'manual'

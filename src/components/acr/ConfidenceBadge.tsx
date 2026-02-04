@@ -43,14 +43,13 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({
 
   const getConfidenceColor = () => {
     if (confidence >= 90) return 'bg-green-100 text-green-800 border-green-300';
-    if (confidence >= 70) return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-    if (confidence >= 50) return 'bg-orange-100 text-orange-800 border-orange-300';
-    return 'bg-red-100 text-red-800 border-red-300';
+    if (confidence >= 60) return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+    return 'bg-orange-100 text-orange-800 border-orange-300';
   };
 
   const getConfidenceLabel = () => {
     if (confidence >= 90) return 'High';
-    if (confidence >= 70) return 'Medium';
+    if (confidence >= 60) return 'Medium';
     return 'Low';
   };
 
