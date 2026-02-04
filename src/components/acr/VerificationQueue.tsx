@@ -133,6 +133,7 @@ function convertCriteriaToVerificationItems(
         fixedIssues: fixedIssues && fixedIssues.length > 0 ? fixedIssues : undefined,
         fixedCount,
         remainingCount,
+        naSuggestion: c.naSuggestion,
       };
 
       if (saved) {
@@ -305,6 +306,15 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
   const bulkRequiresNotes = bulkStatus === 'verified_fail' || bulkStatus === 'verified_partial';
   const canBulkSubmit = selectedItems.size > 0 && (!bulkRequiresNotes || bulkNotes.trim().length > 0);
 
+  // Count high-confidence N/A suggestions among selected items
+  const selectedHighConfidenceNACount = useMemo(() => {
+    return items.filter(item =>
+      selectedItems.has(item.id) &&
+      item.naSuggestion?.suggestedStatus === 'not_applicable' &&
+      item.naSuggestion.confidence >= 80
+    ).length;
+  }, [items, selectedItems]);
+
   const filteredItems = useMemo(() => {
     if (!useMockData) return items;
     return items.filter((item) => {
@@ -427,15 +437,15 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
 
   const handleBulkSubmit = async () => {
     if (!canBulkSubmit) return;
-    
+
     const itemIds = Array.from(selectedItems);
     // Update local items when using mock data OR when using criteria from analysis
     if (useMockData || useLocalItems || hasCriteriaFromAnalysis) {
-      setLocalItems(prev => prev.map(item => 
+      setLocalItems(prev => prev.map(item =>
         selectedItems.has(item.id)
-          ? { 
-              ...item, 
-              status: bulkStatus, 
+          ? {
+              ...item,
+              status: bulkStatus,
               history: [...item.history, {
                 id: `h-${Date.now()}-${item.id}`,
                 status: bulkStatus,
@@ -444,22 +454,72 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
                 verifiedBy: 'Current User',
                 verifiedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
               }]
-            } 
+            }
           : item
       ));
       itemIds.forEach(itemId => {
         onVerificationUpdate?.(itemId, bulkStatus, bulkMethod, bulkNotes);
       });
     } else {
-      await bulkMutation.mutateAsync({ 
-        itemIds, 
-        status: bulkStatus, 
-        method: bulkMethod, 
-        notes: bulkNotes 
+      await bulkMutation.mutateAsync({
+        itemIds,
+        status: bulkStatus,
+        method: bulkMethod,
+        notes: bulkNotes
       });
     }
     setSelectedItems(new Set());
     setBulkNotes('');
+  };
+
+  const handleBulkAcceptNA = async () => {
+    const itemIds = Array.from(selectedItems);
+    const highConfidenceNAItems = items.filter(item =>
+      selectedItems.has(item.id) &&
+      item.naSuggestion?.suggestedStatus === 'not_applicable' &&
+      item.naSuggestion.confidence >= 80
+    );
+
+    if (highConfidenceNAItems.length === 0) return;
+
+    // Update local items when using mock data OR when using criteria from analysis
+    if (useMockData || useLocalItems || hasCriteriaFromAnalysis) {
+      setLocalItems(prev => prev.map(item => {
+        const suggestion = item.naSuggestion;
+        if (selectedItems.has(item.id) && suggestion?.suggestedStatus === 'not_applicable' && suggestion.confidence >= 80) {
+          const naNote = `AI-suggested Not Applicable (${suggestion.confidence}% confidence): ${suggestion.rationale}`;
+          return {
+            ...item,
+            status: 'verified_pass' as VerificationStatus,
+            history: [...item.history, {
+              id: `h-${Date.now()}-${item.id}`,
+              status: 'verified_pass' as VerificationStatus,
+              method: 'Manual Review' as VerificationMethod,
+              notes: naNote,
+              verifiedBy: 'Current User',
+              verifiedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+            }]
+          };
+        }
+        return item;
+      }));
+      highConfidenceNAItems.forEach(item => {
+        const naNote = `AI-suggested Not Applicable (${item.naSuggestion?.confidence}% confidence): ${item.naSuggestion?.rationale}`;
+        onVerificationUpdate?.(item.id, 'verified_pass', 'Manual Review', naNote);
+      });
+    } else {
+      // For API-based flow, submit each with its specific N/A note
+      for (const item of highConfidenceNAItems) {
+        const naNote = `AI-suggested Not Applicable (${item.naSuggestion?.confidence}% confidence): ${item.naSuggestion?.rationale}`;
+        await submitMutation.mutateAsync({
+          itemId: item.id,
+          status: 'verified_pass',
+          method: 'Manual Review',
+          notes: naNote
+        });
+      }
+    }
+    setSelectedItems(new Set());
   };
 
   const toggleFilter = <T extends string>(
@@ -640,10 +700,28 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
                   <CheckSquare className="h-4 w-4" />
                   Apply to Selected
                 </Button>
+                {selectedHighConfidenceNACount > 0 && (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={handleBulkAcceptNA}
+                    disabled={isSubmitting}
+                    isLoading={isSubmitting}
+                    className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    <CheckSquare className="h-4 w-4" />
+                    Quick Accept {selectedHighConfidenceNACount} N/A
+                  </Button>
+                )}
               </div>
             </div>
             {bulkRequiresNotes && !bulkNotes.trim() && (
               <p className="text-xs text-red-600 mt-2">Notes are required for Fail status</p>
+            )}
+            {selectedHighConfidenceNACount > 0 && selectedHighConfidenceNACount < selectedItems.size && (
+              <p className="text-xs text-blue-700 mt-2 bg-blue-50 px-2 py-1 rounded">
+                {selectedHighConfidenceNACount} of {selectedItems.size} selected items have high-confidence (≥80%) N/A suggestions
+              </p>
             )}
           </div>
         )}

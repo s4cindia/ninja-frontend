@@ -1,23 +1,24 @@
 import { useState, useEffect } from 'react';
-import { 
-  ChevronDown, 
+import {
+  ChevronDown,
   ChevronRight,
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  AlertTriangle, 
+  Clock,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
   AlertCircle,
-  History, 
+  History,
   FileText,
   Copy
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import type { 
-  VerificationItem as VerificationItemType, 
-  VerificationStatus, 
-  VerificationMethod 
+import { NASuggestionBanner } from './NASuggestionBanner';
+import type {
+  VerificationItem as VerificationItemType,
+  VerificationStatus,
+  VerificationMethod
 } from '@/types/verification.types';
 
 interface VerificationItemProps {
@@ -102,6 +103,16 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
     if (canSubmit) {
       onSubmit(item.id, formStatus, formMethod, formNotes);
     }
+  };
+
+  const handleAcceptNASuggestion = () => {
+    // Accept the N/A suggestion by marking as verified pass with AI-generated note
+    const naNote = `AI-suggested Not Applicable (${item.naSuggestion?.confidence}% confidence): ${item.naSuggestion?.rationale}`;
+    setFormStatus('verified_pass');
+    setFormMethod('Manual Review');
+    setFormNotes(naNote);
+    // Auto-submit the verification
+    onSubmit(item.id, 'verified_pass', 'Manual Review', naNote);
   };
 
   const handleRowClick = (e: React.MouseEvent) => {
@@ -235,6 +246,15 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
               <h4 className="text-sm font-medium text-gray-700 mb-1">Automated Finding</h4>
               <p className="text-sm text-gray-600">{item.automatedNotes}</p>
             </div>
+
+            {/* N/A Suggestion Banner */}
+            {item.naSuggestion && (
+              <NASuggestionBanner
+                suggestion={item.naSuggestion}
+                onAccept={handleAcceptNASuggestion}
+                isAccepting={isSubmitting}
+              />
+            )}
 
             {/* SECTION 1: Fixed Issues (Reference Only) */}
             {item.fixedIssues && item.fixedIssues.length > 0 && (
