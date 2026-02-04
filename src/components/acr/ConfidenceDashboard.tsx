@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { AlertCircle, AlertTriangle, CheckCircle, LayoutGrid, Table, HelpCircle, ChevronDown, BookOpen } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle, LayoutGrid, Table, HelpCircle, ChevronDown, BookOpen, Lightbulb } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
@@ -995,6 +995,16 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
               </span>
             )}
             <span className="text-gray-600">{criterion.name}</span>
+            {/* N/A Suggestion indicator */}
+            {criterion.naSuggestion && (
+              <span 
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium"
+                title={`AI suggests N/A (${criterion.naSuggestion.confidence}% confidence)`}
+              >
+                <Lightbulb className="h-3 w-3" aria-hidden="true" />
+                N/A
+              </span>
+            )}
             {/* Issue count badges - show both pending and remediated */}
             {issueData && (issueData.count > 0 || (issueData.remediatedCount && issueData.remediatedCount > 0)) && (
               <span className="inline-flex items-center gap-1">
