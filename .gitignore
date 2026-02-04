@@ -155,3 +155,6 @@ FE-PDF-*.txt
 prompts/
 FE-PDF-*.txt
 
+
+# Local temporary files
+IMPLEMENTATION_SUMMARY.md
