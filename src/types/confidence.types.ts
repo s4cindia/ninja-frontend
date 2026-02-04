@@ -69,6 +69,8 @@ export interface CriterionConfidenceWithIssues {
   fixedCount?: number;
   needsVerification?: boolean;
   naSuggestion?: NaSuggestion;
+  requiresManualVerification?: boolean;
+  automationCapability?: number;
 }
 
 export interface ConfidenceSummary {
