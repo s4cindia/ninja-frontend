@@ -95,12 +95,22 @@ export const ReAuditSection: React.FC<ReAuditSectionProps> = ({
           setResult(mappedResult);
           onReauditComplete(mappedResult);
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error("Re-audit failed:", err);
-        const errorMessage = err.response?.data?.error?.message
-          || err.response?.data?.message
-          || err.message
-          || "Failed to analyze EPUB. Please try again.";
+        let errorMessage = "Failed to analyze EPUB. Please try again.";
+
+        if (err && typeof err === "object") {
+          const error = err as {
+            response?: { data?: { error?: { message?: string }; message?: string } };
+            message?: string;
+          };
+          errorMessage =
+            error.response?.data?.error?.message ||
+            error.response?.data?.message ||
+            error.message ||
+            errorMessage;
+        }
+
         setError(errorMessage);
       } finally {
         setIsUploading(false);
