@@ -80,9 +80,20 @@ export const ReAuditSection: React.FC<ReAuditSectionProps> = ({
             },
           );
 
-          const data = response.data.data || response.data;
-          setResult(data);
-          onReauditComplete(data);
+          const backendData = response.data.data || response.data;
+
+          // Map backend field names to frontend interface
+          const mappedResult: ReauditResult = {
+            originalIssues: backendData.originalIssues,
+            resolved: backendData.fixedIssues || 0,
+            stillPending: backendData.remainingIssues || 0,
+            newIssuesFound: backendData.remainingIssuesList || [],
+            score: backendData.score,
+            resolvedIssueCodes: backendData.resolvedIssueCodes,
+          };
+
+          setResult(mappedResult);
+          onReauditComplete(mappedResult);
         }
       } catch (err: any) {
         console.error("Re-audit failed:", err);
