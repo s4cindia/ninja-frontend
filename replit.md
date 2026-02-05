@@ -84,8 +84,8 @@ The application features a clean, responsive design built with Tailwind CSS. It 
 New feature allowing AI-suggested "Not Applicable" status for WCAG criteria with one-click acceptance:
 - **NaSuggestion Type**: Added to `confidence.types.ts` with `suggestedStatus`, `confidence`, `rationale`, `detectionChecks`, and `edgeCases` fields.
 - **NaSuggestionBanner Component**: Blue banner displayed in CriterionDetailsModal when AI suggests N/A status. Features:
-  - Confidence badge (High ≥80% green, Medium 60-79% yellow, Low <60% red)
-  - Quick Accept button for high-confidence suggestions (≥80%)
+  - Confidence badge (High ≥90% green, Medium 60-89% yellow, Low <60% red)
+  - Quick Accept button for high-confidence suggestions (≥90%)
   - Expandable detection checks section showing what was analyzed
   - Edge cases warnings section
 - **Verification Service**: New `submitNaVerification` method sends AI-suggested N/A status to backend with auto-generated notes.

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { ChevronDown, ChevronUp, CheckCircle, AlertTriangle, XCircle, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { NaSuggestion } from '@/types/confidence.types';
 
@@ -19,7 +19,7 @@ interface NaSuggestionBannerProps {
 }
 
 function getConfidenceLabel(confidence: number): { label: string; colorClass: string } {
-  if (confidence >= 80) {
+  if (confidence >= 90) {
     return { label: 'High Confidence', colorClass: 'bg-green-100 text-green-800' };
   } else if (confidence >= 60) {
     return { label: 'Medium Confidence', colorClass: 'bg-yellow-100 text-yellow-800' };
@@ -55,7 +55,7 @@ export function NaSuggestionBanner({
   }
 
   const { label: confidenceLabel, colorClass: confidenceColorClass } = getConfidenceLabel(naSuggestion.confidence);
-  const showQuickAccept = naSuggestion.confidence >= 80;
+  const showQuickAccept = naSuggestion.confidence >= 90;
 
   const handleQuickAccept = async () => {
     setIsLoading(true);
@@ -101,17 +101,10 @@ export function NaSuggestionBanner({
             variant="primary"
             size="sm"
             onClick={handleQuickAccept}
-            disabled={isLoading}
+            isLoading={isLoading}
             className="flex-shrink-0"
           >
-            {isLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Accepting...
-              </>
-            ) : (
-              'Quick Accept N/A'
-            )}
+            {isLoading ? 'Accepting...' : 'Quick Accept N/A'}
           </Button>
         )}
       </div>

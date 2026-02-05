@@ -928,16 +928,15 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   
   // Calculate confidence category counts for filter buttons
   // Manual verification overrides all other categories
-  const confidenceCounts = useMemo(() => {
-    const isManual = (c: CriterionConfidence) => c.requiresManualVerification || c.confidenceScore === 0;
-    return {
-      all: criteria.length,
-      high: criteria.filter(c => !isManual(c) && c.confidenceScore >= 90).length,
-      medium: criteria.filter(c => !isManual(c) && c.confidenceScore >= 60 && c.confidenceScore < 90).length,
-      low: criteria.filter(c => !isManual(c) && c.confidenceScore < 60 && c.confidenceScore > 0).length,
-      manual: criteria.filter(c => isManual(c)).length,
-    };
-  }, [criteria]);
+  // Note: Computed synchronously (not useMemo) to avoid hooks after early return
+  const isManualCriterion = (c: CriterionConfidence) => c.requiresManualVerification || c.confidenceScore === 0;
+  const confidenceCounts = {
+    all: criteria.length,
+    high: criteria.filter(c => !isManualCriterion(c) && c.confidenceScore >= 90).length,
+    medium: criteria.filter(c => !isManualCriterion(c) && c.confidenceScore >= 60 && c.confidenceScore < 90).length,
+    low: criteria.filter(c => !isManualCriterion(c) && c.confidenceScore < 60 && c.confidenceScore > 0).length,
+    manual: criteria.filter(c => isManualCriterion(c)).length,
+  };
 
   // Group by status first, then by confidence within each status
   const hybridGroupedCriteria: Record<StatusGroup, Record<ConfidenceGroup, CriterionConfidence[]>> = {
