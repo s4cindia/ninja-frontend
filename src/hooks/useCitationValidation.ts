@@ -28,9 +28,10 @@ export function useValidateDocument() {
       });
       toast.success(`Validation complete: ${data.summary.errorCount} errors, ${data.summary.warningCount} warnings`);
     },
-    onError: (error) => {
-      toast.error('Validation failed');
-      console.error(error);
+    onError: (error: Error & { response?: { data?: { error?: { message?: string } } } }) => {
+      const message = error.response?.data?.error?.message || error.message || 'Validation failed';
+      toast.error(message);
+      console.error('Validation error:', error);
     }
   });
 }

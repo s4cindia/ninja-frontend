@@ -18,8 +18,10 @@ export function useGenerateReferenceList() {
       queryClient.setQueryData(['reference-list', variables.documentId], data);
       toast.success(`Generated ${data.summary.totalEntries} reference entries`);
     },
-    onError: () => {
-      toast.error('Failed to generate reference list');
+    onError: (error: Error & { response?: { data?: { error?: { message?: string } } } }) => {
+      const message = error.response?.data?.error?.message || error.message || 'Failed to generate reference list';
+      toast.error(message);
+      console.error('Reference list generation error:', error);
     }
   });
 }

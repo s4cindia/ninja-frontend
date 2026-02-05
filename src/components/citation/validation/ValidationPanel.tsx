@@ -35,6 +35,11 @@ export function ValidationPanel({ documentId }: ValidationPanelProps) {
   const batchMutation = useBatchCorrect();
 
   const handleValidate = async () => {
+    if (!documentId) {
+      console.error('No documentId available - job may still be loading');
+      return;
+    }
+    console.log('Validating citations for documentId:', documentId);
     const result = await validateMutation.mutateAsync({
       documentId,
       request: { styleCode: selectedStyle }

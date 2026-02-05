@@ -26,6 +26,11 @@ export function ReferenceListGenerator({ documentId }: ReferenceListGeneratorPro
   const finalizeMutation = useFinalizeReferenceList();
 
   const handleGenerate = async () => {
+    if (!documentId) {
+      console.error('No documentId available - job may still be loading');
+      return;
+    }
+    console.log('Generating reference list for documentId:', documentId);
     const result = await generateMutation.mutateAsync({
       documentId,
       request: {
