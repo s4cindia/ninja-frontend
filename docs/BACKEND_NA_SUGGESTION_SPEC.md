@@ -91,7 +91,7 @@ interface NaSuggestion {
 
 ### Confidence Score Calculation
 
-```
+```text
 Base confidence = 50%
 
 Positive factors (add):
