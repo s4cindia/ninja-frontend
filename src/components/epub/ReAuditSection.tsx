@@ -2,7 +2,6 @@ import React, { useState, useCallback } from "react";
 import {
   Upload,
   RefreshCw,
-  CheckCircle,
   AlertTriangle,
   XCircle,
 } from "lucide-react";
@@ -102,24 +101,6 @@ export const ReAuditSection: React.FC<ReAuditSectionProps> = ({
     disabled: isUploading,
   });
 
-  if (pendingCount === 0 && !result) {
-    return (
-      <Card className="border-green-200 bg-green-50">
-        <CardContent className="py-6">
-          <div className="flex items-center gap-3 text-green-700">
-            <CheckCircle className="h-6 w-6" />
-            <div>
-              <p className="font-medium">All tasks completed!</p>
-              <p className="text-sm text-green-600">
-                Your EPUB is fully remediated.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <Card className="border-blue-200 bg-blue-50">
       <CardHeader>
@@ -130,10 +111,19 @@ export const ReAuditSection: React.FC<ReAuditSectionProps> = ({
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-gray-600">
-          After fixing the{" "}
-          <span className="font-medium text-blue-700">{pendingCount}</span>{" "}
-          pending issues manually, upload the fixed EPUB to verify the issues
-          are resolved.
+          {pendingCount > 0 ? (
+            <>
+              After fixing the{" "}
+              <span className="font-medium text-blue-700">{pendingCount}</span>{" "}
+              pending issues manually, upload the fixed EPUB to verify the
+              issues are resolved.
+            </>
+          ) : (
+            <>
+              Upload the remediated EPUB to verify all fixes and check for any
+              new accessibility issues that may have been introduced.
+            </>
+          )}
         </p>
 
         <div
