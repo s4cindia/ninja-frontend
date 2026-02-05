@@ -70,7 +70,7 @@ export const ReAuditSection: React.FC<ReAuditSectionProps> = ({
           onReauditComplete(demoResult);
         } else {
           const formData = new FormData();
-          formData.append("epub", file);
+          formData.append("file", file);
 
           const response = await api.post(
             `/epub/job/${jobId}/reaudit`,
