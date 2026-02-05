@@ -7,19 +7,17 @@ interface BatchCorrectionModalProps {
   isOpen: boolean;
   onClose: () => void;
   violations: ValidationViolation[];
-  onApplyBatch: (validationIds: string[]) => Promise<void>;
+  onApplyByType: (violationType: string) => Promise<void>;
 }
 
 export function BatchCorrectionModal({
   isOpen,
   onClose,
   violations,
-  onApplyBatch
+  onApplyByType
 }: BatchCorrectionModalProps) {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(
-    new Set(violations.map(v => v.id))
-  );
-  const [isApplying, setIsApplying] = useState(false);
+  const [applyingType, setApplyingType] = useState<string | null>(null);
+  const [appliedTypes, setAppliedTypes] = useState<Set<string>>(new Set());
 
   if (!isOpen) return null;
 
@@ -31,37 +29,22 @@ export function BatchCorrectionModal({
     return acc;
   }, {} as Record<string, ValidationViolation[]>);
 
-  const handleToggle = (id: string) => {
-    const newSelected = new Set(selectedIds);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
-    } else {
-      newSelected.add(id);
-    }
-    setSelectedIds(newSelected);
-  };
-
-  const handleSelectAll = (type: string) => {
-    const newSelected = new Set(selectedIds);
-    groupedByType[type].forEach(v => newSelected.add(v.id));
-    setSelectedIds(newSelected);
-  };
-
-  const handleDeselectAll = (type: string) => {
-    const newSelected = new Set(selectedIds);
-    groupedByType[type].forEach(v => newSelected.delete(v.id));
-    setSelectedIds(newSelected);
-  };
-
-  const handleApply = async () => {
-    setIsApplying(true);
+  const handleApplyType = async (type: string) => {
+    setApplyingType(type);
     try {
-      await onApplyBatch(Array.from(selectedIds));
-      onClose();
+      await onApplyByType(type);
+      setAppliedTypes(prev => new Set([...prev, type]));
     } finally {
-      setIsApplying(false);
+      setApplyingType(null);
     }
   };
+
+  const formatTypeName = (type: string) => {
+    return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  };
+
+  const pendingTypes = Object.keys(groupedByType).filter(t => !appliedTypes.has(t));
+  const allApplied = pendingTypes.length === 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -90,79 +73,86 @@ export function BatchCorrectionModal({
 
         <div className="flex-1 overflow-y-auto p-4">
           <p className="text-sm text-gray-600 mb-4">
-            Select the corrections you want to apply. {selectedIds.size} of {violations.length} selected.
+            Apply all corrections by type. This will fix all {violations.length} pending issues.
           </p>
 
-          {Object.entries(groupedByType).map(([type, typeViolations]) => (
-            <div key={type} className="mb-6">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-medium text-gray-900 capitalize">
-                  {type.replace(/_/g, ' ')} ({typeViolations.length})
-                </h3>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleSelectAll(type)}
-                    className="text-xs text-blue-600 hover:text-blue-800"
-                  >
-                    Select all
-                  </button>
-                  <button
-                    onClick={() => handleDeselectAll(type)}
-                    className="text-xs text-gray-500 hover:text-gray-700"
-                  >
-                    Deselect all
-                  </button>
+          {allApplied && (
+            <div className="text-center py-8 text-green-600">
+              <Check className="h-12 w-12 mx-auto mb-2" />
+              <p className="font-medium">All corrections applied!</p>
+            </div>
+          )}
+
+          {Object.entries(groupedByType).map(([type, typeViolations]) => {
+            const isApplied = appliedTypes.has(type);
+            const isApplying = applyingType === type;
+
+            return (
+              <div 
+                key={type} 
+                className={`mb-4 p-4 rounded-lg border ${
+                  isApplied ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <h3 className="font-medium text-gray-900">
+                      {formatTypeName(type)}
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      {typeViolations.length} issue{typeViolations.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  {isApplied ? (
+                    <span className="inline-flex items-center gap-1 text-green-600 text-sm">
+                      <Check className="h-4 w-4" />
+                      Applied
+                    </span>
+                  ) : (
+                    <Button
+                      size="sm"
+                      onClick={() => handleApplyType(type)}
+                      disabled={isApplying || applyingType !== null}
+                    >
+                      {isApplying ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" aria-hidden="true" />
+                          Applying...
+                        </>
+                      ) : (
+                        'Apply All'
+                      )}
+                    </Button>
+                  )}
+                </div>
+
+                <div className="space-y-1 mt-3">
+                  {typeViolations.slice(0, 3).map(violation => (
+                    <div 
+                      key={violation.id} 
+                      className={`text-sm p-2 rounded ${isApplied ? 'bg-green-100' : 'bg-white'}`}
+                    >
+                      <span className={isApplied ? 'text-gray-500' : 'text-red-600 line-through'}>
+                        {violation.originalText}
+                      </span>
+                      <span className="mx-2 text-gray-400">→</span>
+                      <span className="text-green-600">{violation.suggestedFix}</span>
+                    </div>
+                  ))}
+                  {typeViolations.length > 3 && (
+                    <p className="text-xs text-gray-500 pl-2">
+                      +{typeViolations.length - 3} more...
+                    </p>
+                  )}
                 </div>
               </div>
-
-              <div className="space-y-2">
-                {typeViolations.map(violation => (
-                  <label
-                    key={violation.id}
-                    className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(violation.id)}
-                      onChange={() => handleToggle(violation.id)}
-                      className="mt-1 rounded border-gray-300"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-mono text-sm">
-                        <span className="text-red-600 line-through">{violation.originalText}</span>
-                        <span className="mx-2">→</span>
-                        <span className="text-green-600">{violation.suggestedFix}</span>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1 truncate">
-                        {violation.citationText}
-                      </p>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="flex items-center justify-end gap-3 p-4 border-t">
-          <Button variant="outline" onClick={onClose} disabled={isApplying}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleApply}
-            disabled={selectedIds.size === 0 || isApplying}
-          >
-            {isApplying ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden="true" />
-                Applying...
-              </>
-            ) : (
-              <>
-                <Check className="h-4 w-4 mr-2" aria-hidden="true" />
-                Apply {selectedIds.size} Corrections
-              </>
-            )}
+          <Button variant="outline" onClick={onClose}>
+            {allApplied ? 'Done' : 'Close'}
           </Button>
         </div>
       </div>

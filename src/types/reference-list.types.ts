@@ -6,7 +6,7 @@ export interface ReferenceAuthor {
 
 export interface ReferenceEntry {
   id: string;
-  citationIds: string[];
+  citationIds?: string[];
   sourceType: 'journal' | 'book' | 'chapter' | 'conference' | 'website' | 'unknown';
   authors: ReferenceAuthor[];
   year?: string;
@@ -19,6 +19,9 @@ export interface ReferenceEntry {
   doi?: string;
   url?: string;
   formatted: string;
+  formattedApa?: string;
+  formattedMla?: string;
+  isEdited?: boolean;
   enrichmentSource: 'crossref' | 'pubmed' | 'manual' | 'ai';
   enrichmentConfidence: number;
   needsReview: boolean;

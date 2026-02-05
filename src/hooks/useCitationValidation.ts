@@ -93,14 +93,46 @@ export function useBatchCorrect() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ documentId, validationIds }: { documentId: string; validationIds: string[] }) =>
-      citationValidationService.batchCorrect(documentId, validationIds),
+    mutationFn: ({ 
+      documentId, 
+      violationType, 
+      applyAll = true 
+    }: { 
+      documentId: string; 
+      violationType: string; 
+      applyAll?: boolean;
+    }) => citationValidationService.batchCorrect(documentId, violationType, applyAll),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['citation-validations'] });
       toast.success(`Applied ${data.correctedCount} corrections`);
     },
     onError: () => {
       toast.error('Batch correction failed');
+    }
+  });
+}
+
+export function useChangeHistory(documentId: string) {
+  return useQuery({
+    queryKey: ['citation-changes', documentId],
+    queryFn: () => citationValidationService.getChangeHistory(documentId),
+    enabled: !!documentId
+  });
+}
+
+export function useRevertChange() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (changeId: string) =>
+      citationValidationService.revertChange(changeId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['citation-validations'] });
+      queryClient.invalidateQueries({ queryKey: ['citation-changes'] });
+      toast.success('Change reverted');
+    },
+    onError: () => {
+      toast.error('Failed to revert change');
     }
   });
 }

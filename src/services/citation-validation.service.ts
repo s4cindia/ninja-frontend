@@ -53,11 +53,31 @@ export const citationValidationService = {
 
   async batchCorrect(
     documentId: string,
-    validationIds: string[]
+    violationType: string,
+    applyAll: boolean = true
   ): Promise<{ correctedCount: number; skippedCount: number }> {
     const response = await api.post(`/citation/document/${documentId}/correct/batch`, {
-      validationIds
+      violationType,
+      applyAll
     });
     return response.data.data;
+  },
+
+  async getChangeHistory(
+    documentId: string
+  ): Promise<Array<{
+    id: string;
+    validationId: string;
+    originalText: string;
+    correctedText: string;
+    changeType: 'accept' | 'reject' | 'edit';
+    createdAt: string;
+  }>> {
+    const response = await api.get(`/citation/document/${documentId}/changes`);
+    return response.data.data;
+  },
+
+  async revertChange(changeId: string): Promise<void> {
+    await api.post(`/citation/change/${changeId}/revert`);
   }
 };

@@ -151,8 +151,8 @@ export function ValidationPanel({ documentId }: ValidationPanelProps) {
         isOpen={showBatchModal}
         onClose={() => setShowBatchModal(false)}
         violations={pendingViolations}
-        onApplyBatch={async (ids) => {
-          await batchMutation.mutateAsync({ documentId, validationIds: ids });
+        onApplyByType={async (violationType) => {
+          await batchMutation.mutateAsync({ documentId, violationType, applyAll: true });
         }}
       />
     </div>
