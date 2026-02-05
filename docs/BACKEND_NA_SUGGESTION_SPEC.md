@@ -241,4 +241,4 @@ The frontend will:
 - [ ] Edge cases are properly identified
 - [ ] Verification submission correctly stores AI-suggested status
 - [ ] Frontend displays banner when naSuggestion data is present
-- [ ] Quick Accept button only shows for confidence ≥ 80%
+- [ ] Quick Accept button only shows for confidence ≥ 90%

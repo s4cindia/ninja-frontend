@@ -64,7 +64,7 @@ Add `naSuggestion` field to each criterion in the response when AI analysis dete
 ```typescript
 interface NaSuggestion {
   suggestedStatus: "not_applicable";  // Always "not_applicable" when suggesting N/A
-  confidence: number;                  // 0-100 (frontend shows Quick Accept if >= 80)
+  confidence: number;                  // 0-100 (frontend shows Quick Accept if >= 90)
   rationale: string;                   // Human-readable explanation
   detectionChecks: DetectionCheck[];   // Array of checks performed
   edgeCases: string[];                 // Potential edge cases (can be empty)
@@ -147,8 +147,8 @@ def analyze_media_criteria(epub_manifest):
 When `naSuggestion` is present with `suggestedStatus: "not_applicable"`:
 
 1. **Blue Banner** appears at top of criterion modal Overview tab
-2. **Confidence Badge**: Green (≥80%), Yellow (60-79%), Red (<60%)
-3. **Quick Accept Button**: Shows only when confidence ≥ 80%
+2. **Confidence Badge**: Green (≥90%), Yellow (60-89%), Red (<60%)
+3. **Quick Accept Button**: Shows only when confidence ≥ 90%
 4. **Detection Checks**: Expandable section showing all checks performed
 5. **Edge Cases**: Warning section if edge cases exist
 
