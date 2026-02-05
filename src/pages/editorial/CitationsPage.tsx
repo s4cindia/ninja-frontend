@@ -68,20 +68,30 @@ export function CitationsPage() {
         </nav>
       </div>
 
-      <div className="min-h-[400px]" role="tabpanel" id={`${activeTab}-panel`}>
-        {activeTab === 'citations' && (
-          jobLoading ? (
+      <div className="min-h-[400px]">
+        <div
+          role="tabpanel"
+          id="citations-panel"
+          className={activeTab === 'citations' ? '' : 'hidden'}
+          aria-hidden={activeTab !== 'citations'}
+        >
+          {jobLoading ? (
             <Card className="p-8 text-center">
               <Loader2 className="h-8 w-8 text-blue-500 animate-spin mx-auto mb-4" />
               <p className="text-gray-500">Loading citations...</p>
             </Card>
           ) : (
             <CitationsModule jobId={jobId} documentId={documentId} />
-          )
-        )}
+          )}
+        </div>
 
-        {activeTab === 'validation' && (
-          documentId ? (
+        <div
+          role="tabpanel"
+          id="validation-panel"
+          className={activeTab === 'validation' ? '' : 'hidden'}
+          aria-hidden={activeTab !== 'validation'}
+        >
+          {documentId ? (
             <ValidationPanel documentId={documentId} />
           ) : (
             <Card className="p-8 text-center">
@@ -89,11 +99,16 @@ export function CitationsPage() {
               <h3 className="text-lg font-medium text-gray-900 mb-2">Loading...</h3>
               <p className="text-gray-500">Please wait while we load the document.</p>
             </Card>
-          )
-        )}
+          )}
+        </div>
 
-        {activeTab === 'references' && (
-          documentId ? (
+        <div
+          role="tabpanel"
+          id="references-panel"
+          className={activeTab === 'references' ? '' : 'hidden'}
+          aria-hidden={activeTab !== 'references'}
+        >
+          {documentId ? (
             <ReferenceListGenerator documentId={documentId} />
           ) : (
             <Card className="p-8 text-center">
@@ -101,8 +116,8 @@ export function CitationsPage() {
               <h3 className="text-lg font-medium text-gray-900 mb-2">Loading...</h3>
               <p className="text-gray-500">Please wait while we load the document.</p>
             </Card>
-          )
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
