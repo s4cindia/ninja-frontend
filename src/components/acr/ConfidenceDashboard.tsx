@@ -781,6 +781,8 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
             confidenceScore?: number;
             issueCount?: number;
             remainingCount?: number;
+            requiresManualVerification?: boolean;
+            automationCapability?: number;
           }>();
           if (confidenceResponse?.criteria) {
             const naSuggestionCriteria: string[] = [];
@@ -790,6 +792,8 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                 confidenceScore: c.confidenceScore ?? c.confidence,
                 issueCount: c.issueCount,
                 remainingCount: c.remainingCount,
+                requiresManualVerification: c.requiresManualVerification,
+                automationCapability: c.automationCapability,
               });
               if (c.naSuggestion) {
                 naSuggestionCriteria.push(c.criterionId);
@@ -812,6 +816,8 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
               naSuggestion: confidenceData?.naSuggestion || c.naSuggestion,
               confidenceScore: canonicalConfidence,
               confidence: canonicalConfidence,
+              requiresManualVerification: confidenceData?.requiresManualVerification ?? c.requiresManualVerification,
+              automationCapability: confidenceData?.automationCapability ?? c.automationCapability,
             };
             return normalizeCriterion(mergedData as CriterionConfidence, i);
           });
@@ -897,7 +903,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     if (confidenceFilter !== 'all') {
       const isManual = c.requiresManualVerification || c.confidenceScore === 0;
       const isHigh = c.confidenceScore >= 90 && !c.requiresManualVerification;
-      const isMedium = c.confidenceScore >= 60 && c.confidenceScore < 90;
+      const isMedium = c.confidenceScore >= 60 && c.confidenceScore < 90 && !c.requiresManualVerification;
       
       if (confidenceFilter === 'manual' && !isManual) return false;
       if (confidenceFilter === 'high' && !isHigh) return false;
