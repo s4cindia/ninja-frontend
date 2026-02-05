@@ -32,7 +32,7 @@ const CITATION_JOB_TYPES = ['CITATION_DETECTION', 'CITATION_VALIDATION', 'EDITOR
 
 function getJobDetailPath(job: Job): string {
   if (CITATION_JOB_TYPES.includes(job.type)) {
-    return `/citation/${job.id}`;
+    return `/editorial/citations/${job.id}`;
   }
   return `/jobs/${job.id}`;
 }

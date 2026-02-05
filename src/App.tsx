@@ -60,8 +60,6 @@ import {
   StylePage, 
   ReportsPage 
 } from '@/pages/editorial';
-import { CitationWorkflow } from '@/pages/CitationWorkflow';
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -194,7 +192,6 @@ function AppRoutes() {
           <Route path="/batches" element={<BatchListPage />} />
           <Route path="/batches/new" element={<BatchCreationPage />} />
           <Route path="/settings" element={<Settings />} />
-          <Route path="/citation/:jobId" element={<CitationWorkflow />} />
 
           {/* Editorial Services Routes */}
           <Route path="/editorial" element={<EditorialLayout />}>

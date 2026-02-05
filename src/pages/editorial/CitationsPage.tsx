@@ -1,15 +1,111 @@
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { FileText, CheckCircle, BookOpen, ArrowLeft, Loader2 } from 'lucide-react';
 import { CitationsModule } from '@/components/citation';
-import { BookOpen } from 'lucide-react';
+import { ValidationPanel } from '@/components/citation/validation/ValidationPanel';
+import { ReferenceListGenerator } from '@/components/citation/reference-list/ReferenceListGenerator';
+import { Card } from '@/components/ui/Card';
+import { useJob } from '@/hooks/useJobs';
+
+type Tab = 'citations' | 'validation' | 'references';
 
 export function CitationsPage() {
   const { jobId } = useParams<{ jobId: string }>();
+  const [activeTab, setActiveTab] = useState<Tab>('citations');
+
+  const { data: job, isLoading: jobLoading } = useJob(jobId || null);
 
   if (!jobId) {
     return <CitationsJobListPlaceholder />;
   }
 
-  return <CitationsModule jobId={jobId} />;
+  const tabs = [
+    { id: 'citations', label: 'Detected Citations', icon: FileText },
+    { id: 'validation', label: 'Style Validation', icon: CheckCircle },
+    { id: 'references', label: 'Reference List', icon: BookOpen },
+  ] as const;
+
+  const jobOutput = job?.output as Record<string, unknown> | undefined;
+  const jobInput = job?.input as Record<string, unknown> | undefined;
+  const documentId = (jobOutput?.documentId as string) || '';
+  const filename = (jobInput?.filename as string) || (jobInput?.fileName as string) || (jobInput?.originalName as string);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <Link
+          to="/jobs"
+          className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-2"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          Back to Jobs
+        </Link>
+        <h1 className="text-2xl font-bold text-gray-900">Citation Management</h1>
+        {filename && (
+          <p className="text-sm text-gray-600 mt-1">{filename}</p>
+        )}
+      </div>
+
+      <div className="border-b border-gray-200">
+        <nav className="flex gap-4" role="tablist" aria-label="Citation workflow tabs">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              aria-controls={`${tab.id}-panel`}
+              className={`flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === tab.id
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <tab.icon className="h-4 w-4" aria-hidden="true" />
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      <div className="min-h-[400px]" role="tabpanel" id={`${activeTab}-panel`}>
+        {activeTab === 'citations' && (
+          jobLoading ? (
+            <Card className="p-8 text-center">
+              <Loader2 className="h-8 w-8 text-blue-500 animate-spin mx-auto mb-4" />
+              <p className="text-gray-500">Loading citations...</p>
+            </Card>
+          ) : (
+            <CitationsModule jobId={jobId} documentId={documentId} />
+          )
+        )}
+
+        {activeTab === 'validation' && (
+          documentId ? (
+            <ValidationPanel documentId={documentId} />
+          ) : (
+            <Card className="p-8 text-center">
+              <CheckCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" aria-hidden="true" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Loading...</h3>
+              <p className="text-gray-500">Please wait while we load the document.</p>
+            </Card>
+          )
+        )}
+
+        {activeTab === 'references' && (
+          documentId ? (
+            <ReferenceListGenerator documentId={documentId} />
+          ) : (
+            <Card className="p-8 text-center">
+              <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" aria-hidden="true" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Loading...</h3>
+              <p className="text-gray-500">Please wait while we load the document.</p>
+            </Card>
+          )
+        )}
+      </div>
+    </div>
+  );
 }
 
 function CitationsJobListPlaceholder() {
@@ -21,23 +117,29 @@ function CitationsJobListPlaceholder() {
             <BookOpen className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Citation Analyses</h2>
-            <p className="text-sm text-gray-500">Citation management and validation</p>
+            <h2 className="text-lg font-semibold text-gray-900">Citation Management</h2>
+            <p className="text-sm text-gray-500">Detection, validation, and reference list generation</p>
           </div>
         </div>
         <Link
-          to="/editorial/upload"
+          to="/jobs"
           className="text-sm text-blue-600 hover:text-blue-800 font-medium"
         >
-          + New Analysis
+          View Jobs
         </Link>
       </div>
       <div className="bg-white rounded-lg border p-6 text-center">
         <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-        <p className="text-gray-500">No citation analyses yet.</p>
+        <p className="text-gray-500">Select a citation job from the Jobs page to get started.</p>
         <p className="text-sm text-gray-400 mt-1">
-          Upload a document to run citation analysis.
+          Citation jobs will appear here with full management features.
         </p>
+        <Link
+          to="/jobs"
+          className="inline-block mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+        >
+          Go to Jobs
+        </Link>
       </div>
     </div>
   );
