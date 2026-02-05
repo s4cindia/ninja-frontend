@@ -5,6 +5,20 @@ export interface IssueLocation {
   endColumn?: number;
 }
 
+export interface NaDetectionCheck {
+  check: string;
+  result: 'pass' | 'fail' | 'warning';
+  details?: string;
+}
+
+export interface NaSuggestion {
+  suggestedStatus: 'not_applicable' | 'applicable' | 'uncertain';
+  confidence: number;
+  rationale: string;
+  detectionChecks: NaDetectionCheck[];
+  edgeCases: string[];
+}
+
 export interface IssueMapping {
   issueId: string;
   ruleId: string;
@@ -53,6 +67,10 @@ export interface CriterionConfidenceWithIssues {
   remediatedCount?: number;
   fixedIssues?: RemediatedIssue[];
   fixedCount?: number;
+  needsVerification?: boolean;
+  naSuggestion?: NaSuggestion;
+  requiresManualVerification?: boolean;
+  automationCapability?: number;
 }
 
 export interface ConfidenceSummary {

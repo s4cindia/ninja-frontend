@@ -5,13 +5,13 @@ import { Button } from '@/components/ui/Button';
 import { NA_QUICK_ACCEPT_THRESHOLD } from '@/constants/verification';
 import type { ApplicabilitySuggestion } from '@/types/acr.types';
 
-interface NASuggestionBannerProps {
+interface NaSuggestionBannerSimpleProps {
   suggestion: ApplicabilitySuggestion;
   onAccept: () => void;
   isAccepting?: boolean;
 }
 
-export function NASuggestionBanner({ suggestion, onAccept, isAccepting }: NASuggestionBannerProps) {
+export function NaSuggestionBannerSimple({ suggestion, onAccept, isAccepting }: NaSuggestionBannerSimpleProps) {
   const [showDetails, setShowDetails] = useState(false);
 
   // Don't show banner for "applicable" suggestions (criterion applies)

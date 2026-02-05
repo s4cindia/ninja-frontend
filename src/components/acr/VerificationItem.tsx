@@ -14,7 +14,7 @@ import {
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { NASuggestionBanner } from './NASuggestionBanner';
+import { NaSuggestionBannerSimple } from './NaSuggestionBannerSimple';
 import type {
   VerificationItem as VerificationItemType,
   VerificationStatus,
@@ -249,7 +249,7 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
 
             {/* N/A Suggestion Banner */}
             {item.naSuggestion && (
-              <NASuggestionBanner
+              <NaSuggestionBannerSimple
                 suggestion={item.naSuggestion}
                 onAccept={handleAcceptNASuggestion}
                 isAccepting={isSubmitting}

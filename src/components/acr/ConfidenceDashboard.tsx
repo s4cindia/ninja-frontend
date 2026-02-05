@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { AlertCircle, AlertTriangle, CheckCircle, LayoutGrid, Table, HelpCircle, ChevronDown, BookOpen } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle, LayoutGrid, Table, HelpCircle, ChevronDown, BookOpen, Lightbulb } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
@@ -8,8 +8,9 @@ import { CriteriaTable, CriterionRow } from './CriteriaTable';
 import { WcagDocumentationModal } from './WcagDocumentationModal';
 import { CriterionDetailsModal } from './CriterionDetailsModal';
 import { useConfidenceWithIssues } from '@/hooks/useConfidence';
-import { IssueMapping, RemediatedIssue, OtherIssuesData } from '@/types/confidence.types';
+import { IssueMapping, RemediatedIssue, OtherIssuesData, NaSuggestion } from '@/types/confidence.types';
 import { confidenceService } from '@/services/confidence.service';
+import { ConfidenceBadge } from './ConfidenceBadge';
 
 interface ConfidenceDashboardProps {
   jobId: string;
@@ -270,16 +271,61 @@ const SECTION_CONFIG: Record<ConfidenceGroup, {
   },
 };
 
+const MANUAL_VERIFICATION_CRITERIA: Record<string, { requiresManualVerification: boolean; automationCapability: number }> = {
+  '1.1.1': { requiresManualVerification: true, automationCapability: 30 },
+  '1.2.1': { requiresManualVerification: true, automationCapability: 40 },
+  '1.2.2': { requiresManualVerification: true, automationCapability: 30 },
+  '1.2.3': { requiresManualVerification: true, automationCapability: 30 },
+  '1.2.4': { requiresManualVerification: true, automationCapability: 20 },
+  '1.2.5': { requiresManualVerification: true, automationCapability: 30 },
+  '1.3.1': { requiresManualVerification: true, automationCapability: 60 },
+  '1.3.2': { requiresManualVerification: true, automationCapability: 50 },
+  '1.3.3': { requiresManualVerification: true, automationCapability: 20 },
+  '1.4.1': { requiresManualVerification: true, automationCapability: 40 },
+  '1.4.3': { requiresManualVerification: false, automationCapability: 95 },
+  '1.4.4': { requiresManualVerification: false, automationCapability: 90 },
+  '1.4.5': { requiresManualVerification: true, automationCapability: 60 },
+  '2.1.1': { requiresManualVerification: true, automationCapability: 50 },
+  '2.1.2': { requiresManualVerification: true, automationCapability: 50 },
+  '2.2.1': { requiresManualVerification: true, automationCapability: 40 },
+  '2.2.2': { requiresManualVerification: true, automationCapability: 60 },
+  '2.3.1': { requiresManualVerification: true, automationCapability: 50 },
+  '2.4.1': { requiresManualVerification: true, automationCapability: 70 },
+  '2.4.2': { requiresManualVerification: false, automationCapability: 90 },
+  '2.4.3': { requiresManualVerification: true, automationCapability: 50 },
+  '2.4.4': { requiresManualVerification: false, automationCapability: 85 },
+  '2.4.5': { requiresManualVerification: true, automationCapability: 40 },
+  '2.4.6': { requiresManualVerification: false, automationCapability: 80 },
+  '2.4.7': { requiresManualVerification: true, automationCapability: 60 },
+  '3.1.1': { requiresManualVerification: false, automationCapability: 90 },
+  '3.1.2': { requiresManualVerification: true, automationCapability: 50 },
+  '3.2.1': { requiresManualVerification: true, automationCapability: 40 },
+  '3.2.2': { requiresManualVerification: true, automationCapability: 40 },
+  '3.2.3': { requiresManualVerification: true, automationCapability: 60 },
+  '3.2.4': { requiresManualVerification: true, automationCapability: 50 },
+  '3.3.1': { requiresManualVerification: true, automationCapability: 60 },
+  '3.3.2': { requiresManualVerification: false, automationCapability: 80 },
+  '3.3.3': { requiresManualVerification: true, automationCapability: 40 },
+  '3.3.4': { requiresManualVerification: true, automationCapability: 50 },
+  '4.1.1': { requiresManualVerification: false, automationCapability: 95 },
+  '4.1.2': { requiresManualVerification: true, automationCapability: 70 },
+  '4.1.3': { requiresManualVerification: true, automationCapability: 60 },
+};
+
+function getManualVerificationInfo(criterionId: string): { requiresManualVerification: boolean; automationCapability: number } {
+  return MANUAL_VERIFICATION_CRITERIA[criterionId] || { requiresManualVerification: false, automationCapability: 90 };
+}
+
 function getConfidenceColor(confidence: number): string {
-  if (confidence >= 80) return 'bg-green-500';
-  if (confidence >= 50) return 'bg-yellow-500';
+  if (confidence >= 90) return 'bg-green-500';
+  if (confidence >= 60) return 'bg-yellow-500';
   if (confidence > 0) return 'bg-orange-500';
   return 'bg-gray-400';
 }
 
 function getConfidenceLabel(confidence: number): string {
-  if (confidence >= 80) return 'High';
-  if (confidence >= 50) return 'Medium';
+  if (confidence >= 90) return 'High';
+  if (confidence >= 60) return 'Medium';
   if (confidence > 0) return 'Low';
   return 'Manual';
 }
@@ -298,10 +344,10 @@ function getStatusGroup(criterion: CriterionConfidence): StatusGroup {
 }
 
 function getConfidenceGroup(criterion: CriterionConfidence): ConfidenceGroup {
-  if (criterion.confidenceScore >= 80) return 'high';
-  if (criterion.confidenceScore >= 50) return 'medium';
-  if (criterion.confidenceScore > 0) return 'low';
-  return 'manual';
+  if (criterion.requiresManualVerification || criterion.confidenceScore === 0) return 'manual';
+  if (criterion.confidenceScore >= 90) return 'high';
+  if (criterion.confidenceScore >= 60) return 'medium';
+  return 'low';
 }
 
 function isDemoJob(jobId: string): boolean {
@@ -377,6 +423,8 @@ function normalizeCriterion(c: Partial<CriterionConfidence>, index: number): Nor
   const rawConfidence = c.confidence ?? c.confidenceScore;
   const confidenceScore = typeof rawConfidence === 'number' && !isNaN(rawConfidence) ? rawConfidence : 0;
   
+  const manualVerificationInfo = getManualVerificationInfo(criterionId);
+  
   return {
     id: c.id || `criterion-${index}`,
     criterionId,
@@ -389,6 +437,9 @@ function normalizeCriterion(c: Partial<CriterionConfidence>, index: number): Nor
     automatedChecks: Array.isArray(c.automatedChecks) ? c.automatedChecks : [],
     manualChecks: Array.isArray(c.manualChecks) ? c.manualChecks : [],
     evidence,
+    naSuggestion: c.naSuggestion,
+    requiresManualVerification: c.requiresManualVerification ?? manualVerificationInfo.requiresManualVerification,
+    automationCapability: c.automationCapability ?? manualVerificationInfo.automationCapability,
   };
 }
 
@@ -636,6 +687,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   const [showOtherIssues, setShowOtherIssues] = useState(false);
   const otherIssuesRef = useRef<HTMLDivElement>(null);
   const [otherIssues, setOtherIssues] = useState<OtherIssuesData | null>(null);
+  const [confidenceFilter, setConfidenceFilter] = useState<'all' | 'high' | 'medium' | 'manual'>('all');
 
   const { data: confidenceData } = useConfidenceWithIssues(jobId, undefined, { enabled: !isDemoJob(jobId) });
 
@@ -723,7 +775,52 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     Promise.all([acrPromise, confidencePromise])
       .then(([acrResponse, confidenceResponse]) => {
         if (!cancelled) {
-          const normalizedCriteria = (acrResponse.criteria || []).map((c, i) => normalizeCriterion(c, i));
+          // Build a map of confidence data (including naSuggestion and confidenceScore) from confidence response
+          const confidenceDataMap = new Map<string, {
+            naSuggestion?: NaSuggestion;
+            confidenceScore?: number;
+            issueCount?: number;
+            remainingCount?: number;
+            requiresManualVerification?: boolean;
+            automationCapability?: number;
+          }>();
+          if (confidenceResponse?.criteria) {
+            const naSuggestionCriteria: string[] = [];
+            for (const c of confidenceResponse.criteria) {
+              confidenceDataMap.set(c.criterionId, {
+                naSuggestion: c.naSuggestion,
+                confidenceScore: c.confidenceScore ?? c.confidence,
+                issueCount: c.issueCount,
+                remainingCount: c.remainingCount,
+                requiresManualVerification: c.requiresManualVerification,
+                automationCapability: c.automationCapability,
+              });
+              if (c.naSuggestion) {
+                naSuggestionCriteria.push(c.criterionId);
+              }
+            }
+            if (import.meta.env.DEV && naSuggestionCriteria.length > 0) {
+              console.log('[ACR Step 3] Criteria with N/A suggestions from confidence API:', naSuggestionCriteria);
+            }
+          }
+          
+          // Merge confidence data into criteria during normalization
+          const normalizedCriteria = (acrResponse.criteria || []).map((c, i) => {
+            const criterionId = extractCriterionId(c, i);
+            const confidenceData = confidenceDataMap.get(criterionId);
+            // Compute a single canonical confidence value with consistent fallback order
+            const canonicalConfidence = confidenceData?.confidenceScore ?? c.confidenceScore ?? c.confidence ?? 0;
+            // Prefer confidence response data over ACR response data
+            const mergedData = {
+              ...c,
+              naSuggestion: confidenceData?.naSuggestion || c.naSuggestion,
+              confidenceScore: canonicalConfidence,
+              confidence: canonicalConfidence,
+              requiresManualVerification: confidenceData?.requiresManualVerification ?? c.requiresManualVerification,
+              automationCapability: confidenceData?.automationCapability ?? c.automationCapability,
+            };
+            return normalizeCriterion(mergedData as CriterionConfidence, i);
+          });
           setCriteria(normalizedCriteria);
           
           if (confidenceResponse?.otherIssues) {
@@ -793,7 +890,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   const { tableRows, transformed } = analysisData;
 
   /**
-   * Filter criteria for "Has Issues" view.
+   * Filter criteria for "Has Issues" view and confidence level filtering.
    * Priority order (first match wins):
    * 1. issuesByCriterion - Most reliable, derived from audit issue mapping
    * 2. issueCount/remainingCount - Direct counts from criterion data
@@ -801,27 +898,53 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
    * 4. needsVerification - Items requiring human verification
    * 5. status === 'fail' - Failing criteria status
    */
-  const filteredCriteria = showOnlyWithIssues
-    ? criteria.filter(c => {
-        // Priority 1: Check issuesByCriterion (most reliable source)
-        const issueInfo = issuesByCriterion.get(c.criterionId);
-        if (issueInfo && issueInfo.count > 0) return true;
-        
-        // Priority 2: Check issueCount/remainingCount from criterion
-        if ((c.issueCount || 0) > 0 || (c.remainingCount || 0) > 0) return true;
-        
-        // Priority 3: Check hasIssues flag from backend
-        if (c.hasIssues === true) return true;
-        
-        // Priority 4: Include items needing verification
-        if (c.needsVerification === true) return true;
-        
-        // Priority 5: Check for failing status
-        if (c.status === 'fail') return true;
-        
-        return false;
-      })
-    : criteria;
+  const filteredCriteria = criteria.filter(c => {
+    // First apply confidence filter
+    if (confidenceFilter !== 'all') {
+      const isManual = c.requiresManualVerification || c.confidenceScore === 0;
+      const isHigh = c.confidenceScore >= 90 && !c.requiresManualVerification;
+      const isMedium = c.confidenceScore >= 60 && c.confidenceScore < 90 && !c.requiresManualVerification;
+      
+      if (confidenceFilter === 'manual' && !isManual) return false;
+      if (confidenceFilter === 'high' && !isHigh) return false;
+      if (confidenceFilter === 'medium' && !isMedium) return false;
+    }
+    
+    // Then apply "has issues" filter if enabled
+    if (showOnlyWithIssues) {
+      // Priority 1: Check issuesByCriterion (most reliable source)
+      const issueInfo = issuesByCriterion.get(c.criterionId);
+      if (issueInfo && issueInfo.count > 0) return true;
+      
+      // Priority 2: Check issueCount/remainingCount from criterion
+      if ((c.issueCount || 0) > 0 || (c.remainingCount || 0) > 0) return true;
+      
+      // Priority 3: Check hasIssues flag from backend
+      if (c.hasIssues === true) return true;
+      
+      // Priority 4: Include items needing verification
+      if (c.needsVerification === true) return true;
+      
+      // Priority 5: Check for failing status
+      if (c.status === 'fail') return true;
+      
+      return false;
+    }
+    
+    return true;
+  });
+  
+  // Calculate confidence category counts for filter buttons
+  // Manual verification overrides all other categories
+  // Note: Computed synchronously (not useMemo) to avoid hooks after early return
+  const isManualCriterion = (c: CriterionConfidence) => c.requiresManualVerification || c.confidenceScore === 0;
+  const confidenceCounts = {
+    all: criteria.length,
+    high: criteria.filter(c => !isManualCriterion(c) && c.confidenceScore >= 90).length,
+    medium: criteria.filter(c => !isManualCriterion(c) && c.confidenceScore >= 60 && c.confidenceScore < 90).length,
+    low: criteria.filter(c => !isManualCriterion(c) && c.confidenceScore < 60 && c.confidenceScore > 0).length,
+    manual: criteria.filter(c => isManualCriterion(c)).length,
+  };
 
   // Group by status first, then by confidence within each status
   const hybridGroupedCriteria: Record<StatusGroup, Record<ConfidenceGroup, CriterionConfidence[]>> = {
@@ -979,24 +1102,24 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
               </span>
             )}
             <span className="text-gray-600">{criterion.name}</span>
-            {/* Issue count badges - show both pending and remediated */}
-            {issueData && (issueData.count > 0 || (issueData.remediatedCount && issueData.remediatedCount > 0)) && (
-              <span className="inline-flex items-center gap-1">
-                {issueData.count > 0 && (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                    {issueData.count} pending
-                  </span>
-                )}
-                {issueData.remediatedCount && issueData.remediatedCount > 0 && (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    {issueData.remediatedCount} fixed
-                  </span>
-                )}
+            {/* N/A Suggestion indicator */}
+            {criterion.naSuggestion && (
+              <span 
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium"
+                title={`AI suggests N/A (${criterion.naSuggestion.confidence}% confidence)`}
+              >
+                <Lightbulb className="h-3 w-3" aria-hidden="true" />
+                N/A
               </span>
             )}
           </span>
           <span className="flex items-center gap-3">
-            <span className="text-sm text-gray-500">{criterion.confidenceScore}%</span>
+            <ConfidenceBadge
+              confidence={criterion.confidenceScore}
+              requiresManualVerification={criterion.requiresManualVerification}
+              automationCapability={criterion.automationCapability}
+              size="sm"
+            />
             <ChevronDown className={cn('h-4 w-4 text-gray-400 transition-transform', isExpanded && 'rotate-180')} />
           </span>
         </button>
@@ -1123,6 +1246,106 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
             <p className="text-xs text-gray-500 mt-1">criteria with fixed issues</p>
           </div>
         )}
+      </div>
+
+      {/* Confidence Analysis Summary */}
+      <div className="bg-white rounded-lg border shadow-sm p-6">
+        <h2 className="text-lg font-bold mb-4 text-gray-900">Confidence Analysis Summary</h2>
+        
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
+            <div className="text-3xl font-bold text-green-600">{confidenceCounts.high}</div>
+            <div className="text-sm text-gray-600">High Confidence (90%+)</div>
+            <div className="text-xs text-gray-500 mt-1">Reliably automated</div>
+          </div>
+          
+          <div className="text-center p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+            <div className="text-3xl font-bold text-yellow-600">{confidenceCounts.medium}</div>
+            <div className="text-sm text-gray-600">Medium Confidence (60-89%)</div>
+            <div className="text-xs text-gray-500 mt-1">Partial automation</div>
+          </div>
+          
+          <div className="text-center p-4 bg-orange-50 rounded-lg border border-orange-200">
+            <div className="text-3xl font-bold text-orange-600">{confidenceCounts.low}</div>
+            <div className="text-sm text-gray-600">Low Confidence (&lt;60%)</div>
+            <div className="text-xs text-gray-500 mt-1">Limited automation</div>
+          </div>
+          
+          <div className="text-center p-4 bg-amber-50 rounded-lg border border-amber-300">
+            <div className="text-3xl font-bold text-amber-600">{confidenceCounts.manual}</div>
+            <div className="text-sm text-gray-600">Manual Review Required</div>
+            <div className="text-xs text-gray-500 mt-1">Human verification needed</div>
+          </div>
+        </div>
+        
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-semibold text-blue-900">Overall Automation Confidence</div>
+              <div className="text-sm text-blue-700">
+                Based on {criteria.length} WCAG 2.1 Level A & AA criteria
+              </div>
+            </div>
+            <div className="text-4xl font-bold text-blue-600">{overallConfidence}%</div>
+          </div>
+          {confidenceCounts.manual > 0 && (
+            <div className="mt-2 text-sm text-blue-800">
+              Note: {confidenceCounts.manual} criteria require manual human verification for complete conformance assessment
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Confidence Filter Buttons */}
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by confidence level">
+        <button
+          onClick={() => setConfidenceFilter('all')}
+          aria-pressed={confidenceFilter === 'all'}
+          className={cn(
+            'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+            confidenceFilter === 'all'
+              ? 'bg-blue-500 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          )}
+        >
+          All Criteria ({confidenceCounts.all})
+        </button>
+        <button
+          onClick={() => setConfidenceFilter('high')}
+          aria-pressed={confidenceFilter === 'high'}
+          className={cn(
+            'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+            confidenceFilter === 'high'
+              ? 'bg-green-500 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          )}
+        >
+          High Confidence ({confidenceCounts.high})
+        </button>
+        <button
+          onClick={() => setConfidenceFilter('medium')}
+          aria-pressed={confidenceFilter === 'medium'}
+          className={cn(
+            'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+            confidenceFilter === 'medium'
+              ? 'bg-yellow-500 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          )}
+        >
+          Medium Confidence ({confidenceCounts.medium})
+        </button>
+        <button
+          onClick={() => setConfidenceFilter('manual')}
+          aria-pressed={confidenceFilter === 'manual'}
+          className={cn(
+            'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+            confidenceFilter === 'manual'
+              ? 'bg-amber-500 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          )}
+        >
+          Manual Review Required ({confidenceCounts.manual})
+        </button>
       </div>
 
       {/* View Mode Toggle */}
