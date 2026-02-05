@@ -13,7 +13,8 @@ import {
   X,
   RefreshCw,
   Eye,
-  Clock
+  Clock,
+  FileText
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -320,6 +321,14 @@ export function Jobs() {
                               View
                             </Button>
                           </Link>
+                          {CITATION_JOB_TYPES.includes(job.type) && job.status === 'COMPLETED' && (
+                            <Link to={`/citation/${job.id}`}>
+                              <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700">
+                                <FileText className="w-4 h-4 mr-1" />
+                                Manage
+                              </Button>
+                            </Link>
+                          )}
                           {(job.status === 'QUEUED' || job.status === 'PROCESSING') && (
                             <Button
                               variant="ghost"
