@@ -10,16 +10,16 @@ import { useJob } from '@/hooks/useJobs';
 type Tab = 'citations' | 'validation' | 'references';
 
 export function CitationWorkflow() {
-  const { documentId } = useParams<{ documentId: string }>();
+  const { jobId } = useParams<{ jobId: string }>();
   const [activeTab, setActiveTab] = useState<Tab>('citations');
 
-  const { data: job, isLoading: jobLoading } = useJob(documentId || null);
+  const { data: job, isLoading: jobLoading } = useJob(jobId || null);
 
-  if (!documentId) {
+  if (!jobId) {
     return (
       <div className="max-w-6xl mx-auto p-6">
         <Card className="p-8 text-center">
-          <p className="text-gray-500">No document selected</p>
+          <p className="text-gray-500">No job selected</p>
           <Link to="/jobs" className="text-blue-600 hover:underline mt-2 inline-block">
             Go to Jobs
           </Link>
@@ -36,7 +36,7 @@ export function CitationWorkflow() {
 
   const jobOutput = job?.output as Record<string, unknown> | undefined;
   const jobInput = job?.input as Record<string, unknown> | undefined;
-  const jobDocumentId = (jobOutput?.documentId as string) || documentId;
+  const documentId = (jobOutput?.documentId as string) || '';
   const filename = (jobInput?.filename as string) || (jobInput?.fileName as string) || (jobInput?.originalName as string);
 
   return (
@@ -53,7 +53,10 @@ export function CitationWorkflow() {
         {filename && (
           <p className="text-sm text-gray-600 mt-1">{filename}</p>
         )}
-        <p className="text-xs text-gray-400 mt-1">Job ID: {documentId}</p>
+        <p className="text-xs text-gray-400 mt-1">Job ID: {jobId}</p>
+        {documentId && (
+          <p className="text-xs text-gray-400">Document ID: {documentId}</p>
+        )}
       </div>
 
       <div className="border-b border-gray-200 mb-6">
@@ -86,16 +89,16 @@ export function CitationWorkflow() {
               <p className="text-gray-500">Loading citations...</p>
             </Card>
           ) : (
-            <CitationsModule jobId={documentId} documentId={jobDocumentId} />
+            <CitationsModule jobId={jobId} documentId={documentId} />
           )
         )}
 
         {activeTab === 'validation' && (
-          <ValidationPanel documentId={jobDocumentId} />
+          <ValidationPanel documentId={documentId} />
         )}
 
         {activeTab === 'references' && (
-          <ReferenceListGenerator documentId={jobDocumentId} />
+          <ReferenceListGenerator documentId={documentId} />
         )}
       </div>
     </div>

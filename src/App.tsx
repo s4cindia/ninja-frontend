@@ -194,7 +194,7 @@ function AppRoutes() {
           <Route path="/batches" element={<BatchListPage />} />
           <Route path="/batches/new" element={<BatchCreationPage />} />
           <Route path="/settings" element={<Settings />} />
-          <Route path="/citation/:documentId" element={<CitationWorkflow />} />
+          <Route path="/citation/:jobId" element={<CitationWorkflow />} />
 
           {/* Editorial Services Routes */}
           <Route path="/editorial" element={<EditorialLayout />}>
