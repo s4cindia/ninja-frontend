@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
-import { Wand2, AlertCircle, X, Quote, StopCircle } from 'lucide-react';
+import { Wand2, AlertCircle, X, Quote, StopCircle, FileText } from 'lucide-react';
 import type { Citation, CitationFilters } from '@/types/citation.types';
 
 interface CitationsModuleProps {
@@ -193,6 +193,12 @@ export function CitationsModule({ jobId, documentId: propDocumentId }: Citations
           <p className="text-sm text-gray-500">
             Detected citations and parsed components
           </p>
+          {citations?.filename && (
+            <div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
+              <FileText className="h-4 w-4" aria-hidden="true" />
+              <span>{citations.filename}</span>
+            </div>
+          )}
         </div>
 
         {unparsedCount > 0 && (

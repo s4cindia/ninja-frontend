@@ -212,6 +212,8 @@ export interface PaginatedCitations {
   totalPages: number;
   documentId?: string;
   jobId?: string;
+  /** Original filename of the uploaded document */
+  filename?: string;
 }
 
 // Statistics for dashboard
