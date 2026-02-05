@@ -84,9 +84,13 @@ export const ReAuditSection: React.FC<ReAuditSectionProps> = ({
           setResult(data);
           onReauditComplete(data);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Re-audit failed:", err);
-        setError("Failed to analyze EPUB. Please try again.");
+        const errorMessage = err.response?.data?.error?.message
+          || err.response?.data?.message
+          || err.message
+          || "Failed to analyze EPUB. Please try again.";
+        setError(errorMessage);
       } finally {
         setIsUploading(false);
       }
