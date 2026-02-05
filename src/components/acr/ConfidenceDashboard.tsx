@@ -804,12 +804,14 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
           const normalizedCriteria = (acrResponse.criteria || []).map((c, i) => {
             const criterionId = extractCriterionId(c, i);
             const confidenceData = confidenceDataMap.get(criterionId);
+            // Compute a single canonical confidence value with consistent fallback order
+            const canonicalConfidence = confidenceData?.confidenceScore ?? c.confidenceScore ?? c.confidence ?? 0;
             // Prefer confidence response data over ACR response data
             const mergedData = {
               ...c,
               naSuggestion: confidenceData?.naSuggestion || c.naSuggestion,
-              confidenceScore: confidenceData?.confidenceScore ?? c.confidenceScore ?? c.confidence,
-              confidence: confidenceData?.confidenceScore ?? c.confidence ?? c.confidenceScore,
+              confidenceScore: canonicalConfidence,
+              confidence: canonicalConfidence,
             };
             return normalizeCriterion(mergedData as CriterionConfidence, i);
           });
