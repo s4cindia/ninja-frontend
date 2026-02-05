@@ -22,6 +22,7 @@ export interface ReferenceEntry {
   formatted?: string;
   formattedApa?: string;
   formattedMla?: string;
+  formattedChicago?: string;
   isEdited?: boolean;
   enrichmentSource?: 'crossref' | 'pubmed' | 'manual' | 'ai';
   crossrefEnriched?: boolean;

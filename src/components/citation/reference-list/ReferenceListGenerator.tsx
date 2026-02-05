@@ -139,6 +139,7 @@ export function ReferenceListGenerator({ documentId }: ReferenceListGeneratorPro
               key={entry.id}
               entry={entry}
               index={index}
+              styleCode={selectedStyle}
               onEdit={(updates) =>
                 updateEntryMutation.mutate({ entryId: entry.id, updates })
               }

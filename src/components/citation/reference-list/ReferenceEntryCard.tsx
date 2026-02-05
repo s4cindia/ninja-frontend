@@ -8,10 +8,31 @@ import type { ReferenceEntry } from '@/types/reference-list.types';
 interface ReferenceEntryCardProps {
   entry: ReferenceEntry;
   index: number;
+  styleCode?: string;
   onEdit: (updates: Partial<ReferenceEntry>) => void;
 }
 
-export function ReferenceEntryCard({ entry, index, onEdit }: ReferenceEntryCardProps) {
+const getFormattedEntry = (entry: ReferenceEntry, styleCode: string): string | undefined => {
+  const styleFieldMap: Record<string, keyof ReferenceEntry> = {
+    'apa7': 'formattedApa',
+    'apa': 'formattedApa',
+    'mla9': 'formattedMla',
+    'mla': 'formattedMla',
+    'chicago17': 'formattedChicago',
+    'chicago': 'formattedChicago',
+  };
+  
+  const field = styleFieldMap[styleCode] || 'formattedApa';
+  const value = entry[field];
+  
+  if (typeof value === 'string') {
+    return value;
+  }
+  
+  return entry.formatted || entry.formattedApa || entry.formattedMla || entry.title;
+};
+
+export function ReferenceEntryCard({ entry, index, styleCode = 'apa7', onEdit }: ReferenceEntryCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedEntry, setEditedEntry] = useState(entry);
 
@@ -20,11 +41,18 @@ export function ReferenceEntryCard({ entry, index, onEdit }: ReferenceEntryCardP
     setIsEditing(false);
   };
 
-  const formatWithItalics = (text: string) => {
+  const formatWithItalics = (text?: string) => {
+    if (!text) {
+      return <span className="text-gray-500 italic">No formatted entry available</span>;
+    }
     return text.split(/\*([^*]+)\*/).map((part, i) =>
       i % 2 === 1 ? <em key={i}>{part}</em> : part
     );
   };
+
+  const formattedText = getFormattedEntry(entry, styleCode);
+  const enrichmentSource = entry.enrichmentSource || (entry.crossrefEnriched ? 'crossref' : 'manual');
+  const confidence = entry.enrichmentConfidence ?? entry.confidence ?? 0;
 
   return (
     <Card className={cn(
@@ -36,7 +64,7 @@ export function ReferenceEntryCard({ entry, index, onEdit }: ReferenceEntryCardP
 
         <div className="flex-1">
           {!isEditing ? (
-            <p className="text-gray-900">{formatWithItalics(entry.formatted)}</p>
+            <p className="text-gray-900">{formatWithItalics(formattedText)}</p>
           ) : (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -44,7 +72,7 @@ export function ReferenceEntryCard({ entry, index, onEdit }: ReferenceEntryCardP
                   <label className="block text-xs text-gray-500 mb-1">Authors</label>
                   <input
                     type="text"
-                    value={editedEntry.authors.map(a => `${a.lastName}, ${a.firstName || ''}`).join('; ')}
+                    value={editedEntry.authors?.map(a => `${a.lastName}, ${a.firstName || ''}`).join('; ') || ''}
                     onChange={(e) => {
                       const authors = e.target.value.split(';').map(a => {
                         const [lastName, firstName] = a.trim().split(',').map(s => s.trim());
@@ -79,7 +107,7 @@ export function ReferenceEntryCard({ entry, index, onEdit }: ReferenceEntryCardP
                   <label className="block text-xs text-gray-500 mb-1">Journal</label>
                   <input
                     type="text"
-                    value={editedEntry.journalName || ''}
+                    value={editedEntry.journalName || editedEntry.journal || ''}
                     onChange={(e) => setEditedEntry({ ...editedEntry, journalName: e.target.value })}
                     className="w-full px-2 py-1 border rounded text-sm"
                   />
@@ -125,18 +153,22 @@ export function ReferenceEntryCard({ entry, index, onEdit }: ReferenceEntryCardP
           )}
 
           <div className="flex items-center gap-2 mt-2">
-            <span className={cn(
-              'text-xs px-2 py-0.5 rounded',
-              entry.enrichmentSource === 'crossref' && 'bg-green-100 text-green-700',
-              entry.enrichmentSource === 'pubmed' && 'bg-blue-100 text-blue-700',
-              entry.enrichmentSource === 'manual' && 'bg-gray-100 text-gray-700',
-              entry.enrichmentSource === 'ai' && 'bg-purple-100 text-purple-700'
-            )}>
-              {entry.enrichmentSource}
-            </span>
-            <span className="text-xs text-gray-500">
-              {Math.round(entry.enrichmentConfidence * 100)}% confidence
-            </span>
+            {enrichmentSource && (
+              <span className={cn(
+                'text-xs px-2 py-0.5 rounded',
+                enrichmentSource === 'crossref' && 'bg-green-100 text-green-700',
+                enrichmentSource === 'pubmed' && 'bg-blue-100 text-blue-700',
+                enrichmentSource === 'manual' && 'bg-gray-100 text-gray-700',
+                enrichmentSource === 'ai' && 'bg-purple-100 text-purple-700'
+              )}>
+                {enrichmentSource}
+              </span>
+            )}
+            {confidence > 0 && (
+              <span className="text-xs text-gray-500">
+                {Math.round(confidence * 100)}% confidence
+              </span>
+            )}
             {entry.doi && (
               <a
                 href={`https://doi.org/${entry.doi}`}
