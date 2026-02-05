@@ -30,6 +30,21 @@ export function CitationsPage() {
   const documentId = (jobOutput?.documentId as string) || '';
   const filename = (jobInput?.filename as string) || (jobInput?.fileName as string) || (jobInput?.originalName as string);
 
+  if (job) {
+    console.log('[CitationsPage] Job loaded:', JSON.stringify({
+      jobId,
+      jobStatus: job.status,
+      jobType: job.type,
+      hasOutput: !!job.output,
+      output: job.output,
+      extractedDocumentId: documentId
+    }, null, 2));
+  } else if (jobLoading) {
+    console.log('[CitationsPage] Loading job:', jobId);
+  } else {
+    console.log('[CitationsPage] No job data yet for:', jobId);
+  }
+
   return (
     <div className="space-y-6">
       <div>
