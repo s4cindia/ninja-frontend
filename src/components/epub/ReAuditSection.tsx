@@ -74,7 +74,7 @@ export const ReAuditSection: React.FC<ReAuditSectionProps> = ({
           formData.append("epub", file);
 
           const response = await api.post(
-            `/epub/remediation/${jobId}/reaudit`,
+            `/epub/job/${jobId}/reaudit`,
             formData,
             {
               headers: { "Content-Type": "multipart/form-data" },
