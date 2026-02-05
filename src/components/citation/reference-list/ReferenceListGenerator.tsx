@@ -55,7 +55,7 @@ export function ReferenceListGenerator({ documentId }: ReferenceListGeneratorPro
     if (!referenceList) return;
 
     const text = referenceList.entries
-      .map((e, i) => `${i + 1}. ${e.formatted.replace(/\*/g, '')}`)
+      .map((e, i) => `${i + 1}. ${(e.formatted || e.formattedApa || e.title || '').replace(/\*/g, '')}`)
       .join('\n\n');
 
     const blob = new Blob([text], { type: 'text/plain' });
@@ -102,35 +102,29 @@ export function ReferenceListGenerator({ documentId }: ReferenceListGeneratorPro
         </div>
       </div>
 
-      {referenceList && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      {referenceList && referenceList.stats && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="p-3 text-center">
-            <p className="text-2xl font-semibold">{referenceList.summary.totalEntries}</p>
+            <p className="text-2xl font-semibold">{referenceList.stats.total}</p>
             <p className="text-xs text-gray-500">Total</p>
           </Card>
           <Card className="p-3 text-center">
             <p className="text-2xl font-semibold text-green-600">
-              {referenceList.summary.enrichedFromCrossRef}
+              {referenceList.stats.enrichedWithDoi || 0}
             </p>
-            <p className="text-xs text-gray-500">CrossRef</p>
-          </Card>
-          <Card className="p-3 text-center">
-            <p className="text-2xl font-semibold text-blue-600">
-              {referenceList.summary.enrichedFromPubMed}
-            </p>
-            <p className="text-xs text-gray-500">PubMed</p>
-          </Card>
-          <Card className="p-3 text-center">
-            <p className="text-2xl font-semibold text-gray-600">
-              {referenceList.summary.manualEntries}
-            </p>
-            <p className="text-xs text-gray-500">Manual</p>
+            <p className="text-xs text-gray-500">With DOI</p>
           </Card>
           <Card className="p-3 text-center">
             <p className="text-2xl font-semibold text-yellow-600">
-              {referenceList.summary.needsReview}
+              {referenceList.stats.needsReview}
             </p>
             <p className="text-xs text-gray-500">Needs Review</p>
+          </Card>
+          <Card className="p-3 text-center">
+            <p className="text-2xl font-semibold text-gray-600">
+              {referenceList.entries.length - (referenceList.stats.needsReview || 0)}
+            </p>
+            <p className="text-xs text-gray-500">Complete</p>
           </Card>
         </div>
       )}
@@ -161,7 +155,7 @@ export function ReferenceListGenerator({ documentId }: ReferenceListGeneratorPro
           </Button>
           <Button
             onClick={handleFinalize}
-            disabled={referenceList.summary.needsReview > 0 || finalizeMutation.isPending}
+            disabled={(referenceList.stats?.needsReview || 0) > 0 || finalizeMutation.isPending}
           >
             {finalizeMutation.isPending ? (
               <>

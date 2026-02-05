@@ -16,7 +16,7 @@ export function useGenerateReferenceList() {
     }) => referenceListService.generate(documentId, request),
     onSuccess: (data, variables) => {
       queryClient.setQueryData(['reference-list', variables.documentId], data);
-      toast.success(`Generated ${data.summary.totalEntries} reference entries`);
+      toast.success(`Generated ${data.stats?.total || data.entries?.length || 0} reference entries`);
     },
     onError: (error: Error & { response?: { data?: { error?: { message?: string } } } }) => {
       const message = error.response?.data?.error?.message || error.message || 'Failed to generate reference list';

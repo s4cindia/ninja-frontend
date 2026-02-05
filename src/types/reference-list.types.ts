@@ -12,35 +12,39 @@ export interface ReferenceEntry {
   year?: string;
   title: string;
   journalName?: string;
+  journal?: string;
   volume?: string;
   issue?: string;
   pages?: string;
   publisher?: string;
   doi?: string;
   url?: string;
-  formatted: string;
+  formatted?: string;
   formattedApa?: string;
   formattedMla?: string;
   isEdited?: boolean;
-  enrichmentSource: 'crossref' | 'pubmed' | 'manual' | 'ai';
-  enrichmentConfidence: number;
-  needsReview: boolean;
+  enrichmentSource?: 'crossref' | 'pubmed' | 'manual' | 'ai';
+  crossrefEnriched?: boolean;
+  enrichmentConfidence?: number;
+  confidence?: number;
+  needsReview?: boolean;
   reviewReason?: string;
 }
 
-export interface ReferenceListSummary {
-  totalEntries: number;
-  enrichedFromCrossRef: number;
-  enrichedFromPubMed: number;
-  manualEntries: number;
+export interface ReferenceListStats {
+  total: number;
+  enrichedWithDoi?: number;
+  enrichedFromCrossRef?: number;
+  enrichedFromPubMed?: number;
+  manualEntries?: number;
   needsReview: number;
 }
 
 export interface ReferenceListResult {
-  documentId: string;
-  styleCode: string;
-  status: 'draft' | 'finalized';
-  summary: ReferenceListSummary;
+  documentId?: string;
+  styleCode?: string;
+  status?: 'draft' | 'finalized';
+  stats: ReferenceListStats;
   entries: ReferenceEntry[];
 }
 
