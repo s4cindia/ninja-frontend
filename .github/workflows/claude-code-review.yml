@@ -6,6 +6,7 @@
 
   jobs:
     claude-review:
+      if: false  # Disabled - using CodeRabbit instead
       runs-on: ubuntu-latest
       permissions:
         contents: read
