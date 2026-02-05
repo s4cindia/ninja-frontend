@@ -9,6 +9,7 @@ import {
   useParseCitation,
   useParseAllCitations
 } from '@/hooks/useCitation';
+import { useJob } from '@/hooks/useJobs';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
@@ -41,8 +42,16 @@ export function CitationsModule({ jobId, documentId: propDocumentId }: Citations
     error
   } = useCitationsByJob(jobId, filters);
 
+  const { data: job } = useJob(jobId);
+
   const documentId = propDocumentId || citations?.documentId;
   const isEmpty = !citations?.items || citations.items.length === 0;
+  
+  // Get filename from citations response or job input
+  const filename = citations?.filename || 
+    (job?.input?.filename as string | undefined) ||
+    (job?.input?.fileName as string | undefined) ||
+    (job?.input?.originalName as string | undefined);
 
   const {
     data: stats,
@@ -193,10 +202,10 @@ export function CitationsModule({ jobId, documentId: propDocumentId }: Citations
           <p className="text-sm text-gray-500">
             Detected citations and parsed components
           </p>
-          {citations?.filename && (
+          {filename && (
             <div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
               <FileText className="h-4 w-4" aria-hidden="true" />
-              <span>{citations.filename}</span>
+              <span>{filename}</span>
             </div>
           )}
         </div>
