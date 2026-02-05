@@ -1,14 +1,13 @@
 import { useState } from 'react';
 import { X, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { cn } from '@/utils/cn';
 import type { ValidationViolation } from '@/types/citation-validation.types';
 
 interface BatchCorrectionModalProps {
   isOpen: boolean;
   onClose: () => void;
   violations: ValidationViolation[];
-  onApplyBatch: (ids: string[]) => Promise<void>;
+  onApplyBatch: (validationIds: string[]) => Promise<void>;
 }
 
 export function BatchCorrectionModal({
@@ -24,7 +23,15 @@ export function BatchCorrectionModal({
 
   if (!isOpen) return null;
 
-  const toggleSelection = (id: string) => {
+  const groupedByType = violations.reduce((acc, v) => {
+    if (!acc[v.violationType]) {
+      acc[v.violationType] = [];
+    }
+    acc[v.violationType].push(v);
+    return acc;
+  }, {} as Record<string, ValidationViolation[]>);
+
+  const handleToggle = (id: string) => {
     const newSelected = new Set(selectedIds);
     if (newSelected.has(id)) {
       newSelected.delete(id);
@@ -34,12 +41,16 @@ export function BatchCorrectionModal({
     setSelectedIds(newSelected);
   };
 
-  const toggleAll = () => {
-    if (selectedIds.size === violations.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(violations.map(v => v.id)));
-    }
+  const handleSelectAll = (type: string) => {
+    const newSelected = new Set(selectedIds);
+    groupedByType[type].forEach(v => newSelected.add(v.id));
+    setSelectedIds(newSelected);
+  };
+
+  const handleDeselectAll = (type: string) => {
+    const newSelected = new Set(selectedIds);
+    groupedByType[type].forEach(v => newSelected.delete(v.id));
+    setSelectedIds(newSelected);
   };
 
   const handleApply = async () => {
@@ -59,6 +70,7 @@ export function BatchCorrectionModal({
         onClick={onClose}
         aria-hidden="true"
       />
+
       <div
         className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] flex flex-col"
         role="dialog"
@@ -66,98 +78,92 @@ export function BatchCorrectionModal({
         aria-labelledby="batch-modal-title"
       >
         <div className="flex items-center justify-between p-4 border-b">
-          <h2 id="batch-modal-title" className="text-lg font-semibold">
-            Batch Correction
-          </h2>
+          <h2 id="batch-modal-title" className="text-lg font-semibold">Batch Correction</h2>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-gray-100 rounded"
+            className="text-gray-400 hover:text-gray-600"
             aria-label="Close modal"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="p-4 border-b">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={selectedIds.size === violations.length}
-              onChange={toggleAll}
-              className="rounded border-gray-300"
-            />
-            <span className="text-sm font-medium">
-              Select all ({violations.length})
-            </span>
-          </label>
-        </div>
+        <div className="flex-1 overflow-y-auto p-4">
+          <p className="text-sm text-gray-600 mb-4">
+            Select the corrections you want to apply. {selectedIds.size} of {violations.length} selected.
+          </p>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {violations.map((violation) => (
-            <label
-              key={violation.id}
-              className={cn(
-                'flex items-start gap-3 p-3 rounded border cursor-pointer transition-colors',
-                selectedIds.has(violation.id)
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 hover:bg-gray-50'
-              )}
-            >
-              <input
-                type="checkbox"
-                checked={selectedIds.has(violation.id)}
-                onChange={() => toggleSelection(violation.id)}
-                className="mt-1 rounded border-gray-300"
-              />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span
-                    className={cn(
-                      'px-1.5 py-0.5 rounded text-xs font-medium',
-                      violation.severity === 'error'
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-yellow-100 text-yellow-800'
-                    )}
+          {Object.entries(groupedByType).map(([type, typeViolations]) => (
+            <div key={type} className="mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-medium text-gray-900 capitalize">
+                  {type.replace(/_/g, ' ')} ({typeViolations.length})
+                </h3>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleSelectAll(type)}
+                    className="text-xs text-blue-600 hover:text-blue-800"
                   >
-                    {violation.severity}
-                  </span>
-                  <span className="text-sm font-medium truncate">
-                    {violation.ruleName}
-                  </span>
+                    Select all
+                  </button>
+                  <button
+                    onClick={() => handleDeselectAll(type)}
+                    className="text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    Deselect all
+                  </button>
                 </div>
-                <p className="text-xs text-gray-500 truncate">
-                  {violation.originalText} → {violation.suggestedFix}
-                </p>
               </div>
-            </label>
+
+              <div className="space-y-2">
+                {typeViolations.map(violation => (
+                  <label
+                    key={violation.id}
+                    className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(violation.id)}
+                      onChange={() => handleToggle(violation.id)}
+                      className="mt-1 rounded border-gray-300"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-mono text-sm">
+                        <span className="text-red-600 line-through">{violation.originalText}</span>
+                        <span className="mx-2">→</span>
+                        <span className="text-green-600">{violation.suggestedFix}</span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1 truncate">
+                        {violation.citationText}
+                      </p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
 
-        <div className="flex items-center justify-between p-4 border-t bg-gray-50">
-          <span className="text-sm text-gray-600">
-            {selectedIds.size} of {violations.length} selected
-          </span>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose} disabled={isApplying}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleApply}
-              disabled={selectedIds.size === 0 || isApplying}
-            >
-              {isApplying ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Applying...
-                </>
-              ) : (
-                <>
-                  <Check className="h-4 w-4 mr-2" />
-                  Apply {selectedIds.size} Corrections
-                </>
-              )}
-            </Button>
-          </div>
+        <div className="flex items-center justify-end gap-3 p-4 border-t">
+          <Button variant="outline" onClick={onClose} disabled={isApplying}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleApply}
+            disabled={selectedIds.size === 0 || isApplying}
+          >
+            {isApplying ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden="true" />
+                Applying...
+              </>
+            ) : (
+              <>
+                <Check className="h-4 w-4 mr-2" aria-hidden="true" />
+                Apply {selectedIds.size} Corrections
+              </>
+            )}
+          </Button>
         </div>
       </div>
     </div>
