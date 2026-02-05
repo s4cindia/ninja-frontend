@@ -119,7 +119,7 @@ Maximum confidence: 95% (always leave room for edge cases)
   "criterionId": "1.2.1",
   "jobId": "job-uuid-here",
   "status": "not_applicable",
-  "method": "ai_suggested",
+  "method": "quick_accept",
   "notes": "AI-suggested Not Applicable (92% confidence): No audio-only or video-only prerecorded content was detected in this EPUB."
 }
 ```
@@ -134,7 +134,7 @@ Maximum confidence: 95% (always leave room for edge cases)
     "newStatus": "not_applicable",
     "verifiedAt": "2026-02-04T08:30:00Z",
     "verifiedBy": "user@example.com",
-    "method": "ai_suggested"
+    "method": "quick_accept"
   }
 }
 ```
@@ -148,15 +148,15 @@ The frontend will:
    - `jobId` is available
 
 2. **Show Quick Accept Button** when:
-   - `naSuggestion.confidence >= 80`
+   - `naSuggestion.confidence >= 90`
 
 3. **Display Confidence Badge**:
-   - ≥80%: "High Confidence" (green)
-   - 60-79%: "Medium Confidence" (yellow)
+   - ≥90%: "High Confidence" (green)
+   - 60-89%: "Medium Confidence" (yellow)
    - <60%: "Low Confidence" (red)
 
 4. **On Quick Accept**:
-   - Submit verification with `method: 'ai_suggested'`
+   - Submit verification with `method: 'quick_accept'`
    - Auto-populate notes with confidence and rationale
    - Update UI to show acceptance confirmation
 

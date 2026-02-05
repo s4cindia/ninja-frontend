@@ -72,7 +72,7 @@ interface NaSuggestion {
 
 interface DetectionCheck {
   check: string;                       // What was checked (e.g., "Audio file presence")
-  result: "pass" | "fail";             // "pass" = no content found (supports N/A)
+  result: "pass" | "fail" | "warning"; // "pass" = no content found (supports N/A), "warning" = needs attention
   details: string;                     // Details about the check result
 }
 ```
