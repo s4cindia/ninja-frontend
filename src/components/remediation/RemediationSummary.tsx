@@ -1,20 +1,27 @@
 import React from 'react';
-import { CheckCircle, AlertCircle, Clock, Download, Eye, Plus } from 'lucide-react';
+import { CheckCircle, AlertCircle, AlertTriangle, XCircle, Download, Eye, Plus, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { Alert } from '@/components/ui/Alert';
+import { AuditCoverageDisplay } from './AuditCoverageDisplay';
+import { IssuesList } from './IssuesList';
 import { clsx } from 'clsx';
+import type { AuditCoverage, IssueWithNewFlag } from '@/types/remediation.types';
 
 interface RemediationSummaryProps {
   contentType: 'pdf' | 'epub';
   originalIssueCount: number;
   fixedIssueCount: number;
   remainingIssues: number;
-  timeTaken?: string;
+  newIssues?: number;
+  auditCoverage?: AuditCoverage;
+  remainingIssuesList?: IssueWithNewFlag[];
   jobId: string;
   onViewDetails?: () => void;
   onDownload?: () => void;
   onStartNew?: () => void;
+  onRunRemediationAgain?: () => void;
   className?: string;
 }
 
@@ -23,15 +30,22 @@ export const RemediationSummary: React.FC<RemediationSummaryProps> = ({
   originalIssueCount,
   fixedIssueCount,
   remainingIssues,
-  timeTaken,
+  newIssues = 0,
+  auditCoverage,
+  remainingIssuesList = [],
   onViewDetails,
   onDownload,
   onStartNew,
+  onRunRemediationAgain,
   className,
 }) => {
-  const fixRate = originalIssueCount > 0 
-    ? Math.round((fixedIssueCount / originalIssueCount) * 100) 
+  const fixRate = originalIssueCount > 0
+    ? Math.round((fixedIssueCount / originalIssueCount) * 100)
     : 0;
+
+  const allOriginalFixed = originalIssueCount > 0 && fixedIssueCount === originalIssueCount;
+  const isFullyCompliant = remainingIssues === 0;
+  const hasNewIssues = newIssues > 0;
 
   const getFixRateColor = (rate: number) => {
     if (rate >= 80) return 'text-green-600';
@@ -49,19 +63,56 @@ export const RemediationSummary: React.FC<RemediationSummaryProps> = ({
   const strokeDashoffset = circumference - (fixRate / 100) * circumference;
 
   return (
-    <Card className={className}>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-500" />
-            Remediation Summary
-          </CardTitle>
-          <Badge variant={contentType === 'epub' ? 'info' : 'default'}>
-            {contentType.toUpperCase()}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent>
+    <div className="space-y-6">
+      <Card className={className}>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              Remediation Summary
+            </CardTitle>
+            <Badge variant={contentType === 'epub' ? 'info' : 'default'}>
+              {contentType.toUpperCase()}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {/* Status Alert */}
+          {isFullyCompliant && (
+            <Alert variant="success" className="mb-6">
+              <CheckCircle className="h-4 w-4" />
+              <div className="ml-2">
+                <div className="font-semibold">Fully Compliant!</div>
+                <div>All accessibility issues have been resolved. No remaining issues detected.</div>
+              </div>
+            </Alert>
+          )}
+
+          {!isFullyCompliant && allOriginalFixed && hasNewIssues && (
+            <Alert variant="warning" className="mb-6">
+              <AlertTriangle className="h-4 w-4" />
+              <div className="ml-2">
+                <div className="font-semibold">New Issues Detected</div>
+                <div>
+                  All original issues were fixed, but {newIssues} new issue{newIssues !== 1 ? 's' : ''} {newIssues !== 1 ? 'were' : 'was'} found during re-audit.
+                  Consider running remediation again.
+                </div>
+              </div>
+            </Alert>
+          )}
+
+          {!isFullyCompliant && !allOriginalFixed && (
+            <Alert variant="error" className="mb-6">
+              <XCircle className="h-4 w-4" />
+              <div className="ml-2">
+                <div className="font-semibold">Remediation Incomplete</div>
+                <div>
+                  {remainingIssues} issue{remainingIssues !== 1 ? 's' : ''} remaining.
+                  {hasNewIssues && ` This includes ${newIssues} new issue${newIssues !== 1 ? 's' : ''} discovered during re-audit.`}
+                </div>
+              </div>
+            </Alert>
+          )}
         <div className="flex flex-col md:flex-row gap-6">
           <div className="flex-shrink-0 flex justify-center">
             <div className="relative w-32 h-32">
@@ -96,11 +147,11 @@ export const RemediationSummary: React.FC<RemediationSummaryProps> = ({
             </div>
           </div>
 
-          <div className="flex-1 grid grid-cols-2 gap-4">
+          <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="p-3 bg-gray-50 rounded-lg">
               <div className="flex items-center gap-2 text-gray-500 mb-1">
                 <AlertCircle className="h-4 w-4" />
-                <span className="text-xs">Original Issues</span>
+                <span className="text-xs">Original</span>
               </div>
               <p className="text-2xl font-bold text-gray-900">{originalIssueCount}</p>
             </div>
@@ -113,23 +164,21 @@ export const RemediationSummary: React.FC<RemediationSummaryProps> = ({
               <p className="text-2xl font-bold text-green-700">{fixedIssueCount}</p>
             </div>
 
-            <div className="p-3 bg-amber-50 rounded-lg">
-              <div className="flex items-center gap-2 text-amber-600 mb-1">
-                <AlertCircle className="h-4 w-4" />
-                <span className="text-xs">Remaining</span>
+            <div className="p-3 bg-orange-50 rounded-lg">
+              <div className="flex items-center gap-2 text-orange-600 mb-1">
+                <AlertTriangle className="h-4 w-4" />
+                <span className="text-xs">New</span>
               </div>
-              <p className="text-2xl font-bold text-amber-700">{remainingIssues}</p>
+              <p className="text-2xl font-bold text-orange-700">{newIssues}</p>
             </div>
 
-            {timeTaken && (
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <div className="flex items-center gap-2 text-blue-600 mb-1">
-                  <Clock className="h-4 w-4" />
-                  <span className="text-xs">Time Taken</span>
-                </div>
-                <p className="text-2xl font-bold text-blue-700">{timeTaken}</p>
+            <div className="p-3 bg-red-50 rounded-lg">
+              <div className="flex items-center gap-2 text-red-600 mb-1">
+                <XCircle className="h-4 w-4" />
+                <span className="text-xs">Remaining</span>
               </div>
-            )}
+              <p className="text-2xl font-bold text-red-700">{remainingIssues}</p>
+            </div>
           </div>
         </div>
 
@@ -146,6 +195,12 @@ export const RemediationSummary: React.FC<RemediationSummaryProps> = ({
               Download
             </Button>
           )}
+          {onRunRemediationAgain && !isFullyCompliant && (
+            <Button variant="outline" onClick={onRunRemediationAgain}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Run Remediation Again
+            </Button>
+          )}
           {onStartNew && (
             <Button variant="ghost" onClick={onStartNew}>
               <Plus className="h-4 w-4 mr-2" />
@@ -155,5 +210,16 @@ export const RemediationSummary: React.FC<RemediationSummaryProps> = ({
         </div>
       </CardContent>
     </Card>
+
+    {/* Audit Coverage Display */}
+    {auditCoverage && (
+      <AuditCoverageDisplay coverage={auditCoverage} />
+    )}
+
+    {/* Remaining Issues List */}
+    {remainingIssuesList.length > 0 && (
+      <IssuesList issues={remainingIssuesList} />
+    )}
+  </div>
   );
 };

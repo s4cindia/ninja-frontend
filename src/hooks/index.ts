@@ -5,6 +5,7 @@ export * from './useCompliance';
 export * from './useDashboard';
 export * from './useAcr';
 export * from './useRemediationConfig';
+export * from './useRemediationResults';
 
 // Citation Management
 export {
