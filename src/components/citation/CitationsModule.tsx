@@ -3,18 +3,32 @@ import { CitationList } from './CitationList';
 import { CitationDetail } from './CitationDetail';
 import { CitationStats } from './CitationStats';
 import { CitationTypeFilter } from './CitationTypeFilter';
+import { StyleSelector } from './validation/StyleSelector';
+import { ValidationSummary } from './validation/ValidationSummary';
+import { ViolationCard } from './validation/ViolationCard';
+import { BatchCorrectionModal } from './correction/BatchCorrectionModal';
 import {
   useCitationsByJob,
   useCitationStats,
   useParseCitation,
   useParseAllCitations
 } from '@/hooks/useCitation';
+import {
+  useCitationStyles,
+  useValidateDocument,
+  useValidations,
+  useAcceptValidation,
+  useRejectValidation,
+  useEditValidation,
+  useBatchCorrect
+} from '@/hooks/useCitationValidation';
 import { useJob } from '@/hooks/useJobs';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
-import { Wand2, AlertCircle, X, Quote, StopCircle, FileText } from 'lucide-react';
+import { Wand2, AlertCircle, X, Quote, StopCircle, FileText, FileCheck, Loader2, Layers } from 'lucide-react';
 import type { Citation, CitationFilters } from '@/types/citation.types';
+import type { ValidationResult } from '@/types/citation-validation.types';
 
 interface CitationsModuleProps {
   jobId: string;
@@ -32,6 +46,9 @@ export function CitationsModule({ jobId, documentId: propDocumentId }: Citations
   const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [showErrorMessage, setShowErrorMessage] = useState(false);
+  const [selectedStyle, setSelectedStyle] = useState('apa7');
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+  const [showBatchModal, setShowBatchModal] = useState(false);
   
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -47,7 +64,6 @@ export function CitationsModule({ jobId, documentId: propDocumentId }: Citations
   const documentId = propDocumentId || citations?.documentId;
   const isEmpty = !citations?.items || citations.items.length === 0;
   
-  // Get filename from citations response or job input
   const filename = citations?.filename || 
     (job?.input?.filename as string | undefined) ||
     (job?.input?.fileName as string | undefined) ||
@@ -60,6 +76,17 @@ export function CitationsModule({ jobId, documentId: propDocumentId }: Citations
 
   const parseMutation = useParseCitation();
   const parseAllMutation = useParseAllCitations();
+
+  const { data: styles = [] } = useCitationStyles();
+  const { data: validations = [] } = useValidations(documentId ?? '');
+  const validateMutation = useValidateDocument();
+  const acceptMutation = useAcceptValidation();
+  const rejectMutation = useRejectValidation();
+  const editMutation = useEditValidation();
+  const batchMutation = useBatchCorrect();
+
+  const pendingViolations = validations.filter(v => v.status === 'pending');
+  const resolvedViolations = validations.filter(v => v.status !== 'pending');
 
   useEffect(() => {
     if (parseAllMutation.isSuccess) {
@@ -113,6 +140,15 @@ export function CitationsModule({ jobId, documentId: propDocumentId }: Citations
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
   }, []);
+
+  const handleValidate = async () => {
+    if (!documentId) return;
+    const result = await validateMutation.mutateAsync({
+      documentId,
+      request: { styleCode: selectedStyle }
+    });
+    setValidationResult(result);
+  };
 
   const unparsedCount = stats?.unparsed || 0;
 
@@ -176,7 +212,7 @@ export function CitationsModule({ jobId, documentId: propDocumentId }: Citations
             Citation Analysis
           </h2>
           <p className="text-sm text-gray-500">
-            Detected citations and parsed components
+            Detected citations and style validation
           </p>
         </div>
         <Card className="p-8 text-center">
@@ -194,13 +230,13 @@ export function CitationsModule({ jobId, documentId: propDocumentId }: Citations
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-xl font-semibold text-gray-900">
             Citation Analysis
           </h2>
           <p className="text-sm text-gray-500">
-            Detected citations and parsed components
+            Detected citations and style validation
           </p>
           {filename && (
             <div className="flex items-center gap-2 mt-1 text-sm text-gray-600">
@@ -210,26 +246,28 @@ export function CitationsModule({ jobId, documentId: propDocumentId }: Citations
           )}
         </div>
 
-        {unparsedCount > 0 && (
-          parseAllMutation.isPending ? (
-            <Button
-              variant="outline"
-              onClick={handleCancelParseAll}
-              aria-label="Cancel parsing citations"
-            >
-              <StopCircle className="h-4 w-4 mr-2" />
-              Cancel
-            </Button>
-          ) : (
-            <Button
-              onClick={handleParseAll}
-              disabled={!documentId}
-            >
-              <Wand2 className="h-4 w-4 mr-2" />
-              Parse All ({unparsedCount})
-            </Button>
-          )
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {unparsedCount > 0 && (
+            parseAllMutation.isPending ? (
+              <Button
+                variant="outline"
+                onClick={handleCancelParseAll}
+                aria-label="Cancel parsing citations"
+              >
+                <StopCircle className="h-4 w-4 mr-2" />
+                Cancel
+              </Button>
+            ) : (
+              <Button
+                onClick={handleParseAll}
+                disabled={!documentId}
+              >
+                <Wand2 className="h-4 w-4 mr-2" />
+                Parse All ({unparsedCount})
+              </Button>
+            )
+          )}
+        </div>
       </div>
 
       {showSuccessMessage && parseAllMutation.data && (
@@ -303,6 +341,116 @@ export function CitationsModule({ jobId, documentId: propDocumentId }: Citations
                 Next
               </Button>
             </div>
+          </div>
+        )}
+
+        {documentId && (
+          <div className="border-t border-gray-200 pt-6 mt-6 space-y-6">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Style Validation</h3>
+                <p className="text-sm text-gray-500">
+                  Check citations against style guide rules
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <StyleSelector
+                  styles={styles}
+                  selected={selectedStyle}
+                  onChange={setSelectedStyle}
+                  disabled={validateMutation.isPending}
+                />
+                <Button
+                  onClick={handleValidate}
+                  disabled={validateMutation.isPending}
+                >
+                  {validateMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden="true" />
+                      Validating...
+                    </>
+                  ) : (
+                    <>
+                      <FileCheck className="h-4 w-4 mr-2" aria-hidden="true" />
+                      Validate
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {validationResult && (
+              <ValidationSummary data={validationResult.summary} />
+            )}
+
+            {pendingViolations.length > 1 && (
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowBatchModal(true)}
+                >
+                  <Layers className="h-4 w-4 mr-2" aria-hidden="true" />
+                  Batch Correct ({pendingViolations.length})
+                </Button>
+              </div>
+            )}
+
+            {pendingViolations.length > 0 && (
+              <div>
+                <h4 className="text-md font-medium text-gray-900 mb-3">
+                  Issues to Review ({pendingViolations.length})
+                </h4>
+                <div className="space-y-3">
+                  {pendingViolations.map((violation) => (
+                    <ViolationCard
+                      key={violation.id}
+                      violation={violation}
+                      onAccept={() => acceptMutation.mutate(violation.id)}
+                      onReject={() => rejectMutation.mutate({ validationId: violation.id })}
+                      onEdit={(text) => editMutation.mutate({ validationId: violation.id, correctedText: text })}
+                      isLoading={acceptMutation.isPending || rejectMutation.isPending || editMutation.isPending}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {resolvedViolations.length > 0 && (
+              <div>
+                <h4 className="text-md font-medium text-gray-500 mb-3">
+                  Resolved ({resolvedViolations.length})
+                </h4>
+                <div className="space-y-3">
+                  {resolvedViolations.map((violation) => (
+                    <ViolationCard
+                      key={violation.id}
+                      violation={violation}
+                      onAccept={() => {}}
+                      onReject={() => {}}
+                      onEdit={() => {}}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {!validationResult && validations.length === 0 && (
+              <Card className="p-6 text-center">
+                <FileCheck className="h-10 w-10 text-gray-400 mx-auto mb-3" aria-hidden="true" />
+                <p className="text-gray-500 text-sm">
+                  Select a citation style and click "Validate" to check your citations against style guide rules.
+                </p>
+              </Card>
+            )}
+
+            <BatchCorrectionModal
+              isOpen={showBatchModal}
+              onClose={() => setShowBatchModal(false)}
+              violations={pendingViolations}
+              onApplyByType={async (violationType) => {
+                await batchMutation.mutateAsync({ documentId, violationType, applyAll: true });
+              }}
+            />
           </div>
         )}
 

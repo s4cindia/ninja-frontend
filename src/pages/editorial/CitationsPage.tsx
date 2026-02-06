@@ -1,19 +1,16 @@
 import { useState } from 'react';
-import { useParams, Link, useLocation } from 'react-router-dom';
-import { FileText, BookOpen, ArrowLeft, Loader2, AlertTriangle, CheckCircle, Info } from 'lucide-react';
+import { useParams, Link } from 'react-router-dom';
+import { FileText, BookOpen, ArrowLeft, Loader2 } from 'lucide-react';
 import { CitationsModule } from '@/components/citation';
-import { ValidationPanel } from '@/components/citation/validation/ValidationPanel';
 import { ReferenceListGenerator } from '@/components/citation/reference-list/ReferenceListGenerator';
 import { Card } from '@/components/ui/Card';
 import { useJob } from '@/hooks/useJobs';
-import type { DetectionValidationResult } from '@/types/citation.types';
 
-type Tab = 'citations-validation' | 'references';
+type Tab = 'citations' | 'references';
 
 export function CitationsPage() {
   const { jobId } = useParams<{ jobId: string }>();
-  const location = useLocation();
-  const [activeTab, setActiveTab] = useState<Tab>('citations-validation');
+  const [activeTab, setActiveTab] = useState<Tab>('citations');
 
   const { data: job, isLoading: jobLoading } = useJob(jobId || null);
 
@@ -22,7 +19,7 @@ export function CitationsPage() {
   }
 
   const tabs = [
-    { id: 'citations-validation' as const, label: 'Detected Citations & Validation', icon: FileText },
+    { id: 'citations' as const, label: 'Citations & Validation', icon: FileText },
     { id: 'references' as const, label: 'Reference List', icon: BookOpen },
   ];
 
@@ -30,9 +27,6 @@ export function CitationsPage() {
   const jobInput = job?.input as Record<string, unknown> | undefined;
   const documentId = (jobOutput?.documentId as string) || '';
   const filename = (jobInput?.filename as string) || (jobInput?.fileName as string) || (jobInput?.originalName as string);
-  const locationState = location.state as { validation?: DetectionValidationResult } | null;
-  const inlineValidation = locationState?.validation
-    || (jobOutput?.validation as DetectionValidationResult | undefined);
 
   return (
     <div className="space-y-6">
@@ -74,31 +68,17 @@ export function CitationsPage() {
       <div className="min-h-[400px]">
         <div
           role="tabpanel"
-          id="citations-validation-panel"
-          className={activeTab === 'citations-validation' ? '' : 'hidden'}
-          aria-hidden={activeTab !== 'citations-validation'}
+          id="citations-panel"
+          className={activeTab === 'citations' ? '' : 'hidden'}
+          aria-hidden={activeTab !== 'citations'}
         >
-          {inlineValidation && (
-            <div className="mb-6">
-              <ValidationSummaryBanner validation={inlineValidation} />
-            </div>
-          )}
-
           {jobLoading ? (
             <Card className="p-8 text-center">
               <Loader2 className="h-8 w-8 text-blue-500 animate-spin mx-auto mb-4" />
               <p className="text-gray-500">Loading citations...</p>
             </Card>
           ) : (
-            <div className="space-y-8">
-              <CitationsModule jobId={jobId} documentId={documentId} />
-
-              {documentId && (
-                <div className="border-t border-gray-200 pt-8">
-                  <ValidationPanel documentId={documentId} />
-                </div>
-              )}
-            </div>
+            <CitationsModule jobId={jobId} documentId={documentId} />
           )}
         </div>
 
@@ -118,56 +98,6 @@ export function CitationsPage() {
             </Card>
           )}
         </div>
-      </div>
-    </div>
-  );
-}
-
-function ValidationSummaryBanner({
-  validation,
-}: {
-  validation: DetectionValidationResult;
-}) {
-  const hasErrors = validation.errorCount > 0;
-  const hasWarnings = validation.warningCount > 0;
-
-  if (!hasErrors && !hasWarnings) {
-    return (
-      <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2" role="status">
-        <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" aria-hidden="true" />
-        <span className="text-sm text-green-800">
-          All {validation.totalCitations} citations pass {validation.styleName} validation
-        </span>
-      </div>
-    );
-  }
-
-  return (
-    <div className={`p-3 rounded-lg border flex items-center gap-3 ${
-      hasErrors ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'
-    }`} role="alert">
-      {hasErrors ? (
-        <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0" aria-hidden="true" />
-      ) : (
-        <Info className="h-5 w-5 text-yellow-600 flex-shrink-0" aria-hidden="true" />
-      )}
-      <div className="text-sm">
-        <span className={hasErrors ? 'text-red-800' : 'text-yellow-800'}>
-          {validation.styleName} validation:
-        </span>
-        <span className="ml-2 text-gray-700">
-          {validation.validCitations}/{validation.totalCitations} valid
-          {hasErrors && (
-            <span className="text-red-700 ml-1">
-              ({validation.errorCount} error{validation.errorCount !== 1 ? 's' : ''})
-            </span>
-          )}
-          {hasWarnings && (
-            <span className="text-yellow-700 ml-1">
-              ({validation.warningCount} warning{validation.warningCount !== 1 ? 's' : ''})
-            </span>
-          )}
-        </span>
       </div>
     </div>
   );
