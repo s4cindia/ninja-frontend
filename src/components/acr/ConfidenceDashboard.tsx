@@ -640,45 +640,37 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   const { data: confidenceData } = useConfidenceWithIssues(jobId, undefined, { enabled: !isDemoJob(jobId) });
 
   const { issuesByCriterion, remediatedCriteriaCount } = useMemo(() => {
-    const map = new Map<string, { 
-      issues: IssueMapping[]; 
+    const map = new Map<string, {
+      issues: IssueMapping[];
       count: number;
       remediatedIssues?: RemediatedIssue[];
       remediatedCount?: number;
     }>();
     let remediatedCount = 0;
-    if (confidenceData?.criteria) {
-      for (const c of confidenceData.criteria) {
-        const remediatedIssues = c.remediatedIssues || c.fixedIssues;
-        // Field priority for fixed count: explicit count > array length > 0
-        // Backend may send fixedCount, remediatedCount, or just the issues array
-        const fixedCount = c.fixedCount ?? c.remediatedCount ?? remediatedIssues?.length ?? 0;
-        // Field priority for remaining issues: issueCount > remainingCount > array length > 0
-        // Backend may update issueCount after remediation, or provide remainingCount separately
-        const remainingIssueCount = c.issueCount ?? c.remainingCount ?? c.relatedIssues?.length ?? 0;
-        
-        const hasRelatedIssues = c.relatedIssues && c.relatedIssues.length > 0;
-        const hasRemediatedIssues = remediatedIssues && remediatedIssues.length > 0;
-        // Also include criteria with only counts (no arrays) for status boosting
-        // Include remainingCount check to properly track criteria with pending issues
-        const hasCountsOnly = fixedCount > 0 || (c.fixedCount != null) || (c.remediatedCount != null) || (c.remainingCount != null);
-        
-        if (hasRelatedIssues || hasRemediatedIssues || hasCountsOnly) {
+
+    // Build map from criteria (which comes from ACR analysis, not confidence endpoint)
+    // ACR analysis has accurate fixedCount from proper WCAG mapping
+    if (criteria.length > 0) {
+      for (const c of criteria) {
+        const fixedCount = c.fixedCount ?? 0;
+        const remainingCount = c.issueCount ?? c.remainingCount ?? 0;
+
+        if (fixedCount > 0 || remainingCount > 0) {
           map.set(c.criterionId, {
             issues: c.relatedIssues || [],
-            count: remainingIssueCount,
-            remediatedIssues: remediatedIssues || [],
+            count: remainingCount,
+            remediatedIssues: c.fixedIssues || [],
             remediatedCount: fixedCount,
           });
           // Only count as remediated if there are fixes AND no remaining issues
-          if (fixedCount > 0 && remainingIssueCount === 0) {
+          if (fixedCount > 0 && remainingCount === 0) {
             remediatedCount++;
           }
         }
       }
     }
     return { issuesByCriterion: map, remediatedCriteriaCount: remediatedCount };
-  }, [confidenceData]);
+  }, [criteria]);
 
   const toggleRow = (id: string) => {
     setExpandedRows(prev => {
