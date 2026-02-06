@@ -83,7 +83,9 @@ export function EditorialUploadPage() {
           undefined,
           selectedStyle || undefined
         );
-        navigate(`/editorial/citations/${result.jobId}`);
+        navigate(`/editorial/citations/${result.jobId}`, {
+          state: result.validation ? { validation: result.validation } : undefined,
+        });
       } else {
         navigate('/editorial');
       }

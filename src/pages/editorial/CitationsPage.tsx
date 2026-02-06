@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { FileText, CheckCircle, BookOpen, ArrowLeft, Loader2, AlertTriangle, Info } from 'lucide-react';
 import { CitationsModule } from '@/components/citation';
 import { ValidationPanel } from '@/components/citation/validation/ValidationPanel';
@@ -13,6 +13,7 @@ type Tab = 'citations' | 'validation' | 'references';
 
 export function CitationsPage() {
   const { jobId } = useParams<{ jobId: string }>();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState<Tab>('citations');
 
   const { data: job, isLoading: jobLoading } = useJob(jobId || null);
@@ -31,7 +32,9 @@ export function CitationsPage() {
   const jobInput = job?.input as Record<string, unknown> | undefined;
   const documentId = (jobOutput?.documentId as string) || '';
   const filename = (jobInput?.filename as string) || (jobInput?.fileName as string) || (jobInput?.originalName as string);
-  const inlineValidation = jobOutput?.validation as DetectionValidationResult | undefined;
+  const locationState = location.state as { validation?: DetectionValidationResult } | null;
+  const inlineValidation = locationState?.validation
+    || (jobOutput?.validation as DetectionValidationResult | undefined);
 
   return (
     <div className="space-y-6">
