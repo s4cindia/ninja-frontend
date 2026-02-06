@@ -95,10 +95,13 @@ export const citationService = {
    * @returns Detection result with citations array and statistics by type/style
    * @throws {CitationServiceError} If file upload fails (413 for size, 415 for type) or parsing errors occur
    */
-  async detectFromFile(file: File, signal?: AbortSignal): Promise<DetectionResult> {
+  async detectFromFile(file: File, signal?: AbortSignal, styleCode?: string): Promise<DetectionResult> {
     try {
       const formData = new FormData();
       formData.append('file', file);
+      if (styleCode) {
+        formData.append('styleCode', styleCode);
+      }
 
       const response = await api.post<ApiResponse<DetectionResult>>(
         '/citation/detect',

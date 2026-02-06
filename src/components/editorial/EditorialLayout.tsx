@@ -5,12 +5,14 @@ import {
   BookOpen, 
   Search, 
   CheckSquare, 
-  FileText 
+  FileText,
+  FolderOpen,
 } from 'lucide-react';
 
 const EDITORIAL_TABS = [
   { path: '/editorial', label: 'Overview', icon: LayoutDashboard, end: true },
   { path: '/editorial/upload', label: 'Upload', icon: Upload, end: false },
+  { path: '/editorial/documents', label: 'Documents', icon: FolderOpen, end: false },
   { path: '/editorial/citations', label: 'Citations', icon: BookOpen, end: false },
   { path: '/editorial/plagiarism', label: 'Plagiarism', icon: Search, end: false },
   { path: '/editorial/style', label: 'Style', icon: CheckSquare, end: false },

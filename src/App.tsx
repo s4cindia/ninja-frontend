@@ -58,7 +58,9 @@ import {
   CitationsPage, 
   PlagiarismPage, 
   StylePage, 
-  ReportsPage 
+  ReportsPage,
+  EditorialDocumentsPage,
+  EditorialDocumentOverviewPage,
 } from '@/pages/editorial';
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -197,6 +199,8 @@ function AppRoutes() {
           <Route path="/editorial" element={<EditorialLayout />}>
             <Route index element={<EditorialDashboardPage />} />
             <Route path="upload" element={<EditorialUploadPage />} />
+            <Route path="documents" element={<EditorialDocumentsPage />} />
+            <Route path="documents/:documentId" element={<EditorialDocumentOverviewPage />} />
             <Route path="citations" element={<CitationsPage />} />
             <Route path="citations/:jobId" element={<CitationsPage />} />
             <Route path="plagiarism" element={<PlagiarismPage />} />

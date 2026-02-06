@@ -160,14 +160,39 @@ export const REVIEW_REASON_LABELS: Record<string, string> = {
   'URL format appears invalid': 'Invalid URL',
 };
 
-// Detection result summary
+export interface DetectionValidationResult {
+  styleCode: string;
+  styleName: string;
+  totalCitations: number;
+  validCitations: number;
+  citationsWithErrors: number;
+  citationsWithWarnings: number;
+  errorCount: number;
+  warningCount: number;
+  violations: Array<{
+    citationId: string;
+    citationText: string;
+    violationType: string;
+    ruleReference: string;
+    ruleName: string;
+    explanation: string;
+    originalText: string;
+    suggestedFix: string;
+    correctedCitation: string;
+    severity: 'error' | 'warning' | 'info';
+  }>;
+}
+
 export interface DetectionResult {
   jobId: string;
   documentId: string;
+  filename?: string;
   citations: Citation[];
   totalCount: number;
   byType: Record<CitationType, number>;
   byStyle: Record<CitationStyle, number>;
+  processingTimeMs?: number;
+  validation?: DetectionValidationResult;
 }
 
 // Bulk parse result

@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { FileText, CheckCircle, BookOpen, ArrowLeft, Loader2 } from 'lucide-react';
+import { FileText, CheckCircle, BookOpen, ArrowLeft, Loader2, AlertTriangle, Info } from 'lucide-react';
 import { CitationsModule } from '@/components/citation';
 import { ValidationPanel } from '@/components/citation/validation/ValidationPanel';
 import { ReferenceListGenerator } from '@/components/citation/reference-list/ReferenceListGenerator';
 import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 import { useJob } from '@/hooks/useJobs';
+import type { DetectionValidationResult } from '@/types/citation.types';
 
 type Tab = 'citations' | 'validation' | 'references';
 
@@ -29,6 +31,7 @@ export function CitationsPage() {
   const jobInput = job?.input as Record<string, unknown> | undefined;
   const documentId = (jobOutput?.documentId as string) || '';
   const filename = (jobInput?.filename as string) || (jobInput?.fileName as string) || (jobInput?.originalName as string);
+  const inlineValidation = jobOutput?.validation as DetectionValidationResult | undefined;
 
   return (
     <div className="space-y-6">
@@ -45,6 +48,13 @@ export function CitationsPage() {
           <p className="text-sm text-gray-600 mt-1">{filename}</p>
         )}
       </div>
+
+      {inlineValidation && activeTab === 'citations' && (
+        <ValidationSummaryBanner
+          validation={inlineValidation}
+          onViewDetails={() => setActiveTab('validation')}
+        />
+      )}
 
       <div className="border-b border-gray-200">
         <nav className="flex gap-4" role="tablist" aria-label="Citation workflow tabs">
@@ -63,6 +73,11 @@ export function CitationsPage() {
             >
               <tab.icon className="h-4 w-4" aria-hidden="true" />
               {tab.label}
+              {tab.id === 'validation' && inlineValidation && inlineValidation.errorCount > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-red-100 text-red-700 rounded-full">
+                  {inlineValidation.errorCount}
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -119,6 +134,68 @@ export function CitationsPage() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function ValidationSummaryBanner({
+  validation,
+  onViewDetails,
+}: {
+  validation: DetectionValidationResult;
+  onViewDetails: () => void;
+}) {
+  const hasErrors = validation.errorCount > 0;
+  const hasWarnings = validation.warningCount > 0;
+
+  if (!hasErrors && !hasWarnings) {
+    return (
+      <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between" role="status">
+        <div className="flex items-center gap-2">
+          <CheckCircle className="h-5 w-5 text-green-600" aria-hidden="true" />
+          <span className="text-sm text-green-800">
+            All {validation.totalCitations} citations pass {validation.styleName} validation
+          </span>
+        </div>
+        <Button variant="ghost" size="sm" onClick={onViewDetails}>
+          View Details
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`p-3 rounded-lg border flex items-center justify-between ${
+      hasErrors ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'
+    }`} role="alert">
+      <div className="flex items-center gap-3">
+        {hasErrors ? (
+          <AlertTriangle className="h-5 w-5 text-red-600" aria-hidden="true" />
+        ) : (
+          <Info className="h-5 w-5 text-yellow-600" aria-hidden="true" />
+        )}
+        <div className="text-sm">
+          <span className={hasErrors ? 'text-red-800' : 'text-yellow-800'}>
+            {validation.styleName} validation:
+          </span>
+          <span className="ml-2 text-gray-700">
+            {validation.validCitations}/{validation.totalCitations} valid
+            {hasErrors && (
+              <span className="text-red-700 ml-1">
+                ({validation.errorCount} error{validation.errorCount !== 1 ? 's' : ''})
+              </span>
+            )}
+            {hasWarnings && (
+              <span className="text-yellow-700 ml-1">
+                ({validation.warningCount} warning{validation.warningCount !== 1 ? 's' : ''})
+              </span>
+            )}
+          </span>
+        </div>
+      </div>
+      <Button variant="ghost" size="sm" onClick={onViewDetails}>
+        View Details
+      </Button>
     </div>
   );
 }
