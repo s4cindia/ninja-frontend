@@ -20,6 +20,7 @@ export interface ReferenceEntry {
   doi?: string;
   url?: string;
   formatted?: string;
+  formattedEntry?: string;
   formattedApa?: string;
   formattedMla?: string;
   formattedChicago?: string;

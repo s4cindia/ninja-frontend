@@ -6,6 +6,17 @@ import type {
 } from '@/types/reference-list.types';
 
 export const referenceListService = {
+  async fetch(
+    documentId: string,
+    styleCode: string = 'apa7'
+  ): Promise<ReferenceListResult | null> {
+    const response = await api.get(
+      `/citation/document/${documentId}/reference-list`,
+      { params: { styleCode } }
+    );
+    return response.data.data ?? null;
+  },
+
   async generate(
     documentId: string,
     request: GenerateReferenceListRequest

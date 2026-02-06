@@ -29,7 +29,7 @@ const getFormattedEntry = (entry: ReferenceEntry, styleCode: string): string | u
     return value;
   }
   
-  return entry.formatted || entry.formattedApa || entry.formattedMla || entry.title;
+  return entry.formattedEntry || entry.formatted || entry.formattedApa || entry.formattedMla || entry.title;
 };
 
 export function ReferenceEntryCard({ entry, index, styleCode = 'apa7', onEdit }: ReferenceEntryCardProps) {

@@ -3,6 +3,16 @@ import { referenceListService } from '@/services/reference-list.service';
 import type { GenerateReferenceListRequest, ReferenceEntry } from '@/types/reference-list.types';
 import toast from 'react-hot-toast';
 
+export function useFetchReferenceList(documentId: string, styleCode: string = 'apa7') {
+  return useQuery({
+    queryKey: ['reference-list', documentId, styleCode],
+    queryFn: () => referenceListService.fetch(documentId, styleCode),
+    enabled: !!documentId,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+}
+
 export function useGenerateReferenceList() {
   const queryClient = useQueryClient();
 
@@ -15,7 +25,10 @@ export function useGenerateReferenceList() {
       request: GenerateReferenceListRequest;
     }) => referenceListService.generate(documentId, request),
     onSuccess: (data, variables) => {
-      queryClient.setQueryData(['reference-list', variables.documentId], data);
+      queryClient.setQueryData(
+        ['reference-list', variables.documentId, variables.request.styleCode],
+        data
+      );
       toast.success(`Generated ${data.stats?.total || data.entries?.length || 0} reference entries`);
     },
     onError: (error: Error & { response?: { data?: { error?: { message?: string } } } }) => {
@@ -23,17 +36,6 @@ export function useGenerateReferenceList() {
       toast.error(message);
       console.error('Reference list generation error:', error);
     }
-  });
-}
-
-export function useReferenceList(documentId: string) {
-  return useQuery({
-    queryKey: ['reference-list', documentId],
-    queryFn: () => referenceListService.generate(documentId, {
-      styleCode: 'apa7',
-      options: { enrichFromCrossRef: true }
-    }),
-    enabled: false
   });
 }
 

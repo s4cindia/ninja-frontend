@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { BookOpen, Loader2, Download, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { BookOpen, Loader2, Download, Check, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { StyleSelector } from '../validation/StyleSelector';
 import { ReferenceEntryCard } from './ReferenceEntryCard';
 import { useCitationStyles } from '@/hooks/useCitationValidation';
 import {
+  useFetchReferenceList,
   useGenerateReferenceList,
   useUpdateReferenceEntry,
   useFinalizeReferenceList
@@ -21,16 +22,25 @@ export function ReferenceListGenerator({ documentId }: ReferenceListGeneratorPro
   const [referenceList, setReferenceList] = useState<ReferenceListResult | null>(null);
 
   const { data: styles = [] } = useCitationStyles();
+  const {
+    data: existingList,
+    isLoading: isFetching,
+  } = useFetchReferenceList(documentId, selectedStyle);
   const generateMutation = useGenerateReferenceList();
   const updateEntryMutation = useUpdateReferenceEntry();
   const finalizeMutation = useFinalizeReferenceList();
+
+  useEffect(() => {
+    if (existingList && existingList.entries && existingList.entries.length > 0) {
+      setReferenceList(existingList);
+    }
+  }, [existingList]);
 
   const handleGenerate = async () => {
     if (!documentId) {
       console.error('No documentId available - job may still be loading');
       return;
     }
-    console.log('Generating reference list for documentId:', documentId);
     const result = await generateMutation.mutateAsync({
       documentId,
       request: {
@@ -55,7 +65,7 @@ export function ReferenceListGenerator({ documentId }: ReferenceListGeneratorPro
     if (!referenceList) return;
 
     const text = referenceList.entries
-      .map((e, i) => `${i + 1}. ${(e.formatted || e.formattedApa || e.title || '').replace(/\*/g, '')}`)
+      .map((e, i) => `${i + 1}. ${(e.formattedEntry || e.formatted || e.formattedApa || e.title || '').replace(/\*/g, '')}`)
       .join('\n\n');
 
     const blob = new Blob([text], { type: 'text/plain' });
@@ -66,6 +76,9 @@ export function ReferenceListGenerator({ documentId }: ReferenceListGeneratorPro
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  const isLoading = isFetching || generateMutation.isPending;
+  const hasEntries = referenceList && referenceList.entries && referenceList.entries.length > 0;
 
   return (
     <div className="space-y-6">
@@ -81,16 +94,21 @@ export function ReferenceListGenerator({ documentId }: ReferenceListGeneratorPro
             styles={styles}
             selected={selectedStyle}
             onChange={setSelectedStyle}
-            disabled={generateMutation.isPending}
+            disabled={isLoading}
           />
           <Button
             onClick={handleGenerate}
-            disabled={generateMutation.isPending}
+            disabled={isLoading}
           >
             {generateMutation.isPending ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden="true" />
                 Generating...
+              </>
+            ) : hasEntries ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2" aria-hidden="true" />
+                Regenerate
               </>
             ) : (
               <>
@@ -101,6 +119,13 @@ export function ReferenceListGenerator({ documentId }: ReferenceListGeneratorPro
           </Button>
         </div>
       </div>
+
+      {isFetching && !referenceList && (
+        <Card className="p-8 text-center">
+          <Loader2 className="h-8 w-8 text-blue-500 animate-spin mx-auto mb-4" />
+          <p className="text-gray-500">Loading existing reference list...</p>
+        </Card>
+      )}
 
       {referenceList && referenceList.stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -129,7 +154,7 @@ export function ReferenceListGenerator({ documentId }: ReferenceListGeneratorPro
         </div>
       )}
 
-      {referenceList && (
+      {hasEntries && (
         <div className="space-y-3">
           <h3 className="font-medium text-gray-900">
             References ({referenceList.entries.length})
@@ -148,7 +173,7 @@ export function ReferenceListGenerator({ documentId }: ReferenceListGeneratorPro
         </div>
       )}
 
-      {referenceList && referenceList.entries.length > 0 && (
+      {hasEntries && (
         <div className="flex items-center justify-between pt-4 border-t">
           <Button variant="outline" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" aria-hidden="true" />
@@ -173,7 +198,7 @@ export function ReferenceListGenerator({ documentId }: ReferenceListGeneratorPro
         </div>
       )}
 
-      {!referenceList && (
+      {!hasEntries && !isFetching && (
         <Card className="p-8 text-center">
           <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" aria-hidden="true" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">
