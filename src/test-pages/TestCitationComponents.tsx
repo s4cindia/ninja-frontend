@@ -1,10 +1,8 @@
 import { useState } from 'react';
-import {
-  CitationList,
-  CitationDetail,
-  CitationStats,
-  CitationTypeFilter
-} from '@/components/citation';
+import { CitationList } from '@/components/citation/CitationList';
+import { CitationDetail } from '@/components/citation/CitationDetail';
+import { CitationStats } from '@/components/citation/CitationStats';
+import { CitationTypeFilter } from '@/components/citation/CitationTypeFilter';
 import type { Citation, CitationFilters, CitationStats as CitationStatsType } from '@/types/citation.types';
 
 const mockCitations: Citation[] = [

@@ -10,6 +10,7 @@ import type {
   PaginatedCitations,
   CitationStats,
 } from '@/types/citation.types';
+import type { StylesheetDetectionResult } from '@/types/stylesheet-detection.types';
 
 class CitationServiceError extends Error {
   public code?: string;
@@ -290,6 +291,31 @@ export const citationService = {
       return response.data.data;
     } catch (error) {
       handleError(error, 'CITATION_GET_STATS');
+    }
+  },
+
+  async getStylesheetDetection(documentId: string): Promise<StylesheetDetectionResult> {
+    try {
+      validateId(documentId, 'document ID');
+      const response = await api.get<ApiResponse<StylesheetDetectionResult>>(
+        `/citation/document/${documentId}`
+      );
+      return response.data.data;
+    } catch (error) {
+      handleError(error, 'STYLESHEET_DETECTION');
+    }
+  },
+
+  async convertStyle(documentId: string, targetStyle: string): Promise<StylesheetDetectionResult> {
+    try {
+      validateId(documentId, 'document ID');
+      const response = await api.post<ApiResponse<StylesheetDetectionResult>>(
+        `/citation/detect`,
+        { documentId, styleCode: targetStyle }
+      );
+      return response.data.data;
+    } catch (error) {
+      handleError(error, 'STYLE_CONVERT');
     }
   },
 };

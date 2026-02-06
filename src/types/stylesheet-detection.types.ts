@@ -13,7 +13,7 @@ export interface SequenceGap {
 
 export interface SequenceAnalysis {
   isSequential: boolean;
-  expectedRange: { start: number; end: number };
+  expectedRange: { start: number; end: number } | null;
   missingNumbers: number[];
   duplicates: number[];
   outOfOrder: number[];
@@ -62,13 +62,13 @@ export interface CitationCounts {
 
 export interface StylesheetDetectionResult {
   documentId: string;
-  jobId: string;
-  filename: string;
-  processingTimeMs: number;
-  detectedStyle: DetectedStyle;
-  sequenceAnalysis: SequenceAnalysis;
-  crossReference: CrossReference;
-  referenceList: ReferenceListData;
-  citations: CitationCounts;
-  conversionOptions: string[];
+  jobId?: string;
+  filename?: string;
+  processingTimeMs?: number;
+  detectedStyle?: DetectedStyle | null;
+  sequenceAnalysis?: SequenceAnalysis | null;
+  crossReference?: CrossReference | null;
+  referenceList?: ReferenceListData | null;
+  citations?: CitationCounts | null;
+  conversionOptions?: string[];
 }

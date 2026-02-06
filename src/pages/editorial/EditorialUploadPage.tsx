@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, ChevronDown } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { FileUploader, UploadedFile } from '@/components/shared';
 import { citationService } from '@/services/citation.service';
 
@@ -16,8 +16,8 @@ interface AnalysisOption {
 const ANALYSIS_OPTIONS: AnalysisOption[] = [
   {
     id: 'citations',
-    label: 'Citation Analysis',
-    description: 'Detect and validate all citations in the document',
+    label: 'Stylesheet Detection',
+    description: 'Automatically identify citation style, check sequences, and cross-reference against the reference list',
     available: true,
   },
   {
@@ -34,22 +34,12 @@ const ANALYSIS_OPTIONS: AnalysisOption[] = [
   },
 ];
 
-const STYLE_OPTIONS = [
-  { code: '', label: 'No validation (detect only)' },
-  { code: 'apa7', label: 'APA 7th Edition' },
-  { code: 'mla9', label: 'MLA 9th Edition' },
-  { code: 'chicago17', label: 'Chicago 17th Edition' },
-  { code: 'vancouver', label: 'Vancouver' },
-  { code: 'ieee', label: 'IEEE' },
-];
-
 export function EditorialUploadPage() {
   const navigate = useNavigate();
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [selectedAnalyses, setSelectedAnalyses] = useState<Set<AnalysisType>>(
     new Set(['citations'])
   );
-  const [selectedStyle, setSelectedStyle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -78,14 +68,8 @@ export function EditorialUploadPage() {
     try {
       if (selectedAnalyses.has('citations')) {
         const file = uploadedFiles[0].file;
-        const result = await citationService.detectFromFile(
-          file,
-          undefined,
-          selectedStyle || undefined
-        );
-        navigate(`/editorial/citations/${result.jobId}`, {
-          state: result.validation ? { validation: result.validation } : undefined,
-        });
+        const result = await citationService.detectFromFile(file);
+        navigate(`/editorial/citations/${result.jobId}`);
       } else {
         navigate('/editorial');
       }
@@ -98,7 +82,6 @@ export function EditorialUploadPage() {
   };
 
   const hasUploadedFiles = uploadedFiles.length > 0;
-  const showCitationOptions = hasUploadedFiles && selectedAnalyses.has('citations');
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -163,33 +146,6 @@ export function EditorialUploadPage() {
         </div>
       )}
 
-      {showCitationOptions && (
-        <div className="bg-white rounded-lg border p-6">
-          <h3 className="text-md font-medium text-gray-900 mb-2">
-            Style Validation (Optional)
-          </h3>
-          <p className="text-xs text-gray-500 mb-3">
-            Select a citation style to automatically validate citations after detection
-          </p>
-          <div className="relative max-w-xs">
-            <select
-              value={selectedStyle}
-              onChange={(e) => setSelectedStyle(e.target.value)}
-              disabled={isSubmitting}
-              className="appearance-none w-full bg-white border border-gray-300 rounded-md py-2 pl-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
-              aria-label="Select citation style for validation"
-            >
-              {STYLE_OPTIONS.map((style) => (
-                <option key={style.code} value={style.code}>
-                  {style.label}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" aria-hidden="true" />
-          </div>
-        </div>
-      )}
-
       {submitError && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4" role="alert">
           <p className="text-sm text-red-700">{submitError}</p>
@@ -206,7 +162,7 @@ export function EditorialUploadPage() {
             {isSubmitting ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-                <span>Detecting citations...</span>
+                <span>Analyzing document...</span>
               </>
             ) : (
               `Run ${selectedAnalyses.size} Analysis${selectedAnalyses.size !== 1 ? 'es' : ''}`
