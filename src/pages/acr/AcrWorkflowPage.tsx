@@ -30,6 +30,7 @@ import { ExportDialog } from '@/components/acr/ExportDialog';
 import { VersionHistory } from '@/components/acr/VersionHistory';
 import { useEditions } from '@/hooks/useAcr';
 import { useConfidenceWithIssues } from '@/hooks/useConfidence';
+import { useInitializeReport } from '@/hooks/useAcrReport';
 import type { AcrEdition, AcrEditionCode } from '@/types/acr.types';
 
 interface WorkflowStep {
@@ -274,7 +275,8 @@ export function AcrWorkflowPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [preFilledValuesApplied, setPreFilledValuesApplied] = useState(false);
-  
+  const [isInitializingReport, setIsInitializingReport] = useState(false);
+
   // Store actual File object for upload (not serializable to localStorage)
   const uploadedFileRef = useRef<File | null>(null);
   
@@ -287,6 +289,9 @@ export function AcrWorkflowPage() {
     'VPAT2.5-INT',  // Default edition
     { enabled: !!state.jobId && state.currentStep === 4 && analysisResults.length === 0 }
   );
+
+  // Initialize report mutation for Review & Edit
+  const { mutate: initializeReport } = useInitializeReport();
 
   // Populate analysisResults from confidence API if empty (e.g., after refresh)
   useEffect(() => {
@@ -303,6 +308,47 @@ export function AcrWorkflowPage() {
   const handleCriteriaLoaded = useCallback((criteria: CriterionConfidence[]) => {
     setAnalysisResults(criteria);
   }, []);
+
+  // Handler for "Proceed to Review & Edit" button
+  const handleProceedToReviewEdit = useCallback(() => {
+    if (!state.jobId || !state.selectedEdition) {
+      alert('Missing job ID or edition');
+      return;
+    }
+
+    setIsInitializingReport(true);
+
+    // Transform verification data from state to API format
+    const verificationData = Object.entries(state.verifications).map(([criterionId, verification]) => ({
+      criterionId,
+      verificationStatus: verification.status,
+      verificationMethod: verification.method,
+      verificationNotes: verification.notes,
+      verifiedAt: verification.verifiedAt,
+    }));
+
+    // Call initialize report API
+    initializeReport(
+      {
+        jobId: state.jobId,
+        edition: state.selectedEdition.code,
+        verificationData,
+        documentTitle: state.fileName || 'Untitled Document',
+      },
+      {
+        onSuccess: () => {
+          setIsInitializingReport(false);
+          // Navigate to Review & Edit page
+          navigate(`/acr/report/review/${state.jobId}`);
+        },
+        onError: (error) => {
+          setIsInitializingReport(false);
+          console.error('Failed to initialize report:', error);
+          alert(`Failed to initialize report: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        },
+      }
+    );
+  }, [state.jobId, state.selectedEdition, state.verifications, state.fileName, initializeReport, navigate]);
 
   // Track the last applied URL job to detect navigation between jobs
   const lastAppliedJobRef = useRef<string | null>(null);
@@ -1117,10 +1163,20 @@ export function AcrWorkflowPage() {
                   <Button
                     variant="default"
                     size="sm"
-                    onClick={() => navigate(`/acr/report/review/${state.jobId}`)}
+                    onClick={handleProceedToReviewEdit}
+                    disabled={isInitializingReport}
                   >
-                    <Edit3 className="h-4 w-4 mr-2" />
-                    Proceed to Review & Edit
+                    {isInitializingReport ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Initializing...
+                      </>
+                    ) : (
+                      <>
+                        <Edit3 className="h-4 w-4 mr-2" />
+                        Proceed to Review & Edit
+                      </>
+                    )}
                   </Button>
                 </div>
               </Alert>
