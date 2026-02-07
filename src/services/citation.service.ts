@@ -313,7 +313,16 @@ export const citationService = {
         `/editorial/document/${documentId}/text`,
         { signal }
       );
-      return response.data.data;
+      const raw = response.data.data ?? response.data;
+      const result: DocumentTextResponse = {
+        documentId: (raw as DocumentTextResponse).documentId ?? documentId,
+        fullText: (raw as DocumentTextResponse).fullText ?? '',
+        fullHtml: (raw as DocumentTextResponse).fullHtml ?? null,
+        highlightedHtml: (raw as DocumentTextResponse).highlightedHtml ?? null,
+        referenceLookup: (raw as DocumentTextResponse).referenceLookup ?? undefined,
+        filename: (raw as DocumentTextResponse).filename ?? undefined,
+      };
+      return result;
     } catch (error) {
       handleError(error, 'DOCUMENT_TEXT');
     }

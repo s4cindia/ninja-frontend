@@ -104,7 +104,10 @@ export function DocumentTextViewer({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const sanitizedHtml = useMemo(() => {
-    const rawHtml = highlightedHtml || fullHtml;
+    let rawHtml = highlightedHtml || fullHtml;
+    if (!rawHtml && fullText && /<[a-z][\s\S]*?>/i.test(fullText)) {
+      rawHtml = fullText;
+    }
     if (!rawHtml) return null;
     const decoded = decodeHtmlEntities(rawHtml);
     return DOMPurify.sanitize(decoded, {
@@ -112,7 +115,7 @@ export function DocumentTextViewer({
       ALLOWED_ATTR,
       ALLOW_DATA_ATTR: true,
     });
-  }, [highlightedHtml, fullHtml]);
+  }, [highlightedHtml, fullHtml, fullText]);
 
   const plainTextLines = useMemo(() => {
     if (!fullText) return [];
