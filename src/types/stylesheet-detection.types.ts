@@ -72,3 +72,30 @@ export interface StylesheetDetectionResult {
   citations?: CitationCounts | null;
   conversionOptions?: string[];
 }
+
+export interface DocumentTextResponse {
+  documentId: string;
+  text: string;
+  totalLines: number;
+  filename?: string;
+}
+
+export type IssueSeverity = 'error' | 'warning';
+export type IssueStatus = 'pending' | 'accepted' | 'dismissed';
+
+export interface FixOption {
+  id: string;
+  label: string;
+}
+
+export interface CitationIssue {
+  id: string;
+  severity: IssueSeverity;
+  category: 'sequence' | 'cross-reference' | 'conversion';
+  title: string;
+  description: string;
+  fixOptions: FixOption[];
+  selectedFix?: string;
+  status: IssueStatus;
+  citationNumbers?: number[];
+}

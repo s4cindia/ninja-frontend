@@ -19,21 +19,26 @@ export function CitationsPage() {
   const filename = (jobInput?.filename as string) || (jobInput?.fileName as string) || (jobInput?.originalName as string);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Link
-          to="/jobs"
-          className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-2"
-        >
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          Back to Jobs
-        </Link>
-        {filename && (
-          <p className="text-sm text-gray-600">{filename}</p>
-        )}
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Link
+            to="/jobs"
+            className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Back to Jobs
+          </Link>
+          {filename && (
+            <span className="text-sm text-gray-400">|</span>
+          )}
+          {filename && (
+            <span className="text-sm text-gray-600">{filename}</span>
+          )}
+        </div>
       </div>
 
-      <div className="min-h-[400px]">
+      <div>
         {jobLoading ? (
           <Card className="p-8 text-center">
             <Loader2 className="h-8 w-8 text-blue-500 animate-spin mx-auto mb-4" />
@@ -56,8 +61,8 @@ function CitationsJobListPlaceholder() {
             <BookOpen className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Stylesheet Detection</h2>
-            <p className="text-sm text-gray-500">Automatic style identification, sequence analysis, and cross-referencing</p>
+            <h2 className="text-lg font-semibold text-gray-900">Citation Editor</h2>
+            <p className="text-sm text-gray-500">View document text with highlighted citations and fix detected issues</p>
           </div>
         </div>
         <Link
@@ -69,9 +74,9 @@ function CitationsJobListPlaceholder() {
       </div>
       <div className="bg-white rounded-lg border p-6 text-center">
         <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-        <p className="text-gray-500">Select a job from the Jobs page to see stylesheet detection results.</p>
+        <p className="text-gray-500">Select a job from the Jobs page to open the citation editor.</p>
         <p className="text-sm text-gray-400 mt-1">
-          The system will automatically identify the citation style, check sequences, and compare against the reference list.
+          The editor shows your document text with highlighted citations alongside detected issues and fix options.
         </p>
         <Link
           to="/jobs"

@@ -10,7 +10,7 @@ import type {
   PaginatedCitations,
   CitationStats,
 } from '@/types/citation.types';
-import type { StylesheetDetectionResult } from '@/types/stylesheet-detection.types';
+import type { StylesheetDetectionResult, DocumentTextResponse } from '@/types/stylesheet-detection.types';
 
 class CitationServiceError extends Error {
   public code?: string;
@@ -303,6 +303,19 @@ export const citationService = {
       return response.data.data;
     } catch (error) {
       handleError(error, 'STYLESHEET_DETECTION');
+    }
+  },
+
+  async getDocumentText(documentId: string, signal?: AbortSignal): Promise<DocumentTextResponse> {
+    try {
+      validateId(documentId, 'document ID');
+      const response = await api.get<ApiResponse<DocumentTextResponse>>(
+        `/editorial/document/${documentId}/text`,
+        { signal }
+      );
+      return response.data.data;
+    } catch (error) {
+      handleError(error, 'DOCUMENT_TEXT');
     }
   },
 
