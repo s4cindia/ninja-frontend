@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import {
@@ -6,20 +6,27 @@ import {
   XCircle,
   Check,
   X,
+  Play,
+  Loader2,
 } from 'lucide-react';
 import type {
   StylesheetDetectionResult,
   CitationIssue,
   IssueSeverity,
   IssueStatus,
+  ValidationResult,
+  ValidationIssue,
 } from '@/types/stylesheet-detection.types';
 
 interface IssuePanelProps {
   data: StylesheetDetectionResult;
   onHighlightCitation?: (num: number | null) => void;
+  validationResult?: ValidationResult | null;
+  isValidating?: boolean;
+  onRunValidation?: () => void;
 }
 
-function buildIssues(data: StylesheetDetectionResult): CitationIssue[] {
+function buildIssuesFromAnalysis(data: StylesheetDetectionResult): CitationIssue[] {
   const issues: CitationIssue[] = [];
   const seq = data.sequenceAnalysis;
   const xref = data.crossReference;
@@ -46,7 +53,7 @@ function buildIssues(data: StylesheetDetectionResult): CitationIssue[] {
     if (duplicates.length > 0) {
       issues.push({
         id: 'seq-duplicates',
-        severity: 'warning',
+        severity: 'error',
         category: 'sequence',
         title: `Duplicate citation number${duplicates.length > 1 ? 's' : ''}: [${duplicates.join(', ')}]`,
         description: `${duplicates.length} citation number${duplicates.length > 1 ? 's are' : ' is'} used more than once.`,
@@ -135,6 +142,57 @@ function buildIssues(data: StylesheetDetectionResult): CitationIssue[] {
   return issues;
 }
 
+function validationIssueToCitationIssue(vi: ValidationIssue): CitationIssue {
+  const categoryMap: Record<string, CitationIssue['category']> = {
+    DUPLICATE_CITATION: 'sequence',
+    MISSING_CITATION_NUMBER: 'sequence',
+    OUT_OF_ORDER: 'sequence',
+    SEQUENCE_GAP: 'sequence',
+    CITATION_WITHOUT_REFERENCE: 'cross-reference',
+    REFERENCE_WITHOUT_CITATION: 'cross-reference',
+  };
+
+  const fixOptionsMap: Record<string, CitationIssue['fixOptions']> = {
+    DUPLICATE_CITATION: [
+      { id: 'deduplicate', label: 'Assign unique numbers' },
+      { id: 'review', label: 'Review manually' },
+    ],
+    MISSING_CITATION_NUMBER: [
+      { id: 'renumber', label: 'Renumber citations sequentially' },
+      { id: 'flag', label: 'Flag for manual review' },
+    ],
+    CITATION_WITHOUT_REFERENCE: [
+      { id: 'add-ref', label: 'Add reference entry' },
+      { id: 'remove-cit', label: 'Remove citation' },
+      { id: 'flag', label: 'Flag for review' },
+    ],
+    REFERENCE_WITHOUT_CITATION: [
+      { id: 'remove-uncited', label: 'Remove uncited references' },
+      { id: 'keep', label: 'Keep all' },
+      { id: 'flag', label: 'Flag for review' },
+    ],
+    OUT_OF_ORDER: [
+      { id: 'reorder', label: 'Reorder by first appearance' },
+      { id: 'ignore', label: 'Ignore (intentional order)' },
+    ],
+    SEQUENCE_GAP: [
+      { id: 'renumber', label: 'Renumber to close gap' },
+      { id: 'ignore', label: 'Ignore' },
+    ],
+  };
+
+  return {
+    id: vi.id,
+    severity: vi.severity,
+    category: categoryMap[vi.type] ?? 'cross-reference',
+    title: vi.title,
+    description: vi.detail,
+    fixOptions: fixOptionsMap[vi.type] ?? [{ id: 'flag', label: 'Flag for review' }],
+    status: 'pending',
+    citationNumbers: vi.citationNumbers,
+  };
+}
+
 const STYLE_LABELS: Record<string, string> = {
   apa7: 'APA 7th',
   mla9: 'MLA 9th',
@@ -145,10 +203,27 @@ const STYLE_LABELS: Record<string, string> = {
 
 type FilterTab = 'all' | 'errors' | 'warnings';
 
-export function IssuePanel({ data, onHighlightCitation }: IssuePanelProps): JSX.Element {
-  const initialIssues = useMemo(() => buildIssues(data), [data]);
+export function IssuePanel({ data, onHighlightCitation, validationResult, isValidating, onRunValidation }: IssuePanelProps): JSX.Element {
+  const analysisIssues = useMemo(() => buildIssuesFromAnalysis(data), [data]);
+
+  const validationIssues = useMemo(() => {
+    if (!validationResult?.issues) return [];
+    return validationResult.issues.map(validationIssueToCitationIssue);
+  }, [validationResult]);
+
+  const initialIssues = useMemo(() => {
+    if (validationIssues.length > 0) return validationIssues;
+    return analysisIssues;
+  }, [validationIssues, analysisIssues]);
+
   const [issues, setIssues] = useState<CitationIssue[]>(initialIssues);
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
+
+  useEffect(() => {
+    if (validationIssues.length > 0) {
+      setIssues(validationIssues);
+    }
+  }, [validationIssues]);
 
   const filteredIssues = useMemo(() => {
     if (filterTab === 'all') return issues;
@@ -205,6 +280,8 @@ export function IssuePanel({ data, onHighlightCitation }: IssuePanelProps): JSX.
     );
   }, []);
 
+  const summary = validationResult?.summary;
+
   return (
     <div className="h-full flex flex-col bg-white">
       <div className="flex-shrink-0 border-b p-3 space-y-3">
@@ -214,10 +291,51 @@ export function IssuePanel({ data, onHighlightCitation }: IssuePanelProps): JSX.
             <Badge variant="error" size="sm">{errorCount} E</Badge>
             <Badge variant="warning" size="sm">{warningCount} W</Badge>
           </div>
-          {data.detectedStyle && (
-            <Badge variant="info" size="sm">{data.detectedStyle.styleName}</Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {data.detectedStyle && (
+              <Badge variant="info" size="sm">{data.detectedStyle.styleName}</Badge>
+            )}
+            {onRunValidation && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onRunValidation}
+                disabled={isValidating}
+                className="text-xs"
+              >
+                {isValidating ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" aria-hidden="true" />
+                    Validating...
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-3 w-3 mr-1" aria-hidden="true" />
+                    Run Validation
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         </div>
+
+        {summary && (
+          <div className="validation-summary" role="status" aria-label="Validation summary">
+            <span className="stat success">Matched: {summary.matched}/{summary.totalBodyCitations}</span>
+            {summary.duplicates > 0 && (
+              <span className="stat error">Duplicates: {summary.duplicates}</span>
+            )}
+            {summary.orphanedCitations > 0 && (
+              <span className="stat error">Orphaned: {summary.orphanedCitations}</span>
+            )}
+            {summary.uncitedReferences > 0 && (
+              <span className="stat warning">Uncited refs: {summary.uncitedReferences}</span>
+            )}
+            {summary.missingInSequence > 0 && (
+              <span className="stat error">Missing: {summary.missingInSequence}</span>
+            )}
+          </div>
+        )}
 
         <div className="flex items-center gap-1" role="tablist" aria-label="Filter issues">
           {(['all', 'errors', 'warnings'] as const).map((tab) => (

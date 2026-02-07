@@ -88,41 +88,84 @@ pre[class*="language-"] {
   line-height: 1.7;
   color: #1a1a1a;
 }
-.document-panel h1 { font-size: 24px; font-weight: 700; margin: 24px 0 12px; }
-.document-panel h2 { font-size: 20px; font-weight: 600; margin: 20px 0 10px; }
-.document-panel h3 { font-size: 17px; font-weight: 600; margin: 16px 0 8px; }
-.document-panel h4 { font-size: 15px; font-weight: 600; margin: 14px 0 6px; }
-.document-panel p { margin: 0 0 12px; }
+.document-panel h1 { font-size: 24px; font-weight: 700; margin: 24px 0 12px; font-family: 'Georgia', serif; display: block; }
+.document-panel h2 { font-size: 20px; font-weight: 600; margin: 20px 0 10px; font-family: 'Georgia', serif; display: block; }
+.document-panel h3 { font-size: 17px; font-weight: 600; margin: 16px 0 8px; font-family: 'Georgia', serif; display: block; }
+.document-panel h4 { font-size: 15px; font-weight: 600; margin: 14px 0 6px; font-family: 'Georgia', serif; display: block; }
+.document-panel p { font-size: 14px; line-height: 1.7; margin: 0 0 12px; font-family: 'Georgia', serif; }
+.document-panel strong, .document-panel b { font-weight: 700; }
+.document-panel em, .document-panel i { font-style: italic; }
+.document-panel u { text-decoration: underline; }
+.document-panel s, .document-panel del { text-decoration: line-through; }
+.document-panel sup { vertical-align: super; font-size: 0.75em; }
+.document-panel sub { vertical-align: sub; font-size: 0.75em; }
 .document-panel table { border-collapse: collapse; width: 100%; margin: 16px 0; }
 .document-panel th,
 .document-panel td { border: 1px solid #ccc; padding: 8px 12px; font-size: 13px; }
 .document-panel th { background: #f5f5f5; font-weight: 600; }
-.document-panel ul,
-.document-panel ol { margin: 8px 0 12px 24px; }
-.document-panel li { font-size: 14px; line-height: 1.6; }
+.document-panel ul { list-style-type: disc; margin: 8px 0 12px 24px; padding-left: 0; }
+.document-panel ol { list-style-type: decimal; margin: 8px 0 12px 24px; padding-left: 0; }
+.document-panel li { font-size: 14px; line-height: 1.6; display: list-item; }
 .document-panel img { max-width: 100%; height: auto; margin: 12px 0; }
 .document-panel blockquote { border-left: 3px solid #ccc; padding-left: 16px; color: #555; margin: 12px 0; }
 .document-panel pre { background: #f5f5f5; padding: 12px; border-radius: 4px; overflow-x: auto; }
 .document-panel code { font-family: 'JetBrains Mono', Consolas, monospace; font-size: 13px; }
+.document-panel a { color: #2563eb; text-decoration: underline; }
 
 /* Citation highlights */
 .citation-matched {
   background: rgba(61, 214, 140, 0.15);
   border-bottom: 2px solid #3dd68c;
   padding: 1px 2px;
-  cursor: default;
+  cursor: pointer;
 }
 .citation-issue {
   background: rgba(255, 107, 107, 0.15);
   border-bottom: 2px solid #ff6b6b;
   padding: 1px 2px;
-  cursor: default;
+  cursor: pointer;
 }
+.citation-matched:hover { background: rgba(61, 214, 140, 0.3); }
+.citation-issue:hover { background: rgba(255, 107, 107, 0.3); }
 .citation-matched.citation-active,
 .citation-issue.citation-active {
   outline: 2px solid #facc15;
   outline-offset: 1px;
 }
+
+/* Citation hover tooltip */
+.citation-tooltip {
+  position: fixed;
+  z-index: 1000;
+  max-width: 450px;
+  padding: 10px 14px;
+  background: #1a1a2e;
+  color: #fff;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  pointer-events: none;
+  display: none;
+  font-family: -apple-system, system-ui, sans-serif;
+}
+
+/* Validation summary bar */
+.validation-summary {
+  display: flex;
+  gap: 16px;
+  padding: 8px 16px;
+  background: #f0f4ff;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.validation-summary .stat { font-weight: 600; }
+.validation-summary .stat.error { color: #e53e3e; }
+.validation-summary .stat.success { color: #38a169; }
+.validation-summary .stat.warning { color: #d69e2e; }
 
 /* Indeterminate progress animation */
 @keyframes indeterminate {

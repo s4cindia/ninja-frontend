@@ -1,7 +1,8 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import { DocumentTextViewer } from './DocumentTextViewer';
 import { IssuePanel } from './IssuePanel';
 import { useDocumentText } from '@/hooks/useDocumentText';
+import { useEditorValidation, useReferenceLookup } from '@/hooks/useCitationEditorValidation';
 import { useQueryClient } from '@tanstack/react-query';
 import { documentTextKeys } from '@/hooks/useDocumentText';
 import { citationService } from '@/services/citation.service';
@@ -18,10 +19,45 @@ export function CitationEditorLayout({ data, textLookupId }: CitationEditorLayou
   const { data: docText, isLoading: textLoading } = useDocumentText(textLookupId);
   const [highlightedCitation, setHighlightedCitation] = useState<number | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [validationRan, setValidationRan] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
   const documentId = docText?.documentId ?? data.documentId ?? textLookupId;
+
+  const {
+    data: validationResult,
+    isFetching: isValidating,
+    runValidation,
+  } = useEditorValidation(documentId, validationRan);
+
+  const { data: lookupData } = useReferenceLookup(documentId);
+
+  const referenceLookup = useMemo(() => {
+    if (validationResult?.referenceLookup) return validationResult.referenceLookup;
+    if (lookupData?.lookupMap) return lookupData.lookupMap;
+    return undefined;
+  }, [validationResult, lookupData]);
+
+  const orphanedFromValidation = useMemo(() => {
+    if (!validationResult?.issues) return undefined;
+    const orphanNums = new Set<number>();
+    for (const issue of validationResult.issues) {
+      if (issue.type === 'CITATION_WITHOUT_REFERENCE') {
+        issue.citationNumbers.forEach((n) => orphanNums.add(n));
+      }
+    }
+    return orphanNums.size > 0 ? orphanNums : undefined;
+  }, [validationResult]);
+
+  const handleRunValidation = useCallback(async () => {
+    setValidationRan(true);
+    try {
+      await runValidation();
+    } catch {
+      // Error handled by query
+    }
+  }, [runValidation]);
 
   const handleRegenerateHtml = useCallback(() => {
     fileInputRef.current?.click();
@@ -46,6 +82,10 @@ export function CitationEditorLayout({ data, textLookupId }: CitationEditorLayou
       }
     }
   }, [documentId, textLookupId, queryClient]);
+
+  const handleCitationClick = useCallback((citationNumber: number) => {
+    setHighlightedCitation(citationNumber);
+  }, []);
 
   const style = data.detectedStyle;
   const pct = style ? Math.round(style.confidence * 100) : 0;
@@ -105,6 +145,9 @@ export function CitationEditorLayout({ data, textLookupId }: CitationEditorLayou
             highlightedCitation={highlightedCitation}
             onRegenerateHtml={handleRegenerateHtml}
             isRegenerating={isRegenerating}
+            referenceLookup={referenceLookup}
+            orphanedFromValidation={orphanedFromValidation}
+            onCitationClick={handleCitationClick}
           />
         </div>
 
@@ -112,6 +155,9 @@ export function CitationEditorLayout({ data, textLookupId }: CitationEditorLayou
           <IssuePanel
             data={data}
             onHighlightCitation={setHighlightedCitation}
+            validationResult={validationResult}
+            isValidating={isValidating}
+            onRunValidation={handleRunValidation}
           />
         </div>
       </div>

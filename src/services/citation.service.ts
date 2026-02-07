@@ -10,7 +10,7 @@ import type {
   PaginatedCitations,
   CitationStats,
 } from '@/types/citation.types';
-import type { StylesheetDetectionResult, DocumentTextResponse } from '@/types/stylesheet-detection.types';
+import type { StylesheetDetectionResult, DocumentTextResponse, ValidationResult, ReferenceLookupResponse } from '@/types/stylesheet-detection.types';
 
 class CitationServiceError extends Error {
   public code?: string;
@@ -332,6 +332,32 @@ export const citationService = {
       return response.data.data;
     } catch (error) {
       handleError(error, 'REGENERATE_HTML');
+    }
+  },
+
+  async validateCitations(documentId: string, signal?: AbortSignal): Promise<ValidationResult> {
+    try {
+      validateId(documentId, 'document ID');
+      const response = await api.get<ApiResponse<ValidationResult>>(
+        `/editorial/document/${documentId}/validate-citations`,
+        { signal }
+      );
+      return response.data.data;
+    } catch (error) {
+      handleError(error, 'VALIDATE_CITATIONS');
+    }
+  },
+
+  async getReferenceLookup(documentId: string, signal?: AbortSignal): Promise<ReferenceLookupResponse> {
+    try {
+      validateId(documentId, 'document ID');
+      const response = await api.get<ApiResponse<ReferenceLookupResponse>>(
+        `/editorial/document/${documentId}/reference-lookup`,
+        { signal }
+      );
+      return response.data.data;
+    } catch (error) {
+      handleError(error, 'REFERENCE_LOOKUP');
     }
   },
 

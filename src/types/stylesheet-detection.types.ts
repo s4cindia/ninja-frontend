@@ -103,6 +103,13 @@ export interface CitationItem {
 
 export type IssueSeverity = 'error' | 'warning';
 export type IssueStatus = 'pending' | 'accepted' | 'dismissed';
+export type ValidationIssueType =
+  | 'DUPLICATE_CITATION'
+  | 'MISSING_CITATION_NUMBER'
+  | 'CITATION_WITHOUT_REFERENCE'
+  | 'REFERENCE_WITHOUT_CITATION'
+  | 'OUT_OF_ORDER'
+  | 'SEQUENCE_GAP';
 
 export interface FixOption {
   id: string;
@@ -119,4 +126,41 @@ export interface CitationIssue {
   selectedFix?: string;
   status: IssueStatus;
   citationNumbers?: number[];
+}
+
+export interface ValidationIssue {
+  id: string;
+  severity: IssueSeverity;
+  type: ValidationIssueType;
+  title: string;
+  detail: string;
+  citationNumbers: number[];
+}
+
+export interface ValidationSummary {
+  totalBodyCitations: number;
+  totalReferences: number;
+  matched: number;
+  duplicates: number;
+  missingInSequence: number;
+  orphanedCitations: number;
+  uncitedReferences: number;
+}
+
+export interface ValidationResult {
+  documentId: string;
+  totalIssues: number;
+  errors: number;
+  warnings: number;
+  issues: ValidationIssue[];
+  referenceLookup: Record<string, string | null>;
+  summary: ValidationSummary;
+}
+
+export interface ReferenceLookupResponse {
+  documentId: string;
+  totalReferences: number;
+  lookupMap: Record<string, string | null>;
+  crossReference?: CrossReference;
+  sequenceAnalysis?: SequenceAnalysis;
 }

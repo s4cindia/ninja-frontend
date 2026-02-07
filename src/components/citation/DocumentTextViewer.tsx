@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect, useState } from 'react';
+import { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import { Loader2, FileText, Upload } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { Button } from '@/components/ui/Button';
@@ -12,6 +12,9 @@ interface DocumentTextViewerProps {
   highlightedCitation?: number | null;
   onRegenerateHtml?: () => void;
   isRegenerating?: boolean;
+  referenceLookup?: Record<string, string | null>;
+  orphanedFromValidation?: Set<number>;
+  onCitationClick?: (citationNumber: number) => void;
 }
 
 const CITATION_PATTERN = /\[(\d+(?:\s*[-–]\s*\d+)?(?:\s*,\s*\d+)*)\]/g;
@@ -163,6 +166,34 @@ function escapeText(str: string): string {
   return DOMPurify.sanitize(str, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
 }
 
+function showTooltip(anchorEl: Element, text: string) {
+  if (typeof document === 'undefined') return;
+  let tooltip = document.getElementById('citation-tooltip');
+  if (!tooltip) {
+    tooltip = document.createElement('div');
+    tooltip.id = 'citation-tooltip';
+    tooltip.className = 'citation-tooltip';
+    document.body.appendChild(tooltip);
+  }
+  tooltip.textContent = text;
+  tooltip.style.display = 'block';
+  const rect = anchorEl.getBoundingClientRect();
+  const tooltipWidth = 450;
+  let left = rect.left;
+  if (left + tooltipWidth > window.innerWidth) {
+    left = window.innerWidth - tooltipWidth - 10;
+  }
+  if (left < 10) left = 10;
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${rect.bottom + 6}px`;
+}
+
+function hideTooltip() {
+  if (typeof document === 'undefined') return;
+  const tooltip = document.getElementById('citation-tooltip');
+  if (tooltip) tooltip.style.display = 'none';
+}
+
 export function DocumentTextViewer({
   fullHtml,
   fullText,
@@ -171,11 +202,19 @@ export function DocumentTextViewer({
   highlightedCitation,
   onRegenerateHtml,
   isRegenerating,
+  referenceLookup,
+  orphanedFromValidation,
+  onCitationClick,
 }: DocumentTextViewerProps): JSX.Element {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [useHtmlMode] = useState(true);
 
-  const orphanedSet = useMemo(() => getOrphanedNumbers(crossReference), [crossReference]);
+  const orphanedSet = useMemo(() => {
+    if (orphanedFromValidation && orphanedFromValidation.size > 0) {
+      return orphanedFromValidation;
+    }
+    return getOrphanedNumbers(crossReference);
+  }, [crossReference, orphanedFromValidation]);
 
   const sanitizedHtml = useMemo(() => {
     if (!fullHtml) return null;
@@ -209,6 +248,49 @@ export function DocumentTextViewer({
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [highlightedCitation]);
+
+  const setupTooltips = useCallback((container: HTMLDivElement | null) => {
+    if (!container || !referenceLookup) return;
+
+    const handleMouseEnter = (e: Event) => {
+      const target = e.target as HTMLElement;
+      const citNum = target.dataset?.citation;
+      if (!citNum) return;
+      const refText = referenceLookup[citNum];
+      showTooltip(target, refText || 'No matching reference found');
+    };
+
+    const handleMouseLeave = () => {
+      hideTooltip();
+    };
+
+    const handleClick = (e: Event) => {
+      const target = e.target as HTMLElement;
+      const citNum = target.dataset?.citation;
+      if (citNum && onCitationClick) {
+        onCitationClick(parseInt(citNum, 10));
+      }
+    };
+
+    const citationEls = container.querySelectorAll('[data-citation]');
+    citationEls.forEach((el) => {
+      el.addEventListener('mouseenter', handleMouseEnter);
+      el.addEventListener('mouseleave', handleMouseLeave);
+      el.addEventListener('click', handleClick);
+    });
+
+    return () => {
+      citationEls.forEach((el) => {
+        el.removeEventListener('mouseenter', handleMouseEnter);
+        el.removeEventListener('mouseleave', handleMouseLeave);
+        el.removeEventListener('click', handleClick);
+      });
+    };
+  }, [referenceLookup, onCitationClick]);
+
+  useEffect(() => {
+    return setupTooltips(scrollRef.current);
+  }, [setupTooltips, highlightedHtml]);
 
   if (isLoading) {
     return (
@@ -271,6 +353,8 @@ export function DocumentTextViewer({
             lines={plainTextLines}
             orphanedSet={orphanedSet}
             highlightedCitation={highlightedCitation}
+            referenceLookup={referenceLookup}
+            onCitationClick={onCitationClick}
           />
         </div>
       </div>
@@ -283,6 +367,8 @@ export function DocumentTextViewer({
         lines={plainTextLines}
         orphanedSet={orphanedSet}
         highlightedCitation={highlightedCitation}
+        referenceLookup={referenceLookup}
+        onCitationClick={onCitationClick}
       />
     </div>
   );
@@ -292,9 +378,17 @@ interface PlainTextViewProps {
   lines: string[];
   orphanedSet: Set<number>;
   highlightedCitation?: number | null;
+  referenceLookup?: Record<string, string | null>;
+  onCitationClick?: (citationNumber: number) => void;
 }
 
-function PlainTextView({ lines, orphanedSet, highlightedCitation }: PlainTextViewProps): JSX.Element {
+function PlainTextView({ lines, orphanedSet, highlightedCitation, referenceLookup, onCitationClick }: PlainTextViewProps): JSX.Element {
+  const handleCitationHover = useCallback((e: React.MouseEvent, citNum: number | null) => {
+    if (citNum == null || !referenceLookup) return;
+    const refText = referenceLookup[String(citNum)];
+    showTooltip(e.currentTarget, refText || 'No matching reference found');
+  }, [referenceLookup]);
+
   return (
     <div className="font-mono text-sm bg-gray-900 min-h-full">
       {lines.map((line, idx) => {
@@ -322,7 +416,7 @@ function PlainTextView({ lines, orphanedSet, highlightedCitation }: PlainTextVie
                     key={si}
                     data-citation={seg.citationNumber}
                     className={`
-                      rounded px-0.5 font-semibold cursor-default
+                      rounded px-0.5 font-semibold cursor-pointer
                       ${seg.isOrphaned
                         ? 'bg-red-500/30 text-red-300 border border-red-500/50'
                         : 'bg-green-500/30 text-green-300 border border-green-500/50'
@@ -334,6 +428,9 @@ function PlainTextView({ lines, orphanedSet, highlightedCitation }: PlainTextVie
                         ? `Orphaned citation ${seg.text} — no matching reference`
                         : `Matched citation ${seg.text}`
                     }
+                    onMouseEnter={(e) => handleCitationHover(e, seg.citationNumber)}
+                    onMouseLeave={hideTooltip}
+                    onClick={() => seg.citationNumber != null && onCitationClick?.(seg.citationNumber)}
                   >
                     {escapeText(seg.text)}
                   </span>
