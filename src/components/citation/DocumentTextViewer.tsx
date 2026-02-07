@@ -68,6 +68,15 @@ function escapeText(str: string): string {
   return DOMPurify.sanitize(str, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
 }
 
+function decodeHtmlEntities(html: string): string {
+  if (!html.includes('&lt;') && !html.includes('&gt;') && !html.includes('&amp;')) {
+    return html;
+  }
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = html;
+  return textarea.value;
+}
+
 function findCitationElement(container: HTMLElement, citNum: number): Element | null {
   const legacy = container.querySelector(`[data-citation="${citNum}"]`);
   if (legacy) return legacy;
@@ -97,7 +106,8 @@ export function DocumentTextViewer({
   const sanitizedHtml = useMemo(() => {
     const rawHtml = highlightedHtml || fullHtml;
     if (!rawHtml) return null;
-    return DOMPurify.sanitize(rawHtml, {
+    const decoded = decodeHtmlEntities(rawHtml);
+    return DOMPurify.sanitize(decoded, {
       ALLOWED_TAGS,
       ALLOWED_ATTR,
       ALLOW_DATA_ATTR: true,
