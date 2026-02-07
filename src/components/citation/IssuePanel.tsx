@@ -42,35 +42,37 @@ function buildIssues(data: StylesheetDetectionResult): CitationIssue[] {
       });
     }
 
-    if (seq.duplicates && seq.duplicates.length > 0) {
+    const duplicates = seq.duplicates ?? seq.duplicateNumbers ?? [];
+    if (duplicates.length > 0) {
       issues.push({
         id: 'seq-duplicates',
         severity: 'warning',
         category: 'sequence',
-        title: `Duplicate citation number${seq.duplicates.length > 1 ? 's' : ''}: [${seq.duplicates.join(', ')}]`,
-        description: `${seq.duplicates.length} citation number${seq.duplicates.length > 1 ? 's are' : ' is'} used more than once.`,
+        title: `Duplicate citation number${duplicates.length > 1 ? 's' : ''}: [${duplicates.join(', ')}]`,
+        description: `${duplicates.length} citation number${duplicates.length > 1 ? 's are' : ' is'} used more than once.`,
         fixOptions: [
           { id: 'deduplicate', label: 'Assign unique numbers' },
           { id: 'flag', label: 'Flag for manual review' },
         ],
         status: 'pending',
-        citationNumbers: seq.duplicates,
+        citationNumbers: duplicates,
       });
     }
 
-    if (seq.outOfOrder && seq.outOfOrder.length > 0) {
+    const outOfOrder = seq.outOfOrder ?? seq.outOfOrderNumbers ?? [];
+    if (outOfOrder.length > 0) {
       issues.push({
         id: 'seq-order',
         severity: 'warning',
         category: 'sequence',
-        title: `Out-of-order citations: [${seq.outOfOrder.join(', ')}]`,
-        description: `${seq.outOfOrder.length} citation${seq.outOfOrder.length > 1 ? 's appear' : ' appears'} out of sequential order.`,
+        title: `Out-of-order citations: [${outOfOrder.join(', ')}]`,
+        description: `${outOfOrder.length} citation${outOfOrder.length > 1 ? 's appear' : ' appears'} out of sequential order.`,
         fixOptions: [
-          { id: 'reorder', label: 'Reorder citations' },
+          { id: 'reorder', label: 'Reorder by first appearance' },
           { id: 'flag', label: 'Flag for manual review' },
         ],
         status: 'pending',
-        citationNumbers: seq.outOfOrder,
+        citationNumbers: outOfOrder,
       });
     }
   }

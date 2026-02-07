@@ -7,16 +7,21 @@ export interface DetectedStyle {
 }
 
 export interface SequenceGap {
-  from: number;
-  to: number;
+  from?: number;
+  to?: number;
+  after?: number;
+  before?: number;
 }
 
 export interface SequenceAnalysis {
   isSequential: boolean;
+  totalNumbers?: number;
   expectedRange: { start: number; end: number } | null;
   missingNumbers: number[];
-  duplicates: number[];
-  outOfOrder: number[];
+  duplicates?: number[];
+  duplicateNumbers?: number[];
+  outOfOrder?: number[];
+  outOfOrderNumbers?: number[];
   gaps: SequenceGap[];
   summary: string;
 }
@@ -58,6 +63,7 @@ export interface CitationCounts {
   totalCount: number;
   inBody: number;
   inReferences: number;
+  items?: CitationItem[];
 }
 
 export interface StylesheetDetectionResult {
@@ -76,7 +82,23 @@ export interface StylesheetDetectionResult {
 export interface DocumentTextResponse {
   documentId: string;
   fullText: string;
+  fullHtml?: string | null;
   filename?: string;
+}
+
+export interface CitationItem {
+  id: string;
+  rawText: string;
+  citationType: string;
+  detectedStyle: string;
+  startOffset: number;
+  endOffset: number;
+  confidence: number;
+  pageNumber: number | null;
+  paragraphIndex: number | null;
+  primaryComponentId: string | null;
+  isParsed: boolean;
+  parseConfidence: number | null;
 }
 
 export type IssueSeverity = 'error' | 'warning';

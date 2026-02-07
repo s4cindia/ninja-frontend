@@ -319,6 +319,22 @@ export const citationService = {
     }
   },
 
+  async regenerateHtml(documentId: string, file: File): Promise<{ documentId: string; htmlLength: number; warnings: number }> {
+    try {
+      validateId(documentId, 'document ID');
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await api.post<ApiResponse<{ documentId: string; htmlLength: number; warnings: number }>>(
+        `/editorial/document/${documentId}/regenerate-html`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+      return response.data.data;
+    } catch (error) {
+      handleError(error, 'REGENERATE_HTML');
+    }
+  },
+
   async convertStyle(documentId: string, targetStyle: string): Promise<StylesheetDetectionResult> {
     try {
       validateId(documentId, 'document ID');

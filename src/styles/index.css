@@ -81,6 +81,49 @@ pre[class*="language-"] {
   font-style: italic;
 }
 
+/* Document panel — Word-like rendering for fullHtml */
+.document-panel {
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #1a1a1a;
+}
+.document-panel h1 { font-size: 24px; font-weight: 700; margin: 24px 0 12px; }
+.document-panel h2 { font-size: 20px; font-weight: 600; margin: 20px 0 10px; }
+.document-panel h3 { font-size: 17px; font-weight: 600; margin: 16px 0 8px; }
+.document-panel h4 { font-size: 15px; font-weight: 600; margin: 14px 0 6px; }
+.document-panel p { margin: 0 0 12px; }
+.document-panel table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+.document-panel th,
+.document-panel td { border: 1px solid #ccc; padding: 8px 12px; font-size: 13px; }
+.document-panel th { background: #f5f5f5; font-weight: 600; }
+.document-panel ul,
+.document-panel ol { margin: 8px 0 12px 24px; }
+.document-panel li { font-size: 14px; line-height: 1.6; }
+.document-panel img { max-width: 100%; height: auto; margin: 12px 0; }
+.document-panel blockquote { border-left: 3px solid #ccc; padding-left: 16px; color: #555; margin: 12px 0; }
+.document-panel pre { background: #f5f5f5; padding: 12px; border-radius: 4px; overflow-x: auto; }
+.document-panel code { font-family: 'JetBrains Mono', Consolas, monospace; font-size: 13px; }
+
+/* Citation highlights */
+.citation-matched {
+  background: rgba(61, 214, 140, 0.15);
+  border-bottom: 2px solid #3dd68c;
+  padding: 1px 2px;
+  cursor: default;
+}
+.citation-issue {
+  background: rgba(255, 107, 107, 0.15);
+  border-bottom: 2px solid #ff6b6b;
+  padding: 1px 2px;
+  cursor: default;
+}
+.citation-matched.citation-active,
+.citation-issue.citation-active {
+  outline: 2px solid #facc15;
+  outline-offset: 1px;
+}
+
 /* Indeterminate progress animation */
 @keyframes indeterminate {
   0% { transform: translateX(-100%); }
