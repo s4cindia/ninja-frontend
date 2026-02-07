@@ -112,7 +112,31 @@ pre[class*="language-"] {
 .document-panel code { font-family: 'JetBrains Mono', Consolas, monospace; font-size: 13px; }
 .document-panel a { color: #2563eb; text-decoration: underline; }
 
-/* Citation highlights */
+/* Citation highlights — backend classes (cit-hl, cit-matched, cit-issue, cit-unmatched) */
+.document-panel .cit-hl {
+  cursor: pointer;
+  border-radius: 2px;
+}
+.document-panel .cit-matched {
+  background-color: rgba(61, 214, 140, 0.25) !important;
+  border-bottom: 2px solid #3dd68c !important;
+  padding: 1px 3px;
+}
+.document-panel .cit-issue {
+  background-color: rgba(255, 107, 107, 0.25) !important;
+  border-bottom: 2px solid #ff6b6b !important;
+  padding: 1px 3px;
+}
+.document-panel .cit-unmatched {
+  background-color: rgba(250, 204, 21, 0.25) !important;
+  border-bottom: 2px solid #facc15 !important;
+  padding: 1px 3px;
+}
+.document-panel .cit-matched:hover { background-color: rgba(61, 214, 140, 0.4) !important; }
+.document-panel .cit-issue:hover { background-color: rgba(255, 107, 107, 0.4) !important; }
+.document-panel .cit-unmatched:hover { background-color: rgba(250, 204, 21, 0.4) !important; }
+
+/* Legacy client-side highlight classes (fallback) */
 .citation-matched {
   background-color: rgba(61, 214, 140, 0.25) !important;
   border-bottom: 2px solid #3dd68c !important;
@@ -129,6 +153,9 @@ pre[class*="language-"] {
 }
 .citation-matched:hover { background-color: rgba(61, 214, 140, 0.4) !important; }
 .citation-issue:hover { background-color: rgba(255, 107, 107, 0.4) !important; }
+
+/* Active citation highlight */
+.document-panel .cit-hl.citation-active,
 .citation-matched.citation-active,
 .citation-issue.citation-active {
   outline: 2px solid #facc15;

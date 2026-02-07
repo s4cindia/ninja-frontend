@@ -1,23 +1,19 @@
-import { useMemo, useRef, useEffect, useState, useCallback } from 'react';
+import { useMemo, useRef, useEffect, useCallback } from 'react';
 import { Loader2, FileText, Upload } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { Button } from '@/components/ui/Button';
-import type { CrossReference } from '@/types/stylesheet-detection.types';
 
 interface DocumentTextViewerProps {
+  highlightedHtml?: string | null;
   fullHtml?: string | null;
   fullText?: string;
   isLoading: boolean;
-  crossReference?: CrossReference | null;
   highlightedCitation?: number | null;
   onRegenerateHtml?: () => void;
   isRegenerating?: boolean;
   referenceLookup?: Record<string, string | null>;
-  orphanedFromValidation?: Set<number>;
   onCitationClick?: (citationNumber: number) => void;
 }
-
-const CITATION_PATTERN = /\[(\d+(?:\s*[-–]\s*\d+)?(?:\s*,\s*\d+)*)\]/g;
 
 const ALLOWED_TAGS = [
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
@@ -28,143 +24,17 @@ const ALLOWED_TAGS = [
   'blockquote', 'pre', 'code',
   'a', 'img',
   'figure', 'figcaption',
+  'style',
 ];
 
 const ALLOWED_ATTR = [
   'href', 'src', 'alt', 'title', 'class', 'id',
   'colspan', 'rowspan', 'scope',
   'width', 'height', 'style',
+  'data-cit-nums', 'data-ref-text', 'data-citation',
 ];
 
-function getOrphanedNumbers(crossReference?: CrossReference | null): Set<number> {
-  if (!crossReference?.citationsWithoutReference) return new Set();
-  return new Set(crossReference.citationsWithoutReference.map((c) => c.number));
-}
-
-function parseCitationNumbers(match: string): number[] {
-  const inner = match.slice(1, -1);
-  const nums: number[] = [];
-  for (const part of inner.split(',')) {
-    const trimmed = part.trim();
-    const rangeParts = trimmed.split(/[-–]/);
-    if (rangeParts.length === 2) {
-      const start = parseInt(rangeParts[0].trim(), 10);
-      const end = parseInt(rangeParts[1].trim(), 10);
-      if (!isNaN(start) && !isNaN(end)) {
-        for (let i = start; i <= end; i++) nums.push(i);
-      }
-    } else {
-      const n = parseInt(trimmed, 10);
-      if (!isNaN(n)) nums.push(n);
-    }
-  }
-  return nums;
-}
-
-function highlightCitationsInHtml(htmlString: string, orphanedSet: Set<number>): string {
-  if (typeof window === 'undefined' || typeof document === 'undefined') {
-    return htmlString;
-  }
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(htmlString, 'text/html');
-  const walker = doc.createTreeWalker(
-    doc.body,
-    NodeFilter.SHOW_TEXT,
-    null
-  );
-
-  const textNodes: Text[] = [];
-  while (walker.nextNode()) {
-    textNodes.push(walker.currentNode as Text);
-  }
-
-  textNodes.forEach((node) => {
-    const text = node.textContent || '';
-    if (!/\[\d{1,4}\]/.test(text)) return;
-
-    const fragment = doc.createDocumentFragment();
-    let lastIndex = 0;
-    const regex = /\[(\d{1,4}(?:\s*[-–]\s*\d{1,4})?(?:\s*,\s*\d{1,4})*)\]/g;
-    let match: RegExpExecArray | null;
-
-    while ((match = regex.exec(text)) !== null) {
-      if (match.index > lastIndex) {
-        fragment.appendChild(
-          doc.createTextNode(text.slice(lastIndex, match.index))
-        );
-      }
-
-      const nums = parseCitationNumbers(match[0]);
-      const anyOrphaned = nums.some((n) => orphanedSet.has(n));
-      const span = doc.createElement('span');
-      span.className = anyOrphaned ? 'citation-issue' : 'citation-matched';
-      span.setAttribute('data-citation', String(nums[0] ?? 0));
-      span.textContent = match[0];
-      fragment.appendChild(span);
-
-      lastIndex = regex.lastIndex;
-    }
-
-    if (lastIndex < text.length) {
-      fragment.appendChild(doc.createTextNode(text.slice(lastIndex)));
-    }
-
-    node.parentNode?.replaceChild(fragment, node);
-  });
-
-  return doc.body.innerHTML;
-}
-
-interface PlainTextSegment {
-  text: string;
-  isHighlight: boolean;
-  citationNumber: number | null;
-  isOrphaned: boolean;
-}
-
-function highlightPlainTextLine(line: string, orphanedSet: Set<number>): PlainTextSegment[] {
-  const segments: PlainTextSegment[] = [];
-  let lastIndex = 0;
-  const regex = new RegExp(CITATION_PATTERN.source, 'g');
-  let match: RegExpExecArray | null;
-
-  while ((match = regex.exec(line)) !== null) {
-    if (match.index > lastIndex) {
-      segments.push({
-        text: line.slice(lastIndex, match.index),
-        isHighlight: false,
-        citationNumber: null,
-        isOrphaned: false,
-      });
-    }
-
-    const nums = parseCitationNumbers(match[0]);
-    const anyOrphaned = nums.some((n) => orphanedSet.has(n));
-    segments.push({
-      text: match[0],
-      isHighlight: true,
-      citationNumber: nums[0] ?? null,
-      isOrphaned: anyOrphaned,
-    });
-
-    lastIndex = match.index + match[0].length;
-  }
-
-  if (lastIndex < line.length) {
-    segments.push({
-      text: line.slice(lastIndex),
-      isHighlight: false,
-      citationNumber: null,
-      isOrphaned: false,
-    });
-  }
-
-  return segments;
-}
-
-function escapeText(str: string): string {
-  return DOMPurify.sanitize(str, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
-}
+const CITATION_PATTERN = /\[(\d+(?:\s*[-–]\s*\d+)?(?:\s*,\s*\d+)*)\]/g;
 
 function showTooltip(anchorEl: Element, text: string) {
   if (typeof document === 'undefined') return;
@@ -194,41 +64,45 @@ function hideTooltip() {
   if (tooltip) tooltip.style.display = 'none';
 }
 
+function escapeText(str: string): string {
+  return DOMPurify.sanitize(str, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
+}
+
+function findCitationElement(container: HTMLElement, citNum: number): Element | null {
+  const legacy = container.querySelector(`[data-citation="${citNum}"]`);
+  if (legacy) return legacy;
+  const allCitEls = container.querySelectorAll('[data-cit-nums]');
+  for (const el of allCitEls) {
+    const nums = el.getAttribute('data-cit-nums');
+    if (!nums) continue;
+    const parsed = nums.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
+    if (parsed.includes(String(citNum))) return el;
+  }
+  return null;
+}
+
 export function DocumentTextViewer({
+  highlightedHtml,
   fullHtml,
   fullText,
   isLoading,
-  crossReference,
   highlightedCitation,
   onRegenerateHtml,
   isRegenerating,
   referenceLookup,
-  orphanedFromValidation,
   onCitationClick,
 }: DocumentTextViewerProps): JSX.Element {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [useHtmlMode] = useState(true);
-
-  const orphanedSet = useMemo(() => {
-    if (orphanedFromValidation && orphanedFromValidation.size > 0) {
-      return orphanedFromValidation;
-    }
-    return getOrphanedNumbers(crossReference);
-  }, [crossReference, orphanedFromValidation]);
 
   const sanitizedHtml = useMemo(() => {
-    if (!fullHtml) return null;
-    return DOMPurify.sanitize(fullHtml, {
+    const rawHtml = highlightedHtml || fullHtml;
+    if (!rawHtml) return null;
+    return DOMPurify.sanitize(rawHtml, {
       ALLOWED_TAGS,
       ALLOWED_ATTR,
       ALLOW_DATA_ATTR: true,
     });
-  }, [fullHtml]);
-
-  const highlightedHtml = useMemo(() => {
-    if (!sanitizedHtml) return null;
-    return highlightCitationsInHtml(sanitizedHtml, orphanedSet);
-  }, [sanitizedHtml, orphanedSet]);
+  }, [highlightedHtml, fullHtml]);
 
   const plainTextLines = useMemo(() => {
     if (!fullText) return [];
@@ -237,27 +111,31 @@ export function DocumentTextViewer({
 
   useEffect(() => {
     if (highlightedCitation == null || !scrollRef.current) return;
-    const el = scrollRef.current.querySelector(
-      `[data-citation="${highlightedCitation}"]`
+    scrollRef.current.querySelectorAll('.citation-active').forEach((e) =>
+      e.classList.remove('citation-active')
     );
+    const el = findCitationElement(scrollRef.current, highlightedCitation);
     if (el) {
-      scrollRef.current.querySelectorAll('.citation-active').forEach((e) =>
-        e.classList.remove('citation-active')
-      );
       el.classList.add('citation-active');
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [highlightedCitation]);
 
-  const setupTooltips = useCallback((container: HTMLDivElement | null) => {
-    if (!container || !referenceLookup) return;
+  const setupInteractions = useCallback((container: HTMLDivElement | null) => {
+    if (!container) return;
 
     const handleMouseEnter = (e: Event) => {
       const target = e.target as HTMLElement;
+      const refText = target.getAttribute('data-ref-text');
+      if (refText) {
+        showTooltip(target, refText);
+        return;
+      }
       const citNum = target.dataset?.citation;
-      if (!citNum) return;
-      const refText = referenceLookup[citNum];
-      showTooltip(target, refText || 'No matching reference found');
+      if (citNum && referenceLookup) {
+        const ref = referenceLookup[citNum];
+        showTooltip(target, ref || 'No matching reference found');
+      }
     };
 
     const handleMouseLeave = () => {
@@ -266,13 +144,20 @@ export function DocumentTextViewer({
 
     const handleClick = (e: Event) => {
       const target = e.target as HTMLElement;
+      if (!onCitationClick) return;
+      const citNums = target.getAttribute('data-cit-nums');
+      if (citNums) {
+        const firstNum = parseInt(citNums.split(',')[0].trim(), 10);
+        if (!isNaN(firstNum)) onCitationClick(firstNum);
+        return;
+      }
       const citNum = target.dataset?.citation;
-      if (citNum && onCitationClick) {
+      if (citNum) {
         onCitationClick(parseInt(citNum, 10));
       }
     };
 
-    const citationEls = container.querySelectorAll('[data-citation]');
+    const citationEls = container.querySelectorAll('.cit-hl, [data-citation]');
     citationEls.forEach((el) => {
       el.addEventListener('mouseenter', handleMouseEnter);
       el.addEventListener('mouseleave', handleMouseLeave);
@@ -289,8 +174,8 @@ export function DocumentTextViewer({
   }, [referenceLookup, onCitationClick]);
 
   useEffect(() => {
-    return setupTooltips(scrollRef.current);
-  }, [setupTooltips, highlightedHtml]);
+    return setupInteractions(scrollRef.current);
+  }, [setupInteractions, sanitizedHtml]);
 
   if (isLoading) {
     return (
@@ -303,7 +188,7 @@ export function DocumentTextViewer({
     );
   }
 
-  if (!fullHtml && !fullText) {
+  if (!sanitizedHtml && !fullText) {
     return (
       <div className="flex items-center justify-center h-full bg-white text-gray-400">
         <div className="text-center">
@@ -315,7 +200,7 @@ export function DocumentTextViewer({
     );
   }
 
-  if (fullHtml && useHtmlMode && highlightedHtml) {
+  if (sanitizedHtml) {
     return (
       <div
         ref={scrollRef}
@@ -325,13 +210,13 @@ export function DocumentTextViewer({
       >
         <div
           className="document-panel px-10 py-8 max-w-none"
-          dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
       </div>
     );
   }
 
-  if (!fullHtml && fullText && onRegenerateHtml) {
+  if (!fullHtml && !highlightedHtml && fullText && onRegenerateHtml) {
     return (
       <div className="h-full flex flex-col bg-white">
         <div className="flex-shrink-0 bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center gap-3">
@@ -351,7 +236,6 @@ export function DocumentTextViewer({
         <div className="flex-1 overflow-auto" ref={scrollRef}>
           <PlainTextView
             lines={plainTextLines}
-            orphanedSet={orphanedSet}
             highlightedCitation={highlightedCitation}
             referenceLookup={referenceLookup}
             onCitationClick={onCitationClick}
@@ -365,7 +249,6 @@ export function DocumentTextViewer({
     <div ref={scrollRef} className="h-full overflow-auto bg-white">
       <PlainTextView
         lines={plainTextLines}
-        orphanedSet={orphanedSet}
         highlightedCitation={highlightedCitation}
         referenceLookup={referenceLookup}
         onCitationClick={onCitationClick}
@@ -376,13 +259,40 @@ export function DocumentTextViewer({
 
 interface PlainTextViewProps {
   lines: string[];
-  orphanedSet: Set<number>;
   highlightedCitation?: number | null;
   referenceLookup?: Record<string, string | null>;
   onCitationClick?: (citationNumber: number) => void;
 }
 
-function PlainTextView({ lines, orphanedSet, highlightedCitation, referenceLookup, onCitationClick }: PlainTextViewProps): JSX.Element {
+interface PlainTextSegment {
+  text: string;
+  isHighlight: boolean;
+  citationNumber: number | null;
+}
+
+function parsePlainTextSegments(line: string): PlainTextSegment[] {
+  const segments: PlainTextSegment[] = [];
+  let lastIndex = 0;
+  const regex = new RegExp(CITATION_PATTERN.source, 'g');
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(line)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ text: line.slice(lastIndex, match.index), isHighlight: false, citationNumber: null });
+    }
+    const num = parseInt(match[1], 10);
+    segments.push({ text: match[0], isHighlight: true, citationNumber: isNaN(num) ? null : num });
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < line.length) {
+    segments.push({ text: line.slice(lastIndex), isHighlight: false, citationNumber: null });
+  }
+
+  return segments;
+}
+
+function PlainTextView({ lines, highlightedCitation, referenceLookup, onCitationClick }: PlainTextViewProps): JSX.Element {
   const handleCitationHover = useCallback((e: React.MouseEvent, citNum: number | null) => {
     if (citNum == null || !referenceLookup) return;
     const refText = referenceLookup[String(citNum)];
@@ -393,7 +303,7 @@ function PlainTextView({ lines, orphanedSet, highlightedCitation, referenceLooku
     <div className="font-mono text-sm bg-gray-900 min-h-full">
       {lines.map((line, idx) => {
         const lineNum = idx + 1;
-        const segments = highlightPlainTextLine(line, orphanedSet);
+        const segments = parsePlainTextSegments(line);
 
         return (
           <div key={idx} className="flex hover:bg-gray-800/50 group">
@@ -417,17 +327,10 @@ function PlainTextView({ lines, orphanedSet, highlightedCitation, referenceLooku
                     data-citation={seg.citationNumber}
                     className={`
                       rounded px-0.5 font-semibold cursor-pointer
-                      ${seg.isOrphaned
-                        ? 'bg-red-500/30 text-red-300 border border-red-500/50'
-                        : 'bg-green-500/30 text-green-300 border border-green-500/50'
-                      }
+                      bg-green-500/30 text-green-300 border border-green-500/50
                       ${isActive ? 'ring-2 ring-yellow-400' : ''}
                     `}
-                    title={
-                      seg.isOrphaned
-                        ? `Orphaned citation ${seg.text} — no matching reference`
-                        : `Matched citation ${seg.text}`
-                    }
+                    title={`Citation ${seg.text}`}
                     onMouseEnter={(e) => handleCitationHover(e, seg.citationNumber)}
                     onMouseLeave={hideTooltip}
                     onClick={() => seg.citationNumber != null && onCitationClick?.(seg.citationNumber)}

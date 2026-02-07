@@ -83,6 +83,8 @@ export interface DocumentTextResponse {
   documentId: string;
   fullText: string;
   fullHtml?: string | null;
+  highlightedHtml?: string | null;
+  referenceLookup?: Record<string, string | null>;
   filename?: string;
 }
 

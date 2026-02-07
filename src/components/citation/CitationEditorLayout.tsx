@@ -10,6 +10,19 @@ import { Badge } from '@/components/ui/Badge';
 import { BookOpen, FileText, Gauge } from 'lucide-react';
 import type { StylesheetDetectionResult } from '@/types/stylesheet-detection.types';
 
+function findCitationInPanel(container: HTMLElement, citNum: number): Element | null {
+  const legacy = container.querySelector(`[data-citation="${citNum}"]`);
+  if (legacy) return legacy;
+  const allCitEls = container.querySelectorAll('[data-cit-nums]');
+  for (const el of allCitEls) {
+    const nums = el.getAttribute('data-cit-nums');
+    if (!nums) continue;
+    const parsed = nums.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
+    if (parsed.includes(String(citNum))) return el;
+  }
+  return null;
+}
+
 interface CitationEditorLayoutProps {
   data: StylesheetDetectionResult;
   textLookupId: string;
@@ -37,20 +50,10 @@ export function CitationEditorLayout({ data, textLookupId }: CitationEditorLayou
 
   const referenceLookup = useMemo(() => {
     if (validationResult?.referenceLookup) return validationResult.referenceLookup;
+    if (docText?.referenceLookup) return docText.referenceLookup;
     if (lookupData?.lookupMap) return lookupData.lookupMap;
     return undefined;
-  }, [validationResult, lookupData]);
-
-  const orphanedFromValidation = useMemo(() => {
-    if (!validationResult?.issues) return undefined;
-    const orphanNums = new Set<number>();
-    for (const issue of validationResult.issues) {
-      if (issue.type === 'CITATION_WITHOUT_REFERENCE') {
-        issue.citationNumbers.forEach((n) => orphanNums.add(n));
-      }
-    }
-    return orphanNums.size > 0 ? orphanNums : undefined;
-  }, [validationResult]);
+  }, [validationResult, docText, lookupData]);
 
   const handleRunValidation = useCallback(async () => {
     setValidationRan(true);
@@ -95,7 +98,9 @@ export function CitationEditorLayout({ data, textLookupId }: CitationEditorLayou
       if (issueCard) {
         issueCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
         issueCard.classList.add('issue-card-flash');
-        setTimeout(() => issueCard.classList.remove('issue-card-flash'), 1500);
+        setTimeout(() => {
+          issueCard.classList.remove('issue-card-flash');
+        }, 1500);
       }
     }
   }, []);
@@ -106,9 +111,7 @@ export function CitationEditorLayout({ data, textLookupId }: CitationEditorLayou
     setHighlightedCitation(firstNum);
 
     if (documentPanelRef.current) {
-      const citationEl = documentPanelRef.current.querySelector(
-        `[data-citation="${firstNum}"]`
-      );
+      const citationEl = findCitationInPanel(documentPanelRef.current, firstNum);
       if (citationEl) {
         citationEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
         citationEl.classList.add('citation-flash');
@@ -161,6 +164,10 @@ export function CitationEditorLayout({ data, textLookupId }: CitationEditorLayou
               <span className="w-3 h-3 rounded bg-red-500/40 border border-red-500/60" aria-hidden="true" />
               Orphaned
             </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded bg-yellow-500/40 border border-yellow-500/60" aria-hidden="true" />
+              Unmatched
+            </span>
           </div>
         </div>
       </div>
@@ -168,15 +175,14 @@ export function CitationEditorLayout({ data, textLookupId }: CitationEditorLayou
       <div className="flex-1 flex overflow-hidden border border-t-0 border-gray-300 rounded-b-lg">
         <div ref={documentPanelRef} className="flex-1 min-w-0 overflow-hidden">
           <DocumentTextViewer
+            highlightedHtml={docText?.highlightedHtml}
             fullHtml={docText?.fullHtml}
             fullText={docText?.fullText}
             isLoading={textLoading}
-            crossReference={data.crossReference}
             highlightedCitation={highlightedCitation}
             onRegenerateHtml={handleRegenerateHtml}
             isRegenerating={isRegenerating}
             referenceLookup={referenceLookup}
-            orphanedFromValidation={orphanedFromValidation}
             onCitationClick={handleCitationClick}
           />
         </div>
