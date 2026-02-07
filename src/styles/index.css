@@ -114,19 +114,21 @@ pre[class*="language-"] {
 
 /* Citation highlights */
 .citation-matched {
-  background: rgba(61, 214, 140, 0.15);
-  border-bottom: 2px solid #3dd68c;
-  padding: 1px 2px;
+  background-color: rgba(61, 214, 140, 0.25) !important;
+  border-bottom: 2px solid #3dd68c !important;
+  padding: 1px 3px;
+  border-radius: 2px;
   cursor: pointer;
 }
 .citation-issue {
-  background: rgba(255, 107, 107, 0.15);
-  border-bottom: 2px solid #ff6b6b;
-  padding: 1px 2px;
+  background-color: rgba(255, 107, 107, 0.25) !important;
+  border-bottom: 2px solid #ff6b6b !important;
+  padding: 1px 3px;
+  border-radius: 2px;
   cursor: pointer;
 }
-.citation-matched:hover { background: rgba(61, 214, 140, 0.3); }
-.citation-issue:hover { background: rgba(255, 107, 107, 0.3); }
+.citation-matched:hover { background-color: rgba(61, 214, 140, 0.4) !important; }
+.citation-issue:hover { background-color: rgba(255, 107, 107, 0.4) !important; }
 .citation-matched.citation-active,
 .citation-issue.citation-active {
   outline: 2px solid #facc15;

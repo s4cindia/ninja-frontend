@@ -67,7 +67,7 @@ function highlightCitationsInHtml(htmlString: string, orphanedSet: Set<number>):
   }
   const parser = new DOMParser();
   const doc = parser.parseFromString(htmlString, 'text/html');
-  const walker = document.createTreeWalker(
+  const walker = doc.createTreeWalker(
     doc.body,
     NodeFilter.SHOW_TEXT,
     null
@@ -82,7 +82,7 @@ function highlightCitationsInHtml(htmlString: string, orphanedSet: Set<number>):
     const text = node.textContent || '';
     if (!/\[\d{1,4}\]/.test(text)) return;
 
-    const fragment = document.createDocumentFragment();
+    const fragment = doc.createDocumentFragment();
     let lastIndex = 0;
     const regex = /\[(\d{1,4}(?:\s*[-–]\s*\d{1,4})?(?:\s*,\s*\d{1,4})*)\]/g;
     let match: RegExpExecArray | null;
@@ -90,15 +90,15 @@ function highlightCitationsInHtml(htmlString: string, orphanedSet: Set<number>):
     while ((match = regex.exec(text)) !== null) {
       if (match.index > lastIndex) {
         fragment.appendChild(
-          document.createTextNode(text.slice(lastIndex, match.index))
+          doc.createTextNode(text.slice(lastIndex, match.index))
         );
       }
 
       const nums = parseCitationNumbers(match[0]);
       const anyOrphaned = nums.some((n) => orphanedSet.has(n));
-      const span = document.createElement('span');
+      const span = doc.createElement('span');
       span.className = anyOrphaned ? 'citation-issue' : 'citation-matched';
-      span.dataset.citation = String(nums[0] ?? 0);
+      span.setAttribute('data-citation', String(nums[0] ?? 0));
       span.textContent = match[0];
       fragment.appendChild(span);
 
@@ -106,7 +106,7 @@ function highlightCitationsInHtml(htmlString: string, orphanedSet: Set<number>):
     }
 
     if (lastIndex < text.length) {
-      fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+      fragment.appendChild(doc.createTextNode(text.slice(lastIndex)));
     }
 
     node.parentNode?.replaceChild(fragment, node);
