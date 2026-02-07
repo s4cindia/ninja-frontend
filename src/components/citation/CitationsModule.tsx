@@ -12,19 +12,24 @@ interface CitationsModuleProps {
   documentId?: string;
 }
 
+function resolveTextLookupId(documentId?: string, jobId?: string): string {
+  return documentId || jobId || '';
+}
+
 const SKELETON_ROWS = 8;
 
-export function CitationsModule({ documentId }: CitationsModuleProps): JSX.Element {
-  const hasDocumentId = !!documentId;
+export function CitationsModule({ jobId, documentId }: CitationsModuleProps): JSX.Element {
+  const lookupId = resolveTextLookupId(documentId, jobId);
+  const hasLookupId = !!lookupId;
 
   const {
     data,
     isLoading,
     isError,
     error,
-  } = useStylesheetDetection(documentId ?? '');
+  } = useStylesheetDetection(documentId || jobId || '');
 
-  if (!hasDocumentId) {
+  if (!hasLookupId) {
     return (
       <div className="p-6 text-center">
         <FileQuestion className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -86,7 +91,7 @@ export function CitationsModule({ documentId }: CitationsModuleProps): JSX.Eleme
 
   return (
     <ErrorBoundary>
-      <CitationEditorLayout data={data} documentId={documentId!} />
+      <CitationEditorLayout data={data} textLookupId={lookupId} />
     </ErrorBoundary>
   );
 }

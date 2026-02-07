@@ -75,8 +75,7 @@ export interface StylesheetDetectionResult {
 
 export interface DocumentTextResponse {
   documentId: string;
-  text: string;
-  totalLines: number;
+  fullText: string;
   filename?: string;
 }
 

@@ -8,11 +8,11 @@ import type { StylesheetDetectionResult } from '@/types/stylesheet-detection.typ
 
 interface CitationEditorLayoutProps {
   data: StylesheetDetectionResult;
-  documentId: string;
+  textLookupId: string;
 }
 
-export function CitationEditorLayout({ data, documentId }: CitationEditorLayoutProps): JSX.Element {
-  const { data: docText, isLoading: textLoading } = useDocumentText(documentId);
+export function CitationEditorLayout({ data, textLookupId }: CitationEditorLayoutProps): JSX.Element {
+  const { data: docText, isLoading: textLoading } = useDocumentText(textLookupId);
   const [highlightedCitation, setHighlightedCitation] = useState<number | null>(null);
 
   const style = data.detectedStyle;
@@ -57,7 +57,7 @@ export function CitationEditorLayout({ data, documentId }: CitationEditorLayoutP
       <div className="flex-1 flex overflow-hidden border border-t-0 border-gray-300 rounded-b-lg">
         <div className="flex-1 min-w-0 overflow-hidden">
           <DocumentTextViewer
-            text={docText?.text}
+            text={docText?.fullText}
             isLoading={textLoading}
             crossReference={data.crossReference}
             highlightedCitation={highlightedCitation}
