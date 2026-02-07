@@ -167,6 +167,25 @@ pre[class*="language-"] {
 .validation-summary .stat.success { color: #38a169; }
 .validation-summary .stat.warning { color: #d69e2e; }
 
+/* Flash-highlight animations for cross-panel click interactions */
+@keyframes citation-flash {
+  0%, 100% { background: inherit; }
+  25% { background: rgba(250, 204, 21, 0.4); }
+  75% { background: rgba(250, 204, 21, 0.2); }
+}
+.citation-flash {
+  animation: citation-flash 1.5s ease-in-out;
+}
+
+@keyframes issue-card-flash {
+  0%, 100% { box-shadow: none; }
+  25% { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5); }
+  75% { box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
+}
+.issue-card-flash {
+  animation: issue-card-flash 1.5s ease-in-out;
+}
+
 /* Indeterminate progress animation */
 @keyframes indeterminate {
   0% { transform: translateX(-100%); }

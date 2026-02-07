@@ -19,8 +19,10 @@ export function CitationEditorLayout({ data, textLookupId }: CitationEditorLayou
   const { data: docText, isLoading: textLoading } = useDocumentText(textLookupId);
   const [highlightedCitation, setHighlightedCitation] = useState<number | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
-  const [validationRan, setValidationRan] = useState(false);
+  const [validationRan, setValidationRan] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const issuePanelRef = useRef<HTMLDivElement>(null);
+  const documentPanelRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
   const documentId = docText?.documentId ?? data.documentId ?? textLookupId;
@@ -85,6 +87,34 @@ export function CitationEditorLayout({ data, textLookupId }: CitationEditorLayou
 
   const handleCitationClick = useCallback((citationNumber: number) => {
     setHighlightedCitation(citationNumber);
+
+    if (issuePanelRef.current) {
+      const issueCard = issuePanelRef.current.querySelector(
+        `[data-issue-citation~="${citationNumber}"]`
+      );
+      if (issueCard) {
+        issueCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        issueCard.classList.add('issue-card-flash');
+        setTimeout(() => issueCard.classList.remove('issue-card-flash'), 1500);
+      }
+    }
+  }, []);
+
+  const handleIssueClick = useCallback((citationNumbers: number[]) => {
+    if (citationNumbers.length === 0) return;
+    const firstNum = citationNumbers[0];
+    setHighlightedCitation(firstNum);
+
+    if (documentPanelRef.current) {
+      const citationEl = documentPanelRef.current.querySelector(
+        `[data-citation="${firstNum}"]`
+      );
+      if (citationEl) {
+        citationEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        citationEl.classList.add('citation-flash');
+        setTimeout(() => citationEl.classList.remove('citation-flash'), 1500);
+      }
+    }
   }, []);
 
   const style = data.detectedStyle;
@@ -136,7 +166,7 @@ export function CitationEditorLayout({ data, textLookupId }: CitationEditorLayou
       </div>
 
       <div className="flex-1 flex overflow-hidden border border-t-0 border-gray-300 rounded-b-lg">
-        <div className="flex-1 min-w-0 overflow-hidden">
+        <div ref={documentPanelRef} className="flex-1 min-w-0 overflow-hidden">
           <DocumentTextViewer
             fullHtml={docText?.fullHtml}
             fullText={docText?.fullText}
@@ -151,10 +181,11 @@ export function CitationEditorLayout({ data, textLookupId }: CitationEditorLayou
           />
         </div>
 
-        <div className="w-96 flex-shrink-0 border-l border-gray-300 overflow-hidden">
+        <div ref={issuePanelRef} className="w-96 flex-shrink-0 border-l border-gray-300 overflow-hidden">
           <IssuePanel
             data={data}
             onHighlightCitation={setHighlightedCitation}
+            onIssueClick={handleIssueClick}
             validationResult={validationResult}
             isValidating={isValidating}
             onRunValidation={handleRunValidation}

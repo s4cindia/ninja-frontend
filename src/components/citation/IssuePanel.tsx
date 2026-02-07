@@ -21,6 +21,7 @@ import type {
 interface IssuePanelProps {
   data: StylesheetDetectionResult;
   onHighlightCitation?: (num: number | null) => void;
+  onIssueClick?: (citationNumbers: number[]) => void;
   validationResult?: ValidationResult | null;
   isValidating?: boolean;
   onRunValidation?: () => void;
@@ -142,6 +143,13 @@ function buildIssuesFromAnalysis(data: StylesheetDetectionResult): CitationIssue
   return issues;
 }
 
+function withDefaultFix(issue: CitationIssue): CitationIssue {
+  if (!issue.selectedFix && issue.fixOptions.length > 0) {
+    return { ...issue, selectedFix: issue.fixOptions[0].id };
+  }
+  return issue;
+}
+
 function validationIssueToCitationIssue(vi: ValidationIssue): CitationIssue {
   const categoryMap: Record<string, CitationIssue['category']> = {
     DUPLICATE_CITATION: 'sequence',
@@ -203,12 +211,12 @@ const STYLE_LABELS: Record<string, string> = {
 
 type FilterTab = 'all' | 'errors' | 'warnings';
 
-export function IssuePanel({ data, onHighlightCitation, validationResult, isValidating, onRunValidation }: IssuePanelProps): JSX.Element {
-  const analysisIssues = useMemo(() => buildIssuesFromAnalysis(data), [data]);
+export function IssuePanel({ data, onHighlightCitation, onIssueClick, validationResult, isValidating, onRunValidation }: IssuePanelProps): JSX.Element {
+  const analysisIssues = useMemo(() => buildIssuesFromAnalysis(data).map(withDefaultFix), [data]);
 
   const validationIssues = useMemo(() => {
     if (!validationResult?.issues) return [];
-    return validationResult.issues.map(validationIssueToCitationIssue);
+    return validationResult.issues.map(validationIssueToCitationIssue).map(withDefaultFix);
   }, [validationResult]);
 
   const initialIssues = useMemo(() => {
@@ -386,6 +394,7 @@ export function IssuePanel({ data, onHighlightCitation, validationResult, isVali
               onDismiss={handleDismiss}
               onSelectFix={handleSelectFix}
               onHighlightCitation={onHighlightCitation}
+              onIssueClick={onIssueClick}
             />
           ))
         )}
@@ -400,9 +409,10 @@ interface IssueCardProps {
   onDismiss: (id: string) => void;
   onSelectFix: (id: string, fixId: string) => void;
   onHighlightCitation?: (num: number | null) => void;
+  onIssueClick?: (citationNumbers: number[]) => void;
 }
 
-function IssueCard({ issue, onAccept, onDismiss, onSelectFix, onHighlightCitation }: IssueCardProps): JSX.Element {
+function IssueCard({ issue, onAccept, onDismiss, onSelectFix, onHighlightCitation, onIssueClick }: IssueCardProps): JSX.Element {
   const isPending = issue.status === 'pending';
   const isAccepted = issue.status === 'accepted';
   const isDismissed = issue.status === 'dismissed';
@@ -421,15 +431,31 @@ function IssueCard({ issue, onAccept, onDismiss, onSelectFix, onHighlightCitatio
     ? 'bg-green-50'
     : 'bg-white';
 
+  const citationAttr = issue.citationNumbers?.join(' ') ?? '';
+
   return (
     <div
-      className={`border rounded-lg ${borderColor} ${bgColor} transition-all`}
+      className={`border rounded-lg ${borderColor} ${bgColor} transition-all cursor-pointer`}
+      data-issue-citation={citationAttr}
       onMouseEnter={() => {
         if (issue.citationNumbers?.length && onHighlightCitation) {
           onHighlightCitation(issue.citationNumbers[0]);
         }
       }}
       onMouseLeave={() => onHighlightCitation?.(null)}
+      onClick={() => {
+        if (issue.citationNumbers?.length && onIssueClick) {
+          onIssueClick(issue.citationNumbers);
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if ((e.key === 'Enter' || e.key === ' ') && issue.citationNumbers?.length && onIssueClick) {
+          e.preventDefault();
+          onIssueClick(issue.citationNumbers);
+        }
+      }}
     >
       <div className="p-3">
         <div className="flex items-start gap-2 mb-2">
@@ -470,6 +496,7 @@ function IssueCard({ issue, onAccept, onDismiss, onSelectFix, onHighlightCitatio
                       value={opt.id}
                       checked={issue.selectedFix === opt.id}
                       onChange={() => onSelectFix(issue.id, opt.id)}
+                      onClick={(e) => e.stopPropagation()}
                       className="text-blue-600 focus:ring-blue-500"
                     />
                     <span className="text-gray-700">{opt.label}</span>
@@ -481,7 +508,7 @@ function IssueCard({ issue, onAccept, onDismiss, onSelectFix, onHighlightCitatio
             <div className="flex gap-2 pt-1">
               <Button
                 size="sm"
-                onClick={() => onAccept(issue.id)}
+                onClick={(e) => { e.stopPropagation(); onAccept(issue.id); }}
                 disabled={!issue.selectedFix}
                 className="flex-1"
               >
@@ -491,7 +518,7 @@ function IssueCard({ issue, onAccept, onDismiss, onSelectFix, onHighlightCitatio
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => onDismiss(issue.id)}
+                onClick={(e) => { e.stopPropagation(); onDismiss(issue.id); }}
                 className="flex-1"
               >
                 <X className="h-3.5 w-3.5 mr-1" aria-hidden="true" />
