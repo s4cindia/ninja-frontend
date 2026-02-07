@@ -29,6 +29,7 @@ import { AcrEditor } from '@/components/acr/AcrEditor';
 import { ExportDialog } from '@/components/acr/ExportDialog';
 import { VersionHistory } from '@/components/acr/VersionHistory';
 import { useEditions } from '@/hooks/useAcr';
+import { useConfidenceWithIssues } from '@/hooks/useConfidence';
 import type { AcrEdition, AcrEditionCode } from '@/types/acr.types';
 
 interface WorkflowStep {
@@ -279,6 +280,20 @@ export function AcrWorkflowPage() {
   
   // Fetch available editions to match pre-filled edition code
   const { data: editions } = useEditions();
+
+  // Fetch confidence analysis data (for when page is refreshed on step 4)
+  const { data: confidenceData } = useConfidenceWithIssues(
+    state.jobId || '',
+    'VPAT2.5-INT',  // Default edition
+    { enabled: !!state.jobId && state.currentStep === 4 && analysisResults.length === 0 }
+  );
+
+  // Populate analysisResults from confidence API if empty (e.g., after refresh)
+  useEffect(() => {
+    if (confidenceData?.criteria && analysisResults.length === 0 && state.currentStep === 4) {
+      setAnalysisResults(confidenceData.criteria);
+    }
+  }, [confidenceData, analysisResults.length, state.currentStep]);
 
   // Reset preFilledValuesApplied when query params or job ID change
   useEffect(() => {
@@ -1085,8 +1100,8 @@ export function AcrWorkflowPage() {
                 Verify flagged criteria that require human review.
               </p>
             </div>
-            <VerificationQueue 
-              jobId={state.jobId || 'demo'} 
+            <VerificationQueue
+              jobId={state.jobId || 'demo'}
               onComplete={handleVerificationComplete}
               savedVerifications={state.verifications}
               onVerificationUpdate={handleVerificationUpdate}
@@ -1094,7 +1109,20 @@ export function AcrWorkflowPage() {
             />
             {state.verificationComplete && (
               <Alert variant="success">
-                All verification tasks completed. You can proceed to review.
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5" />
+                    <span>All verification tasks completed. You can proceed to review.</span>
+                  </div>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => navigate(`/acr/report/review/${state.jobId}`)}
+                  >
+                    <Edit3 className="h-4 w-4 mr-2" />
+                    Proceed to Review & Edit
+                  </Button>
+                </div>
               </Alert>
             )}
           </div>

@@ -10,6 +10,7 @@ import { RemediationStepper, RemediationStep } from './RemediationStepper';
 import { RemediationSummary } from './RemediationSummary';
 import { ComparisonSummaryCard } from './ComparisonSummaryCard';
 import { api } from '@/services/api';
+import type { IssueWithNewFlag, AuditCoverage } from '@/types/remediation.types';
 
 const downloadBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
@@ -55,6 +56,9 @@ interface ComparisonData {
   remainingIssues: number;
   fixedIssues: number;
   improvementScore: number;
+  newIssues?: number;
+  auditCoverage?: AuditCoverage;
+  remainingIssuesList?: IssueWithNewFlag[];
 }
 
 const generateDemoAudit = (): AuditData => ({
@@ -77,6 +81,18 @@ const generateDemoComparison = (): ComparisonData => ({
   remainingIssues: 8,
   fixedIssues: 37,
   improvementScore: 89,
+  newIssues: 0,
+  auditCoverage: {
+    totalFiles: 24,
+    filesScanned: 24,
+    percentage: 100,
+    fileCategories: {
+      frontMatter: 3,
+      chapters: 18,
+      backMatter: 3,
+    },
+  },
+  remainingIssuesList: [],
 });
 
 const mapAuditData = (data: Record<string, unknown>): AuditData => ({
@@ -94,12 +110,29 @@ const mapPlanData = (data: Record<string, unknown>): PlanData => ({
   estimatedTime: String(data.estimatedTime ?? data.estimated_time ?? data.eta ?? '~15 mins'),
 });
 
-const mapComparisonData = (data: Record<string, unknown>): ComparisonData => ({
-  originalIssues: Number(data.originalIssues ?? data.original_issues ?? data.originalCount ?? data.original_count ?? data.beforeCount ?? data.before_count ?? 0),
-  remainingIssues: Number(data.remainingIssues ?? data.remaining_issues ?? data.remainingCount ?? data.remaining_count ?? data.afterCount ?? data.after_count ?? 0),
-  fixedIssues: Number(data.fixedIssues ?? data.fixed_issues ?? data.fixedCount ?? data.fixed_count ?? data.resolvedCount ?? data.resolved_count ?? 0),
-  improvementScore: Number(data.improvementScore ?? data.improvement_score ?? data.improvement ?? data.score ?? 0),
-});
+const mapComparisonData = (data: Record<string, unknown>): ComparisonData => {
+  const auditCoverageRaw = data.auditCoverage ?? data.audit_coverage;
+  const auditCoverage = auditCoverageRaw && typeof auditCoverageRaw === 'object' ? (auditCoverageRaw as Record<string, unknown>) : null;
+
+  return {
+    originalIssues: Number(data.originalIssues ?? data.original_issues ?? data.originalCount ?? data.original_count ?? data.beforeCount ?? data.before_count ?? 0),
+    remainingIssues: Number(data.remainingIssues ?? data.remaining_issues ?? data.remainingCount ?? data.remaining_count ?? data.afterCount ?? data.after_count ?? 0),
+    fixedIssues: Number(data.fixedIssues ?? data.fixed_issues ?? data.fixedCount ?? data.fixed_count ?? data.resolvedCount ?? data.resolved_count ?? 0),
+    improvementScore: Number(data.improvementScore ?? data.improvement_score ?? data.improvement ?? data.score ?? 0),
+    newIssues: data.newIssues !== undefined ? Number(data.newIssues) : (data.new_issues !== undefined ? Number(data.new_issues) : undefined),
+    auditCoverage: auditCoverage ? {
+      totalFiles: Number(auditCoverage.totalFiles ?? auditCoverage.total_files ?? 0),
+      filesScanned: Number(auditCoverage.filesScanned ?? auditCoverage.files_scanned ?? 0),
+      percentage: Number(auditCoverage.percentage ?? 0),
+      fileCategories: {
+        frontMatter: Number((auditCoverage.fileCategories as Record<string, unknown> ?? auditCoverage.file_categories as Record<string, unknown>)?.frontMatter ?? (auditCoverage.fileCategories as Record<string, unknown> ?? auditCoverage.file_categories as Record<string, unknown>)?.front_matter ?? 0),
+        chapters: Number((auditCoverage.fileCategories as Record<string, unknown> ?? auditCoverage.file_categories as Record<string, unknown>)?.chapters ?? 0),
+        backMatter: Number((auditCoverage.fileCategories as Record<string, unknown> ?? auditCoverage.file_categories as Record<string, unknown>)?.backMatter ?? (auditCoverage.fileCategories as Record<string, unknown> ?? auditCoverage.file_categories as Record<string, unknown>)?.back_matter ?? 0),
+      },
+    } : undefined,
+    remainingIssuesList: Array.isArray(data.remainingIssuesList ?? data.remaining_issues_list) ? (data.remainingIssuesList ?? data.remaining_issues_list) as IssueWithNewFlag[] : undefined,
+  };
+};
 
 export const RemediationWorkflow: React.FC<RemediationWorkflowProps> = ({
   contentType,
@@ -394,8 +427,15 @@ export const RemediationWorkflow: React.FC<RemediationWorkflowProps> = ({
                   originalIssueCount={comparisonData.originalIssues}
                   fixedIssueCount={comparisonData.fixedIssues}
                   remainingIssues={comparisonData.remainingIssues}
-                  timeTaken="12 mins"
+                  newIssues={comparisonData.newIssues}
+                  auditCoverage={comparisonData.auditCoverage}
+                  remainingIssuesList={comparisonData.remainingIssuesList}
                   jobId={jobId}
+                  onRunRemediationAgain={() => {
+                    // Reset to remediate step to run again
+                    setCurrentStep('remediate');
+                    handleStartRemediation();
+                  }}
                 />
                 <ComparisonSummaryCard
                   totalFiles={24}

@@ -25,8 +25,6 @@ export const TransferToAcrButton: React.FC<TransferToAcrButtonProps> = ({
   const navigate = useNavigate();
 
   const handleTransfer = async () => {
-    if (pendingCount === 0) return;
-
     setIsTransferring(true);
     setError(null);
 
@@ -64,10 +62,6 @@ export const TransferToAcrButton: React.FC<TransferToAcrButtonProps> = ({
     }
   };
 
-  if (pendingCount === 0) {
-    return null;
-  }
-
   if (transferred) {
     return (
       <Card className="border-green-200 bg-green-50">
@@ -75,9 +69,15 @@ export const TransferToAcrButton: React.FC<TransferToAcrButtonProps> = ({
           <div className="flex items-center gap-3 text-green-700">
             <FileCheck className="h-6 w-6 flex-shrink-0" />
             <div className="flex-1">
-              <p className="font-medium">{pendingCount} tasks transferred to ACR Workflow</p>
+              <p className="font-medium">
+                {pendingCount > 0
+                  ? `${pendingCount} tasks transferred to ACR Workflow`
+                  : 'Remediation results transferred to ACR Workflow'}
+              </p>
               <p className="text-sm text-green-600">
-                Document these manual fixes in your Accessibility Conformance Report
+                {pendingCount > 0
+                  ? 'Document these manual fixes in your Accessibility Conformance Report'
+                  : 'Document the remediation outcomes in your Accessibility Conformance Report'}
               </p>
             </div>
           </div>
@@ -106,10 +106,14 @@ export const TransferToAcrButton: React.FC<TransferToAcrButtonProps> = ({
         <ArrowRight className="h-5 w-5 mr-2" />
         {isTransferring
           ? 'Transferring...'
-          : `Send ${pendingCount} Pending Tasks to ACR Workflow`}
+          : pendingCount > 0
+            ? `Send ${pendingCount} Pending Tasks to ACR Workflow`
+            : 'Send Remediation Results to ACR Workflow'}
       </Button>
       <p className="text-xs text-gray-500 text-center">
-        Transfer unresolved issues to the ACR workflow for documentation and reporting
+        {pendingCount > 0
+          ? 'Transfer unresolved issues to the ACR workflow for documentation and reporting'
+          : 'Document the successful remediation in your Accessibility Conformance Report'}
       </p>
       
       {error && (

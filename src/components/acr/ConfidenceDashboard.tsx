@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { AlertCircle, AlertTriangle, CheckCircle, LayoutGrid, Table, HelpCircle, ChevronDown, BookOpen } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle, LayoutGrid, Table, HelpCircle, ChevronDown, BookOpen, Circle, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
@@ -7,6 +7,8 @@ import { fetchAcrAnalysis, CriterionConfidence } from '@/services/api';
 import { CriteriaTable, CriterionRow } from './CriteriaTable';
 import { WcagDocumentationModal } from './WcagDocumentationModal';
 import { CriterionDetailsModal } from './CriterionDetailsModal';
+import { ExpandableSection } from './ExpandableSection';
+import { ConfidenceBadge } from './ConfidenceBadge';
 import { useConfidenceWithIssues } from '@/hooks/useConfidence';
 import { IssueMapping, RemediatedIssue, OtherIssuesData } from '@/types/confidence.types';
 import { confidenceService } from '@/services/confidence.service';
@@ -311,7 +313,8 @@ function isDemoJob(jobId: string): boolean {
 function isValidWcagId(value: unknown): value is string {
   if (typeof value !== 'string') return false;
   if (value === '' || value.includes('earl:') || value.includes('@type')) return false;
-  return /^\d+\.\d+(\.\d+)?$/.test(value);
+  // Match WCAG IDs (e.g., "1.1.1", "2.4.1") or EN IDs (e.g., "EN-5.2", "EN-7.3")
+  return /^\d+\.\d+(\.\d+)?$/.test(value) || /^EN-\d+\.\d+$/.test(value);
 }
 
 function extractNestedId(obj: Record<string, unknown>): string | null {
@@ -361,7 +364,7 @@ interface NormalizedCriterion extends CriterionConfidence {
 function normalizeCriterion(c: Partial<CriterionConfidence>, index: number): NormalizedCriterion {
   const criterionId = extractCriterionId(c, index);
   const rawData = c as Record<string, unknown>;
-  
+
   let evidence: BackendEvidence | undefined;
   if (rawData.evidence && typeof rawData.evidence === 'object') {
     const e = rawData.evidence as BackendEvidence;
@@ -373,11 +376,14 @@ function normalizeCriterion(c: Partial<CriterionConfidence>, index: number): Nor
       auditIssues: Array.isArray(e.auditIssues) ? e.auditIssues : undefined,
     };
   }
-  
+
   const rawConfidence = c.confidence ?? c.confidenceScore;
   const confidenceScore = typeof rawConfidence === 'number' && !isNaN(rawConfidence) ? rawConfidence : 0;
-  
+
+  // CRITICAL: Spread all fields from backend first to preserve new fields like
+  // requiresManualVerification, automationCapability, isNotApplicable, fixedIssues, etc.
   return {
+    ...c,  // Preserve all backend fields (requiresManualVerification, automationCapability, etc.)
     id: c.id || `criterion-${index}`,
     criterionId,
     name: c.name || 'Unknown Criterion',
@@ -648,8 +654,8 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     }>();
     let remediatedCount = 0;
 
-    // Build map from criteria (which comes from ACR analysis, not confidence endpoint)
-    // ACR analysis has accurate fixedCount from proper WCAG mapping
+    // Build map from criteria (now prioritizes confidence endpoint with accurate scores)
+    // Confidence API provides correct confidence scores and fixed issue tracking
     if (criteria.length > 0) {
       for (const c of criteria) {
         const fixedCount = c.fixedCount ?? 0;
@@ -715,7 +721,10 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     Promise.all([acrPromise, confidencePromise])
       .then(([acrResponse, confidenceResponse]) => {
         if (!cancelled) {
-          const normalizedCriteria = (acrResponse.criteria || []).map((c, i) => normalizeCriterion(c, i));
+          // Use confidence API data if available (new system with accurate scores)
+          // Fall back to ACR analysis if confidence service failed (backward compatibility)
+          const sourceData = confidenceResponse?.criteria || acrResponse.criteria || [];
+          const normalizedCriteria = sourceData.map((c, i) => normalizeCriterion(c, i));
           setCriteria(normalizedCriteria);
           
           if (confidenceResponse?.otherIssues) {
@@ -772,6 +781,41 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     const transformed = criteria.map(transformToCriterionAnalysis);
     const tableRows = transformed.map(convertToTableRow);
     return { transformed, tableRows };
+  }, [criteria]);
+
+  // New hierarchical categorization for visual hierarchy
+  const categorizedCriteria = useMemo(() => {
+    const passed: CriterionConfidence[] = [];
+    const needsReview: {
+      high: CriterionConfidence[];
+      medium: CriterionConfidence[];
+      low: CriterionConfidence[];
+    } = { high: [], medium: [], low: [] };
+    const notApplicable: CriterionConfidence[] = [];
+    const manualRequired: CriterionConfidence[] = [];
+
+    criteria.forEach(c => {
+      // N/A takes precedence
+      if (c.isNotApplicable) {
+        notApplicable.push(c);
+      }
+      // Manual review required (0% automation capability)
+      else if (c.requiresManualVerification || c.automationCapability === 0) {
+        manualRequired.push(c);
+      }
+      // Passed with 100% confidence
+      else if (c.status === 'pass' && c.confidenceScore === 1) {
+        passed.push(c);
+      }
+      // Needs Review - categorize by confidence level
+      else {
+        if (c.confidenceScore >= 0.9) needsReview.high.push(c);
+        else if (c.confidenceScore >= 0.7) needsReview.medium.push(c);
+        else needsReview.low.push(c);
+      }
+    });
+
+    return { passed, needsReview, notApplicable, manualRequired };
   }, [criteria]);
 
   if (isLoading) {
@@ -857,19 +901,30 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
     }
   });
 
-  // Calculate overall confidence - boost score for remediated criteria if backend hasn't updated
-  const overallConfidence = criteria.length > 0
-    ? Math.round(criteria.reduce((sum, c) => {
-        // If this criterion has remediated issues but still shows 0 confidence,
-        // give it a minimum boost since remediation occurred
-        const issueInfo = issuesByCriterion.get(c.criterionId);
-        if (issueInfo?.remediatedCount && issueInfo.remediatedCount > 0 && c.confidenceScore === 0) {
-          const hasRemainingIssues = issueInfo.count > 0;
-          return sum + (hasRemainingIssues ? CONFIDENCE_BOOST_PARTIAL : CONFIDENCE_BOOST_COMPLETE);
-        }
-        return sum + c.confidenceScore;
-      }, 0) / criteria.length)
-    : 0;
+  // Calculate overall confidence - prefer API summary, fallback to calculation
+  const overallConfidence = (() => {
+    // First, try to use the API's averageConfidence (already calculated correctly)
+    if (confidenceData?.summary?.averageConfidence != null) {
+      return Math.round(confidenceData.summary.averageConfidence * 100);
+    }
+
+    // Fallback: calculate from criteria (for backward compatibility)
+    if (criteria.length === 0) return 0;
+
+    const avgConfidence = criteria.reduce((sum, c) => {
+      // If this criterion has remediated issues but still shows 0 confidence,
+      // give it a minimum boost since remediation occurred
+      const issueInfo = issuesByCriterion.get(c.criterionId);
+      if (issueInfo?.remediatedCount && issueInfo.remediatedCount > 0 && c.confidenceScore === 0) {
+        const hasRemainingIssues = issueInfo.count > 0;
+        return sum + (hasRemainingIssues ? CONFIDENCE_BOOST_PARTIAL : CONFIDENCE_BOOST_COMPLETE);
+      }
+      return sum + c.confidenceScore;
+    }, 0) / criteria.length;
+
+    // Convert from 0-1 scale to percentage
+    return Math.round(avgConfidence * 100);
+  })();
 
   // Count criteria needing verification - exclude fully remediated criteria
   const needsVerificationCount = criteria.filter(c => {
@@ -988,7 +1043,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
             )}
           </span>
           <span className="flex items-center gap-3">
-            <span className="text-sm text-gray-500">{criterion.confidenceScore}%</span>
+            <span className="text-sm text-gray-500">{Math.round(criterion.confidenceScore * 100)}%</span>
             <ChevronDown className={cn('h-4 w-4 text-gray-400 transition-transform', isExpanded && 'rotate-180')} />
           </span>
         </button>
@@ -1232,136 +1287,194 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
           showFilters={true}
         />
       ) : (
-        /* Status-Based Grouped Criteria */
-        <div className="bg-white rounded-lg border overflow-hidden">
-          <div className="px-4 py-3 border-b bg-gray-50">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div>
-                <p className="text-sm text-gray-500">Grouped by status with confidence levels</p>
-              </div>
-              <div className="flex items-center gap-4 text-xs text-gray-500">
-                <span className="flex items-center gap-1">
-                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium">A</span>
-                  Basic
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium">AA</span>
-                  Standard
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded font-medium">AAA</span>
-                  Enhanced
-                </span>
-              </div>
-            </div>
-          </div>
+        /* New Hierarchical Visual Structure */
+        <div className="space-y-4">
+          {/* Priority: Manual Review Required */}
+          {categorizedCriteria.manualRequired.length > 0 && (
+            <ExpandableSection
+              title="Manual Review Required"
+              icon={<Circle className="h-5 w-5 text-gray-600" />}
+              count={categorizedCriteria.manualRequired.length}
+              defaultExpanded={true}
+              headerColor="bg-gray-50 border-gray-300"
+              alert={{
+                type: 'warning',
+                message: '⚠️ CRITICAL: These criteria require mandatory human verification. Automated testing cannot assess quality, meaningfulness, or user experience.'
+              }}
+            >
+              {categorizedCriteria.manualRequired.map(criterion => {
+                const issueData = issuesByCriterion.get(criterion.criterionId);
+                return (
+                  <CriterionRowDisplay
+                    key={criterion.id}
+                    criterion={criterion}
+                    isExpanded={expandedRows.has(criterion.id)}
+                    onToggle={() => toggleRow(criterion.id)}
+                    onVerifyClick={onVerifyClick}
+                    onViewDocs={(id, name) => setDocsCriterion({ id, name })}
+                    onCriterionClick={(crit) => setDetailsCriterion(crit)}
+                    issueData={issueData}
+                  />
+                );
+              })}
+            </ExpandableSection>
+          )}
 
-          <div className="divide-y">
-            {statusOrder.map((statusGroup) => {
-              const statusCount = statusCounts[statusGroup];
-              if (statusCount === 0) return null;
+          {/* Needs Review - Hierarchical */}
+          {(categorizedCriteria.needsReview.high.length > 0 ||
+            categorizedCriteria.needsReview.medium.length > 0 ||
+            categorizedCriteria.needsReview.low.length > 0) && (
+            <ExpandableSection
+              title="Needs Review"
+              icon={<AlertTriangle className="h-5 w-5 text-orange-600" />}
+              count={Object.values(categorizedCriteria.needsReview).flat().length}
+              defaultExpanded={true}
+              headerColor="bg-orange-50 border-orange-300"
+            >
+              {/* Nested: High Confidence */}
+              {categorizedCriteria.needsReview.high.length > 0 && (
+                <ExpandableSection
+                  title="High Confidence"
+                  icon={<div className="w-3 h-3 rounded-full bg-green-500" />}
+                  count={categorizedCriteria.needsReview.high.length}
+                  badge="90-98%"
+                  defaultExpanded={false}
+                  nested={true}
+                >
+                  {categorizedCriteria.needsReview.high.map(criterion => {
+                    const issueData = issuesByCriterion.get(criterion.criterionId);
+                    return (
+                      <CriterionRowDisplay
+                        key={criterion.id}
+                        criterion={criterion}
+                        isExpanded={expandedRows.has(criterion.id)}
+                        onToggle={() => toggleRow(criterion.id)}
+                        onVerifyClick={onVerifyClick}
+                        onViewDocs={(id, name) => setDocsCriterion({ id, name })}
+                        onCriterionClick={(crit) => setDetailsCriterion(crit)}
+                        issueData={issueData}
+                      />
+                    );
+                  })}
+                </ExpandableSection>
+              )}
 
-              const statusConfig = STATUS_CONFIG[statusGroup];
-              const isStatusExpanded = expandedStatusSections.has(statusGroup);
-              const StatusIcon = statusConfig.icon;
+              {/* Nested: Medium Confidence */}
+              {categorizedCriteria.needsReview.medium.length > 0 && (
+                <ExpandableSection
+                  title="Medium Confidence"
+                  icon={<div className="w-3 h-3 rounded-full bg-yellow-500" />}
+                  count={categorizedCriteria.needsReview.medium.length}
+                  badge="70-89%"
+                  defaultExpanded={true}
+                  nested={true}
+                >
+                  {categorizedCriteria.needsReview.medium.map(criterion => {
+                    const issueData = issuesByCriterion.get(criterion.criterionId);
+                    return (
+                      <CriterionRowDisplay
+                        key={criterion.id}
+                        criterion={criterion}
+                        isExpanded={expandedRows.has(criterion.id)}
+                        onToggle={() => toggleRow(criterion.id)}
+                        onVerifyClick={onVerifyClick}
+                        onViewDocs={(id, name) => setDocsCriterion({ id, name })}
+                        onCriterionClick={(crit) => setDetailsCriterion(crit)}
+                        issueData={issueData}
+                      />
+                    );
+                  })}
+                </ExpandableSection>
+              )}
 
-              return (
-                <div key={statusGroup}>
-                  {/* Status Group Header */}
-                  <button
-                    type="button"
-                    onClick={() => toggleStatusSection(statusGroup)}
-                    className={cn(
-                      'w-full flex items-center justify-between px-4 py-3 transition-colors',
-                      statusConfig.bgColor,
-                      'hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500'
-                    )}
-                  >
-                    <span className="flex items-center gap-3">
-                      <StatusIcon className={cn('h-5 w-5', statusConfig.textColor)} />
-                      <span className={cn('font-semibold', statusConfig.textColor)}>
-                        {statusConfig.label}
-                      </span>
-                      <span className="text-sm text-gray-500">
-                        ({statusCount} {statusCount === 1 ? 'criterion' : 'criteria'})
-                      </span>
-                    </span>
-                    <ChevronDown
-                      className={cn(
-                        'h-5 w-5 text-gray-500 transition-transform duration-200',
-                        isStatusExpanded && 'rotate-180'
-                      )}
-                    />
-                  </button>
+              {/* Nested: Low Confidence */}
+              {categorizedCriteria.needsReview.low.length > 0 && (
+                <ExpandableSection
+                  title="Low Confidence"
+                  icon={<div className="w-3 h-3 rounded-full bg-orange-500" />}
+                  count={categorizedCriteria.needsReview.low.length}
+                  badge="50-69%"
+                  defaultExpanded={true}
+                  nested={true}
+                >
+                  {categorizedCriteria.needsReview.low.map(criterion => {
+                    const issueData = issuesByCriterion.get(criterion.criterionId);
+                    return (
+                      <CriterionRowDisplay
+                        key={criterion.id}
+                        criterion={criterion}
+                        isExpanded={expandedRows.has(criterion.id)}
+                        onToggle={() => toggleRow(criterion.id)}
+                        onVerifyClick={onVerifyClick}
+                        onViewDocs={(id, name) => setDocsCriterion({ id, name })}
+                        onCriterionClick={(crit) => setDetailsCriterion(crit)}
+                        issueData={issueData}
+                      />
+                    );
+                  })}
+                </ExpandableSection>
+              )}
+            </ExpandableSection>
+          )}
 
-                  {/* Confidence Sub-sections within Status Group */}
-                  {isStatusExpanded && (
-                    <div className={cn('border-l-4', statusConfig.borderColor)}>
-                      {confidenceOrder.map((confidenceGroup) => {
-                        const items = hybridGroupedCriteria[statusGroup][confidenceGroup];
-                        if (items.length === 0) return null;
+          {/* Passed */}
+          {categorizedCriteria.passed.length > 0 && (
+            <ExpandableSection
+              title="Passed"
+              icon={<CheckCircle className="h-5 w-5 text-green-600" />}
+              count={categorizedCriteria.passed.length}
+              badge="100%"
+              defaultExpanded={false}
+              headerColor="bg-green-50 border-green-300"
+            >
+              {categorizedCriteria.passed.map(criterion => {
+                const issueData = issuesByCriterion.get(criterion.criterionId);
+                return (
+                  <CriterionRowDisplay
+                    key={criterion.id}
+                    criterion={criterion}
+                    isExpanded={expandedRows.has(criterion.id)}
+                    onToggle={() => toggleRow(criterion.id)}
+                    onVerifyClick={onVerifyClick}
+                    onViewDocs={(id, name) => setDocsCriterion({ id, name })}
+                    onCriterionClick={(crit) => setDetailsCriterion(crit)}
+                    issueData={issueData}
+                  />
+                );
+              })}
+            </ExpandableSection>
+          )}
 
-                        const confidenceConfig = SECTION_CONFIG[confidenceGroup];
-                        const sectionKey = `${statusGroup}-${confidenceGroup}`;
-                        const isConfidenceExpanded = expandedConfidenceSections.has(sectionKey);
-
-                        return (
-                          <div key={confidenceGroup}>
-                            {/* Confidence Sub-header */}
-                            <button
-                              type="button"
-                              onClick={() => toggleConfidenceSection(sectionKey)}
-                              className={cn(
-                                'w-full flex items-center justify-between px-6 py-2.5 transition-colors',
-                                confidenceConfig.bgColor,
-                                'hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500',
-                                'border-b border-gray-100'
-                              )}
-                            >
-                              <span className="flex items-center gap-2.5">
-                                <span className={cn('w-2.5 h-2.5 rounded-full', confidenceConfig.dotColor)} />
-                                <span className="text-sm font-medium text-gray-700">{confidenceConfig.label}</span>
-                                <span className="text-xs text-gray-500">
-                                  ({items.length} {items.length === 1 ? 'item' : 'items'})
-                                </span>
-                              </span>
-                              <ChevronDown
-                                className={cn(
-                                  'h-4 w-4 text-gray-400 transition-transform duration-200',
-                                  isConfidenceExpanded && 'rotate-180'
-                                )}
-                              />
-                            </button>
-
-                            {/* Criteria Rows */}
-                            {isConfidenceExpanded && (
-                              <div>
-                                {items.map((criterion) => {
-                                  const issueData = issuesByCriterion.get(criterion.criterionId);
-                                  return (
-                                  <CriterionRowDisplay
-                                    key={criterion.id}
-                                    criterion={criterion}
-                                    isExpanded={expandedRows.has(criterion.id)}
-                                    onToggle={() => toggleRow(criterion.id)}
-                                    onVerifyClick={onVerifyClick}
-                                    onViewDocs={(id, name) => setDocsCriterion({ id, name })}
-                                    onCriterionClick={(crit) => setDetailsCriterion(crit)}
-                                    issueData={issueData}
-                                  />
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          {/* Not Applicable */}
+          {categorizedCriteria.notApplicable.length > 0 && (
+            <ExpandableSection
+              title="Not Applicable"
+              icon={<Info className="h-5 w-5 text-blue-600" />}
+              count={categorizedCriteria.notApplicable.length}
+              defaultExpanded={false}
+              headerColor="bg-blue-50 border-blue-300"
+              alert={{
+                type: 'info',
+                message: 'These criteria do not apply to your content and are excluded from conformance calculations.'
+              }}
+            >
+              {categorizedCriteria.notApplicable.map(criterion => {
+                const issueData = issuesByCriterion.get(criterion.criterionId);
+                return (
+                  <CriterionRowDisplay
+                    key={criterion.id}
+                    criterion={criterion}
+                    isExpanded={expandedRows.has(criterion.id)}
+                    onToggle={() => toggleRow(criterion.id)}
+                    onVerifyClick={onVerifyClick}
+                    onViewDocs={(id, name) => setDocsCriterion({ id, name })}
+                    onCriterionClick={(crit) => setDetailsCriterion(crit)}
+                    issueData={issueData}
+                  />
+                );
+              })}
+            </ExpandableSection>
+          )}
         </div>
       )}
 

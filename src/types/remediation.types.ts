@@ -99,3 +99,28 @@ export interface RemediationConfigResponse {
   data: RemediationConfig;
   message?: string;
 }
+
+export interface AuditCoverage {
+  totalFiles: number;
+  filesScanned: number;
+  percentage: number;
+  fileCategories: {
+    frontMatter: number;
+    chapters: number;
+    backMatter: number;
+  };
+}
+
+export interface RemediationResultsData {
+  originalIssues: number;
+  fixedIssues: number;
+  newIssues: number;
+  remainingIssues: number;
+  auditCoverage: AuditCoverage;
+  remainingIssuesList?: AccessibilityIssue[];
+}
+
+// Extend AccessibilityIssue with new flag for re-audit issues
+export interface IssueWithNewFlag extends AccessibilityIssue {
+  isNew?: boolean;
+}

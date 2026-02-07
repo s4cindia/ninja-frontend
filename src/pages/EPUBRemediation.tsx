@@ -2104,7 +2104,7 @@ export const EPUBRemediation: React.FC = () => {
         onRefreshPlan={handleRefreshPlan}
       />
 
-      {pageState !== "running" && pendingManualCount > 0 && (
+      {pageState === "complete" && (
         <>
           <ReAuditSection
             jobId={jobId || "demo"}

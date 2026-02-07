@@ -53,6 +53,13 @@ export interface CriterionConfidenceWithIssues {
   remediatedCount?: number;
   fixedIssues?: RemediatedIssue[];
   fixedCount?: number;
+  // New fields from enhanced API response
+  requiresManualVerification?: boolean;
+  automationCapability?: number;
+  findings?: string[];
+  recommendation?: string;
+  isNotApplicable?: boolean;
+  naReason?: string;
 }
 
 export interface ConfidenceSummary {

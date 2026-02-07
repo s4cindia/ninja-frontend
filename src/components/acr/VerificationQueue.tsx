@@ -37,11 +37,13 @@ interface VerificationQueueProps {
 }
 
 function needsHumanVerification(c: CriterionConfidence): boolean {
+  // Explicit verification flags take precedence
   if (c.needsVerification === true) return true;
   if (c.needsVerification === false) return false;
-  if (c.status === 'not_applicable') return false;
-  if (c.confidenceScore < CONFIDENCE_THRESHOLD_HIGH) return true;
-  return false;
+
+  // Include all criteria (N/A, low confidence, and high confidence) for human review
+  // This allows users to spot-check high-confidence results and verify N/A suggestions
+  return true;
 }
 
 function convertCriteriaToVerificationItems(
@@ -53,8 +55,9 @@ function convertCriteriaToVerificationItems(
   return filtered.map((c, index) => {
       const saved = savedVerifications?.[c.id];
       const score = typeof c.confidenceScore === 'number' ? c.confidenceScore : 0;
-      
-      const confidenceLevel: ConfidenceLevel = 
+      const scorePercentage = Math.round(score * 100); // Convert 0-1 scale to percentage
+
+      const confidenceLevel: ConfidenceLevel =
         score >= CONFIDENCE_THRESHOLDS.HIGH ? 'high' :
         score >= CONFIDENCE_THRESHOLDS.MEDIUM ? 'medium' :
         score > CONFIDENCE_THRESHOLDS.LOW ? 'low' : 'manual';
@@ -102,7 +105,10 @@ function convertCriteriaToVerificationItems(
       const remainingCount = c.remainingCount ?? issues?.length ?? 0;
       const fixedCount = c.fixedCount ?? fixedIssues?.length ?? 0;
       const totalIssueCount = remainingCount + fixedCount;
-      
+
+      // Use N/A suggestion confidence if available, otherwise use ACR analysis confidence
+      const displayConfidence = c.naSuggestion?.confidence ?? scorePercentage;
+
       let automatedNotesWithIssues: string;
       if (totalIssueCount > 0) {
         const parts: string[] = [];
@@ -114,7 +120,7 @@ function convertCriteriaToVerificationItems(
         }
         automatedNotesWithIssues = parts.join(', ') + '. ' + (c.remarks || '');
       } else {
-        automatedNotesWithIssues = c.remarks || `Automated analysis flagged this criterion for human review. Confidence: ${score}%`;
+        automatedNotesWithIssues = c.remarks || `Automated analysis flagged this criterion for human review. Confidence: ${displayConfidence}%`;
       }
 
       const baseItem: VerificationItemType = {
@@ -124,7 +130,7 @@ function convertCriteriaToVerificationItems(
         wcagLevel: c.level || 'A',
         severity,
         confidenceLevel,
-        confidenceScore: score,
+        confidenceScore: displayConfidence,
         automatedResult,
         automatedNotes: automatedNotesWithIssues,
         status: 'pending',
@@ -572,7 +578,7 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
             )}
             <p className="text-xs text-gray-500">Job ID: {jobId}</p>
           </div>
-          {useMockData && (
+          {useMockData && !useLocalItems && (
             <span className="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded">Demo Mode</span>
           )}
         </div>
