@@ -1,477 +1,109 @@
-File: src/components/epub/ReAuditSection.tsx
-Line: 83 to 93
-Type: potential_issue
-
-Comment:
-Add fallback for originalIssues and verify field mapping semantics.
-
-1. originalIssues lacks a fallback value. If the backend omits this field, the UI will display undefined at line 194.
-
-2. newIssuesFound is mapped from remainingIssuesList — verify this is semantically correct. "Remaining issues" typically means unresolved existing issues, whereas "new issues found" implies issues introduced by the fix.
-
-
-
-
-🛠️ Proposed fix for missing fallback
-
-          const mappedResult: ReauditResult = {
--           originalIssues: backendData.originalIssues,
-+           originalIssues: backendData.originalIssues ?? 0,
-            resolved: backendData.fixedIssues || 0,
-            stillPending: backendData.remainingIssues || 0,
-            newIssuesFound: backendData.remainingIssuesList || [],
-
-Prompt for AI Agent:
-In @src/components/epub/ReAuditSection.tsx around lines 83 - 93, The mappedResult construction in ReAuditSection.tsx should provide a safe default for originalIssues and correct the mapping for newIssuesFound: set originalIssues to backendData.originalIssues || 0 (so the UI doesn’t render undefined) and map newIssuesFound from the backend field that actually represents newly introduced issues (e.g., backendData.newIssuesList || backendData.introducedIssues || []); if that new-issues field doesn’t exist yet, fall back to backendData.remainingIssuesList with a clear TODO comment to confirm semantics. Update the ReauditResult mapping (the mappedResult object) accordingly and add a short comment by newIssuesFound to clarify which backend property is authoritative.
-
-
-
-============================================================================
-File: src/components/remediation/ComparisonView.tsx
-Line: 291 to 297
-Type: potential_issue
-
-Comment:
-Color logic assumes score always improves.
-
-The beforeScore is hardcoded as red and afterScore as green, but if scoreChange is negative (score decreased), this would be misleading. Consider making the colors conditional based on the actual improvement.
-
-
-🐛 Proposed fix for conditional coloring
-
-
--
-+
-                       {improvement.beforeScore}
-
-
--
-+                     0 ? 'text-green-600' : improvement.scoreChange
-                       {improvement.afterScore}
-
-Prompt for AI Agent:
-In @src/components/remediation/ComparisonView.tsx around lines 291 - 297, The colorized score display assumes improvement always increases; update the two spans that render improvement.beforeScore and improvement.afterScore (in ComparisonView.tsx) to choose classes conditionally based on the actual change (e.g., use improvement.scoreChange or compare improvement.afterScore vs improvement.beforeScore) so the "before" value is red when the score decreased and green when it increased, and the "after" value is green when increased and red when decreased; replace the hardcoded "text-red-600" and "text-green-600" with a conditional className expression (or helper) that yields the correct color for each span.
-
-
-
-============================================================================
-File: .claude/hooks/file-protection.sh
-Line: 14 to 15
-Type: potential_issue
-
-Comment:
-Add a check for jq dependency.
-
-The script relies on jq for JSON parsing but doesn't verify it's installed. If jq is missing, the script will fail silently or produce unexpected behavior.
-
-
-
-🛡️ Proposed fix
-
- INPUT=$(cat)
-+
-+# Check for jq dependency
-+if ! command -v jq &> /dev/null; then
-+  echo "Warning: jq is not installed, skipping file protection check" >&2
-+  exit 0
-+fi
-+
- FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
-
-Prompt for AI Agent:
-In @.claude/hooks/file-protection.sh around lines 14 - 15, The script uses jq to parse JSON into FILE_PATH (see INPUT and FILE_PATH variables) but doesn't verify jq is installed; add a pre-check at the top of .claude/hooks/file-protection.sh that tests for jq (e.g., via command -v jq or which jq) and if not found prints a clear error to stderr and exits non-zero so the script does not continue and produce wrong behavior; ensure the check runs before reading INPUT and computing FILE_PATH.
-
-
-
-============================================================================
-File: src/components/acr/VersionTimelineSidebar.tsx
-Line: 42
-Type: refactor_suggestion
-
-Comment:
-Remove unused queryClient.
-
-useQueryClient() is called but queryClient is never used in this component.
-
-
-
-🧹 Remove unused variable
-
--  const queryClient = useQueryClient();
-
-
-Also remove the import if not needed elsewhere:
--import { useQueryClient } from '@tanstack/react-query';
-
-Prompt for AI Agent:
-In @src/components/acr/VersionTimelineSidebar.tsx at line 42, Remove the unused query client: delete the line that calls useQueryClient() (const queryClient = useQueryClient();) from the VersionTimelineSidebar component and, if that was the only usage, also remove the corresponding useQueryClient import (e.g., from react-query/@tanstack/react-query) so there are no unused variables or imports remaining.
-
-
-
-============================================================================
-File: .claude/hooks/file-protection.sh
-Line: 23 to 33
-Type: potential_issue
-
-Comment:
-The .env pattern may be overly broad.
-
-The substring match for ".env" will block any file path containing .env anywhere, including legitimate files like config.environment.ts or src/env.d.ts. Consider using more precise patterns or anchoring the match.
-
-
-
-🛡️ Suggested refinement
-
- PROTECTED_PATTERNS=(
--  ".env"
--  ".env.local"
--  ".env.production"
--  ".env.development"
-+  "/.env"
-+  ".env.local"
-+  ".env.production"
-+  ".env.development"
-   "package-lock.json"
-   "yarn.lock"
-   "pnpm-lock.yaml"
-   ".git/"
-   ".github/workflows/"
- )
-
-
-Alternatively, consider using regex patterns with grep -E for more precise matching (e.g., (^|/)\.env($|\.)).
-
-Prompt for AI Agent:
-In @.claude/hooks/file-protection.sh around lines 23 - 33, The entry ".env" in the PROTECTED_PATTERNS array is too broad and will substring-match files like config.environment.ts; update the PROTECTED_PATTERNS handling to use anchored regex or a more precise pattern for the dot-env file (e.g., replace the simple ".env" token with a regex like '(^|/)\\.env($|/|$)' and update the matching code to use grep -E or bash =~ so only exact .env files or .env.* variants are matched; ensure other patterns in PROTECTED_PATTERNS remain unchanged and tests/conditions that call this array (the file-protection.sh matching logic) use the new regex-aware check.
-
-
-
-============================================================================
-File: vite.config.ts
-Line: 16 to 18
-Type: potential_issue
-
-Comment:
-Overly permissive CSP connect-src directive.
-
-Adding http: to connect-src allows connections to any HTTP endpoint, which is very broad even for a development server. Consider restricting to specific origins or using a more targeted approach if certain HTTP endpoints are needed.
-
-Prompt for AI Agent:
-In @vite.config.ts around lines 16 - 18, The CSP added in vite.config.ts sets the 'Content-Security-Policy' header with an overly broad connect-src that includes "http:", which allows connections to any HTTP origin; update the header value string (the value assigned where 'Content-Security-Policy' is set) to remove the broad "http:" token and instead list only the specific origins needed (e.g., explicit hostnames or localhost with port) or gate the inclusion via an environment/dev-only condition so connect-src is restricted to trusted endpoints.
-
-
-
-============================================================================
-File: src/components/ui/Tabs.tsx
-Line: 56 to 67
-Type: potential_issue
-
-Comment:
-TabsList should have role="tablist" for accessibility.
-
-The container for tab triggers should have role="tablist" to properly communicate the tab interface structure to assistive technologies.
-
-
-
-
-Suggested fix
-
- export const TabsList: React.FC = ({ children, className }) => {
-   return (
-
-       {children}
-
-   );
- };
-
-Prompt for AI Agent:
-In @src/components/ui/Tabs.tsx around lines 56 - 67, The TabsList component's container div is missing the accessibility role for tab containers; update the TabsList React component to add role="tablist" to the outer div (the one rendering children) so assistive technologies recognize it as a tablist, preserving existing classes and props (children, className) and leaving component name TabsList unchanged.
-
-
-
-============================================================================
-File: src/components/ui/Dialog.tsx
-Line: 24 to 35
-Type: potential_issue
-
-Comment:
-Missing critical accessibility attributes on dialog container.
-
-The dialog container lacks role="dialog" and aria-modal="true", which are essential for screen readers to announce the dialog correctly. Without these, assistive technologies won't recognize this as a modal dialog.
-
-
-
-
-Suggested fix
-
-   return (
--
-+
-       {/ Overlay /}
-        onOpenChange(false)}
-+        aria-hidden="true"
-       />
-       {/ Content /}
-       {children}
-
-   );
-
-Prompt for AI Agent:
-In @src/components/ui/Dialog.tsx around lines 24 - 35, The dialog container (the outer  returned by the Dialog component) is missing required accessibility attributes; add role="dialog" and aria-modal="true" to that container element and ensure it references a visible label if available (use aria-labelledby pointing to the dialog title id or aria-label) so screen readers announce the modal correctly; update the JSX in the Dialog component to include these attributes on the main container that currently has className="fixed inset-0 z-50 flex items-center justify-center".
-
-
-
-============================================================================
-File: src/components/ui/Tabs.tsx
-Line: 119 to 129
-Type: potential_issue
-
-Comment:
-TabsContent is missing role="tabpanel" for accessibility.
-
-Tab panels need role="tabpanel" and should be linked to their triggers via aria-labelledby for proper screen reader support.
-
-
-
-
-Suggested fix
-
-+  const panelId = tabpanel-${contentValue};
-+  const triggerId = tab-${contentValue};
-
-   return (
-
-       {children}
-
-   );
-
-Prompt for AI Agent:
-In @src/components/ui/Tabs.tsx around lines 119 - 129, TabsContent is missing role="tabpanel" and an aria linkage to its trigger; update the TabsContent component to add role="tabpanel" and set aria-labelledby to the matching trigger id (for example aria-labelledby={tab-${value}}), and ensure the corresponding TabsTrigger/Tab button uses id={tab-${value}} and the panel has an id like id={panel-${value}} so triggers and panels are mutually referenced (use the existing prop that identifies the tab, e.g., value or id, inside TabsContent and TabsTrigger to build these attributes).
-
-
-
-============================================================================
-File: src/components/acr/EditableCriteriaTable.tsx
-Line: 224 to 230
-Type: potential_issue
-
-Comment:
-History button is non-functional.
-
-The History button is rendered without an onClick handler. This may confuse users who expect it to work. Consider either implementing the functionality, disabling the button with a tooltip explaining it's coming soon, or removing it until ready.
-
-
-
-🔧 Proposed fix to disable with tooltip
-
-Prompt for AI Agent:
-In @src/components/acr/EditableCriteriaTable.tsx around lines 224 - 230, The History Button rendered in EditableCriteriaTable (the Button containing the History icon) is missing an onClick and should not be actionable; either implement a handler (e.g., openHistoryModal or navigateToHistory) or disable the button and surface a tooltip indicating "Coming soon." Locate the Button element in EditableCriteriaTable and: if implementing, wire its onClick to the appropriate handler (create/open a function like openHistoryModal that receives the row id or criteria and triggers the history view); otherwise set the Button prop disabled={true} and wrap it with a tooltip component (or use title) explaining "History coming soon" so users aren’t confused.
-
-
-
-============================================================================
-File: src/components/ui/Tabs.tsx
-Line: 83 to 100
-Type: potential_issue
-
-Comment:
-TabsTrigger is missing required ARIA attributes for tab semantics.
-
-For proper accessibility, tab triggers need role="tab", aria-selected, and aria-controls to connect to their panels. Without these, screen readers won't announce the component as a tab interface.
-
-
-
-
-Suggested fix
-
- export const TabsTrigger: React.FC = ({
-   value: triggerValue,
-   children,
-   className
- }) => {
-   const { value, onValueChange } = useTabsContext();
-   const isActive = value === triggerValue;
-+  const panelId = tabpanel-${triggerValue};
-
-   return (
-      onValueChange(triggerValue)}
-       className={cn(
-         // ... existing classes
-       )}
-     >
-       {children}
-
-   );
- };
-
-Prompt for AI Agent:
-In @src/components/ui/Tabs.tsx around lines 83 - 100, TabsTrigger is missing ARIA attributes; update the button rendered by TabsTrigger to include role="tab", aria-selected={isActive} and aria-controls that references its panel (e.g. aria-controls={tab-panel-${triggerValue}}) so screen readers treat it as a tab. Ensure the corresponding TabsContent/Panel uses the matching id (e.g. id={tab-panel-${value}}) so aria-controls links correctly; keep existing props (triggerValue, isActive, onValueChange, className) and only add these attributes to the button element in the TabsTrigger component.
-
-
-
-============================================================================
-File: src/pages/acr/AcrReportReviewPage.tsx
-Line: 331 to 332
-Type: potential_issue
-
-Comment:
-Add try-catch around localStorage JSON parsing.
-
-If localStorage.getItem('ninja-auth') returns malformed JSON, JSON.parse will throw and crash the restore flow.
-
-
-
-🛡️ Proposed fix
-
-   const handleRestore = async (versionId: string) => {
-     try {
-       // Get auth token
--      const authData = localStorage.getItem('ninja-auth');
--      const token = authData ? JSON.parse(authData).token : null;
-+      let token: string | null = null;
-+      try {
-+        const authData = localStorage.getItem('ninja-auth');
-+        token = authData ? JSON.parse(authData).token : null;
-+      } catch {
-+        console.error('Failed to parse auth data from localStorage');
-+      }
-
-Prompt for AI Agent:
-In @src/pages/acr/AcrReportReviewPage.tsx around lines 331 - 332, Wrap the JSON.parse call for localStorage in a try-catch to avoid crashing when malformed data is present: in AcrReportReviewPage where you read authData and compute token (variables authData and token), try to JSON.parse(authData) inside a try block and on failure set token to null (optionally clear the bad 'ninja-auth' entry or log the error) so the restore flow continues safely.
-
-
-
-============================================================================
-File: src/components/acr/NASuggestionBanner.tsx
-Line: 116
-Type: potential_issue
-
-Comment:
-Potential runtime error if detectionChecks is undefined.
-
-Line 116 accesses suggestion.detectionChecks.length without a null check. If detectionChecks is undefined or null, this will throw a TypeError.
-
-
-
-🛡️ Proposed defensive fix
-
-           >
-             {showDetails ? (
-
-             ) : (
-
-             )}
--            {showDetails ? 'Hide' : 'Show'} Detection Details ({suggestion.detectionChecks.length} checks)
-+            {showDetails ? 'Hide' : 'Show'} Detection Details ({suggestion.detectionChecks?.length ?? 0} checks)
-
-
-
-
-Also guard the mapping below:
-
-           {showDetails && (
-
--              {suggestion.detectionChecks.map((check, idx) => (
-+              {suggestion.detectionChecks?.map((check, idx) => (
-
-Prompt for AI Agent:
-In @src/components/acr/NASuggestionBanner.tsx at line 116, The code accesses suggestion.detectionChecks.length and maps over suggestion.detectionChecks without null checks; update the UI to defensively handle undefined/null by using a safe fallback (e.g., treat detectionChecks as an empty array) when computing the count and when rendering the list—reference the JSX that uses suggestion.detectionChecks.length and the subsequent mapping over suggestion.detectionChecks and replace those uses with a guarded form (optional chaining or fallback to an empty array) so the count shows 0 and the map is safe when detectionChecks is missing.
-
-
-
-============================================================================
-File: src/components/ui/Dialog.tsx
-Line: 10 to 35
-Type: potential_issue
-
-Comment:
-Implement focus management for accessibility compliance.
-
-The Dialog component lacks focus management controls required by WCAG 2.4.3:
-- Focus does not move into the dialog when opened
-- Users can tab outside the dialog while it's open
-- Focus is not restored to the trigger element on close
-
-Either re-implement focus trapping with a hook (e.g., managing focus state and keyboard event listeners) or document that consumers must handle focus management themselves. DialogProps could accept an initialFocus ref and onFocusExit callback to support this pattern.
-
-Prompt for AI Agent:
-In @src/components/ui/Dialog.tsx around lines 10 - 35, The Dialog component currently doesn't manage focus; update Dialog (and DialogProps) to support focus trapping and restoration by adding an optional initialFocus: React.RefObject prop and an optional onFocusExit: () => void callback, then when open becomes true move focus into initialFocus (or the first focusable element inside the dialog) and install keyboard/tab handlers to trap Tab/Shift+Tab inside the dialog; on close restore focus to the trigger by calling onFocusExit (or the previously focused element) and remove listeners and overflow changes in the cleanup of the useEffect in Dialog to fully restore state.
-
-
-
-============================================================================
-File: src/components/acr/EditableCriteriaTable.tsx
-Line: 37 to 45
-Type: potential_issue
-
-Comment:
-ID mismatch: handleEdit uses criterion.id but handleSave uses criterion.criterionId.
-
-The type AcrCriterionReview has both id and criterionId as separate fields. handleEdit (line 38) sets editing state with criterion.id, and the isEditing check (line 111) also uses criterion.id. However, handleSave is called with criterion.criterionId (line 209). If these properties differ, the save operation will target the wrong criterion, causing data corruption.
-
-Use a consistent identifier throughout—either always use criterion.criterionId for tracking and saving, or verify and document that id and criterionId are always equal.
-
-Prompt for AI Agent:
-In @src/components/acr/EditableCriteriaTable.tsx around lines 37 - 45, The edit/save ID mismatch occurs because handleEdit and isEditing use criterion.id while handleSave is called with criterion.criterionId; pick one canonical identifier (prefer criterion.criterionId) and make all places consistent: update handleEdit to setEditingId(criterion.criterionId) and any isEditing checks to compare against criterion.criterionId, and ensure handleSave and any state keys (editingId) consistently use criterion.criterionId; alternatively, if you prefer id, change handleSave to accept/use criterion.id—ensure AcrCriterionReview usage is uniform across handleEdit, isEditing, and handleSave.
-
-
-
-============================================================================
-File: src/components/acr/ReportMetadataSection.tsx
-Line: 12
-Type: potential_issue
-
-Comment:
-Unused summary prop.
-
-The summary prop is destructured but aliased to _summary and never used in the component. Either utilize this prop or remove it from the interface.
-
-
-
-🧹 Proposed fix
-
-If the prop is not needed:
--export function ReportMetadataSection({ acrJob, summary: _summary }: ReportMetadataSectionProps) {
-+export function ReportMetadataSection({ acrJob }: Omit) {
-
-
-And update the interface accordingly, or use the summary prop if it was intended for displaying report statistics.
-
-Prompt for AI Agent:
-In @src/components/acr/ReportMetadataSection.tsx at line 12, The ReportMetadataSection component currently destructures summary as _summary but never uses it; either remove summary from the ReportMetadataSectionProps and the parameter list in ReportMetadataSection, or reuse it by replacing _summary with summary and rendering the intended report statistics inside ReportMetadataSection; update the ReportMetadataSectionProps type to reflect the chosen approach (remove the prop if unused or keep it if used) and ensure all references to _summary are removed or replaced accordingly.
-
-
-
-============================================================================
-File: src/pages/acr/AcrReportReviewPage.tsx
-Line: 548 to 550
-Type: potential_issue
-
-Comment:
-Save button for executive summary has no onClick handler - changes won't be saved.
-
-The "Save" button in the executive summary editor (line 548) lacks an onClick handler. Clicking it will do nothing, leaving the user unable to persist their changes.
-
-
-
-🐛 Proposed fix
-
-
--
-+                 {
-+                  // TODO: Implement save via mutation
-+                  // e.g., updateReportMetadata({ executiveSummary: editedSummary })
-+                  setIsEditingExecutiveSummary(false);
-+                }}>
-
-                   Save
-
-
-
-
-You'll need to wire this up to an actual mutation (like useUpdateReportMetadata) to persist the changes to the backend.
-
-Prompt for AI Agent:
-In @src/pages/acr/AcrReportReviewPage.tsx around lines 548 - 550, The Save button in the executive summary editor currently lacks an onClick and therefore does not persist changes; wire it to the report metadata update mutation by using the existing useUpdateReportMetadata (or create it if missing) inside the AcrReportReviewPage component, add an onClick on the  that calls the mutation with the current executiveSummary state (or the state variable used for the editor), handle loading/error/success (disable the button while saving and show feedback), and ensure you import/use the mutation hook where the Save icon  and Button are rendered so clicking Save actually triggers the API update.
-
-
+In `@src/components/acr/ConfidenceCalculationModal.tsx`:
+- Around line 33-41: The N/A detection in ConfidenceCalculationModal is too
+narrow: update the isNA check (used where c, score,
+acc.notApplicable/acc.applicable are referenced) to also treat items with
+c.status === 'not_applicable' or c.isNotApplicable === true as N/A in addition
+to the existing 'naSuggestion' check so that CriterionConfidenceWithIssues
+entries without naSuggestion are correctly counted as notApplicable rather than
+applicable.
+
+In `@src/components/acr/EditableCriteriaTable.tsx`:
+- Around line 199-231: The icon-only Buttons (the ones rendering X, Check,
+Edit2, History) lack accessible names; update each Button in this block to
+include an appropriate aria-label (or aria-labelledby) describing the action and
+context — e.g., for the save button used in handleSave(criterion.criterionId)
+use aria-label="Save criterion" (or include the criterion name/id), for the
+cancel button use aria-label="Cancel edit", for the edit button used in
+handleEdit(criterion) use aria-label="Edit criterion" (append
+criterion.criterionId or name for uniqueness), and for the history button use
+aria-label="View history" (or "History for criterion"). Ensure these labels are
+set on the Button elements (the same components rendering <X />, <Check />,
+<Edit2 />, <History />) so screen readers announce their purpose.
+
+In `@src/components/acr/NACriteriaSection.tsx`:
+- Around line 25-33: The local DetectionCheck type in NACriteriaSection is
+incorrect (it only has description and result limited to 'pass'|'fail'), causing
+dropped text and mislabelled 'warning' states; replace it with the shared check
+type used across the app (the type that includes fields like check, details (or
+description), and result: 'pass'|'fail'|'warning'), import that shared type into
+NACriteriaSection, update any local references (e.g., the naCriteria prop usage
+and any state or map operations inside NACriteriaSection and the block around
+the other occurrence at ~lines 315-329) to use the shared type and its correct
+field names so warnings render text and state correctly.
+
+In `@src/components/acr/VerificationItem.tsx`:
+- Around line 913-919: The undo-N/A handler currently forces the form into a
+verified state; update handleUndoNASuggestion so it clears the selection and
+forces manual choice by calling setNaAccepted(false), setFormStatus('') (or
+recompute default empty status), setFormMethod('') (clear method instead of
+'Manual Review'), and setFormNotes('') so the user must explicitly pick a
+status/method before submitting.
+
+In `@src/components/acr/VersionTimelineSidebar.tsx`:
+- Around line 212-220: The version card (Card JSX using className and onClick
+calling handleVersionClick(version.id)) is not keyboard-accessible; make it
+focusable and actionable by either converting the clickable header to a semantic
+<button> or by adding keyboard semantics: give the Card a tabIndex={0},
+role="button", aria-pressed or aria-expanded as appropriate (based on
+isSelected/isCurrent/version.isLatest), and handle onKeyDown to invoke
+handleVersionClick(version.id) for Enter and Space keys; ensure visual focus
+styles remain (ring classes already used) and update any aria labels to include
+the version id or label for screen readers.
+- Around line 12-16: In VersionTimelineSidebar.tsx update the import paths for
+the UI components so their casing matches the filenames: change the imports for
+Button, Card and Badge to use '@/components/ui/Button', '@/components/ui/Card'
+and '@/components/ui/Badge' respectively (leave ScrollArea and Separator imports
+as-is); this ensures the symbols Button, Card and Badge resolve correctly on
+case-sensitive filesystems.
+
+In `@src/components/ui/Dialog.tsx`:
+- Around line 125-160: DialogClose currently renders a button but has no way to
+close the dialog because DialogContext was removed; add a clear API to wire
+closing by adding an optional onClose prop to the DialogClose component (props:
+onClose?: () => void) and invoke it inside the button's onClick handler (falling
+back to any passed onClick), or alternatively re-introduce a minimal
+DialogContext that exposes onOpenChange and have DialogClose call
+onOpenChange(false); update the DialogCloseProps type to include onClose and
+ensure the forwardRef component forwards and composes onClick so consumers can
+still override behavior.
+- Around line 10-40: The Dialog component lacks focus trapping, Escape key
+handling, and ARIA relations; update the Dialog React component to (1) trap
+keyboard focus while open—either integrate a library like focus-trap-react (wrap
+children with <FocusTrap> when open) or implement a custom trap that queries
+focusable elements, handles Tab/Shift+Tab boundary behavior, and restores focus
+on close; (2) add a keydown listener when open to call onOpenChange(false) on
+Escape and ensure it is removed on cleanup; and (3) expose aria-labelledby and
+aria-describedby on the dialog node (connect them to your
+DialogTitle/DialogDescription IDs) and ensure focus is moved into the dialog
+when opened and restored when closed.
+
+In `@src/components/ui/InfoTooltip.tsx`:
+- Around line 201-207: The tooltip trigger is a non-focusable div so keyboard
+users cannot access it; make the element keyboard-accessible by adding
+tabindex={0} and an appropriate role (e.g., role="button") to the element
+referenced by triggerRef, add onFocus/onBlur handlers that call show/hide
+respectively, and add an onKeyDown handler that listens for Enter/Space to
+invoke handleClick (and optionally Escape to hide) so keyboard users can open
+and dismiss the tooltip; update the element with these handlers where
+triggerRef, show, hide, and handleClick are used.
+
+In `@src/pages/acr/AcrReportReviewPage.tsx`:
+- Line 41: Call useUpdateCriterion with only acrJobId (remove the second
+argument), i.e. change useUpdateCriterion(acrJobId, criterion.id) to
+useUpdateCriterion(acrJobId), and update calls to the returned mutate function
+(updateCriterion) to pass a single object { criterionId: criterion.id, updates:
+{ ... } } — for example include verificationStatus inside updates; the hook
+definition in useAcrReport.ts (expects { criterionId, updates }) should be used
+as the contract.
+
+In `@src/pages/acr/AcrWorkflowPage.tsx`:
+- Around line 286-291: The confidence data fetch currently hard-codes the
+edition string; update the useConfidenceWithIssues call to use the selected
+edition code (state.selectedEdition?.code) instead of 'VPAT2.5-INT' and change
+the enabled condition to require state.selectedEdition to exist (e.g., enabled:
+!!state.jobId && state.currentStep === 4 && analysisResults.length === 0 &&
+!!state.selectedEdition). Locate the call to useConfidenceWithIssues in
+AcrWorkflowPage (the const { data: confidenceData } =
+useConfidenceWithIssues(...) line) and replace the literal edition with
+state.selectedEdition?.code while gating the fetch on selectedEdition being
+present.

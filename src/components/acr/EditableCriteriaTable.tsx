@@ -201,6 +201,7 @@ export function EditableCriteriaTable({ criteria, acrJobId, edition: _edition }:
                           variant="ghost"
                           onClick={handleCancel}
                           disabled={isPending}
+                          aria-label="Cancel edit"
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -208,6 +209,7 @@ export function EditableCriteriaTable({ criteria, acrJobId, edition: _edition }:
                           size="sm"
                           onClick={() => handleSave(criterion.criterionId)}
                           disabled={isPending}
+                          aria-label={`Save criterion ${criterion.criterionNumber}`}
                         >
                           <Check className="h-4 w-4" />
                         </Button>
@@ -218,6 +220,7 @@ export function EditableCriteriaTable({ criteria, acrJobId, edition: _edition }:
                           size="sm"
                           variant="ghost"
                           onClick={() => handleEdit(criterion)}
+                          aria-label={`Edit criterion ${criterion.criterionNumber}`}
                         >
                           <Edit2 className="h-4 w-4" />
                         </Button>
@@ -226,6 +229,7 @@ export function EditableCriteriaTable({ criteria, acrJobId, edition: _edition }:
                           variant="ghost"
                           title="History - Coming soon"
                           disabled
+                          aria-label={`View history for criterion ${criterion.criterionNumber}`}
                         >
                           <History className="h-4 w-4" />
                         </Button>

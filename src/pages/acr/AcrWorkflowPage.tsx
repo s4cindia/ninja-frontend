@@ -286,8 +286,8 @@ export function AcrWorkflowPage() {
   // Fetch confidence analysis data (for when page is refreshed on step 4)
   const { data: confidenceData } = useConfidenceWithIssues(
     state.jobId || '',
-    'VPAT2.5-INT',  // Default edition
-    { enabled: !!state.jobId && state.currentStep === 4 && analysisResults.length === 0 }
+    state.selectedEdition?.code || 'VPAT2.5-INT',
+    { enabled: !!state.jobId && state.currentStep === 4 && analysisResults.length === 0 && !!state.selectedEdition }
   );
 
   // Initialize report mutation for Review & Edit

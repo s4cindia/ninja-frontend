@@ -9,9 +9,9 @@ import {
   Eye,
   GitBranch
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -211,12 +211,22 @@ export const VersionTimelineSidebar: React.FC<VersionTimelineSidebarProps> = ({
 
                 <Card
                   className={cn(
-                    'p-3 cursor-pointer transition-all hover:shadow-md',
+                    'p-3 cursor-pointer transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500',
                     isCurrent && 'ring-2 ring-blue-500 bg-blue-50',
                     isSelected && 'ring-2 ring-purple-500',
                     version.isLatest && 'border-green-500 border-2'
                   )}
                   onClick={() => handleVersionClick(version.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleVersionClick(version.id);
+                    }
+                  }}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Version ${version.versionNumber}${version.isLatest ? ' (Latest)' : ''}${isCurrent ? ' (Current)' : ''}`}
+                  aria-pressed={expandedVersion === version.id}
                 >
                   {/* Version Header */}
                   <div className="flex items-start gap-3">

@@ -32,8 +32,11 @@ export function ConfidenceCalculationModal({
     (acc, c) => {
       const score = typeof c.confidenceScore === 'number' ? c.confidenceScore : 0;
 
-      // Check if N/A (naSuggestion only exists on CriterionConfidenceWithIssues)
-      const isNA = 'naSuggestion' in c && c.naSuggestion?.suggestedStatus === 'not_applicable';
+      // Check if N/A (multiple ways to mark as N/A)
+      const isNA =
+        ('naSuggestion' in c && c.naSuggestion?.suggestedStatus === 'not_applicable') ||
+        ('status' in c && c.status === 'not_applicable') ||
+        ('isNotApplicable' in c && c.isNotApplicable === true);
 
       if (isNA) {
         acc.notApplicable++;

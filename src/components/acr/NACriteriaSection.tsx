@@ -3,6 +3,7 @@ import { Info, ChevronDown, ChevronRight, Edit2, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useUpdateCriterion } from '@/hooks/useAcrReport';
 import type { AcrCriterionReview } from '@/types/acr-report.types';
+import type { NaDetectionCheck } from '@/types/confidence.types';
 import { cn } from '@/utils/cn';
 
 interface NACriteriaSectionProps {
@@ -21,11 +22,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   javascript: 'JavaScript-Dependent Features',
   other: 'Other',
 };
-
-interface DetectionCheck {
-  result: 'pass' | 'fail';
-  description: string;
-}
 
 export function NACriteriaSection({ naCriteria, acrJobId, edition: _edition }: NACriteriaSectionProps) {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());

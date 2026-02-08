@@ -38,13 +38,16 @@ function CriterionCard({ criterion, acrJobId, isExpanded, onToggleExpand }: Crit
   const [editedMethod, setEditedMethod] = useState(criterion.verificationMethod || 'Manual Review');
   const [editedNotes, setEditedNotes] = useState(criterion.verificationNotes || '');
 
-  const { mutate: updateCriterion, isPending: isUpdating } = useUpdateCriterion(acrJobId, criterion.id);
+  const { mutate: updateCriterion, isPending: isUpdating } = useUpdateCriterion(acrJobId);
 
   const handleSave = () => {
     updateCriterion({
-      verificationStatus: editedStatus,
-      verificationMethod: editedMethod,
-      verificationNotes: editedNotes,
+      criterionId: criterion.id,
+      updates: {
+        verificationStatus: editedStatus,
+        verificationMethod: editedMethod,
+        verificationNotes: editedNotes,
+      }
     }, {
       onSuccess: () => {
         setShowEditModal(false);
