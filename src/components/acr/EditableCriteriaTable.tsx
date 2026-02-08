@@ -35,7 +35,7 @@ export function EditableCriteriaTable({ criteria, acrJobId, edition: _edition }:
   const { mutate: updateCriterion, isPending } = useUpdateCriterion(acrJobId);
 
   const handleEdit = (criterion: AcrCriterionReview) => {
-    setEditingId(criterion.id);
+    setEditingId(criterion.criterionId);
     setEditingData({
       verificationStatus: criterion.verificationStatus,
       verificationMethod: criterion.verificationMethod,
@@ -108,7 +108,7 @@ export function EditableCriteriaTable({ criteria, acrJobId, edition: _edition }:
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           {criteria.map((criterion) => {
-            const isEditing = editingId === criterion.id;
+            const isEditing = editingId === criterion.criterionId;
 
             return (
               <tr key={criterion.id} className="hover:bg-gray-50">
@@ -224,7 +224,8 @@ export function EditableCriteriaTable({ criteria, acrJobId, edition: _edition }:
                         <Button
                           size="sm"
                           variant="ghost"
-                          title="View history"
+                          title="History - Coming soon"
+                          disabled
                         >
                           <History className="h-4 w-4" />
                         </Button>

@@ -6,7 +6,7 @@ import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { Spinner } from '@/components/ui/Spinner';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
-import { useAcrReport, useApproveReport, useUpdateCriterion } from '@/hooks/useAcrReport';
+import { useAcrReport, useApproveReport, useUpdateCriterion, useUpdateReportMetadata } from '@/hooks/useAcrReport';
 // import { useExportAcr } from '@/hooks/useAcrExport';
 import { VerificationSummaryCard } from '@/components/acr/VerificationSummaryCard';
 import { VersionTimelineSidebar } from '@/components/acr/VersionTimelineSidebar';
@@ -286,6 +286,10 @@ export function AcrReportReviewPage() {
     reportData?.acrJob.id || ''
   );
 
+  const { mutate: updateReportMetadata, isPending: isSavingMetadata } = useUpdateReportMetadata(
+    reportData?.acrJob.id || ''
+  );
+
   const handleToggleExpand = (criterionId: string) => {
     setExpandedCriteria(prev => {
       const next = new Set(prev);
@@ -550,14 +554,32 @@ export function AcrReportReviewPage() {
                 placeholder="Enter executive summary..."
               />
               <div className="flex items-center gap-2">
-                <Button size="sm">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    updateReportMetadata(
+                      { executiveSummary: editedSummary },
+                      {
+                        onSuccess: () => {
+                          setIsEditingExecutiveSummary(false);
+                        },
+                        onError: (error) => {
+                          console.error('Failed to update executive summary:', error);
+                          alert('Failed to save changes. Please try again.');
+                        },
+                      }
+                    );
+                  }}
+                  disabled={isSavingMetadata}
+                >
                   <Save className="h-4 w-4 mr-2" />
-                  Save
+                  {isSavingMetadata ? 'Saving...' : 'Save'}
                 </Button>
                 <Button
                   size="sm"
                   variant="ghost"
                   onClick={() => setIsEditingExecutiveSummary(false)}
+                  disabled={isSavingMetadata}
                 >
                   Cancel
                 </Button>

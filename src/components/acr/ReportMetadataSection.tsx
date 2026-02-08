@@ -6,10 +6,9 @@ import type { AcrJob, AcrReportSummary } from '@/types/acr-report.types';
 
 interface ReportMetadataSectionProps {
   acrJob: AcrJob;
-  summary: AcrReportSummary;
 }
 
-export function ReportMetadataSection({ acrJob, summary: _summary }: ReportMetadataSectionProps) {
+export function ReportMetadataSection({ acrJob }: ReportMetadataSectionProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [executiveSummary, setExecutiveSummary] = useState(
     acrJob.executiveSummary || ''

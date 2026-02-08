@@ -25,12 +25,9 @@ if [ -z "$FILE_PATH" ] || [ "$FILE_PATH" = "null" ]; then
 fi
 
 # ── Protected file patterns ─────────────────────────────────────────────────
-# Add patterns here. Each is checked as a substring match.
+# Add patterns here. Patterns starting with ^ use regex, others use substring match.
 PROTECTED_PATTERNS=(
-  ".env"
-  ".env.local"
-  ".env.production"
-  ".env.development"
+  "^(.*/)?\\.env($|\\.)"
   "package-lock.json"
   "yarn.lock"
   "pnpm-lock.yaml"
@@ -39,12 +36,23 @@ PROTECTED_PATTERNS=(
 )
 
 for pattern in "${PROTECTED_PATTERNS[@]}"; do
-  if echo "$FILE_PATH" | grep -qF "$pattern"; then
-    echo "🔒 Protected file: '$FILE_PATH' matches pattern '$pattern'" >&2
-    echo "" >&2
-    echo "This file is protected from automated edits." >&2
-    echo "If you need to modify it, please do so manually." >&2
-    exit 2
+  # Use regex for patterns starting with ^, substring match otherwise
+  if [[ "$pattern" =~ ^\^ ]]; then
+    if echo "$FILE_PATH" | grep -qE "$pattern"; then
+      echo "🔒 Protected file: '$FILE_PATH' matches pattern '$pattern'" >&2
+      echo "" >&2
+      echo "This file is protected from automated edits." >&2
+      echo "If you need to modify it, please do so manually." >&2
+      exit 2
+    fi
+  else
+    if echo "$FILE_PATH" | grep -qF "$pattern"; then
+      echo "🔒 Protected file: '$FILE_PATH' matches pattern '$pattern'" >&2
+      echo "" >&2
+      echo "This file is protected from automated edits." >&2
+      echo "If you need to modify it, please do so manually." >&2
+      exit 2
+    fi
   fi
 done
 
