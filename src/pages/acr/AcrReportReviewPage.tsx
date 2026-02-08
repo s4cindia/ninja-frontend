@@ -26,7 +26,7 @@ import { cn } from '@/utils/cn';
  */
 
 interface CriterionCardProps {
-  criterion: any;
+  criterion: Record<string, unknown>;
   acrJobId: string;
   isExpanded: boolean;
   onToggleExpand: () => void;
@@ -352,7 +352,7 @@ export function AcrReportReviewPage() {
 
       if (!response.ok) throw new Error('Failed to fetch version');
 
-      const versionData = await response.json();
+      const _versionData = await response.json();
 
       // Re-initialize with this version's data
       alert('Restore functionality coming soon! This will create a new draft based on this version.');
@@ -422,7 +422,7 @@ export function AcrReportReviewPage() {
       detectionChecks: [],
       edgeCases: []
     } : undefined,
-  })) as any;
+  }));
 
   const verifiedCount = allCriteria.filter(c =>
     c.verificationStatus === 'verified_pass' || c.verificationStatus === 'verified_fail'

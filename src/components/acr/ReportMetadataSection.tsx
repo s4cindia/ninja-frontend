@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Edit2, Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useUpdateReportMetadata } from '@/hooks/useAcrReport';
-import type { AcrJob, AcrReportSummary } from '@/types/acr-report.types';
+import type { AcrJob } from '@/types/acr-report.types';
 
 interface ReportMetadataSectionProps {
   acrJob: AcrJob;

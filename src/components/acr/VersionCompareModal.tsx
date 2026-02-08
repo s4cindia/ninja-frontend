@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { useAcrVersion, type ReportData } from '@/hooks/useAcrVersions';
+import { useAcrVersion } from '@/hooks/useAcrVersions';
 
 interface VersionCompareModalProps {
   isOpen: boolean;
@@ -145,7 +145,7 @@ export const VersionCompareModal: React.FC<VersionCompareModalProps> = ({
             Failed to load versions
           </div>
         ) : (
-          <Tabs value={compareMode} onValueChange={(v) => setCompareMode(v as any)} className="flex-1">
+          <Tabs value={compareMode} onValueChange={(v) => setCompareMode(v as 'overview' | 'criteria' | 'changes')} className="flex-1">
             <div className="px-6 pt-4">
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="overview">Overview</TabsTrigger>

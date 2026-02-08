@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, Info, Circle } from 'lucide-react';
+import { AlertTriangle, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ConfidenceBadgeProps {

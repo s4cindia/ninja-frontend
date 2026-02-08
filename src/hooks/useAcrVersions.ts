@@ -34,8 +34,8 @@ export interface ReportData {
     failedCriteria: number;
     naCriteria: number;
   };
-  criteria: any[];
-  naCriteria: any[];
+  criteria: Record<string, unknown>[];
+  naCriteria: Record<string, unknown>[];
   createdAt: string;
   updatedAt: string;
 }
@@ -82,7 +82,7 @@ export function useCompareVersions(acrId: string, version1: number, version2: nu
     queryFn: async () => {
       // This is a placeholder - the actual comparison happens in VersionCompareModal
       // which uses useAcrVersion to fetch both versions individually
-      const response = await api.get<{ data: any }>(`/acr/${acrId}/compare?v1=${version1}&v2=${version2}`);
+      const response = await api.get<{ data: Record<string, unknown> }>(`/acr/${acrId}/compare?v1=${version1}&v2=${version2}`);
       return response.data.data;
     },
     enabled: options?.enabled ?? false,
