@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, ChevronDown, ChevronRight, Edit2, Save, X, GitBranch, PanelLeftClose, PanelLeft, Download } from 'lucide-react';
+import { ArrowLeft, CheckCircle, ChevronDown, ChevronRight, Edit2, Save, X, PanelLeftClose, PanelLeft } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { Spinner } from '@/components/ui/Spinner';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { useAcrReport, useApproveReport, useUpdateCriterion } from '@/hooks/useAcrReport';
-import { useExportAcr } from '@/hooks/useAcrExport';
+// import { useExportAcr } from '@/hooks/useAcrExport';
 import { VerificationSummaryCard } from '@/components/acr/VerificationSummaryCard';
 import { VersionTimelineSidebar } from '@/components/acr/VersionTimelineSidebar';
 import { VersionCompareModal } from '@/components/acr/VersionCompareModal';

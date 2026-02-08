@@ -8,7 +8,7 @@ import { CriteriaTable, CriterionRow } from './CriteriaTable';
 import { WcagDocumentationModal } from './WcagDocumentationModal';
 import { CriterionDetailsModal } from './CriterionDetailsModal';
 import { ExpandableSection } from './ExpandableSection';
-import { ConfidenceBadge } from './ConfidenceBadge';
+// import { ConfidenceBadge } from './ConfidenceBadge';
 import { ConfidenceCalculationModal } from './ConfidenceCalculationModal';
 import { useConfidenceWithIssues } from '@/hooks/useConfidence';
 import { IssueMapping, RemediatedIssue, OtherIssuesData } from '@/types/confidence.types';
