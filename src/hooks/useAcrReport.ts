@@ -17,7 +17,7 @@ export function useAcrReport(jobId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['acr-report', jobId],
     queryFn: async () => {
-      const response = await api.get<{ data: AcrReportData }>(`/api/v1/acr/report/${jobId}`);
+      const response = await api.get<{ data: AcrReportData }>(`/acr/report/${jobId}`);
       return response.data.data;
     },
     enabled: options?.enabled ?? true,
@@ -32,7 +32,7 @@ export function useUpdateCriterion(acrJobId: string) {
   return useMutation({
     mutationFn: async ({ criterionId, updates }: { criterionId: string; updates: CriterionUpdateData }) => {
       const response = await api.patch(
-        `/api/v1/acr/report/${acrJobId}/criteria/${criterionId}`,
+        `/acr/report/${acrJobId}/criteria/${criterionId}`,
         updates
       );
       return response.data;
@@ -51,7 +51,7 @@ export function useUpdateReportMetadata(acrJobId: string) {
   return useMutation({
     mutationFn: async (updates: ReportMetadataUpdate) => {
       const response = await api.patch(
-        `/api/v1/acr/report/${acrJobId}/metadata`,
+        `/acr/report/${acrJobId}/metadata`,
         updates
       );
       return response.data;
@@ -68,7 +68,7 @@ export function useCriterionHistory(acrJobId: string, criterionId: string, optio
     queryKey: ['criterion-history', acrJobId, criterionId],
     queryFn: async () => {
       const response = await api.get<{ data: CriterionChangeLog[] }>(
-        `/api/v1/acr/report/${acrJobId}/criteria/${criterionId}/history`
+        `/acr/report/${acrJobId}/criteria/${criterionId}/history`
       );
       return response.data.data;
     },
@@ -82,7 +82,7 @@ export function useApproveReport(acrJobId: string) {
 
   return useMutation({
     mutationFn: async () => {
-      const response = await api.post(`/api/v1/acr/report/${acrJobId}/approve`);
+      const response = await api.post(`/acr/report/${acrJobId}/approve`);
       return response.data;
     },
     onSuccess: () => {
@@ -107,7 +107,7 @@ export function useInitializeReport() {
       verificationData: Record<string, unknown>[];
       documentTitle?: string;
     }) => {
-      const response = await api.post(`/api/v1/acr/report/${jobId}/initialize`, {
+      const response = await api.post(`/acr/report/${jobId}/initialize`, {
         edition,
         verificationData,
         documentTitle,

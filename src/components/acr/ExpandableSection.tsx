@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, AlertCircle, Info, CheckCircle } from 'lucide-react';
+import { ChevronDown, ChevronRight, AlertCircle, Info, CheckCircle, HelpCircle } from 'lucide-react';
+import { InfoTooltip } from '@/components/ui/InfoTooltip';
 
 interface ExpandableSectionProps {
   title: string;
@@ -14,6 +15,7 @@ interface ExpandableSectionProps {
     type: 'info' | 'warning' | 'success';
     message: string;
   };
+  infoTooltip?: React.ReactNode; // Tooltip content for info icon
 }
 
 export function ExpandableSection({
@@ -26,6 +28,7 @@ export function ExpandableSection({
   headerColor = 'bg-gray-50 border-gray-200',
   children,
   alert,
+  infoTooltip,
 }: ExpandableSectionProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
@@ -75,6 +78,14 @@ export function ExpandableSection({
             <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
               {badge}
             </span>
+          )}
+          {infoTooltip && (
+            <InfoTooltip content={infoTooltip}>
+              <HelpCircle
+                className="h-4 w-4 text-gray-400 hover:text-gray-600 transition-colors cursor-help"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </InfoTooltip>
           )}
         </div>
         {isExpanded ? (

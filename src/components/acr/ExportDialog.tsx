@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, FileText, FileType, Globe, Check, Loader2, AlertCircle } from 'lucide-react';
+import { X, FileText, FileType, Globe, Check, Loader2, AlertCircle, Upload } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -43,8 +43,16 @@ export function ExportDialog({ acrId, isOpen, onClose }: ExportDialogProps) {
   const [includeMethodology, setIncludeMethodology] = useState(true);
   const [includeAttributionTags, setIncludeAttributionTags] = useState(true);
   const [includeLegalDisclaimer, setIncludeLegalDisclaimer] = useState(true);
+
+  // Product Info
+  const [vendorName, setVendorName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+
+  // Branding
   const [companyName, setCompanyName] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#3B82F6');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string>('');
   const [footerText, setFooterText] = useState('');
   const [showBranding, setShowBranding] = useState(false);
 
@@ -65,15 +73,32 @@ export function ExportDialog({ acrId, isOpen, onClose }: ExportDialogProps) {
 
   if (!isOpen) return null;
 
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setLogoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleExport = async () => {
     const options: ExportOptions = {
       format,
       includeMethodology,
       includeAttributionTags,
       includeLegalDisclaimer,
+      productInfo: (vendorName || contactEmail) ? {
+        vendorName: vendorName || undefined,
+        contactEmail: contactEmail || undefined,
+      } : undefined,
       branding: showBranding ? {
         companyName: companyName || undefined,
         primaryColor,
+        logoUrl: logoPreview || undefined,
         footerText: footerText || undefined,
       } : undefined,
     };
@@ -88,12 +113,15 @@ export function ExportDialog({ acrId, isOpen, onClose }: ExportDialogProps) {
 
   const previewSections = [
     'Product Information',
+    ...(vendorName || contactEmail ? ['• Vendor: ' + (vendorName || 'Not specified')] : []),
+    ...(contactEmail ? ['• Contact: ' + contactEmail] : []),
     'VPAT Version and Standards',
     ...(includeMethodology ? ['Methodology Section'] : []),
     'Conformance Results Table',
     ...(includeAttributionTags ? ['Attribution Tags'] : []),
     ...(includeLegalDisclaimer ? ['Legal Disclaimer'] : []),
-    ...(showBranding && companyName ? ['Company Branding'] : []),
+    ...(showBranding && companyName ? ['Company Branding: ' + companyName] : []),
+    ...(showBranding && logoFile ? ['• Logo: ' + logoFile.name] : []),
   ];
 
   return (
@@ -111,6 +139,25 @@ export function ExportDialog({ acrId, isOpen, onClose }: ExportDialogProps) {
         </div>
 
         <div className="p-6 space-y-6">
+          <div>
+            <h3 className="text-sm font-medium text-gray-900 mb-3">Product Information</h3>
+            <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
+              <Input
+                label="Vendor Name"
+                value={vendorName}
+                onChange={(e) => setVendorName(e.target.value)}
+                placeholder="Enter vendor/company name"
+              />
+              <Input
+                label="Contact Email"
+                type="email"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+                placeholder="contact@company.com"
+              />
+            </div>
+          </div>
+
           <div>
             <h3 className="text-sm font-medium text-gray-900 mb-3">Export Format</h3>
             <div className="space-y-2">
@@ -160,14 +207,19 @@ export function ExportDialog({ acrId, isOpen, onClose }: ExportDialogProps) {
                 />
                 <span className="text-sm text-gray-700">Include Methodology Section</span>
               </label>
-              <label className="flex items-center gap-3 p-2 rounded hover:bg-gray-50 cursor-pointer">
+              <label className="flex items-start gap-3 p-2 rounded hover:bg-gray-50 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={includeAttributionTags}
                   onChange={(e) => setIncludeAttributionTags(e.target.checked)}
-                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 mt-0.5"
                 />
-                <span className="text-sm text-gray-700">Include Attribution Tags</span>
+                <div className="flex-1">
+                  <span className="text-sm text-gray-700">Include Attribution Tags</span>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Adds metadata indicating AI was used in analysis (Claude Sonnet 4.5)
+                  </p>
+                </div>
               </label>
               <label className="flex items-center gap-3 p-2 rounded hover:bg-gray-50 cursor-pointer">
                 <input
@@ -202,6 +254,9 @@ export function ExportDialog({ acrId, isOpen, onClose }: ExportDialogProps) {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Primary Color
                   </label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Used for headers, borders, and accent elements
+                  </p>
                   <div className="flex items-center gap-3">
                     <input
                       type="color"
@@ -218,12 +273,46 @@ export function ExportDialog({ acrId, isOpen, onClose }: ExportDialogProps) {
                     />
                   </div>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Company Logo
+                  </label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Appears in the document header (PNG, JPG, or SVG)
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <label className="flex-1 flex items-center justify-center px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-gray-400 transition-colors">
+                      <Upload className="h-5 w-5 text-gray-400 mr-2" />
+                      <span className="text-sm text-gray-600">
+                        {logoFile ? logoFile.name : 'Click to upload logo'}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/svg+xml"
+                        onChange={handleLogoUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    {logoPreview && (
+                      <div className="flex-shrink-0">
+                        <img
+                          src={logoPreview}
+                          alt="Logo preview"
+                          className="h-12 w-12 object-contain border border-gray-300 rounded"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
                 <Input
                   label="Custom Footer Text"
                   value={footerText}
                   onChange={(e) => setFooterText(e.target.value)}
-                  placeholder="Enter custom footer text"
+                  placeholder="© 2026 Your Company | Confidential"
                 />
+                <p className="text-xs text-gray-500">
+                  Footer appears at the bottom of each page
+                </p>
               </div>
             )}
           </div>

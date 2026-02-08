@@ -9,6 +9,7 @@ import { WcagDocumentationModal } from './WcagDocumentationModal';
 import { CriterionDetailsModal } from './CriterionDetailsModal';
 import { ExpandableSection } from './ExpandableSection';
 import { ConfidenceBadge } from './ConfidenceBadge';
+import { ConfidenceCalculationModal } from './ConfidenceCalculationModal';
 import { useConfidenceWithIssues } from '@/hooks/useConfidence';
 import { IssueMapping, RemediatedIssue, OtherIssuesData } from '@/types/confidence.types';
 import { confidenceService } from '@/services/confidence.service';
@@ -638,6 +639,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [docsCriterion, setDocsCriterion] = useState<{ id: string; name: string } | null>(null);
   const [detailsCriterion, setDetailsCriterion] = useState<CriterionConfidence | null>(null);
+  const [showCalculationModal, setShowCalculationModal] = useState(false);
   const [showOnlyWithIssues, setShowOnlyWithIssues] = useState(false);
   const [showOtherIssues, setShowOtherIssues] = useState(false);
   const otherIssuesRef = useRef<HTMLDivElement>(null);
@@ -1136,7 +1138,16 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-lg border p-4">
-          <p className="text-sm text-gray-500 mb-1">Overall Confidence</p>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-sm text-gray-500">Overall Confidence</p>
+            <button
+              onClick={() => setShowCalculationModal(true)}
+              className="text-gray-400 hover:text-blue-600 transition-colors p-1 rounded hover:bg-blue-50"
+              title="View calculation details"
+            >
+              <Info className="h-4 w-4" />
+            </button>
+          </div>
           <div className="flex items-center gap-3">
             <div className="flex-1 bg-gray-200 rounded-full h-3">
               <div
@@ -1301,6 +1312,26 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                 type: 'warning',
                 message: '⚠️ CRITICAL: These criteria require mandatory human verification. Automated testing cannot assess quality, meaningfulness, or user experience.'
               }}
+              infoTooltip={
+                <div className="space-y-2">
+                  <div className="font-semibold text-white">Manual Review Required</div>
+                  <div className="text-xs text-gray-200">
+                    These criteria CANNOT be automatically tested and require mandatory human verification
+                    to assess quality, meaningfulness, or user experience.
+                  </div>
+                  <div className="text-xs text-gray-300 space-y-1 mt-2">
+                    <div><strong className="text-white">Examples:</strong></div>
+                    <div>• Alt text meaningfulness (1.1.1)</div>
+                    <div>• Logical reading order (1.3.2)</div>
+                    <div>• Clear error messages (3.3.3)</div>
+                  </div>
+                  <div className="text-xs text-gray-200 mt-2">
+                    <strong>Automation Capability: 0%</strong>
+                    <br />
+                    Always require human review regardless of confidence.
+                  </div>
+                </div>
+              }
             >
               {categorizedCriteria.manualRequired.map(criterion => {
                 const issueData = issuesByCriterion.get(criterion.criterionId);
@@ -1330,6 +1361,27 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
               count={Object.values(categorizedCriteria.needsReview).flat().length}
               defaultExpanded={true}
               headerColor="bg-orange-50 border-orange-300"
+              infoTooltip={
+                <div className="space-y-2">
+                  <div className="font-semibold text-white">Needs Review</div>
+                  <div className="text-xs text-gray-200">
+                    Automated tools detected potential issues or couldn't fully verify compliance.
+                    Human review is required to confirm findings and assess context.
+                  </div>
+                  <div className="text-xs text-gray-300 space-y-1 mt-2">
+                    <div><strong className="text-white">Confidence Levels:</strong></div>
+                    <div>🟢 High (≥90%): Very likely accurate, verify anyway</div>
+                    <div>🟡 Medium (70-89%): Moderate confidence, investigate</div>
+                    <div>🟠 Low (&lt;70%): Uncertain, needs detailed review</div>
+                  </div>
+                  <div className="text-xs text-gray-200 mt-2">
+                    <strong>Why review needed?</strong>
+                    <br />
+                    Tools can detect technical issues but not semantic correctness.
+                    Context and purpose affect compliance.
+                  </div>
+                </div>
+              }
             >
               {/* Nested: High Confidence */}
               {categorizedCriteria.needsReview.high.length > 0 && (
@@ -1457,6 +1509,26 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                 type: 'info',
                 message: 'These criteria do not apply to your content and are excluded from conformance calculations.'
               }}
+              infoTooltip={
+                <div className="space-y-2">
+                  <div className="font-semibold text-white">Not Applicable (Auto-Resolved)</div>
+                  <div className="text-xs text-gray-200">
+                    AI content detection determined these criteria don't apply to your document
+                    and automatically excluded them from conformance calculations.
+                  </div>
+                  <div className="text-xs text-gray-300 space-y-1 mt-2">
+                    <div><strong className="text-white">Common N/A scenarios:</strong></div>
+                    <div>• Video/audio criteria (static text-only content)</div>
+                    <div>• Form validation (no forms present)</div>
+                    <div>• Time limits (no timed interactions)</div>
+                    <div>• Interactive scripts (no JavaScript detected)</div>
+                  </div>
+                  <div className="text-xs text-gray-200 mt-2">
+                    High-confidence (≥80%) suggestions are auto-applied.
+                    You can review and override if needed.
+                  </div>
+                </div>
+              }
             >
               {categorizedCriteria.notApplicable.map(criterion => {
                 const issueData = issuesByCriterion.get(criterion.criterionId);
@@ -1628,6 +1700,14 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
           mode="interactive"
         />
       )}
+
+      {/* Confidence Calculation Modal */}
+      <ConfidenceCalculationModal
+        isOpen={showCalculationModal}
+        onClose={() => setShowCalculationModal(false)}
+        criteria={confidenceData?.criteria || []}
+        overallConfidence={confidenceData?.summary?.averageConfidence || 0}
+      />
     </div>
   );
 }

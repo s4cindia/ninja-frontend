@@ -78,23 +78,287 @@ Automated tools can detect missing alt text but cannot assess quality, accuracy,
 **Examples:**
 1. A diagram in a textbook showing cell structure needs detailed alt text: "Diagram of animal cell showing nucleus at center, mitochondria scattered throughout cytoplasm, and cell membrane forming outer boundary"
 2. A decorative chapter header image should have alt="" to avoid screen reader announcing irrelevant graphics`,
-  '1.2.1': 'Automated tools cannot verify if audio-only content has an accurate text alternative. Manual review is required to compare the audio content with its text alternative and ensure they are equivalent.',
-  '1.2.2': 'Automated tools cannot verify if captions for video are accurate, synchronized, or include all dialogue and important sounds. Manual review with playback is required.',
-  '1.2.3': 'Automated tools cannot verify if audio descriptions or text alternatives for video are accurate and provide equivalent information. Manual review is required to ensure descriptions convey visual information not available from the audio track.',
-  '1.2.4': 'Automated tools cannot verify if live captions are accurate, synchronized, or complete. Manual monitoring during live broadcasts is required.',
-  '1.2.5': 'Automated tools cannot verify if audio descriptions are accurate, well-timed, or provide equivalent visual information. Manual review with playback is required.',
-  '1.3.1': 'While automated tools can detect structural markup, they cannot verify if the semantic structure accurately represents the information relationships and meaning of the content. Manual review is required to ensure proper heading hierarchy, list usage, and table relationships.',
-  '1.3.2': 'Automated tools can detect reading order issues in code but cannot verify if the visual presentation matches the meaningful sequence. Manual review with assistive technology is required to confirm proper reading order.',
-  '1.3.3': 'Automated tools cannot verify if instructions rely solely on sensory characteristics (shape, size, location, sound, color). Human review is required to ensure instructions are perceivable without sensory abilities.',
-  '1.3.4': 'Automated tools cannot reliably test orientation lock across all devices and scenarios. Manual testing on mobile devices in both portrait and landscape orientations is required.',
-  '1.3.5': 'Automated tools can detect autocomplete attributes but cannot verify if the purpose of each input is correctly identified according to the WCAG list of input purposes. Manual review of form fields and their purposes is required.',
-  '1.4.1': 'Automated tools can detect some color contrast issues but cannot determine if color alone is used to convey information. Manual inspection is required to ensure information conveyed with color is also available through text or other visual means.',
-  '1.4.3': 'While automated tools can calculate contrast ratios, they may have limitations with gradients, images of text, disabled controls, and complex visual designs. Manual verification with contrast measurement tools is recommended.',
-  '1.4.5': 'Automated tools cannot determine if images of text are essential or if text could achieve the same visual presentation. Manual judgment is required to verify the use of images of text is justified.',
-  '1.4.10': 'Automated tools cannot fully assess reflow behavior across different viewport sizes and zoom levels. Manual testing at 400% zoom is required to ensure content reflows without horizontal scrolling or loss of information.',
-  '1.4.11': 'Automated tools can measure contrast but cannot identify all user interface components and graphical objects that require contrast. Manual inspection is needed to verify 3:1 contrast for all meaningful non-text content.',
-  '1.4.12': 'Automated tools cannot fully test text spacing adjustments across all scenarios. Manual testing by adjusting line height, paragraph spacing, letter spacing, and word spacing is required.',
-  '1.4.13': 'Automated tools cannot test pointer hover and keyboard focus trigger scenarios. Manual interaction testing is required to verify content appearing on hover/focus is dismissible, hoverable, and persistent.',
+  '1.2.1': `**Why Manual Review is Required:**
+Automated tools cannot verify if audio-only or video-only content has accurate text alternatives that convey equivalent information.
+
+**What to Check:**
+• Audio-only files (podcasts, audio lectures) have complete text transcripts
+• Video-only content (silent animations, demonstrations) has text descriptions or transcripts
+• Transcripts include all spoken content, speaker identification, and important sounds
+• Text alternatives convey same information as the audio/video
+
+**Examples:**
+1. Educational EPUB with embedded audio lecture should include: full transcript with timestamps, speaker names, and descriptions of relevant sounds
+2. Math textbook with video-only geometric proof should provide: step-by-step text description of the visual demonstration
+3. Language learning EPUB with pronunciation audio clips should have: phonetic transcriptions alongside audio files
+
+**Note:** Rarely applicable to static EPUBs. Most common in multimedia textbooks or educational content with embedded audio/video.`,
+  '1.2.2': `**Why Manual Review is Required:**
+Automated tools can detect caption files but cannot verify accuracy, synchronization, or completeness of captions.
+
+**What to Check:**
+• Captions include all dialogue word-for-word
+• Speaker identification provided when multiple speakers present
+• Important non-speech sounds described [applause], [door closes]
+• Captions synchronized with audio (appear at correct time)
+• Music and sound effects captioned when relevant to content
+
+**Examples:**
+1. Science textbook with experiment video should caption: all instructor dialogue, [beaker bubbling], [timer beeping]
+2. History EPUB with documentary footage should identify: [Narrator], [Interviewee], background music descriptions
+3. Interactive textbook video quiz should caption: question audio, answer options, [correct answer sound]
+
+**Note:** Only applicable to EPUBs with embedded video content. Most static EPUBs don't include video.`,
+  '1.2.3': `**Why Manual Review is Required:**
+Automated tools cannot assess if audio descriptions or text alternatives convey all important visual information from video content.
+
+**What to Check:**
+• Visual information not in dialogue is described (actions, settings, expressions, text on screen)
+• Audio description track available OR comprehensive text alternative provided
+• Descriptions don't overlap important dialogue
+• Text alternatives for video include both visual and auditory information
+
+**Examples:**
+1. Biology textbook video of cell division should describe: visual changes in cell structure, colors indicating different phases, on-screen labels
+2. Art history EPUB video should describe: painting details, brushstroke techniques, color palettes shown
+3. Engineering textbook with assembly video should describe: each step visually shown, tool positions, component orientations
+
+**Note:** Only applicable to EPUBs with video content. Static EPUBs typically don't require audio descriptions.`,
+  '1.2.4': `**Why Manual Review is Required:**
+Automated tools cannot verify the quality, accuracy, or synchronization of live captions during real-time broadcasts.
+
+**What to Check:**
+• Live streaming content has real-time captioning service
+• Captions appear with minimal delay (< 3 seconds)
+• Caption accuracy maintained during live presentation
+• All dialogue and relevant sounds captioned in real-time
+
+**Examples:**
+1. EPUB with embedded live webinar stream should provide: real-time CART (Communication Access Realtime Translation) services
+2. Educational platform with live lecture integration should ensure: instructor speech captioned as it occurs
+3. Interactive textbook with live video discussions should have: automatic speech recognition backup with human correction
+
+**Note:** Very rarely applicable to EPUBs. Only relevant for enhanced EPUBs with live streaming integration or real-time video content.`,
+  '1.2.5': `**Why Manual Review is Required:**
+Automated tools cannot assess the quality, accuracy, or timing of audio description tracks for prerecorded video.
+
+**What to Check:**
+• Audio description track describes all important visual information
+• Descriptions fit in natural pauses without overlapping dialogue
+• Visual actions, settings, expressions, and on-screen text described
+• Description timing synchronized with video content
+
+**Examples:**
+1. Chemistry EPUB video experiment should describe: color changes in solutions, equipment setup, measurement readings on displays
+2. Geography textbook map animation should describe: regions highlighted, data overlays shown, legend information
+3. Literature EPUB with film adaptation excerpts should describe: character expressions, setting details, visual symbolism
+
+**Note:** Only applicable to EPUBs with prerecorded video content. Most static EPUBs don't include video requiring audio descriptions.`,
+  '1.3.1': `**Why Manual Review is Required:**
+Automated tools can detect HTML tags but cannot verify if semantic structure accurately conveys information relationships and meaning.
+
+**What to Check:**
+• Heading hierarchy is logical (h1 → h2 → h3, no skipped levels)
+• Lists use proper markup (<ul>, <ol>, <dl>) not just indentation
+• Tables have proper headers (<th>), captions, and scope attributes
+• Related content grouped with appropriate semantic elements (<section>, <article>, <aside>)
+• Form fields have associated labels programmatically linked
+
+**Examples:**
+1. Textbook chapter structure: Chapter title (h1) → Section headings (h2) → Subsections (h3) → No jumping from h1 to h3
+2. Glossary should use definition list: <dl><dt>Term</dt><dd>Definition</dd></dl>, not regular paragraphs
+3. Data tables should have: <caption>, <th scope="col"> for column headers, <th scope="row"> for row headers
+4. Sidebar content should use: <aside> element, not just visually positioned <div>
+
+**Note:** Critical for all EPUBs. Proper semantic structure enables navigation, comprehension, and assistive technology functionality.`,
+  '1.3.2': `**Why Manual Review is Required:**
+Automated tools cannot verify if the DOM order matches the meaningful reading sequence when content is repositioned visually with CSS.
+
+**What to Check:**
+• Content reads in logical order when CSS disabled or with screen reader
+• Sidebars, footnotes, and callout boxes positioned correctly in reading flow
+• Multi-column layouts maintain proper sequence
+• Floated images don't disrupt reading order
+• Navigation elements appear in logical sequence
+
+**Examples:**
+1. Textbook with sidebar: HTML order should be main content → sidebar, even if CSS positions sidebar to the left
+2. Chapter with footnotes: Footnote reference should appear before footnote content in DOM, even if footnotes displayed at bottom
+3. Two-column layout: Left column content should come before right column in HTML source
+4. Image with caption: Image and caption should be adjacent in DOM, not separated by unrelated content
+
+**Note:** Important for EPUBs with complex layouts, sidebars, or CSS positioning. Test by disabling CSS or using screen reader.`,
+  '1.3.3': `**Why Manual Review is Required:**
+Automated tools cannot identify instructions that rely solely on sensory characteristics, which may not be perceivable to all users.
+
+**What to Check:**
+• Instructions don't rely only on shape ("click the round button")
+• Directions don't depend only on location ("see the box on the right")
+• References don't depend only on size ("use the large text box")
+• Instructions don't depend only on sound ("when you hear the beep")
+• Information conveyed by color also has text or icon
+
+**Examples:**
+1. Bad: "Answer the questions in the blue boxes" → Good: "Answer the questions labeled 'Practice Exercise'"
+2. Bad: "Click the button on the right to continue" → Good: "Click the 'Next Chapter' button to continue"
+3. Bad: "Required fields are marked in red" → Good: "Required fields are marked with an asterisk (*) and the word 'required'"
+4. Bad: "Listen for the completion sound" → Good: "A message will appear saying 'Quiz Complete' when you finish"
+
+**Note:** Important for all EPUBs, especially interactive textbooks and educational content with exercises or activities.`,
+  '1.3.4': `**Why Manual Review is Required:**
+Automated tools cannot test actual device behavior to verify content works in both portrait and landscape orientations.
+
+**What to Check:**
+• EPUB doesn't lock orientation using CSS or viewport meta tags
+• Content reflows properly in both portrait and landscape
+• Fixed layouts work in both orientations (if fixed layout EPUB)
+• No content restricted to single orientation unless essential
+• Reading experience functional when device rotated
+
+**Examples:**
+1. Reflowable EPUB should: adapt to any screen orientation, reflow text naturally, maintain readability in both portrait and landscape
+2. Fixed-layout EPUB (children's picture book) may: use dual-page spreads in landscape, show single pages in portrait
+3. Interactive textbook should: allow exercises to be completed in either orientation, no "rotate your device" messages unless absolutely necessary
+4. Math or music notation EPUB: orientation lock acceptable only if notation fundamentally requires landscape display
+
+**Note:** More relevant for EPUB3 with responsive layouts. Test on actual devices (phones, tablets) in both orientations.`,
+  '1.3.5': `**Why Manual Review is Required:**
+Automated tools can detect autocomplete attributes but cannot verify if the correct purpose is assigned to each input field.
+
+**What to Check:**
+• Personal information fields have appropriate autocomplete values
+• Name fields use: autocomplete="name", "given-name", "family-name"
+• Email fields use: autocomplete="email"
+• Address fields use: autocomplete="street-address", "address-line1", etc.
+• Phone fields use: autocomplete="tel"
+• Autocomplete values match WCAG 2.1 specification list
+
+**Examples:**
+1. Student registration form should use: <input type="text" autocomplete="given-name"> for first name, <input type="email" autocomplete="email"> for email address
+2. Quiz login form should use: <input type="text" autocomplete="username"> for username, <input type="password" autocomplete="current-password"> for password
+3. Survey with demographic info should use: <input type="tel" autocomplete="tel"> for phone, <input autocomplete="bday"> for birthdate
+4. Library card application should use: autocomplete="postal-code" for ZIP code, autocomplete="country" for country field
+
+**Note:** Only applicable to EPUBs with interactive forms. Static EPUBs typically don't have input fields requiring autocomplete.`,
+  '1.4.1': `**Why Manual Review is Required:**
+Automated tools cannot identify all instances where color alone conveys meaning without additional visual or text indicators.
+
+**What to Check:**
+• Links distinguishable from surrounding text by more than just color (underline, bold, icon)
+• Required form fields marked with more than just color (asterisk, "required" label)
+• Chart/graph data series distinguished by patterns or labels, not just color
+• Status indicators use icons or text, not just color coding
+• Color-coded information has text equivalents
+
+**Examples:**
+1. Bad: Hyperlinks only in blue with no underline → Good: Links in blue AND underlined
+2. Bad: Required fields with red border only → Good: Required fields have red border AND asterisk AND "required" label
+3. Bad: Pie chart with color-coded sections only → Good: Pie chart sections have both colors AND text labels AND patterns/textures
+4. Bad: "Items in red are on sale" → Good: "Items marked 'SALE' with red text are on sale"
+
+**Note:** Important for all EPUBs, especially educational content with charts, graphs, diagrams, or color-coded information.`,
+  '1.4.3': `**Why Manual Review is Required:**
+Automated tools may miss contrast issues in gradients, images of text, complex backgrounds, and edge cases requiring human judgment.
+
+**What to Check:**
+• Body text has 4.5:1 contrast ratio against background
+• Large text (18pt+ or 14pt+ bold) has 3:1 contrast ratio
+• Text over images has sufficient contrast (may need semi-transparent overlay)
+• Links have sufficient contrast in all states (normal, hover, visited, focus)
+• Disabled elements don't need to meet contrast (but active elements do)
+
+**Examples:**
+1. Standard body text: Black (#000000) on white (#FFFFFF) = 21:1 ✓ Dark gray (#767676) on white = 4.5:1 ✓
+2. Chapter headings (24pt): Medium gray (#959595) on white = 3:1 ✓
+3. Text over photo: Use semi-transparent black overlay behind white text to ensure 4.5:1 contrast
+4. Link colors: Blue links (#0000EE) on white background = 8.2:1 ✓
+
+**Note:** Critical for all EPUBs. Use contrast checking tools (WebAIM Contrast Checker, WCAG Color Contrast Checker) to verify ratios.`,
+  '1.4.5': `**Why Manual Review is Required:**
+Automated tools cannot assess whether images of text are essential or could be replaced with actual styled text.
+
+**What to Check:**
+• Decorative fonts or logos are the only images of text (essential exception)
+• Body content uses real text, not images of text
+• Mathematical equations use MathML or real text when possible (images acceptable if complex)
+• Historical documents or specific visual presentations justified as essential
+• All images of text have accurate alt text as fallback
+
+**Examples:**
+1. ✓ Acceptable: Book cover logo as image, author's signature as image, historical manuscript photo with transcription
+2. ✗ Not acceptable: Chapter headings as PNG images when CSS fonts would work, body paragraphs as screenshots
+3. ✓ Acceptable: Complex chemical structure diagram as image (with alt text description)
+4. ✗ Not acceptable: Styled quote as image when blockquote with CSS would achieve same effect
+
+**Note:** Important for all EPUBs. Prefer real text over images whenever possible to support customization, translation, and accessibility.`,
+  '1.4.10': `**Why Manual Review is Required:**
+Automated tools cannot test actual reflow behavior at different zoom levels and viewport sizes on real reading systems.
+
+**What to Check:**
+• Content reflows at 320px viewport width without horizontal scrolling
+• Text can be zoomed to 200% without loss of content or functionality
+• No content clipped or hidden when zoomed
+• Reading systems allow text resizing and reflow (for reflowable EPUBs)
+• Fixed-width containers don't prevent reflow
+
+**Examples:**
+1. Reflowable EPUB (preferred): Text reflows naturally when reader changes font size or screen width, no horizontal scrolling needed
+2. Tables: Use responsive table design or provide alternative views for narrow screens
+3. Images: Scale proportionally or allow horizontal scrolling for images only (not text)
+4. Fixed-layout EPUB: Acceptable for specific content like children's books, comics, but may not support reflow
+
+**Note:** Critical for reflowable EPUBs. Test on multiple reading systems (Apple Books, Google Play Books, Kindle) at various sizes.`,
+  '1.4.11': `**Why Manual Review is Required:**
+Automated tools cannot identify all meaningful UI components and graphical objects that require contrast checking.
+
+**What to Check:**
+• Interactive element boundaries have 3:1 contrast (button borders, input fields)
+• Focus indicators visible with 3:1 contrast against background
+• Icons and graphical controls distinguishable with 3:1 contrast
+• Chart/graph elements (bars, lines, data points) have 3:1 contrast
+• State indicators (selected, active) visually distinguishable with 3:1 contrast
+
+**Examples:**
+1. Form inputs: Text input border (#767676) against white background = 3:1 ✓
+2. Buttons: Button outline (#595959) against page background = 3:1 ✓
+3. Interactive elements: Clickable icon (#707070) against white = 3.1:1 ✓
+4. Graph elements: Bar chart bars or line graph lines have 3:1 contrast against background
+
+**Note:** Applicable to EPUBs with interactive elements, forms, charts, or diagrams. Most static text-only EPUBs don't have many UI components.`,
+  '1.4.12': `**Why Manual Review is Required:**
+Automated tools cannot test whether content remains readable when users override text spacing with assistive technology.
+
+**What to Check:**
+• Content readable when line height increased to 1.5x font size
+• Content readable when paragraph spacing increased to 2x font size
+• Content readable when letter spacing increased to 0.12x font size
+• Content readable when word spacing increased to 0.16x font size
+• No text clipping, overlapping, or content loss with spacing overrides
+
+**Examples:**
+1. Test with browser extension (e.g., "Text Spacing Editor") or custom CSS applying WCAG spacing values
+2. Verify: Headings don't overlap with content below, table cells expand to fit text, button labels remain visible
+3. Check: Sidebar content doesn't get clipped, footer text remains readable, navigation menus still functional
+4. Ensure: No fixed-height containers that clip text, no absolute positioning causing overlaps
+
+**Note:** Important for all EPUBs. Users with dyslexia or low vision may need custom text spacing. Test by applying CSS overrides.`,
+  '1.4.13': `**Why Manual Review is Required:**
+Automated tools cannot test interactive behavior of tooltips, popovers, and hover-triggered content across input methods.
+
+**What to Check:**
+• Hover-triggered content (tooltips, footnotes) can be dismissed without moving pointer (usually via Esc key)
+• Users can move pointer over triggered content without it disappearing (hoverable)
+• Content remains visible until user dismisses or moves focus away (persistent)
+• Keyboard users can trigger and dismiss content without mouse
+• Content doesn't obscure other important information
+
+**Examples:**
+1. Footnote popups: User hovers on footnote reference → popup appears → user can move mouse over popup to read/select text → user presses Esc or moves away to dismiss
+2. Glossary term definitions: Keyboard focus on term → definition tooltip appears → remains visible until user moves focus away or presses Esc
+3. Image captions: Hover on image → caption appears → stays visible while mouse over image or caption → disappears when mouse leaves
+4. Interactive diagrams: Hover on diagram element → detail popup appears → user can interact with popup content → closes on Esc or click outside
+
+**Note:** Applicable to EPUBs with interactive tooltips, popovers, or hover-triggered content. Static EPUBs typically don't have hover behaviors.`,
   '2.1.1': `**Why Manual Review is Required:**
 Automated tools can detect keyboard handlers but cannot verify actual keyboard operability of interactive elements.
 
@@ -123,7 +387,23 @@ Automated tools cannot detect keyboard traps where focus gets stuck.
 2. An embedded quiz form should allow tabbing through all fields and out of the form
 
 **Note:** Rarely applicable to static EPUBs. Mainly relevant for interactive textbooks with custom JavaScript widgets or complex embedded forms.`,
-  '2.1.4': 'Automated tools cannot verify if single character shortcuts can be remapped or turned off. Manual testing of keyboard shortcuts is required.',
+  '2.1.4': `**Why Manual Review is Required:**
+Automated tools cannot test if single-character keyboard shortcuts can be remapped, disabled, or only active when component has focus.
+
+**What to Check:**
+• Single-character shortcuts (no modifier key) can be turned off in settings
+• Single-character shortcuts can be remapped to different keys
+• Single-character shortcuts only active when specific component has focus
+• Documentation provided for all keyboard shortcuts
+• No conflicts with assistive technology keyboard commands
+
+**Examples:**
+1. Interactive textbook with 'n' key for next page should: allow disabling in preferences, OR allow remapping to 'Ctrl+n', OR only work when navigation menu focused
+2. Quiz interface with 'a','b','c','d' for answers should: only respond when quiz has focus, not when typing in text field
+3. EPUB reader with single-key navigation should: provide shortcut customization panel, allow toggling shortcuts on/off
+4. Math exercise with 'x' key for multiply should: only work when calculator widget focused, not during text input
+
+**Note:** Only applicable to EPUBs with custom JavaScript keyboard shortcuts. Static EPUBs typically don't implement keyboard shortcuts.`,
   '2.2.1': `**Why Manual Review is Required:**
 Automated tools cannot detect time limits or verify user control over timing.
 
@@ -153,7 +433,23 @@ Automated tools cannot detect all auto-updating or moving content.
 2. A scrolling text box with quotes should pause when user focuses on it
 
 **Note:** Rarely applicable to static EPUBs. Only relevant for multimedia EPUBs with animations, auto-playing media, or interactive diagrams.`,
-  '2.3.1': 'Automated tools can detect flashing content but cannot accurately measure if it flashes more than three times per second or if it meets the general flash and red flash thresholds. Manual analysis with specialized tools may be required.',
+  '2.3.1': `**Why Manual Review is Required:**
+Automated tools can detect flashing content but cannot accurately measure flash frequency or assess general/red flash thresholds.
+
+**What to Check:**
+• Content doesn't flash more than 3 times per second
+• If flashing occurs, it's below general flash threshold (area and luminance limits)
+• No red flashes meeting the red flash threshold criteria
+• Animated GIFs, videos, or JavaScript animations reviewed for flash rates
+• Users can pause or stop any flashing content
+
+**Examples:**
+1. Educational animations: Lightning effect in science animation should flash ≤ 3 times per second OR be below threshold size
+2. Video content: Strobe effects or rapid scene changes reviewed for flash rate compliance
+3. Interactive diagrams: Blinking indicators should flash slowly (< 3 Hz) or use fade effects instead
+4. Attention indicators: Use fading or pulsing effects instead of hard flashing
+
+**Note:** Rarely an issue in static EPUBs. More relevant for EPUBs with embedded video, animated GIFs, or JavaScript animations. Use tools like PEAT (Photosensitive Epilepsy Analysis Tool) for detailed analysis.`,
   '2.4.1': `**Why Manual Review is Required:**
 Automated tools cannot assess if bypass mechanisms are effective or appropriately placed.
 
@@ -206,7 +502,23 @@ Automated tools cannot determine if link text is meaningful without surrounding 
 **Examples:**
 1. Bad: "Click here for definition" → Good: "See glossary definition of mitosis"
 2. Bad: Multiple "See footnote" links → Good: "See footnote 1 about cell structure"`,
-  '2.4.5': 'Automated tools cannot determine if there are multiple ways to locate content. Manual inspection of navigation mechanisms is required.',
+  '2.4.5': `**Why Manual Review is Required:**
+Automated tools cannot assess whether multiple navigation methods exist for locating content within an EPUB.
+
+**What to Check:**
+• At least two ways to navigate to any chapter or section
+• Navigation methods include: table of contents, index, search, chapter links, page list
+• Landmark navigation available (nav element, EPUB landmarks)
+• Related content linked bidirectionally (footnotes link back to reference)
+• Reading system search functionality works with content
+
+**Examples:**
+1. Textbook should provide: Table of Contents AND Index AND internal cross-references
+2. Reference book should offer: TOC AND Index AND glossary with links back to usage
+3. Fiction novel can use: TOC for chapters AND page list for page numbers
+4. Technical manual should have: TOC AND searchable terms AND cross-reference links
+
+**Note:** Important for all multi-chapter EPUBs. Single-chapter documents or short stories may have exceptions. Most EPUB reading systems provide TOC and search by default.`,
   '2.4.6': `**Why Manual Review is Required:**
 Automated tools can detect headings/labels but cannot assess if they're descriptive and meaningful.
 
@@ -233,11 +545,88 @@ Automated tools cannot fully verify focus indicators are visible across all UI s
 2. Interactive quiz buttons should have visible border or background change when tabbed to
 
 **Note:** Reading systems may apply their own focus styles, but EPUB content shouldn't remove default indicators.`,
-  '2.5.1': 'Automated tools cannot test pointer gestures and path-based interactions. Manual testing with various input devices is required.',
-  '2.5.2': 'Automated tools cannot verify pointer cancellation behavior. Manual testing of click, touch, and pointer interactions is required.',
-  '2.5.3': 'Automated tools can detect missing labels but cannot verify if visible labels match accessible names. Manual comparison is required.',
-  '2.5.4': 'Automated tools cannot test motion actuation functionality. Manual testing with device motion and orientation changes is required.',
-  '3.1.1': 'While automated tools can detect missing language attributes, they cannot verify if the specified language is correct for the content. Manual review by someone familiar with the language is recommended.',
+  '2.5.1': `**Why Manual Review is Required:**
+Automated tools cannot test multipoint or path-based gestures to verify single-pointer alternatives exist.
+
+**What to Check:**
+• Pinch-to-zoom has single-pointer alternative (zoom buttons)
+• Multi-finger swipe gestures have single-pointer equivalents (navigation buttons)
+• Drawing or path-based input has alternative methods (text input, selection)
+• Drag operations can be performed with single taps/clicks
+• All functionality accessible without complex gestures
+
+**Examples:**
+1. Interactive diagram with pinch-zoom should provide: zoom in/out buttons as alternative
+2. Swipe-to-turn-page should also support: tap/click on next/previous buttons or arrow keys
+3. Drawing exercise should offer: pre-drawn options to select, or text-based answer input
+4. Drag-to-reorder list should allow: up/down buttons or keyboard shortcuts
+
+**Note:** Only applicable to EPUBs with touch-based interactive elements. Most static EPUBs don't require gesture input. Test on touch devices (tablets, phones).`,
+  '2.5.2': `**Why Manual Review is Required:**
+Automated tools cannot test whether pointer operations can be cancelled before completion to prevent accidental activation.
+
+**What to Check:**
+• Down-event (mousedown, touchstart) doesn't trigger actions
+• Actions trigger on up-event (mouseup, touchend) allowing cancellation
+• Users can move pointer away before releasing to cancel action
+• Or mechanism provided to undo completed action
+• Essential exceptions: drag operations, drawing interfaces
+
+**Examples:**
+1. Quiz submit button: Action occurs on button release (up-event), not when pressed down, allowing user to slide finger/mouse away to cancel
+2. Chapter navigation links: Activate on click release, user can press down then drag away to avoid navigation
+3. Interactive elements: Hover + click pattern allows review before commit
+4. Undo available: If down-event must be used, provide clear undo mechanism
+
+**Note:** Only applicable to EPUBs with interactive buttons, links, or touch interfaces. Test by pressing/touching element and dragging away before release.`,
+  '2.5.3': `**Why Manual Review is Required:**
+Automated tools cannot verify that the visible text label is included in the accessible name announced by assistive technology.
+
+**What to Check:**
+• Visible button text matches or is contained in accessible name (aria-label, aria-labelledby)
+• Icon buttons with visible labels include label text in accessible name
+• Form field visible labels match accessible name
+• Link text matches accessible name
+• If aria-label used, it includes visible text
+
+**Examples:**
+1. ✓ Button shows "Submit Quiz" and accessible name is "Submit Quiz" or "Submit Quiz Answers"
+2. ✗ Button shows "Next" but aria-label="Navigate to next chapter" (doesn't include visible "Next" text)
+3. ✓ Search button with magnifying glass icon and "Search" label has aria-label="Search textbook"
+4. ✗ Link text "Chapter 3" but aria-label="Jump to third chapter" (should include "Chapter 3")
+
+**Note:** Applicable to EPUBs with interactive elements, buttons, forms, or custom controls. Important for voice control users who speak visible labels.`,
+  '2.5.4': `**Why Manual Review is Required:**
+Automated tools cannot test whether functionality triggered by device motion has alternative input methods and can be disabled.
+
+**What to Check:**
+• Shake-to-undo has alternative (undo button)
+• Tilt-to-scroll has alternative (scroll buttons or touch)
+• Motion-activated features can be disabled in settings
+• Device orientation changes don't unintentionally trigger actions
+• Motion actuation only used when essential
+
+**Examples:**
+1. Shake-to-shuffle quiz questions should provide: shuffle button as alternative AND option to disable shake detection
+2. Tilt-based 3D model viewer should offer: on-screen rotation controls AND disable motion toggle
+3. Motion-based games/exercises should include: button-based controls AND settings to turn off motion input
+4. Auto-rotate for orientation is acceptable: standard system behavior for viewing content
+
+**Note:** Very rarely applicable to standard EPUBs. Only relevant for enhanced EPUBs with motion-activated features or interactive exercises using device sensors.`,
+  '3.1.1': `**Why Manual Review is Required:**
+Automated tools can detect missing language attributes but cannot verify if the specified language is correct for the content.
+
+**What to Check:**
+• Each chapter/section has lang attribute matching its primary language
+• Book metadata specifies correct primary language
+• Language codes are valid (e.g., "en" for English, "es" for Spanish, "fr" for French)
+• Mixed-language content has appropriate lang attributes on containing elements
+
+**Examples:**
+1. English EPUB should have: <html lang="en"> or epub:type with language declaration
+2. Spanish textbook should declare: <html lang="es"> in each XHTML file
+3. Bilingual dictionary with English and Spanish should mark sections: <section lang="en"> and <section lang="es">
+4. Foreign language textbook teaching French should use lang="fr" for example sentences`,
   '3.1.2': `**Why Manual Review is Required:**
 Automated tools can detect lang attributes but cannot verify language accuracy or identify unmarked foreign passages.
 
@@ -334,9 +723,58 @@ Automated tools cannot determine if labels and instructions are clear and suffic
 2. Required fields should show: "Student ID (required)" not just a red asterisk or color indicator
 
 **Note:** Only applicable to EPUBs with interactive forms or quizzes. Static EPUBs typically don't have input fields.`,
-  '3.3.3': 'Automated tools cannot determine if error suggestions are provided or if they are helpful. Manual testing with intentional errors is required.',
-  '3.3.4': 'Automated tools cannot detect all submission scenarios that may cause legal commitments or financial transactions. Manual review of forms and submission processes is required.',
-  '4.1.1': 'While automated tools can detect many parsing errors, they cannot verify all aspects of valid HTML/XML. Manual code review may be needed for complex scenarios.',
+  '3.3.3': `**Why Manual Review is Required:**
+Automated tools cannot assess whether error messages provide helpful suggestions for correction or if suggestions are appropriate.
+
+**What to Check:**
+• Input errors provide specific correction suggestions
+• Suggestions are relevant and helpful
+• Multiple correction options offered when applicable
+• Format examples provided for common input patterns
+• Suggestions don't compromise security (e.g., password hints)
+
+**Examples:**
+1. Date format error: "Please enter date as MM/DD/YYYY (example: 12/25/2024)" instead of just "Invalid date"
+2. Quiz answer: "Incorrect. The answer is related to photosynthesis. Try focusing on how plants convert light energy." instead of just "Wrong"
+3. Email validation: "Email must include @ symbol (example: student@school.edu)" instead of "Invalid email"
+4. Numeric range: "Please enter a number between 1 and 100" instead of "Out of range"
+
+**Note:** Only applicable to EPUBs with interactive forms, quizzes, or input validation. Static EPUBs typically don't have error handling.`,
+  '3.3.4': `**Why Manual Review is Required:**
+Automated tools cannot identify legal, financial, or data-modifying submissions that require error prevention mechanisms.
+
+**What to Check:**
+• Submissions can be reversed, verified, or confirmed before final commit
+• Legal agreements have review step before acceptance
+• Financial transactions have confirmation page
+• User data modifications can be reviewed before saving
+• Test submissions clearly marked and separated from real submissions
+
+**Examples:**
+1. Purchase/registration forms: "Review Order" page before final "Confirm Purchase" button
+2. License agreements: Checkbox "I have read and agree" + separate "Accept" button (two-step process)
+3. Quiz submissions: "Review Answers" page before final "Submit for Grading"
+4. Profile updates: "Preview Changes" before "Save Profile" with ability to edit
+
+**Note:** Rarely applicable to standard EPUBs. Only relevant for enhanced EPUBs with e-commerce, registration forms, or high-stakes assessments.`,
+  '4.1.1': `**Why Manual Review is Required:**
+Automated tools detect common parsing errors but cannot verify all aspects of valid XHTML/XML markup in complex EPUBs.
+
+**What to Check:**
+• All XHTML files are well-formed XML (properly closed tags, nested correctly)
+• No duplicate IDs within each file
+• Attribute values properly quoted
+• Special characters properly escaped (&lt; &gt; &amp; &quot; &apos;)
+• Namespace declarations correct for EPUB3
+
+**Examples:**
+1. ✓ Well-formed: <p>Text <strong>bold</strong> text</p>
+2. ✗ Malformed: <p>Text <strong>bold</p></strong> (incorrect nesting)
+3. ✓ Proper IDs: <div id="chapter1">...<section id="section1-1">
+4. ✗ Duplicate IDs: <div id="intro">...<section id="intro"> (same ID twice)
+5. ✓ Escaped entities: <p>Use &lt;b&gt; tag for bold</p>
+
+**Note:** Most EPUB creation tools generate valid markup. Manual review mainly needed for hand-coded EPUBs or complex custom elements. Use EPUBCheck for validation.`,
   '4.1.2': `**Why Manual Review is Required:**
 Automated tools cannot verify if interactive elements work correctly with assistive technology.
 
@@ -351,7 +789,23 @@ Automated tools cannot verify if interactive elements work correctly with assist
 2. Interactive quiz answer buttons should announce "Answer A, radio button, not checked" with clear labels
 
 **Note:** Most applicable to interactive EPUBs with custom JavaScript widgets. Standard HTML links and semantic elements typically pass automatically.`,
-  '4.1.3': 'Automated tools cannot detect all status messages or verify if they are properly announced. Manual testing with screen readers is required.',
+  '4.1.3': `**Why Manual Review is Required:**
+Automated tools cannot verify if status messages are properly announced by assistive technology without interrupting user's current task.
+
+**What to Check:**
+• Status messages use appropriate ARIA live regions (role="status", aria-live="polite")
+• Success/error messages announced without moving focus
+• Loading indicators communicate state changes
+• Quiz feedback announced when answers checked
+• Progress updates communicated to screen reader users
+
+**Examples:**
+1. Quiz submission: "Your answer has been saved" message uses <div role="status">Saved</div> (announced without moving focus)
+2. Form validation: Error messages use aria-live="assertive" for immediate announcement
+3. Progress indicator: "Loading chapter 5 of 10" announced as content loads
+4. Search results: "15 results found" announced when search completes
+
+**Note:** Only applicable to EPUBs with dynamic content updates, interactive forms, or JavaScript-driven status changes. Static EPUBs don't have status messages.`,
   'EN-5.2': 'Automated tools cannot verify if accessibility features can be activated without relying on methods that require abilities the user may not possess. Manual testing is required to ensure all activation methods are accessible.',
   'EN-5.3': 'Automated tools cannot assess if biometric authentication provides alternative methods. Manual review is required to verify that users who cannot use biometric features have accessible alternatives.',
   'EN-5.4': 'Automated tools cannot verify if accessibility information is preserved during content transformations. Manual testing across different formats and platforms is required to ensure accessibility features remain intact.',
@@ -378,17 +832,43 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [showIssues, setShowIssues] = useState(false);
   const [showFixedIssues, setShowFixedIssues] = useState(false);
-  const [showManualReason, setShowManualReason] = useState(false);
+  const [showManualReason, setShowManualReason] = useState(true); // Expanded by default so users see guidance
   
   const latestHistory = item.history.length > 0 ? item.history[item.history.length - 1] : null;
   const historyLength = item.history.length;
 
-  // For N/A items, auto-set status and method from the start
-  const hasNaSuggestion = !!item.naSuggestion;
-  const defaultStatus = hasNaSuggestion ? 'verified_pass' : (latestHistory?.status ?? 'verified_pass');
-  const defaultMethod = hasNaSuggestion ? 'Manual Review' : (latestHistory?.method ?? 'Manual Review');
+  // Smart defaults based on confidence (80% threshold - Option C)
+  // Only treat as N/A suggestion if suggestedStatus is 'not_applicable', not 'uncertain'
+  const hasNaSuggestion = !!item.naSuggestion && item.naSuggestion.suggestedStatus === 'not_applicable';
+  const isHighConfidence = item.confidenceScore >= 0.8; // 80% threshold
+  const hasHistory = !!latestHistory?.status;
 
-  const [formStatus, setFormStatus] = useState<VerificationStatus>(defaultStatus);
+  // Determine default status
+  let defaultStatus: VerificationStatus | '' = '';
+  if (hasHistory) {
+    // If already verified, use history status
+    defaultStatus = latestHistory.status;
+  } else if (hasNaSuggestion) {
+    // N/A suggestions (not uncertain) have high confidence, auto-fill
+    defaultStatus = 'verified_pass';
+  } else if (isHighConfidence) {
+    // High confidence (>=80%): pre-fill based on automated result
+    if (item.automatedResult === 'pass') {
+      defaultStatus = 'verified_pass';
+    } else if (item.automatedResult === 'fail') {
+      defaultStatus = 'verified_fail';
+    } else {
+      // warning or not_tested: leave blank (requires explicit selection)
+      defaultStatus = '';
+    }
+  } else {
+    // Low confidence (<80%): leave blank (requires explicit selection)
+    defaultStatus = '';
+  }
+
+  const defaultMethod = hasHistory ? latestHistory.method : 'Manual Review';
+
+  const [formStatus, setFormStatus] = useState<VerificationStatus | ''>(defaultStatus);
   const [formMethod, setFormMethod] = useState<VerificationMethod>(defaultMethod);
   const [formNotes, setFormNotes] = useState(latestHistory?.notes ?? '');
   const [naAccepted, setNaAccepted] = useState(false);
@@ -412,11 +892,12 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
   const StatusIcon = statusConfig.icon;
 
   const requiresNotes = formStatus === 'verified_fail' || formStatus === 'verified_partial';
-  const canSubmit = !requiresNotes || formNotes.trim().length > 0;
+  const hasSelectedStatus = formStatus !== ''; // Require status selection for low confidence items
+  const canSubmit = hasSelectedStatus && (!requiresNotes || formNotes.trim().length > 0);
 
   const handleSubmit = () => {
-    if (canSubmit) {
-      onSubmit(item.id, formStatus, formMethod, formNotes);
+    if (canSubmit && formStatus !== '') {
+      onSubmit(item.id, formStatus as VerificationStatus, formMethod, formNotes);
     }
   };
 
@@ -875,17 +1356,24 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
                 <label htmlFor={`status-${item.id}`} className="block text-sm font-medium text-gray-700 mb-1">
                   Verification Status
                   {hasNaSuggestion && <span className="ml-2 text-xs text-blue-600">(Auto-set for N/A)</span>}
+                  {!isHighConfidence && !hasNaSuggestion && !hasHistory && (
+                    <span className="ml-2 text-xs text-orange-600">(Selection required)</span>
+                  )}
                 </label>
                 <select
                   id={`status-${item.id}`}
                   value={formStatus}
-                  onChange={(e) => setFormStatus(e.target.value as VerificationStatus)}
+                  onChange={(e) => setFormStatus(e.target.value as VerificationStatus | '')}
                   disabled={hasNaSuggestion}
                   className={cn(
                     "w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm",
-                    hasNaSuggestion && "bg-gray-100 cursor-not-allowed"
+                    hasNaSuggestion && "bg-gray-100 cursor-not-allowed",
+                    formStatus === '' && "text-gray-500"
                   )}
                 >
+                  {formStatus === '' && (
+                    <option value="" disabled>Select verification status...</option>
+                  )}
                   {VERIFICATION_STATUSES.map((s) => (
                     <option key={s.value} value={s.value}>{s.label}</option>
                   ))}

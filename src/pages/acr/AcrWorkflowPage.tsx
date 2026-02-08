@@ -318,14 +318,26 @@ export function AcrWorkflowPage() {
 
     setIsInitializingReport(true);
 
-    // Transform verification data from state to API format
-    const verificationData = Object.entries(state.verifications).map(([criterionId, verification]) => ({
-      criterionId,
-      verificationStatus: verification.status,
-      verificationMethod: verification.method,
-      verificationNotes: verification.notes,
-      verifiedAt: verification.verifiedAt,
-    }));
+    // Include ALL criteria (applicable + N/A) from analysis results
+    const verificationData = analysisResults.map(criterion => {
+      const verification = state.verifications[criterion.criterionId || criterion.id];
+
+      // Check if criterion is N/A from AI suggestion
+      const isNA = criterion.naSuggestion?.suggestedStatus === 'not_applicable' &&
+                   (criterion.naSuggestion?.confidence || 0) >= 80;
+
+      return {
+        criterionId: criterion.criterionId || criterion.id,
+        verificationStatus: verification?.status || (isNA ? 'not_applicable' : 'pending'),
+        verificationMethod: verification?.method || 'Manual Review',
+        verificationNotes: verification?.notes || '',
+        isNotApplicable: isNA,
+        naReason: isNA ? criterion.naSuggestion?.rationale : undefined,
+        naSuggestion: isNA ? criterion.naSuggestion : undefined,
+        verifiedAt: verification?.verifiedAt || new Date().toISOString().slice(0, 16).replace('T', ' '),
+        confidence: Math.round((criterion.confidenceScore || 0) * 100), // Convert 0-1 to 0-100 and send to backend
+      };
+    });
 
     // Call initialize report API
     initializeReport(
@@ -348,7 +360,7 @@ export function AcrWorkflowPage() {
         },
       }
     );
-  }, [state.jobId, state.selectedEdition, state.verifications, state.fileName, initializeReport, navigate]);
+  }, [state.jobId, state.selectedEdition, state.verifications, state.fileName, analysisResults, initializeReport, navigate]);
 
   // Track the last applied URL job to detect navigation between jobs
   const lastAppliedJobRef = useRef<string | null>(null);
@@ -649,6 +661,12 @@ export function AcrWorkflowPage() {
 
   const handleNext = async () => {
     if (state.currentStep < WORKFLOW_STEPS.length) {
+      // If moving from Step 4 (Verification) to Step 5 (Review & Edit), initialize report
+      if (state.currentStep === 4 && state.verificationComplete) {
+        handleProceedToReviewEdit();
+        return;
+      }
+
       // If moving from Step 3 (AI Analysis) to Step 4, upload file and create ACR document
       if (state.currentStep === 3 && state.selectedEdition) {
         const fileToUpload = uploadedFileRef.current;
@@ -766,9 +784,10 @@ export function AcrWorkflowPage() {
   };
 
   const handleVerificationUpdate = (itemId: string, status: string, method: string, notes: string) => {
-    updateState({
+    setState(prev => ({
+      ...prev,
       verifications: {
-        ...state.verifications,
+        ...prev.verifications,  // Use prev.verifications, not state.verifications
         [itemId]: {
           status,
           method,
@@ -776,7 +795,7 @@ export function AcrWorkflowPage() {
           verifiedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
         },
       },
-    });
+    }));
   };
 
 
@@ -1155,29 +1174,9 @@ export function AcrWorkflowPage() {
             />
             {state.verificationComplete && (
               <Alert variant="success">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-5 w-5" />
-                    <span>All verification tasks completed. You can proceed to review.</span>
-                  </div>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={handleProceedToReviewEdit}
-                    disabled={isInitializingReport}
-                  >
-                    {isInitializingReport ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Initializing...
-                      </>
-                    ) : (
-                      <>
-                        <Edit3 className="h-4 w-4 mr-2" />
-                        Proceed to Review & Edit
-                      </>
-                    )}
-                  </Button>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5" />
+                  <span>All verification tasks completed. Click "Next" to proceed to review.</span>
                 </div>
               </Alert>
             )}
@@ -1424,12 +1423,17 @@ export function AcrWorkflowPage() {
           ) : (
             <Button
               onClick={handleNext}
-              disabled={!canProceed() || isUploading}
+              disabled={!canProceed() || isUploading || isInitializingReport}
             >
-              {isUploading ? (
+              {isUploading || isInitializingReport ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  Processing...
+                  {isInitializingReport ? 'Initializing...' : 'Processing...'}
+                </>
+              ) : state.currentStep === 4 ? (
+                <>
+                  Review & Edit
+                  <ChevronRight className="h-4 w-4 ml-1" />
                 </>
               ) : (
                 <>
