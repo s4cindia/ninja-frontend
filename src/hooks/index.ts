@@ -6,3 +6,17 @@ export * from './useDashboard';
 export * from './useAcr';
 export * from './useRemediationConfig';
 export * from './useRemediationResults';
+
+// Citation Management
+export {
+  useCitationsByJob,
+  useCitationsByDocument,
+  useCitation,
+  useCitationComponents,
+  useCitationStats,
+  useDetectCitations,
+  useDetectCitationsFromJob,
+  useParseCitation,
+  useParseAllCitations,
+  citationKeys,
+} from './useCitation';

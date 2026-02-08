@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { AlertCircle, Search, MinusCircle, CheckCircle, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { AlertCircle, Search, MinusCircle, CheckCircle, ChevronDown, ChevronUp, ExternalLink, Lightbulb } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { NaSuggestion } from '@/types/confidence.types';
 
 interface AuditIssue {
   code: string;
@@ -41,6 +42,7 @@ export interface CriterionRow {
   manualTest?: ManualTest;
   remarks?: string;
   conformanceLevel?: 'supports' | 'partially_supports' | 'does_not_support' | 'not_applicable';
+  naSuggestion?: NaSuggestion;
 }
 
 interface CriteriaTableProps {
@@ -338,6 +340,15 @@ export const CriteriaTable: React.FC<CriteriaTableProps> = ({
                           <span className={`text-xs font-medium ${getStatusColor(criterion.status)}`}>
                             {getStatusText(criterion.status)}
                           </span>
+                          {criterion.naSuggestion && (
+                            <span 
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium"
+                              title={`AI suggests N/A (${criterion.naSuggestion.confidence}% confidence)`}
+                            >
+                              <Lightbulb className="h-3 w-3" aria-hidden="true" />
+                              N/A
+                            </span>
+                          )}
                         </div>
                       </td>
 

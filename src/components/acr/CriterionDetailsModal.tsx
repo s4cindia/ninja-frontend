@@ -7,8 +7,10 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '@/services/api';
 import { cn } from '@/lib/utils';
 import { wcagDocumentationService } from '@/services/wcag-documentation.service';
+import { verificationService } from '@/services/verification.service';
+import { NaSuggestionBanner } from './NaSuggestionBanner';
 import type { CriterionConfidence } from '@/services/api';
-import type { IssueMapping, RemediatedIssue } from '@/types/confidence.types';
+import type { IssueMapping, RemediatedIssue, NaSuggestion } from '@/types/confidence.types';
 
 function isFixedStatus(issue: RemediatedIssue): boolean {
   const status = issue.remediationInfo?.status ?? issue.status;
@@ -31,6 +33,7 @@ interface CriterionDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onVerifyClick?: (criterionId: string) => void;
+  onStatusChange?: (criterionId: string, newStatus: string) => void;
   mode?: 'preview' | 'interactive';
 }
 
@@ -42,11 +45,28 @@ export function CriterionDetailsModal({
   isOpen,
   onClose,
   onVerifyClick,
+  onStatusChange,
   mode = 'interactive'
 }: CriterionDetailsModalProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'issues' | 'testing' | 'remediation' | 'wcag'>('overview');
   const [epubTitle, setEpubTitle] = useState<string>('');
   const [hasRemediationData, setHasRemediationData] = useState<boolean>(false);
+  const [naAccepted, setNaAccepted] = useState<boolean>(false);
+
+  const handleQuickAcceptNa = async (data: {
+    criterionId: string;
+    jobId: string;
+    status: 'not_applicable';
+    method: 'quick_accept';
+    notes: string;
+  }) => {
+    await verificationService.submitNaVerification(data);
+  };
+
+  const handleNaAcceptSuccess = () => {
+    setNaAccepted(true);
+    onStatusChange?.(criterion.criterionId, 'not_applicable');
+  };
   const navigate = useNavigate();
   const wcagDocs = wcagDocumentationService.getDocumentation(criterion.criterionId);
 
@@ -181,18 +201,23 @@ export function CriterionDetailsModal({
 
           <div className="flex-1 overflow-y-auto mt-4">
             <TabsContent value="overview" className="space-y-4 mt-0">
-              {criterion.isNotApplicable && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-                  <div className="flex-shrink-0 mt-0.5">
-                    <svg className="h-5 w-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-blue-900 mb-1">Not Applicable</h4>
-                    <p className="text-sm text-blue-800">
-                      {criterion.naReason || 'This criterion does not apply to your content.'}
-                    </p>
+              {criterion.naSuggestion?.suggestedStatus === 'not_applicable' && jobId && !naAccepted && (
+                <NaSuggestionBanner
+                  naSuggestion={criterion.naSuggestion as NaSuggestion}
+                  criterionId={criterion.criterionId}
+                  jobId={jobId}
+                  onQuickAccept={handleQuickAcceptNa}
+                  onAcceptSuccess={handleNaAcceptSuccess}
+                />
+              )}
+
+              {naAccepted && (
+                <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-4 rounded-r-lg">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <span className="text-green-800 font-medium">
+                      Not Applicable status accepted and saved
+                    </span>
                   </div>
                 </div>
               )}
@@ -220,28 +245,11 @@ export function CriterionDetailsModal({
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Confidence Score:</span>
-                    <span className="font-medium">{Math.round(criterion.confidenceScore * 100)}%</span>
+                    <span className="font-medium">{criterion.confidenceScore}%</span>
                   </div>
                   {criterion.needsVerification && (
                     <div className="bg-orange-50 border border-orange-200 rounded px-3 py-2 text-sm text-orange-800">
                       This criterion requires human verification
-                    </div>
-                  )}
-                  {remediatedIssues && remediatedIssues.filter(isFixedStatus).length > 0 && (
-                    <div className="bg-green-50 border border-green-200 rounded px-3 py-2">
-                      <div className="flex items-center gap-2 text-sm font-medium text-green-900 mb-1">
-                        <CheckCircle className="h-4 w-4" />
-                        {remediatedIssues.filter(isFixedStatus).length} Issue{remediatedIssues.filter(isFixedStatus).length !== 1 ? 's' : ''} Fixed
-                      </div>
-                      <p className="text-xs text-green-800">
-                        Automated remediation successfully fixed {remediatedIssues.filter(isFixedStatus).length} accessibility issue{remediatedIssues.filter(isFixedStatus).length !== 1 ? 's' : ''} related to this criterion.
-                        <button
-                          onClick={() => setActiveTab('issues')}
-                          className="ml-1 underline hover:text-green-900 font-medium"
-                        >
-                          View details →
-                        </button>
-                      </p>
                     </div>
                   )}
                 </div>

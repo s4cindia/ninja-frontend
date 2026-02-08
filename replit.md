@@ -80,6 +80,17 @@ The application features a clean, responsive design built with Tailwind CSS. It 
 
 ## Recent Changes (February 2026)
 
+### Quick Accept N/A Feature (AI-Suggested Not Applicable)
+New feature allowing AI-suggested "Not Applicable" status for WCAG criteria with one-click acceptance:
+- **NaSuggestion Type**: Added to `confidence.types.ts` with `suggestedStatus`, `confidence`, `rationale`, `detectionChecks`, and `edgeCases` fields.
+- **NaSuggestionBanner Component**: Blue banner displayed in CriterionDetailsModal when AI suggests N/A status. Features:
+  - Confidence badge (High ≥90% green, Medium 60-89% yellow, Low <60% red)
+  - Quick Accept button for high-confidence suggestions (≥90%)
+  - Expandable detection checks section showing what was analyzed
+  - Edge cases warnings section
+- **Verification Service**: New `submitNaVerification` method sends AI-suggested N/A status to backend with auto-generated notes.
+- **CriterionDetailsModal Integration**: Banner appears at top of Overview tab; `onStatusChange` callback notifies parent when status changes.
+
 ### ACR Post-Remediation Integration Complete
 The ACR AI Analysis step now correctly displays remediated data from the backend after EPUB remediation. Verified integration includes:
 - **Confidence Scores**: Backend returns deterministic scores (80-95%) based on remediation status. Frontend handles both `confidence` and `confidenceScore` field names.

@@ -54,7 +54,7 @@ export const TransferToAcrButton: React.FC<TransferToAcrButtonProps> = ({
       params.set('fileName', fileName);
     }
     const queryString = params.toString();
-    
+
     if (acrWorkflowId) {
       navigate(`/acr/workflow/${acrWorkflowId}${queryString ? `?${queryString}` : ''}`);
     } else {

@@ -5,10 +5,8 @@ import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { VerificationItem } from './VerificationItem';
 import { CriterionDetailsModal } from './CriterionDetailsModal';
-import { VerificationSummaryCard } from './VerificationSummaryCard';
-import { NotApplicableSection } from './NotApplicableSection';
 import { useVerificationQueue, useSubmitVerification, useBulkVerification } from '@/hooks/useVerification';
-import { CONFIDENCE_THRESHOLDS, NA_QUICK_ACCEPT_THRESHOLD } from '@/constants/verification';
+import { CONFIDENCE_THRESHOLD_HIGH, CONFIDENCE_THRESHOLDS, NA_QUICK_ACCEPT_THRESHOLD } from '@/constants/verification';
 import { MOCK_VERIFICATION_ITEMS } from '@/constants/mockVerificationData';
 import type { CriterionConfidence } from '@/services/api';
 import type { 
@@ -39,13 +37,11 @@ interface VerificationQueueProps {
 }
 
 function needsHumanVerification(c: CriterionConfidence): boolean {
-  // Explicit verification flags take precedence
   if (c.needsVerification === true) return true;
   if (c.needsVerification === false) return false;
-
-  // Include all criteria (N/A, low confidence, and high confidence) for human review
-  // This allows users to spot-check high-confidence results and verify N/A suggestions
-  return true;
+  if (c.status === 'not_applicable') return false;
+  if (c.confidenceScore < CONFIDENCE_THRESHOLD_HIGH) return true;
+  return false;
 }
 
 function convertCriteriaToVerificationItems(
@@ -55,11 +51,10 @@ function convertCriteriaToVerificationItems(
   const filtered = criteria.filter(needsHumanVerification);
   
   return filtered.map((c, index) => {
-      const saved = savedVerifications?.[c.criterionId || c.id];
+      const saved = savedVerifications?.[c.id];
       const score = typeof c.confidenceScore === 'number' ? c.confidenceScore : 0;
-      const scorePercentage = Math.round(score * 100); // Convert 0-1 scale to percentage
-
-      const confidenceLevel: ConfidenceLevel =
+      
+      const confidenceLevel: ConfidenceLevel = 
         score >= CONFIDENCE_THRESHOLDS.HIGH ? 'high' :
         score >= CONFIDENCE_THRESHOLDS.MEDIUM ? 'medium' :
         score > CONFIDENCE_THRESHOLDS.LOW ? 'low' : 'manual';
@@ -107,10 +102,7 @@ function convertCriteriaToVerificationItems(
       const remainingCount = c.remainingCount ?? issues?.length ?? 0;
       const fixedCount = c.fixedCount ?? fixedIssues?.length ?? 0;
       const totalIssueCount = remainingCount + fixedCount;
-
-      // Use N/A suggestion confidence if available, otherwise use ACR analysis confidence
-      const displayConfidence = c.naSuggestion?.confidence ?? scorePercentage;
-
+      
       let automatedNotesWithIssues: string;
       if (totalIssueCount > 0) {
         const parts: string[] = [];
@@ -122,17 +114,17 @@ function convertCriteriaToVerificationItems(
         }
         automatedNotesWithIssues = parts.join(', ') + '. ' + (c.remarks || '');
       } else {
-        automatedNotesWithIssues = c.remarks || `Automated analysis flagged this criterion for human review. Confidence: ${displayConfidence}%`;
+        automatedNotesWithIssues = c.remarks || `Automated analysis flagged this criterion for human review. Confidence: ${score}%`;
       }
 
       const baseItem: VerificationItemType = {
-        id: c.criterionId || c.id || `criterion-${index}`, // Use criterionId as the primary ID
+        id: c.id || `criterion-${index}`,
         criterionId: c.criterionId || `Unknown-${index}`,
         criterionName: c.name || 'Unknown Criterion',
         wcagLevel: c.level || 'A',
         severity,
         confidenceLevel,
-        confidenceScore: displayConfidence,
+        confidenceScore: score,
         automatedResult,
         automatedNotes: automatedNotesWithIssues,
         status: 'pending',
@@ -197,7 +189,7 @@ const VERIFICATION_METHODS: VerificationMethod[] = [
   'WAVE',
 ];
 
-export function VerificationQueue({ jobId, fileName: _fileName, onComplete, savedVerifications, onVerificationUpdate, criteriaFromAnalysis }: VerificationQueueProps) {
+export function VerificationQueue({ jobId, fileName, onComplete, savedVerifications, onVerificationUpdate, criteriaFromAnalysis }: VerificationQueueProps) {
   const [filters, setFilters] = useState<VerificationFilters>({});
   const [showFilters, setShowFilters] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
@@ -305,28 +297,11 @@ export function VerificationQueue({ jobId, fileName: _fileName, onComplete, save
     }
   }, [apiData, error, hasCriteriaFromAnalysis, useLocalItems]);
 
-  const items = useMemo(() =>
+  const items = useMemo(() => 
     useLocalItems || useMockData ? localItems : (apiData?.items ?? []),
     [useLocalItems, useMockData, localItems, apiData?.items]
   );
   const isSubmitting = submitMutation.isPending || bulkMutation.isPending;
-
-  // Separate items into applicable and N/A lists
-  const { applicableItems, naItems } = useMemo(() => {
-    const applicable: VerificationItemType[] = [];
-    const na: VerificationItemType[] = [];
-
-    items.forEach(item => {
-      // Check if item has high-confidence N/A suggestion
-      if (item.naSuggestion?.suggestedStatus === 'not_applicable') {
-        na.push(item);
-      } else {
-        applicable.push(item);
-      }
-    });
-
-    return { applicableItems: applicable, naItems: na };
-  }, [items]);
 
   const bulkRequiresNotes = bulkStatus === 'verified_fail' || bulkStatus === 'verified_partial';
   const canBulkSubmit = selectedItems.size > 0 && (!bulkRequiresNotes || bulkNotes.trim().length > 0);
@@ -341,8 +316,8 @@ export function VerificationQueue({ jobId, fileName: _fileName, onComplete, save
   }, [items, selectedItems]);
 
   const filteredItems = useMemo(() => {
-    if (!useMockData) return applicableItems;
-    return applicableItems.filter((item) => {
+    if (!useMockData) return items;
+    return items.filter((item) => {
       if (filters.severity?.length && !filters.severity.includes(item.severity)) {
         return false;
       }
@@ -362,16 +337,16 @@ export function VerificationQueue({ jobId, fileName: _fileName, onComplete, save
       }
       return true;
     });
-  }, [applicableItems, filters, useMockData]);
+  }, [items, filters, useMockData]);
 
   // Memoize verification count to prevent unnecessary recalculations
-  // Only count verified APPLICABLE items (exclude N/A from the count)
   const verifiedCount = useMemo(() => {
-    return applicableItems.filter(i =>
+    return items.filter(i => 
       i.status === 'verified_pass' || i.status === 'verified_fail' || i.status === 'verified_partial'
     ).length;
-  }, [applicableItems]);
-  const totalCount = applicableItems.length;
+  }, [items]);
+  const totalCount = items.length;
+  const progressPercent = totalCount > 0 ? Math.round((verifiedCount / totalCount) * 100) : 0;
 
   const criteriaMap = useMemo(() => {
     const map = new Map<string, CriterionConfidence>();
@@ -579,8 +554,29 @@ export function VerificationQueue({ jobId, fileName: _fileName, onComplete, save
 
   return (
     <div className="space-y-6">
-      {/* Verification Summary Dashboard */}
-      <VerificationSummaryCard items={items} verifiedCount={verifiedCount} />
+      <div className="bg-white rounded-lg border p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-gray-900">Verification Progress</h3>
+          <span className="text-sm text-gray-600">{verifiedCount} of {totalCount} items verified</span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-3">
+          <div
+            className="bg-green-500 h-3 rounded-full transition-all"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+        <div className="flex items-center justify-between mt-2">
+          <div className="flex flex-col gap-0.5">
+            {fileName && (
+              <p className="text-sm font-medium text-gray-700">{fileName}</p>
+            )}
+            <p className="text-xs text-gray-500">Job ID: {jobId}</p>
+          </div>
+          {useMockData && (
+            <span className="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded">Demo Mode</span>
+          )}
+        </div>
+      </div>
 
       <div className="bg-white rounded-lg border overflow-hidden">
         <div className="px-4 py-3 border-b bg-gray-50 flex items-center justify-between">
@@ -770,9 +766,6 @@ export function VerificationQueue({ jobId, fileName: _fileName, onComplete, save
           )}
         </div>
       </div>
-
-      {/* Not Applicable Section */}
-      <NotApplicableSection items={naItems} />
 
       {/* Action buttons - always visible */}
       <div className="bg-white rounded-lg border p-4 flex items-center justify-between">
