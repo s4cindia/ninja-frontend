@@ -113,12 +113,12 @@ export function NASuggestionBanner({ suggestion, onAccept, isAccepting }: NASugg
             ) : (
               <ChevronRight className="h-3 w-3" />
             )}
-            {showDetails ? 'Hide' : 'Show'} Detection Details ({suggestion.detectionChecks.length} checks)
+            {showDetails ? 'Hide' : 'Show'} Detection Details ({suggestion.detectionChecks?.length ?? 0} checks)
           </button>
 
           {showDetails && (
             <div className="mt-2 space-y-1.5">
-              {suggestion.detectionChecks.map((check, idx) => (
+              {suggestion.detectionChecks?.map((check, idx) => (
                 <div key={idx} className="flex items-start gap-2 text-xs bg-white/50 rounded px-2 py-1.5 border border-current/20">
                   <span className="flex-shrink-0 mt-0.5">
                     {check.result === 'pass' && (

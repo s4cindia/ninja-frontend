@@ -22,11 +22,16 @@ export const Dialog: React.FC<DialogProps> = ({ open, onOpenChange, children }) 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      role="dialog"
+      aria-modal="true"
+    >
       {/* Overlay */}
       <div
         className="fixed inset-0 bg-black/50"
         onClick={() => onOpenChange(false)}
+        aria-hidden="true"
       />
       {/* Content */}
       {children}

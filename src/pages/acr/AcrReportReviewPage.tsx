@@ -328,8 +328,13 @@ export function AcrReportReviewPage() {
   const handleRestore = async (versionId: string) => {
     try {
       // Get auth token
-      const authData = localStorage.getItem('ninja-auth');
-      const token = authData ? JSON.parse(authData).token : null;
+      let token: string | null = null;
+      try {
+        const authData = localStorage.getItem('ninja-auth');
+        token = authData ? JSON.parse(authData).token : null;
+      } catch (error) {
+        console.error('Failed to parse auth data from localStorage:', error);
+      }
 
       // Copy the version data to create a new latest version
       const response = await fetch(`/api/v1/acr/report/version/${versionId}`, {

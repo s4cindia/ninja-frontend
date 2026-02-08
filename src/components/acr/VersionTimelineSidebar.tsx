@@ -1,10 +1,7 @@
 import React, { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import {
   Clock,
   CheckCircle,
-  FileText,
-  Download,
   RotateCcw,
   ChevronDown,
   ChevronUp,
@@ -39,7 +36,6 @@ export const VersionTimelineSidebar: React.FC<VersionTimelineSidebarProps> = ({
 }) => {
   const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
   const [selectedForCompare, setSelectedForCompare] = useState<string[]>([]);
-  const queryClient = useQueryClient();
 
   // Fetch versions using the authenticated hook
   const { data: versions, isLoading, error } = useAcrVersions(jobId, {

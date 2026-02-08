@@ -11,6 +11,12 @@
 # Add or remove patterns in PROTECTED_PATTERNS to customize.
 # ============================================================================
 
+# Check for jq dependency
+if ! command -v jq &> /dev/null; then
+  echo "Warning: jq is not installed, skipping file protection check" >&2
+  exit 0
+fi
+
 INPUT=$(cat)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
 

@@ -56,6 +56,7 @@ interface TabsListProps {
 export const TabsList: React.FC<TabsListProps> = ({ children, className }) => {
   return (
     <div
+      role="tablist"
       className={cn(
         'inline-flex h-10 items-center justify-center rounded-md bg-gray-100 p-1 text-gray-600',
         className
@@ -79,10 +80,16 @@ export const TabsTrigger: React.FC<TabsTriggerProps> = ({
 }) => {
   const { value, onValueChange } = useTabsContext();
   const isActive = value === triggerValue;
+  const panelId = `tab-panel-${triggerValue}`;
+  const tabId = `tab-${triggerValue}`;
 
   return (
     <button
       type="button"
+      role="tab"
+      id={tabId}
+      aria-selected={isActive}
+      aria-controls={panelId}
       onClick={() => onValueChange(triggerValue)}
       className={cn(
         'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-white transition-all',
@@ -111,6 +118,8 @@ export const TabsContent: React.FC<TabsContentProps> = ({
   className
 }) => {
   const { value } = useTabsContext();
+  const panelId = `tab-panel-${contentValue}`;
+  const tabId = `tab-${contentValue}`;
 
   if (value !== contentValue) {
     return null;
@@ -118,6 +127,9 @@ export const TabsContent: React.FC<TabsContentProps> = ({
 
   return (
     <div
+      role="tabpanel"
+      id={panelId}
+      aria-labelledby={tabId}
       className={cn(
         'mt-2 ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2',
         className
