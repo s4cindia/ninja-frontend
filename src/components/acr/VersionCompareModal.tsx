@@ -109,7 +109,7 @@ export const VersionCompareModal: React.FC<VersionCompareModalProps> = ({
               <ArrowLeftRight className="h-5 w-5" />
               Compare Versions
             </DialogTitle>
-            <Button variant="ghost" size="sm" onClick={onClose}>
+            <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close version compare modal" title="Close">
               <X className="h-4 w-4" />
             </Button>
           </div>

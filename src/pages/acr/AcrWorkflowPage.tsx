@@ -345,7 +345,7 @@ export function AcrWorkflowPage() {
         jobId: state.jobId,
         edition: state.selectedEdition.code,
         verificationData,
-        documentTitle: state.fileName || 'Untitled Document',
+        documentTitle: state.documentTitle || state.fileName || 'Untitled Document',
       },
       {
         onSuccess: () => {
@@ -360,7 +360,7 @@ export function AcrWorkflowPage() {
         },
       }
     );
-  }, [state.jobId, state.selectedEdition, state.verifications, state.fileName, analysisResults, initializeReport, navigate]);
+  }, [state.jobId, state.selectedEdition, state.verifications, state.documentTitle, state.fileName, analysisResults, initializeReport, navigate]);
 
   // Track the last applied URL job to detect navigation between jobs
   const lastAppliedJobRef = useRef<string | null>(null);

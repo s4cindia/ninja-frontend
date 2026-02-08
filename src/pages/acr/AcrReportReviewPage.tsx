@@ -82,6 +82,12 @@ function CriterionCard({ criterion, acrJobId, isExpanded, onToggleExpand }: Crit
       {/* Card Header - Always Visible */}
       <div className="px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors cursor-pointer"
         onClick={() => !showEditModal && onToggleExpand()}
+        onKeyDown={(e) => {
+          if (!showEditModal && (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar')) {
+            e.preventDefault();
+            onToggleExpand();
+          }
+        }}
         role="button"
         tabIndex={0}
         aria-expanded={isExpanded}
@@ -352,7 +358,7 @@ export function AcrReportReviewPage() {
 
       if (!response.ok) throw new Error('Failed to fetch version');
 
-      const _versionData = await response.json();
+      await response.json(); // Parse response but not used yet
 
       // Re-initialize with this version's data
       alert('Restore functionality coming soon! This will create a new draft based on this version.');
@@ -608,7 +614,7 @@ export function AcrReportReviewPage() {
             </div>
             <div>
               <div className="text-sm text-gray-500">Status</div>
-              <div className="text-base font-medium text-gray-900 capitalize">{acrJob.status.replace('_', ' ')}</div>
+              <div className="text-base font-medium text-gray-900 capitalize">{acrJob.status.replaceAll('_', ' ')}</div>
             </div>
             <div>
               <div className="text-sm text-gray-500">Last Updated</div>
