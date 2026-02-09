@@ -35,6 +35,8 @@ import { TestCitationComponents } from '@/test-pages/TestCitationComponents';
 import { VerificationQueuePage } from '@/pages/acr/VerificationQueuePage';
 import { AcrEditorPage } from '@/pages/acr/AcrEditorPage';
 import { AcrWorkflowPage } from '@/pages/acr/AcrWorkflowPage';
+import AcrAnalysisPage from '@/pages/acr/AcrAnalysisPage';
+import { AcrReportReviewPage } from '@/pages/acr/AcrReportReviewPage';
 import { EPUBAccessibility } from '@/pages/EPUBAccessibility';
 import { EPUBRemediation } from '@/pages/EPUBRemediation';
 import { EPUBComparison } from '@/pages/EPUBComparison';
@@ -164,8 +166,10 @@ function AppRoutes() {
           <Route path="/compliance/fpc/:fileId" element={<FpcPage />} />
           <Route path="/acr/verification/:jobId" element={<VerificationQueuePage />} />
           <Route path="/acr/editor/:jobId" element={<AcrEditorPage />} />
+          <Route path="/acr/analysis/:jobId" element={<AcrAnalysisPage />} />
           <Route path="/acr/workflow" element={<AcrWorkflowPage />} />
           <Route path="/acr/workflow/:jobId" element={<AcrWorkflowPage />} />
+          <Route path="/acr/report/review/:jobId" element={<AcrReportReviewPage />} />
           <Route path="/epub" element={<EPUBAccessibility />} />
           <Route path="/epub/remediate/:jobId" element={<EPUBRemediation />} />
           <Route path="/epub/compare/:jobId" element={<EPUBComparison />} />

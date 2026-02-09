@@ -1,34 +1,72 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, AlertCircle, Info, CheckCircle, HelpCircle } from 'lucide-react';
+import { InfoTooltip } from '@/components/ui/InfoTooltip';
 
 interface ExpandableSectionProps {
   title: string;
   count: number;
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
+  badge?: string; // Badge text like "90-98%", "100%", "N/A"
   defaultExpanded?: boolean;
-  children: React.ReactNode;
+  nested?: boolean; // For nested sections with indent
   headerColor?: string;
+  children: React.ReactNode;
+  alert?: {
+    type: 'info' | 'warning' | 'success';
+    message: string;
+  };
+  infoTooltip?: React.ReactNode; // Tooltip content for info icon
 }
 
 export function ExpandableSection({
   title,
   count,
   icon,
+  badge,
   defaultExpanded = false,
+  nested = false,
+  headerColor = 'bg-gray-50 border-gray-200',
   children,
-  headerColor = 'bg-gray-100',
+  alert,
+  infoTooltip,
 }: ExpandableSectionProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setIsExpanded(!isExpanded);
+    }
+  };
+
+  const alertStyles = {
+    info: 'bg-blue-50 border-blue-200 text-blue-800',
+    warning: 'bg-orange-50 border-orange-200 text-orange-800',
+    success: 'bg-green-50 border-green-200 text-green-800',
+  };
+
+  const alertIcons = {
+    info: <Info className="h-4 w-4 flex-shrink-0" />,
+    warning: <AlertCircle className="h-4 w-4 flex-shrink-0" />,
+    success: <CheckCircle className="h-4 w-4 flex-shrink-0" />,
+  };
+
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden mb-4">
+    <div className={nested ? 'ml-6 mb-3' : 'mb-4'}>
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
-        className={`w-full flex items-center justify-between p-4 ${headerColor} hover:opacity-90 transition-opacity`}
+        onKeyDown={handleKeyDown}
+        className={`
+          w-full flex items-center justify-between p-4
+          border rounded-lg transition-colors
+          hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500
+          ${nested ? 'border-l-4' : ''}
+          ${headerColor}
+        `}
         aria-expanded={isExpanded}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {icon}
           <span className="font-semibold text-gray-900">
             {title}
@@ -36,17 +74,45 @@ export function ExpandableSection({
           <span className="text-sm text-gray-600">
             ({count})
           </span>
+          {badge && (
+            <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+              {badge}
+            </span>
+          )}
+          {infoTooltip && (
+            <InfoTooltip content={infoTooltip}>
+              <HelpCircle
+                className="h-4 w-4 text-gray-400 hover:text-gray-600 transition-colors cursor-help"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </InfoTooltip>
+          )}
         </div>
         {isExpanded ? (
-          <ChevronDown className="h-5 w-5 text-gray-600" aria-hidden="true" />
+          <ChevronDown className="h-5 w-5 text-gray-600 transition-transform" aria-hidden="true" />
         ) : (
-          <ChevronRight className="h-5 w-5 text-gray-600" aria-hidden="true" />
+          <ChevronRight className="h-5 w-5 text-gray-600 transition-transform" aria-hidden="true" />
         )}
       </button>
 
       {isExpanded && (
-        <div className="p-4 bg-white space-y-3">
-          {children}
+        <div className="mt-2">
+          {alert && (
+            <div
+              className={`
+                flex items-start gap-2 p-3 mb-4
+                border rounded-lg
+                ${alertStyles[alert.type]}
+              `}
+              role="alert"
+            >
+              {alertIcons[alert.type]}
+              <p className="text-sm">{alert.message}</p>
+            </div>
+          )}
+          <div className="space-y-3">
+            {children}
+          </div>
         </div>
       )}
     </div>

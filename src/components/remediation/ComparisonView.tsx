@@ -288,11 +288,17 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <div className="text-sm text-gray-500 mb-2">Accessibility Score</div>
                   <div className="flex items-center justify-between">
-                    <span className="text-2xl font-bold text-red-600">
+                    <span className={clsx(
+                      "text-2xl font-bold",
+                      improvement.scoreChange > 0 ? 'text-red-600' : improvement.scoreChange < 0 ? 'text-green-600' : 'text-gray-600'
+                    )}>
                       {improvement.beforeScore}
                     </span>
                     <ArrowRight className="h-5 w-5 text-gray-400 mx-2" />
-                    <span className="text-2xl font-bold text-green-600">
+                    <span className={clsx(
+                      "text-2xl font-bold",
+                      improvement.scoreChange > 0 ? 'text-green-600' : improvement.scoreChange < 0 ? 'text-red-600' : 'text-gray-600'
+                    )}>
                       {improvement.afterScore}
                     </span>
                   </div>

@@ -122,7 +122,7 @@ export function BatchAcrList({
         </CardContent>
       </Card>
 
-      <Card padding="none">
+      <Card className="p-0">
         <CardHeader className="px-6 pt-6">
           <CardTitle>Individual ACR Workflows ({acrWorkflowIds.length})</CardTitle>
         </CardHeader>

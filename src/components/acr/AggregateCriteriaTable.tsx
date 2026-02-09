@@ -70,7 +70,7 @@ export function AggregateCriteriaTable({ criteria }: AggregateCriteriaTableProps
         const isExpanded = expandedCriteria.has(criterion.criterionId);
 
         return (
-          <Card key={criterion.criterionId} padding="none">
+          <Card key={criterion.criterionId} className="p-0">
             <CardContent className="p-4">
               <div className="flex items-start">
                 <button

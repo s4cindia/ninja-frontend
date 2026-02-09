@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
-import { Tabs } from '@/components/ui/Tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import { ParsedComponentsView } from './ParsedComponentsView';
 import { useCitationComponents, useParseCitation } from '@/hooks/useCitation';
 import { cn } from '@/utils/cn';
@@ -272,11 +272,11 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
                 value={activeTab}
                 onValueChange={(v) => setActiveTab(v as 'current' | 'history')}
               >
-                <Tabs.List>
-                  <Tabs.Trigger value="current">
+                <TabsList>
+                  <TabsTrigger value="current">
                     Current Parse
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="history" className="flex items-center gap-1">
+                  </TabsTrigger>
+                  <TabsTrigger value="history" className="flex items-center gap-1">
                     <History className="h-4 w-4" />
                     History
                     {components && components.length > 1 && (
@@ -284,19 +284,19 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
                         {components.length}
                       </Badge>
                     )}
-                  </Tabs.Trigger>
-                </Tabs.List>
+                  </TabsTrigger>
+                </TabsList>
 
-                <Tabs.Content value="current" className="mt-4">
+                <TabsContent value="current" className="mt-4">
                   {citation.primaryComponent && (
                     <ParsedComponentsView
                       component={citation.primaryComponent}
                       isPrimary={true}
                     />
                   )}
-                </Tabs.Content>
+                </TabsContent>
 
-                <Tabs.Content value="history" className="mt-4">
+                <TabsContent value="history" className="mt-4">
                   {isLoadingHistory ? (
                     <div className="flex justify-center py-8">
                       <Spinner className="h-6 w-6" />
@@ -323,7 +323,7 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
                       No parse history available
                     </p>
                   )}
-                </Tabs.Content>
+                </TabsContent>
               </Tabs>
             ) : (
               <Card className="p-8 text-center">

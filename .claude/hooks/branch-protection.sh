@@ -1,0 +1,66 @@
+#!/bin/bash
+# ============================================================================
+# Branch Protection
+# ============================================================================
+# Prevents Claude from:
+#   1. Committing or pushing directly to main/master
+#   2. Editing files while on main/master
+# Forces use of feature branches BEFORE any work begins.
+# ============================================================================
+
+INPUT=$(cat)
+
+# Get current branch
+BRANCH=$(git branch --show-current 2>/dev/null)
+
+# If not in a git repo or can't determine branch, allow
+if [ -z "$BRANCH" ]; then
+  exit 0
+fi
+
+# Only protect main/master
+if [ "$BRANCH" != "main" ] && [ "$BRANCH" != "master" ]; then
+  exit 0
+fi
+
+# Determine what type of tool use triggered this hook
+TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
+COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
+
+# --- Check 1: Block git commit/push on main ---
+if echo "$COMMAND" | grep -qE "^git (commit|push)"; then
+  cat >&2 <<EOF
+
+🚫 Direct commits/pushes to '$BRANCH' are not allowed.
+
+Please create a feature branch first:
+  git checkout -b feat/your-feature-name
+  git checkout -b fix/your-bug-description
+
+Or if you have uncommitted changes:
+  git stash
+  git checkout -b feat/your-feature-name
+  git stash pop
+
+EOF
+  exit 2
+fi
+
+# --- Check 2: Block file edits on main ---
+if echo "$TOOL_NAME" | grep -qiE "^(Edit|MultiEdit|Write)$"; then
+  FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // "unknown"')
+  cat >&2 <<EOF
+
+🚫 Cannot edit files while on '$BRANCH' branch.
+
+You're trying to edit: $FILE_PATH
+
+Create a feature branch first:
+  git checkout -b feat/your-feature-name
+  git checkout -b fix/your-bug-description
+
+EOF
+  exit 2
+fi
+
+exit 0

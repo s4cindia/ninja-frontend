@@ -1,12 +1,5 @@
-import { useEffect, useRef, useId, createContext, useContext } from 'react';
-import { X } from 'lucide-react';
+import React, { useEffect } from 'react';
 import { cn } from '@/lib/utils';
-
-interface DialogContextValue {
-  titleId: string;
-}
-
-const DialogContext = createContext<DialogContextValue | null>(null);
 
 interface DialogProps {
   open: boolean;
@@ -14,157 +7,156 @@ interface DialogProps {
   children: React.ReactNode;
 }
 
-export function Dialog({ open, onOpenChange, children }: DialogProps) {
-  const overlayRef = useRef<HTMLDivElement>(null);
-  const previousFocusRef = useRef<HTMLElement | null>(null);
-  const titleId = useId();
-
+export const Dialog: React.FC<DialogProps> = ({ open, onOpenChange, children }) => {
   useEffect(() => {
-    if (!open) return;
-
-    previousFocusRef.current = document.activeElement as HTMLElement;
-
-    const getFocusableElements = () => {
-      if (!overlayRef.current) return [];
-      return Array.from(
-        overlayRef.current.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        )
-      ).filter(el => !el.hasAttribute('disabled'));
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onOpenChange(false);
-        return;
-      }
-
-      if (e.key === 'Tab') {
-        const focusable = getFocusableElements();
-        if (focusable.length === 0) return;
-
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    document.body.style.overflow = 'hidden';
-
-    requestAnimationFrame(() => {
-      const focusable = getFocusableElements();
-      if (focusable.length > 0) {
-        focusable[0].focus();
-      }
-    });
-
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = '';
-      if (previousFocusRef.current && typeof previousFocusRef.current.focus === 'function') {
-        previousFocusRef.current.focus();
-      }
+      document.body.style.overflow = 'unset';
     };
-  }, [open, onOpenChange]);
+  }, [open]);
 
   if (!open) return null;
 
-  const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === overlayRef.current) {
-      onOpenChange(false);
-    }
-  };
-
   return (
-    <DialogContext.Provider value={{ titleId }}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      role="dialog"
+      aria-modal="true"
+    >
+      {/* Overlay */}
       <div
-        ref={overlayRef}
-        onClick={handleOverlayClick}
-        className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-      >
-        {children}
-      </div>
-    </DialogContext.Provider>
+        className="fixed inset-0 bg-black/50"
+        onClick={() => onOpenChange(false)}
+        aria-hidden="true"
+      />
+      {/* Content */}
+      {children}
+    </div>
   );
-}
+};
 
-interface DialogContentProps {
+interface DialogContentProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
   className?: string;
 }
 
-export function DialogContent({ children, className }: DialogContentProps) {
-  return (
-    <div
-      className={cn(
-        'bg-white rounded-lg shadow-xl w-full animate-in fade-in-0 zoom-in-95',
-        className
-      )}
-      onClick={(e) => e.stopPropagation()}
-    >
-      {children}
-    </div>
-  );
-}
+export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
+  ({ className, children, ...props }, ref) => {
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          'relative z-50 bg-white rounded-lg shadow-lg',
+          'w-full max-w-lg',
+          className
+        )}
+        onClick={(e) => e.stopPropagation()}
+        {...props}
+      >
+        {children}
+      </div>
+    );
+  }
+);
+
+DialogContent.displayName = 'DialogContent';
 
 interface DialogHeaderProps {
   children: React.ReactNode;
   className?: string;
 }
 
-export function DialogHeader({ children, className }: DialogHeaderProps) {
+export const DialogHeader: React.FC<DialogHeaderProps> = ({ children, className }) => {
   return (
-    <div className={cn('px-6 pt-6', className)}>
+    <div className={cn('flex flex-col space-y-1.5', className)}>
       {children}
     </div>
   );
-}
+};
 
 interface DialogTitleProps {
   children: React.ReactNode;
   className?: string;
 }
 
-export function DialogTitle({ children, className }: DialogTitleProps) {
-  const context = useContext(DialogContext);
+export const DialogTitle: React.FC<DialogTitleProps> = ({ children, className }) => {
   return (
-    <h2 
-      id={context?.titleId}
-      className={cn('text-lg font-semibold text-gray-900', className)}
-    >
+    <h2 className={cn('text-lg font-semibold leading-none tracking-tight', className)}>
       {children}
     </h2>
   );
-}
+};
 
-interface DialogCloseProps {
-  onClick: () => void;
+interface DialogDescriptionProps {
+  children: React.ReactNode;
   className?: string;
 }
 
-export function DialogClose({ onClick, className }: DialogCloseProps) {
+export const DialogDescription: React.FC<DialogDescriptionProps> = ({ children, className }) => {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'absolute right-4 top-4 rounded-sm opacity-70 ring-offset-white transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2',
-        className
-      )}
-    >
-      <X className="h-4 w-4" />
-      <span className="sr-only">Close</span>
-    </button>
+    <p className={cn('text-sm text-gray-500', className)}>
+      {children}
+    </p>
   );
+};
+
+interface DialogFooterProps {
+  children: React.ReactNode;
+  className?: string;
 }
+
+export const DialogFooter: React.FC<DialogFooterProps> = ({ children, className }) => {
+  return (
+    <div className={cn('flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2', className)}>
+      {children}
+    </div>
+  );
+};
+
+interface DialogCloseProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  children?: React.ReactNode;
+  className?: string;
+}
+
+export const DialogClose = React.forwardRef<HTMLButtonElement, DialogCloseProps>(
+  ({ className, children, ...props }, ref) => {
+    return (
+      <button
+        ref={ref}
+        type="button"
+        className={cn(
+          'absolute right-4 top-4 rounded-sm opacity-70 ring-offset-white transition-opacity',
+          'hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2',
+          'disabled:pointer-events-none',
+          className
+        )}
+        {...props}
+      >
+        {children || (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        )}
+        <span className="sr-only">Close</span>
+      </button>
+    );
+  }
+);
+
+DialogClose.displayName = 'DialogClose';

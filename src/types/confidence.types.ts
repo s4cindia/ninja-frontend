@@ -71,6 +71,10 @@ export interface CriterionConfidenceWithIssues {
   naSuggestion?: NaSuggestion;
   requiresManualVerification?: boolean;
   automationCapability?: number;
+  findings?: string[];
+  recommendation?: string;
+  isNotApplicable?: boolean;
+  naReason?: string;
 }
 
 export interface ConfidenceSummary {

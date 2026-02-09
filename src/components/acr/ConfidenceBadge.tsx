@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 interface ConfidenceBadgeProps {
   confidence: number;
   requiresManualVerification?: boolean;
+  isNotApplicable?: boolean;
   automationCapability?: number;
   size?: 'sm' | 'md';
 }
@@ -12,15 +13,33 @@ interface ConfidenceBadgeProps {
 export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({
   confidence,
   requiresManualVerification = false,
+  isNotApplicable = false,
   automationCapability = 100,
   size = 'md',
 }) => {
-  const sizeClasses = size === 'sm' 
-    ? 'px-2 py-0.5 text-xs' 
+  const sizeClasses = size === 'sm'
+    ? 'px-2 py-0.5 text-xs'
     : 'px-3 py-1 text-sm';
-  
+
   const iconSize = size === 'sm' ? 'h-3 w-3' : 'h-4 w-4';
 
+  // N/A status (from feature branch)
+  if (isNotApplicable) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <span className={cn(
+          'font-medium rounded-full border',
+          'bg-blue-100 text-blue-800 border-blue-300',
+          sizeClasses
+        )}>
+          <Info className={cn(iconSize, 'inline mr-1')} aria-hidden="true" />
+          N/A
+        </span>
+      </div>
+    );
+  }
+
+  // Manual review required
   if (requiresManualVerification || confidence === 0) {
     return (
       <div className="flex items-center gap-1.5">
@@ -31,7 +50,7 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({
         )}>
           Manual Review Required
         </span>
-        <div 
+        <div
           className="relative group"
           title="This criterion cannot be fully verified by automated tools and requires human evaluation"
         >
@@ -65,7 +84,7 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({
         {confidence}% {getConfidenceLabel()}
       </span>
       {showWarning && (
-        <div 
+        <div
           className="relative group"
           title={`Automated confidence: ${confidence}%. This criterion has ${automationCapability}% automation capability - consider manual spot-checking for complete assurance.`}
         >
