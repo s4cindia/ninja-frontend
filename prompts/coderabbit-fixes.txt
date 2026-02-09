@@ -1,40 +1,62 @@
-In `@src/components/acr/VersionCompareModal.tsx`:
-- Around line 112-114: The close Button in VersionCompareModal is icon-only and
-lacks an accessible name; update the Button (the one rendering <X className="h-4
-w-4" /> and calling onClick={onClose}) to include an aria-label (e.g.
-aria-label="Close" or aria-label="Close version compare modal") and optionally a
-title attribute so screen readers and hover users can identify it; ensure the
-label text is concise and consider using existing localization utilities if the
-component uses i18n.
+In `@src/components/acr/NACriteriaSection.tsx`:
+- Around line 244-256: The label "Rationale for N/A Status" is not
+programmatically linked to the textarea, so update the JSX in NACriteriaSection
+to add a unique id on the textarea (e.g., id="na-rationale" or similar) and set
+the label's htmlFor to that id; keep the existing bindings
+(value={editingReason}, onChange={e => setEditingReason(e.target.value)}) and
+other props unchanged to preserve behavior, and optionally add aria-describedby
+or aria-label only if additional context is required.
+- Around line 177-194: The toggle button in NACriteriaSection lacks ARIA
+attributes; update the button rendered in the category loop (the one that calls
+toggleCategory(category)) to include aria-expanded={isExpanded} and
+aria-controls pointing to a stable unique id for the content panel (e.g.,
+`na-panel-${category}`), and add a matching id attribute to the expanded content
+container that renders the criteria so screen readers can associate the control
+with the panel; ensure the id generation uses the category value (or a sanitized
+slug) so it stays consistent across renders.
+
+In `@src/components/acr/VersionHistory.tsx`:
+- Line 245: The component is accessing .version and .changes but the hooks
+return different shapes; normalize the hook outputs before use: after calling
+useVersionHistory map each ReportVersion (with versionNumber) to include a
+version field (e.g. create normalizedVersions = versions?.map(v => ({...v,
+version: v.versionNumber})) ?? [] and use normalizedVersions instead of versions
+and currentVersion), and after calling useVersionDetails map its ReportData to
+include a changes field (or default changes: [] when absent) so the component's
+accesses (currentVersion, usages at the places referencing .version and
+.changes) match the expected shape; update references to use the normalized
+objects and keep the original hook calls unchanged (refer to useVersionHistory,
+useVersionDetails, currentVersion, and versionDetails).
 
 In `@src/pages/acr/AcrReportReviewPage.tsx`:
-- Around line 83-88: The clickable header div with role="button" and
-tabIndex={0} lacks keyboard activation; add an onKeyDown handler (on the same
-element that uses showEditModal, onToggleExpand, and isExpanded) that listens
-for Enter (key === "Enter") and Space (key === " " or key === "Spacebar") and
-calls onToggleExpand() only when !showEditModal, and also call
-event.preventDefault() for Space to avoid scrolling; ensure the handler mirrors
-the onClick guard so keyboard users can expand/collapse the criteria.
-- Line 611: The status rendering uses acrJob.status.replace('_', ' ') which only
-replaces the first underscore; update the code in AcrReportReviewPage where
-acrJob.status is formatted (the JSX element showing acrJob.status) to replace
-all underscores—either call replaceAll('_', ' ') or use a global regex (e.g.,
-replace(/_/g, ' '))—so multi-underscore statuses like "pending_ai_review" render
-correctly.
-- Around line 355-359: The variable _versionData is assigned from
-response.json() but never used; remove the unused assignment to satisfy the
-linter by either deleting the declaration entirely or awaiting and discarding
-the JSON (e.g., replace "const _versionData = await response.json();" with
-"await response.json();" ) and keep the existing alert/TODO comment in the
-restore placeholder in AcrReportReviewPage so future implementation can consume
-the response.
+- Around line 412-426: The object passed to VerificationSummaryCard uses unsafe
+any casts for status and history; remove the "as any" and "as any[]" and instead
+import or define the exact types expected by VerificationSummaryCard (e.g. the
+Status union/enum and the HistoryItem[] type), then type the properties
+explicitly (status: <ImportedStatusType>, history: <ImportedHistoryItemType>[]),
+ensure confidenceScore remains a number 0-1 and confidenceLevel is typed as
+'high'|'medium'|'low'|'manual', and update the object literal (status,
+confidenceScore, confidenceLevel, automatedResult, automatedNotes, history) to
+use those concrete types rather than any.
 
 In `@src/pages/acr/AcrWorkflowPage.tsx`:
-- Around line 342-363: The initializeReport call is using state.fileName with a
-hard fallback "Untitled Document", which can overwrite a valid title stored in
-state.documentTitle; update the payload to use documentTitle with the same
-fallback logic used by the upload flow (prefer state.documentTitle, then
-state.fileName, then the default) and add state.documentTitle to the useEffect
-dependency array; locate the initializeReport invocation and the surrounding
-useEffect (references: initializeReport, state.fileName, state.documentTitle,
-navigate) and adjust the documentTitle value and deps accordingly.
+- Around line 297-301: Replace the unsafe any cast on confidenceData.criteria
+with a proper type assertion or runtime guard so analysisResults receives a
+CriterionConfidence[]: in the useEffect where you call
+setAnalysisResults(confidenceData.criteria as any), change it to assert
+confidenceData.criteria as CriterionConfidence[] or (preferably)
+validate/transform confidenceData.criteria into an array of CriterionConfidence
+before calling setAnalysisResults (e.g., check
+Array.isArray(confidenceData.criteria) and map/verify required fields) so the
+types line up with the analysisResults state and the ESLint warning is resolved.
+
+In `@src/pages/acr/VerificationQueuePage.tsx`:
+- Line 108: The prop criteriaFromAnalysis is being forced to any because
+VerificationQueue expects CriterionConfidence[] but useConfidenceWithIssues
+returns CriterionConfidenceWithIssues[]; remove the cast and either (A) update
+the VerificationQueueProps type to accept CriterionConfidenceWithIssues[]
+(change the prop type in VerificationQueue component) or (B) add a small mapper
+(e.g., mapCriterionWithIssuesToCriterion) that converts
+CriterionConfidenceWithIssues[] to CriterionConfidence[] and pass the mapped
+array; locate usages around VerificationQueue (prop name criteriaFromAnalysis)
+and the hook useConfidenceWithIssues to implement the chosen fix.

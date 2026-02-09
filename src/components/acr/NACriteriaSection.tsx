@@ -179,6 +179,8 @@ export function NACriteriaSection({ naCriteria, acrJobId, edition: _edition }: N
             <button
               onClick={() => toggleCategory(category)}
               className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+              aria-expanded={isExpanded}
+              aria-controls={`na-panel-${category}`}
             >
               <div className="flex items-center gap-3">
                 {isExpanded ? (
@@ -195,7 +197,7 @@ export function NACriteriaSection({ naCriteria, acrJobId, edition: _edition }: N
 
             {/* Category Criteria */}
             {isExpanded && (
-              <div className="divide-y divide-gray-200">
+              <div id={`na-panel-${category}`} className="divide-y divide-gray-200">
                 {criteria.map((criterion) => {
                   const isEditing = editingId === criterion.id;
                   const detectionDetails = getDetectionDetails(criterion);
@@ -242,12 +244,13 @@ export function NACriteriaSection({ naCriteria, acrJobId, edition: _edition }: N
 
                       {/* N/A Reason */}
                       <div className="mb-3">
-                        <label className="text-xs font-medium text-gray-700 mb-1 block">
+                        <label htmlFor={`na-rationale-${criterion.criterionId}`} className="text-xs font-medium text-gray-700 mb-1 block">
                           Rationale for N/A Status:
                         </label>
                         {isEditing ? (
                           <div className="space-y-2">
                             <textarea
+                              id={`na-rationale-${criterion.criterionId}`}
                               value={editingReason}
                               onChange={(e) => setEditingReason(e.target.value)}
                               rows={3}
