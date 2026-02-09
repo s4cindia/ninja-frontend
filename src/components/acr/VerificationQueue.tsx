@@ -9,7 +9,7 @@ import { useVerificationQueue, useSubmitVerification, useBulkVerification } from
 import { CONFIDENCE_THRESHOLD_HIGH, CONFIDENCE_THRESHOLDS, NA_QUICK_ACCEPT_THRESHOLD } from '@/constants/verification';
 import { MOCK_VERIFICATION_ITEMS } from '@/constants/mockVerificationData';
 import type { CriterionConfidence } from '@/services/api';
-import type { CriterionConfidenceWithIssues } from '@/types/confidence.types';
+import type { CriterionConfidenceWithIssues, IssueLocation } from '@/types/confidence.types';
 import type {
   VerificationItem as VerificationItemType,
   VerificationStatus,
@@ -76,7 +76,7 @@ function convertCriteriaToVerificationItems(
         const locationStr = typeof issue.location === 'string'
           ? issue.location
           : issue.location
-            ? `Line ${(issue.location as any).line || ''}, Column ${(issue.location as any).column || ''}`.trim()
+            ? `Line ${(issue.location as IssueLocation).startLine || ''}, Column ${(issue.location as IssueLocation).startColumn || ''}`.trim()
             : undefined;
 
         return {

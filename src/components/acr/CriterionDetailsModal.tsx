@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { wcagDocumentationService } from '@/services/wcag-documentation.service';
 import { verificationService } from '@/services/verification.service';
 import { NaSuggestionBanner } from './NaSuggestionBanner';
-import type { CriterionConfidence } from '@/services/api';
+import type { CriterionConfidence, CriterionCheck } from '@/services/api';
 import type { IssueMapping, RemediatedIssue, NaSuggestion, CriterionConfidenceWithIssues } from '@/types/confidence.types';
 
 function isFixedStatus(issue: RemediatedIssue): boolean {
@@ -294,7 +294,7 @@ export function CriterionDetailsModal({
                 <div className="border rounded-lg p-4">
                   <h3 className="font-semibold text-gray-900 mb-3">Automated Checks</h3>
                   <ul className="space-y-2">
-                    {criterion.automatedChecks.map((check: any) => (
+                    {criterion.automatedChecks.map((check: CriterionCheck) => (
                       <li key={check.id} className="flex items-start gap-2 text-sm">
                         {check.passed ? (
                           <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
@@ -684,7 +684,7 @@ export function CriterionDetailsModal({
                     <div className="border border-orange-200 bg-orange-50 rounded-lg p-4">
                       <h3 className="font-semibold text-orange-900 mb-3">Manual Checks Needed</h3>
                       <ul className="space-y-2">
-                        {criterion.manualChecks.map((check: any, idx: number) => (
+                        {criterion.manualChecks.map((check: string, idx: number) => (
                           <li key={idx} className="flex items-start gap-2 text-sm text-orange-800">
                             <span className="text-orange-500 mt-0.5">•</span>
                             {check}
