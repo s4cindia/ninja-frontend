@@ -271,7 +271,7 @@ export function AcrWorkflowPage() {
   const [availableJobs, setAvailableJobs] = useState<AuditJob[]>([]);
   const [isLoadingJobs, setIsLoadingJobs] = useState(false);
   const [jobsError, setJobsError] = useState<string | null>(null);
-  const [analysisResults, setAnalysisResults] = useState<CriterionConfidence[]>([]);
+  const [analysisResults, setAnalysisResults] = useState<(CriterionConfidence | CriterionConfidenceWithIssues)[]>([]);
   const [documentTitle, setDocumentTitle] = useState<string>('Untitled Document');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -297,7 +297,7 @@ export function AcrWorkflowPage() {
   // Populate analysisResults from confidence API if empty (e.g., after refresh)
   useEffect(() => {
     if (confidenceData?.criteria && analysisResults.length === 0 && state.currentStep === 4) {
-      setAnalysisResults(confidenceData.criteria as CriterionConfidenceWithIssues[]);
+      setAnalysisResults(confidenceData.criteria);
     }
   }, [confidenceData, analysisResults.length, state.currentStep]);
 
@@ -306,7 +306,7 @@ export function AcrWorkflowPage() {
     setPreFilledValuesApplied(false);
   }, [effectiveJobId, editionFromQuery, productNameFromQuery, vendorFromQuery, contactEmailFromState]);
 
-  const handleCriteriaLoaded = useCallback((criteria: CriterionConfidence[]) => {
+  const handleCriteriaLoaded = useCallback((criteria: CriterionConfidence[] | CriterionConfidenceWithIssues[]) => {
     setAnalysisResults(criteria);
   }, []);
 
@@ -321,14 +321,14 @@ export function AcrWorkflowPage() {
 
     // Include ALL criteria (applicable + N/A) from analysis results
     const verificationData = analysisResults.map(criterion => {
-      const verification = state.verifications[criterion.criterionId || criterion.id];
+      const verification = state.verifications[criterion.criterionId];
 
       // Check if criterion is N/A from AI suggestion
       const isNA = criterion.naSuggestion?.suggestedStatus === 'not_applicable' &&
                    (criterion.naSuggestion?.confidence || 0) >= 80;
 
       return {
-        criterionId: criterion.criterionId || criterion.id,
+        criterionId: criterion.criterionId,
         verificationStatus: verification?.status || (isNA ? 'not_applicable' : 'pending'),
         verificationMethod: verification?.method || 'Manual Review',
         verificationNotes: verification?.notes || '',

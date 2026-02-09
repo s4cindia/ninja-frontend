@@ -3,8 +3,7 @@ import { History, Clock, User, ChevronRight, RotateCcw, ArrowLeftRight, Loader2,
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { useVersionHistory, useVersionDetails } from '@/hooks/useAcrVersions';
-import type { VersionEntry, VersionChange } from '@/types/version.types';
+import { useVersionHistory, useVersionDetails, type ReportVersion } from '@/hooks/useAcrVersions';
 
 interface VersionHistoryProps {
   acrId: string;
@@ -38,65 +37,6 @@ function formatDate(dateStr: string): string {
   });
 }
 
-function formatFieldName(field: string): string {
-  const fieldNames: Record<string, string> = {
-    conformanceLevel: 'Conformance Level',
-    remarks: 'Remarks',
-    attribution: 'Attribution',
-  };
-  return fieldNames[field] || field;
-}
-
-function formatValue(field: string, value: string): string {
-  if (field === 'conformanceLevel') {
-    const levels: Record<string, string> = {
-      supports: 'Supports',
-      partially_supports: 'Partially Supports',
-      does_not_support: 'Does Not Support',
-      not_applicable: 'Not Applicable',
-    };
-    return levels[value] || value;
-  }
-  if (field === 'attribution') {
-    return value.replace(/-/g, ' ');
-  }
-  return value || '(empty)';
-}
-
-function ChangeItem({ change }: { change: VersionChange }) {
-  return (
-    <div className="border rounded-lg p-3 bg-gray-50">
-      <div className="flex items-center gap-2 mb-2">
-        <Badge variant="info" size="sm">{formatFieldName(change.field)}</Badge>
-        {change.criterionId && (
-          <span className="text-sm font-medium text-gray-700">
-            {change.criterionId} - {change.criterionName}
-          </span>
-        )}
-      </div>
-      <div className="grid grid-cols-2 gap-4 text-sm">
-        <div>
-          <div className="text-xs text-gray-500 mb-1">Old Value</div>
-          <div className="p-2 bg-red-50 border border-red-200 rounded text-red-800 line-through">
-            {formatValue(change.field, change.oldValue)}
-          </div>
-        </div>
-        <div>
-          <div className="text-xs text-gray-500 mb-1">New Value</div>
-          <div className="p-2 bg-green-50 border border-green-200 rounded text-green-800">
-            {formatValue(change.field, change.newValue)}
-          </div>
-        </div>
-      </div>
-      {change.reason && (
-        <div className="mt-2 text-sm text-gray-600">
-          <span className="font-medium">Reason:</span> {change.reason}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function VersionItem({
   version,
   isSelected,
@@ -106,7 +46,7 @@ function VersionItem({
   onClick,
   onCompareSelect,
 }: {
-  version: VersionEntry;
+  version: ReportVersion;
   isSelected: boolean;
   isCompareMode: boolean;
   isCompareSelected: boolean;
@@ -126,7 +66,7 @@ function VersionItem({
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-gray-900">Version {version.version}</span>
+            <span className="font-semibold text-gray-900">Version {version.versionNumber}</span>
             {isCurrent && (
               <Badge variant="success" size="sm">Current</Badge>
             )}
@@ -139,19 +79,21 @@ function VersionItem({
               <Clock className="h-3.5 w-3.5" />
               {formatDate(version.createdAt)}
             </span>
-            <span className="flex items-center gap-1">
-              <User className="h-3.5 w-3.5" />
-              {version.createdBy}
-            </span>
+            {version.approvedBy && (
+              <span className="flex items-center gap-1">
+                <User className="h-3.5 w-3.5" />
+                {version.approvedBy}
+              </span>
+            )}
           </div>
-          <p className="mt-1 text-sm text-gray-600">{version.changeSummary}</p>
-          {version.changeCount > 0 && (
-            <div className="mt-1">
-              <Badge variant="default" size="sm">
-                {version.changeCount} change{version.changeCount !== 1 ? 's' : ''}
-              </Badge>
-            </div>
-          )}
+          <p className="mt-1 text-sm text-gray-600">
+            {version.passedCriteria}/{version.totalCriteria} criteria passing
+          </p>
+          <div className="mt-1">
+            <Badge variant="default" size="sm">
+              {version.status}
+            </Badge>
+          </div>
         </div>
         {!isCompareMode && (
           <ChevronRight className={cn(
@@ -242,7 +184,7 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
     }
   };
 
-  const currentVersion = versions && versions.length > 0 ? versions[0]?.version : null;
+  const currentVersion = versions && versions.length > 0 ? versions[0]?.versionNumber : null;
 
   return (
     <div className="space-y-4">
@@ -296,16 +238,16 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="space-y-2">
-          {versions.map((version: VersionEntry) => (
+          {versions.map((version: ReportVersion) => (
             <VersionItem
-              key={version.version}
+              key={version.versionNumber}
               version={version}
-              isSelected={selectedVersion === version.version}
+              isSelected={selectedVersion === version.versionNumber}
               isCompareMode={isCompareMode}
-              isCompareSelected={compareVersions.includes(version.version)}
-              isCurrent={version.version === currentVersion}
-              onClick={() => handleVersionClick(version.version)}
-              onCompareSelect={() => handleCompareSelect(version.version)}
+              isCompareSelected={compareVersions.includes(version.versionNumber)}
+              isCurrent={version.versionNumber === currentVersion}
+              onClick={() => handleVersionClick(version.versionNumber)}
+              onCompareSelect={() => handleCompareSelect(version.versionNumber)}
             />
           ))}
         </div>
@@ -317,7 +259,7 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
                 <h4 className="font-medium text-gray-900">
                   Version {selectedVersion} Details
                 </h4>
-                {selectedVersion !== versions[0]?.version && (
+                {selectedVersion !== versions[0]?.versionNumber && (
                   <Button
                     size="sm"
                     variant="outline"
@@ -333,15 +275,41 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-primary-500" />
                 </div>
-              ) : versionDetails?.changes && versionDetails.changes.length > 0 ? (
+              ) : versionDetails ? (
                 <div className="space-y-3">
-                  {versionDetails.changes.map((change: VersionChange, idx: number) => (
-                    <ChangeItem key={idx} change={change} />
-                  ))}
+                  <div className="border rounded-lg p-4 bg-gray-50">
+                    <h5 className="font-medium mb-2">Version Summary</h5>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <span className="text-gray-600">Total Criteria:</span>
+                        <span className="ml-2 font-medium">{versionDetails.summary.totalCriteria}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Applicable:</span>
+                        <span className="ml-2 font-medium">{versionDetails.summary.applicableCriteria}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Passed:</span>
+                        <span className="ml-2 font-medium text-green-600">{versionDetails.summary.passedCriteria}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Failed:</span>
+                        <span className="ml-2 font-medium text-red-600">{versionDetails.summary.failedCriteria}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">N/A:</span>
+                        <span className="ml-2 font-medium">{versionDetails.summary.naCriteria}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Status:</span>
+                        <span className="ml-2 font-medium">{versionDetails.status}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-500">
-                  No detailed changes recorded for this version.
+                  No details available for this version.
                 </div>
               )}
             </div>

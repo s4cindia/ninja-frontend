@@ -10,7 +10,7 @@ import { wcagDocumentationService } from '@/services/wcag-documentation.service'
 import { verificationService } from '@/services/verification.service';
 import { NaSuggestionBanner } from './NaSuggestionBanner';
 import type { CriterionConfidence } from '@/services/api';
-import type { IssueMapping, RemediatedIssue, NaSuggestion } from '@/types/confidence.types';
+import type { IssueMapping, RemediatedIssue, NaSuggestion, CriterionConfidenceWithIssues } from '@/types/confidence.types';
 
 function isFixedStatus(issue: RemediatedIssue): boolean {
   const status = issue.remediationInfo?.status ?? issue.status;
@@ -26,7 +26,7 @@ function isSkippedStatus(issue: RemediatedIssue): boolean {
 }
 
 interface CriterionDetailsModalProps {
-  criterion: CriterionConfidence;
+  criterion: CriterionConfidence | CriterionConfidenceWithIssues;
   relatedIssues?: IssueMapping[];
   remediatedIssues?: RemediatedIssue[];
   jobId?: string;
@@ -290,11 +290,11 @@ export function CriterionDetailsModal({
                 </>
               )}
 
-              {criterion.automatedChecks && criterion.automatedChecks.length > 0 && (
+              {'automatedChecks' in criterion && criterion.automatedChecks && criterion.automatedChecks.length > 0 && (
                 <div className="border rounded-lg p-4">
                   <h3 className="font-semibold text-gray-900 mb-3">Automated Checks</h3>
                   <ul className="space-y-2">
-                    {criterion.automatedChecks.map((check) => (
+                    {criterion.automatedChecks.map((check: any) => (
                       <li key={check.id} className="flex items-start gap-2 text-sm">
                         {check.passed ? (
                           <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
@@ -680,11 +680,11 @@ export function CriterionDetailsModal({
                     )}
                   </div>
 
-                  {criterion.manualChecks && criterion.manualChecks.length > 0 && (
+                  {'manualChecks' in criterion && criterion.manualChecks && criterion.manualChecks.length > 0 && (
                     <div className="border border-orange-200 bg-orange-50 rounded-lg p-4">
                       <h3 className="font-semibold text-orange-900 mb-3">Manual Checks Needed</h3>
                       <ul className="space-y-2">
-                        {criterion.manualChecks.map((check, idx) => (
+                        {criterion.manualChecks.map((check: any, idx: number) => (
                           <li key={idx} className="flex items-start gap-2 text-sm text-orange-800">
                             <span className="text-orange-500 mt-0.5">•</span>
                             {check}
