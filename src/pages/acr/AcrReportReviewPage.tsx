@@ -14,6 +14,7 @@ import { VersionCompareModal } from '@/components/acr/VersionCompareModal';
 import { ExportDialog } from '@/components/acr/ExportDialog';
 import { cn } from '@/utils/cn';
 import type { AcrCriterionReview } from '@/types/acr-report.types';
+import type { VerificationHistoryEntry } from '@/types/verification.types';
 
 /**
  * ACR Report Review & Edit Page - Enhanced Design
@@ -411,7 +412,7 @@ export function AcrReportReviewPage() {
     severity: 'moderate' as const,
     status: (c.verificationStatus === 'verified_pass' ? 'verified_pass' :
             c.verificationStatus === 'verified_fail' ? 'verified_fail' :
-            c.isNotApplicable ? 'not_applicable' : 'pending') as any,
+            c.isNotApplicable ? 'not_applicable' : 'pending') as 'pending' | 'verified_pass' | 'verified_fail' | 'not_applicable',
     // IMPORTANT: VerificationSummaryCard expects 0-1 scale, backend returns 0-100
     confidenceScore: (c.confidence || 0) / 100, // Convert 0-100 to 0-1 scale
     confidenceLevel: (() => {
@@ -423,7 +424,7 @@ export function AcrReportReviewPage() {
     })() as 'high' | 'medium' | 'low' | 'manual',
     automatedResult: 'not_tested' as const,
     automatedNotes: c.verificationNotes || '',
-    history: [] as any[],
+    history: [] as VerificationHistoryEntry[],
     isNotApplicable: c.isNotApplicable || false,
     // Add naSuggestion for N/A criteria so VerificationSummaryCard can count them correctly
     naSuggestion: c.isNotApplicable ? {

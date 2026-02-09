@@ -5,6 +5,7 @@ import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { Spinner } from '@/components/ui/Spinner';
 import { VerificationQueue } from '@/components/acr/VerificationQueue';
 import { useConfidenceWithIssues } from '@/hooks/useConfidence';
+import type { CriterionConfidence } from '@/services/api';
 
 interface LocationState {
   fileName?: string;
@@ -105,7 +106,7 @@ export function VerificationQueuePage() {
           jobId={jobId}
           fileName={fileName}
           onComplete={handleComplete}
-          criteriaFromAnalysis={confidenceData?.criteria as any}
+          criteriaFromAnalysis={confidenceData?.criteria as CriterionConfidence[] | undefined}
         />
       )}
     </div>

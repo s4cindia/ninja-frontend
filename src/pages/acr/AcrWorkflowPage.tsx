@@ -32,6 +32,7 @@ import { useEditions } from '@/hooks/useAcr';
 import { useConfidenceWithIssues } from '@/hooks/useConfidence';
 import { useInitializeReport } from '@/hooks/useAcrReport';
 import type { AcrEdition, AcrEditionCode } from '@/types/acr.types';
+import type { CriterionConfidenceWithIssues } from '@/types/confidence.types';
 
 interface WorkflowStep {
   id: number;
@@ -296,7 +297,7 @@ export function AcrWorkflowPage() {
   // Populate analysisResults from confidence API if empty (e.g., after refresh)
   useEffect(() => {
     if (confidenceData?.criteria && analysisResults.length === 0 && state.currentStep === 4) {
-      setAnalysisResults(confidenceData.criteria as any);
+      setAnalysisResults(confidenceData.criteria as CriterionConfidenceWithIssues[]);
     }
   }, [confidenceData, analysisResults.length, state.currentStep]);
 
