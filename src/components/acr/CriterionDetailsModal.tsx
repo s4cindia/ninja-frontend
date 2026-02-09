@@ -8,7 +8,7 @@ import { api } from '@/services/api';
 import { cn } from '@/lib/utils';
 import { wcagDocumentationService } from '@/services/wcag-documentation.service';
 import { verificationService } from '@/services/verification.service';
-import { NaSuggestionBanner } from './NaSuggestionBanner';
+import { NaSuggestionBanner } from './NASuggestionBanner';
 import type { CriterionConfidence } from '@/services/api';
 import type { IssueMapping, RemediatedIssue, NaSuggestion } from '@/types/confidence.types';
 

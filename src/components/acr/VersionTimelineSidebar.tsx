@@ -252,7 +252,7 @@ export const VersionTimelineSidebar: React.FC<VersionTimelineSidebarProps> = ({
                           <Badge variant="default" className="text-xs">Latest</Badge>
                         )}
                         {isCurrent && (
-                          <Badge variant="outline" className="text-xs">Current</Badge>
+                          <Badge variant="default" className="text-xs">Current</Badge>
                         )}
                       </div>
 
@@ -347,7 +347,7 @@ export const VersionTimelineSidebar: React.FC<VersionTimelineSidebarProps> = ({
                         <div className="flex gap-2">
                           <Button
                             size="sm"
-                            variant={isSelected ? 'default' : 'outline'}
+                            variant={isSelected ? 'primary' : 'outline'}
                             className="flex-1 text-xs"
                             onClick={(e) => {
                               e.stopPropagation();

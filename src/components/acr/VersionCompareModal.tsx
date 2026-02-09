@@ -8,14 +8,23 @@ import {
   Clock,
   FileText
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/Button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/Dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/Badge';
+import { Card } from '@/components/ui/Card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { cn } from '@/lib/utils';
 import { useAcrVersion } from '@/hooks/useAcrVersions';
+
+interface VersionCriterion {
+  criterionId: string;
+  criterionNumber: string;
+  criterionName: string;
+  verificationStatus: string;
+  confidence: number;
+  verificationNotes?: string;
+}
 
 interface VersionCompareModalProps {
   isOpen: boolean;
@@ -63,7 +72,7 @@ export const VersionCompareModal: React.FC<VersionCompareModalProps> = ({
           <span className="font-medium">{val2}</span>
           {hasChange && (
             <Badge
-              variant={diff > 0 ? 'default' : 'secondary'}
+              variant={diff > 0 ? 'info' : 'default'}
               className={cn(
                 'text-xs',
                 diff > 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
@@ -80,12 +89,12 @@ export const VersionCompareModal: React.FC<VersionCompareModalProps> = ({
   const findChangedCriteria = () => {
     if (!version1 || !version2) return { added: [], removed: [], modified: [] };
 
-    const v1Criteria = new Map(version1.criteria.map(c => [c.criterionId, c]));
-    const v2Criteria = new Map(version2.criteria.map(c => [c.criterionId, c]));
+    const v1Criteria = new Map((version1.criteria as unknown as VersionCriterion[]).map(c => [c.criterionId, c]));
+    const v2Criteria = new Map((version2.criteria as unknown as VersionCriterion[]).map(c => [c.criterionId, c]));
 
-    const added = version2.criteria.filter(c => !v1Criteria.has(c.criterionId));
-    const removed = version1.criteria.filter(c => !v2Criteria.has(c.criterionId));
-    const modified = version2.criteria.filter(c => {
+    const added = (version2.criteria as unknown as VersionCriterion[]).filter(c => !v1Criteria.has(c.criterionId));
+    const removed = (version1.criteria as unknown as VersionCriterion[]).filter(c => !v2Criteria.has(c.criterionId));
+    const modified = (version2.criteria as unknown as VersionCriterion[]).filter(c => {
       const v1c = v1Criteria.get(c.criterionId);
       if (!v1c) return false;
       return (
@@ -152,7 +161,7 @@ export const VersionCompareModal: React.FC<VersionCompareModalProps> = ({
                 <TabsTrigger value="criteria">
                   Criteria Changes
                   {changes.modified.length > 0 && (
-                    <Badge variant="secondary" className="ml-2 text-xs">
+                    <Badge variant="default" className="ml-2 text-xs">
                       {changes.modified.length}
                     </Badge>
                   )}
@@ -160,7 +169,7 @@ export const VersionCompareModal: React.FC<VersionCompareModalProps> = ({
                 <TabsTrigger value="changes">
                   Summary
                   {(changes.added.length + changes.removed.length) > 0 && (
-                    <Badge variant="secondary" className="ml-2 text-xs">
+                    <Badge variant="default" className="ml-2 text-xs">
                       {changes.added.length + changes.removed.length}
                     </Badge>
                   )}
@@ -231,7 +240,7 @@ export const VersionCompareModal: React.FC<VersionCompareModalProps> = ({
                     </div>
                   ) : (
                     changes.modified.map(criterion => {
-                      const v1Criterion = version1.criteria.find(c => c.criterionId === criterion.criterionId);
+                      const v1Criterion = (version1.criteria as unknown as VersionCriterion[]).find(c => c.criterionId === criterion.criterionId);
                       return (
                         <Card key={criterion.criterionId} className="p-4">
                           <div className="font-semibold mb-2">
@@ -241,11 +250,11 @@ export const VersionCompareModal: React.FC<VersionCompareModalProps> = ({
                             <div>
                               <div className="text-xs text-gray-600 mb-1">Version 1</div>
                               <div className="space-y-1">
-                                <div>Status: <Badge variant="outline">{v1Criterion?.verificationStatus || 'Unknown'}</Badge></div>
+                                <div>Status: <Badge variant="default">{String(v1Criterion?.verificationStatus || 'Unknown')}</Badge></div>
                                 <div>Confidence: {v1Criterion?.confidence || 0}%</div>
                                 {v1Criterion?.verificationNotes && (
                                   <div className="text-xs text-gray-600 mt-2">
-                                    Notes: {v1Criterion.verificationNotes}
+                                    Notes: {String(v1Criterion.verificationNotes)}
                                   </div>
                                 )}
                               </div>
@@ -253,11 +262,11 @@ export const VersionCompareModal: React.FC<VersionCompareModalProps> = ({
                             <div>
                               <div className="text-xs text-gray-600 mb-1">Version 2</div>
                               <div className="space-y-1">
-                                <div>Status: <Badge variant="outline">{criterion.verificationStatus || 'Unknown'}</Badge></div>
+                                <div>Status: <Badge variant="default">{String(criterion.verificationStatus || 'Unknown')}</Badge></div>
                                 <div>Confidence: {criterion.confidence || 0}%</div>
                                 {criterion.verificationNotes && (
                                   <div className="text-xs text-gray-600 mt-2">
-                                    Notes: {criterion.verificationNotes}
+                                    Notes: {String(criterion.verificationNotes)}
                                   </div>
                                 )}
                               </div>
@@ -282,8 +291,8 @@ export const VersionCompareModal: React.FC<VersionCompareModalProps> = ({
                       </h3>
                       <ul className="space-y-1">
                         {changes.added.map(c => (
-                          <li key={c.criterionId} className="text-sm text-green-800">
-                            • {c.criterionNumber} - {c.criterionName}
+                          <li key={String(c.criterionId)} className="text-sm text-green-800">
+                            • {String(c.criterionNumber)} - {String(c.criterionName)}
                           </li>
                         ))}
                       </ul>
@@ -299,8 +308,8 @@ export const VersionCompareModal: React.FC<VersionCompareModalProps> = ({
                       </h3>
                       <ul className="space-y-1">
                         {changes.removed.map(c => (
-                          <li key={c.criterionId} className="text-sm text-red-800">
-                            • {c.criterionNumber} - {c.criterionName}
+                          <li key={String(c.criterionId)} className="text-sm text-red-800">
+                            • {String(c.criterionNumber)} - {String(c.criterionName)}
                           </li>
                         ))}
                       </ul>
@@ -316,8 +325,8 @@ export const VersionCompareModal: React.FC<VersionCompareModalProps> = ({
                       </h3>
                       <ul className="space-y-1">
                         {changes.modified.map(c => (
-                          <li key={c.criterionId} className="text-sm text-blue-800">
-                            • {c.criterionNumber} - {c.criterionName}
+                          <li key={String(c.criterionId)} className="text-sm text-blue-800">
+                            • {String(c.criterionNumber)} - {String(c.criterionName)}
                           </li>
                         ))}
                       </ul>

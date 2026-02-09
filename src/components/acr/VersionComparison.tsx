@@ -5,6 +5,10 @@ import { Badge } from '@/components/ui/Badge';
 import { useCompareVersions } from '@/hooks/useAcrVersions';
 import type { VersionDifference } from '@/types/version.types';
 
+interface ComparisonData {
+  differences: VersionDifference[];
+}
+
 interface VersionComparisonProps {
   acrId: string;
   version1: number;
@@ -93,7 +97,8 @@ function DifferenceRow({ diff, isRemarks }: { diff: VersionDifference; isRemarks
 }
 
 export function VersionComparison({ acrId, version1, version2, onBack }: VersionComparisonProps) {
-  const { data: comparison, isLoading } = useCompareVersions(acrId, version1, version2);
+  const { data: comparisonRaw, isLoading } = useCompareVersions(acrId, version1, version2);
+  const comparison = comparisonRaw as ComparisonData | undefined;
 
   if (isLoading) {
     return (
@@ -111,9 +116,9 @@ export function VersionComparison({ acrId, version1, version2, onBack }: Version
     );
   }
 
-  const conformanceChanges = comparison.differences.filter((d: VersionDifference) => d.field === 'conformanceLevel');
-  const remarksChanges = comparison.differences.filter((d: VersionDifference) => d.field === 'remarks');
-  const otherChanges = comparison.differences.filter((d: VersionDifference) => 
+  const conformanceChanges = (comparison.differences || []).filter((d: VersionDifference) => d.field === 'conformanceLevel');
+  const remarksChanges = (comparison.differences || []).filter((d: VersionDifference) => d.field === 'remarks');
+  const otherChanges = (comparison.differences || []).filter((d: VersionDifference) =>
     d.field !== 'conformanceLevel' && d.field !== 'remarks'
   );
 
@@ -140,7 +145,7 @@ export function VersionComparison({ acrId, version1, version2, onBack }: Version
         </div>
         <div className="text-center mt-3">
           <Badge variant="info">
-            {comparison.differences.length} difference{comparison.differences.length !== 1 ? 's' : ''} found
+            {(comparison.differences || []).length} difference{(comparison.differences || []).length !== 1 ? 's' : ''} found
           </Badge>
         </div>
       </div>
@@ -156,7 +161,7 @@ export function VersionComparison({ acrId, version1, version2, onBack }: Version
         </div>
       </div>
 
-      {comparison.differences.length === 0 ? (
+      {(comparison.differences || []).length === 0 ? (
         <div className="text-center py-12 text-gray-500">
           No differences found between these versions.
         </div>

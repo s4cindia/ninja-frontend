@@ -170,8 +170,8 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
   const [compareVersions, setCompareVersions] = useState<number[]>([]);
   const [toast, setToast] = useState<ToastState>({ show: false, message: '' });
 
-  const { versions, isLoading, error } = useVersionHistory(acrId);
-  const { data: versionDetails, isLoading: isLoadingDetails } = useVersionDetails(acrId, selectedVersion);
+  const { data: versions, isLoading, error } = useVersionHistory(acrId, { enabled: true });
+  const { data: versionDetails, isLoading: isLoadingDetails } = useVersionDetails(selectedVersion?.toString() || '', { enabled: !!selectedVersion });
 
   // Show loading spinner first while data is being fetched
   if (isLoading) {
@@ -192,7 +192,7 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
   }
 
   // Show empty state only when not loading and no versions exist
-  if (versions.length === 0) {
+  if (!versions || versions.length === 0) {
     return (
       <div className="text-center py-8">
         <FileText className="h-12 w-12 mx-auto text-gray-400 mb-3" />
@@ -242,7 +242,7 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
     }
   };
 
-  const currentVersion = versions.length > 0 ? versions[0].version : null;
+  const currentVersion = versions && versions.length > 0 ? (versions[0] as any).version : null;
 
   return (
     <div className="space-y-4">
@@ -296,7 +296,7 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="space-y-2">
-          {versions.map((version) => (
+          {versions.map((version: any) => (
             <VersionItem
               key={version.version}
               version={version}
@@ -317,7 +317,7 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
                 <h4 className="font-medium text-gray-900">
                   Version {selectedVersion} Details
                 </h4>
-                {selectedVersion !== versions[0]?.version && (
+                {selectedVersion !== (versions && versions[0] as any)?.version && (
                   <Button
                     size="sm"
                     variant="outline"
@@ -333,9 +333,9 @@ export function VersionHistory({ acrId, onRestore, onCompare }: VersionHistoryPr
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-primary-500" />
                 </div>
-              ) : versionDetails?.changes && versionDetails.changes.length > 0 ? (
+              ) : (versionDetails as any)?.changes && (versionDetails as any).changes.length > 0 ? (
                 <div className="space-y-3">
-                  {versionDetails.changes.map((change: VersionChange, idx: number) => (
+                  {(versionDetails as any).changes.map((change: VersionChange, idx: number) => (
                     <ChangeItem key={idx} change={change} />
                   ))}
                 </div>

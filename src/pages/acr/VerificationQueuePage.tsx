@@ -105,7 +105,7 @@ export function VerificationQueuePage() {
           jobId={jobId}
           fileName={fileName}
           onComplete={handleComplete}
-          criteriaFromAnalysis={confidenceData?.criteria}
+          criteriaFromAnalysis={confidenceData?.criteria as any}
         />
       )}
     </div>

@@ -13,6 +13,7 @@ import { VersionTimelineSidebar } from '@/components/acr/VersionTimelineSidebar'
 import { VersionCompareModal } from '@/components/acr/VersionCompareModal';
 import { ExportDialog } from '@/components/acr/ExportDialog';
 import { cn } from '@/utils/cn';
+import type { AcrCriterionReview } from '@/types/acr-report.types';
 
 /**
  * ACR Report Review & Edit Page - Enhanced Design
@@ -26,7 +27,7 @@ import { cn } from '@/utils/cn';
  */
 
 interface CriterionCardProps {
-  criterion: Record<string, unknown>;
+  criterion: AcrCriterionReview;
   acrJobId: string;
   isExpanded: boolean;
   onToggleExpand: () => void;
@@ -34,15 +35,15 @@ interface CriterionCardProps {
 
 function CriterionCard({ criterion, acrJobId, isExpanded, onToggleExpand }: CriterionCardProps) {
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editedStatus, setEditedStatus] = useState(criterion.verificationStatus || 'pass');
-  const [editedMethod, setEditedMethod] = useState(criterion.verificationMethod || 'Manual Review');
-  const [editedNotes, setEditedNotes] = useState(criterion.verificationNotes || '');
+  const [editedStatus, setEditedStatus] = useState<string>(criterion.verificationStatus || 'pass');
+  const [editedMethod, setEditedMethod] = useState<string>(criterion.verificationMethod || 'Manual Review');
+  const [editedNotes, setEditedNotes] = useState<string>(criterion.verificationNotes || '');
 
   const { mutate: updateCriterion, isPending: isUpdating } = useUpdateCriterion(acrJobId);
 
   const handleSave = () => {
     updateCriterion({
-      criterionId: criterion.id,
+      criterionId: criterion.criterionId,
       updates: {
         verificationStatus: editedStatus,
         verificationMethod: editedMethod,
@@ -109,7 +110,7 @@ function CriterionCard({ criterion, acrJobId, isExpanded, onToggleExpand }: Crit
               <span className="font-semibold text-gray-900">{criterion.criterionNumber}</span>
               <span className="text-sm text-gray-600 truncate">{criterion.criterionName || `WCAG ${criterion.criterionNumber}`}</span>
               {criterion.level && (
-                <Badge variant="outline" className="text-xs">Level {criterion.level}</Badge>
+                <Badge variant="default" className="text-xs">Level {criterion.level}</Badge>
               )}
             </div>
           </div>
@@ -238,7 +239,7 @@ function CriterionCard({ criterion, acrJobId, isExpanded, onToggleExpand }: Crit
                 </div>
                 <div>
                   <div className="text-xs text-gray-500 mb-1">Verified By</div>
-                  <div className="text-sm text-gray-900">{criterion.reviewerName || criterion.reviewedBy || 'Pending Verification'}</div>
+                  <div className="text-sm text-gray-900">{criterion.reviewedBy || 'Pending Verification'}</div>
                 </div>
               </div>
 
@@ -406,9 +407,11 @@ export function AcrReportReviewPage() {
     id: c.id,
     criterionId: c.criterionNumber,
     criterionName: c.criterionName || `WCAG ${c.criterionNumber}`,
-    status: c.verificationStatus === 'verified_pass' ? 'verified_pass' :
+    wcagLevel: (c.level || 'A') as 'A' | 'AA' | 'AAA',
+    severity: 'moderate' as const,
+    status: (c.verificationStatus === 'verified_pass' ? 'verified_pass' :
             c.verificationStatus === 'verified_fail' ? 'verified_fail' :
-            c.isNotApplicable ? 'not_applicable' : 'pending',
+            c.isNotApplicable ? 'not_applicable' : 'pending') as any,
     // IMPORTANT: VerificationSummaryCard expects 0-1 scale, backend returns 0-100
     confidenceScore: (c.confidence || 0) / 100, // Convert 0-100 to 0-1 scale
     confidenceLevel: (() => {
@@ -417,7 +420,10 @@ export function AcrReportReviewPage() {
       if (score >= 70) return 'medium';
       if (score > 0) return 'low';
       return 'manual';
-    })(),
+    })() as 'high' | 'medium' | 'low' | 'manual',
+    automatedResult: 'not_tested' as const,
+    automatedNotes: c.verificationNotes || '',
+    history: [] as any[],
     isNotApplicable: c.isNotApplicable || false,
     // Add naSuggestion for N/A criteria so VerificationSummaryCard can count them correctly
     naSuggestion: c.isNotApplicable ? {
@@ -457,7 +463,7 @@ export function AcrReportReviewPage() {
                   Review & Edit ACR Report
                 </h1>
                 <p className="text-sm text-gray-600 mt-1">
-                  {acrJob.documentTitle || `Job ${jobId}`} • {acrJob.editionName || acrJob.edition}
+                  {acrJob.documentTitle || `Job ${jobId}`} • {acrJob.edition}
                 </p>
               </div>
             </div>
@@ -610,11 +616,11 @@ export function AcrReportReviewPage() {
             </div>
             <div>
               <div className="text-sm text-gray-500">Edition</div>
-              <div className="text-base font-medium text-gray-900">{acrJob.editionName || acrJob.edition}</div>
+              <div className="text-base font-medium text-gray-900">{acrJob.edition}</div>
             </div>
             <div>
               <div className="text-sm text-gray-500">Status</div>
-              <div className="text-base font-medium text-gray-900 capitalize">{acrJob.status.replaceAll('_', ' ')}</div>
+              <div className="text-base font-medium text-gray-900 capitalize">{acrJob.status.replace(/_/g, ' ')}</div>
             </div>
             <div>
               <div className="text-sm text-gray-500">Last Updated</div>
@@ -704,6 +710,8 @@ export function AcrReportReviewPage() {
             <button
               onClick={() => setShowNACriteria(!showNACriteria)}
               className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+              aria-expanded={showNACriteria}
+              aria-controls="na-criteria-panel"
             >
               <div className="flex items-center gap-3">
                 {showNACriteria ? <ChevronDown className="h-5 w-5 text-gray-400" /> : <ChevronRight className="h-5 w-5 text-gray-400" />}
@@ -719,7 +727,7 @@ export function AcrReportReviewPage() {
             </button>
 
             {showNACriteria && (
-              <div className="border-t border-gray-200 p-4 space-y-2">
+              <div id="na-criteria-panel" className="border-t border-gray-200 p-4 space-y-2">
                 {naCriteria.map((criterion) => (
                   <div key={criterion.id} className="border border-blue-200 rounded-lg p-4 bg-blue-50/30 hover:shadow-sm transition-shadow">
                     <div className="flex items-center justify-between">
@@ -727,9 +735,9 @@ export function AcrReportReviewPage() {
                         <span className="font-semibold text-gray-900">{criterion.criterionNumber}</span>
                         <span className="text-sm text-gray-600 truncate">{criterion.criterionName || `WCAG ${criterion.criterionNumber}`}</span>
                         {criterion.level && (
-                          <Badge variant="outline" className="text-xs">Level {criterion.level}</Badge>
+                          <Badge variant="default" className="text-xs">Level {criterion.level}</Badge>
                         )}
-                        <Badge variant="default" className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5">N/A</Badge>
+                        <Badge variant="info" className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5">N/A</Badge>
                       </div>
                     </div>
                     {criterion.naReason && (

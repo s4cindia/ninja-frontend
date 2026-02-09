@@ -3,6 +3,7 @@ import { Info, ChevronDown, ChevronRight, Edit2, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useUpdateCriterion } from '@/hooks/useAcrReport';
 import type { AcrCriterionReview } from '@/types/acr-report.types';
+import type { NaDetectionCheck } from '@/types/confidence.types';
 import { cn } from '@/utils/cn';
 
 interface NACriteriaSectionProps {
@@ -308,7 +309,7 @@ export function NACriteriaSection({ naCriteria, acrJobId, edition: _edition }: N
                               </span>
                               <ul className="text-xs text-gray-600 space-y-1">
                                 {detectionDetails.detectionChecks.map(
-                                  (check: DetectionCheck, idx: number) => (
+                                  (check: NaDetectionCheck, idx: number) => (
                                     <li key={idx} className="flex items-start gap-2">
                                       <span
                                         className={cn(
@@ -320,7 +321,7 @@ export function NACriteriaSection({ naCriteria, acrJobId, edition: _edition }: N
                                       >
                                         {check.result === 'pass' ? '✓' : '○'}
                                       </span>
-                                      <span>{check.description}</span>
+                                      <span>{check.check}</span>
                                     </li>
                                   )
                                 )}

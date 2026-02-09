@@ -296,7 +296,7 @@ export function AcrWorkflowPage() {
   // Populate analysisResults from confidence API if empty (e.g., after refresh)
   useEffect(() => {
     if (confidenceData?.criteria && analysisResults.length === 0 && state.currentStep === 4) {
-      setAnalysisResults(confidenceData.criteria);
+      setAnalysisResults(confidenceData.criteria as any);
     }
   }, [confidenceData, analysisResults.length, state.currentStep]);
 
@@ -345,7 +345,7 @@ export function AcrWorkflowPage() {
         jobId: state.jobId,
         edition: state.selectedEdition.code,
         verificationData,
-        documentTitle: state.documentTitle || state.fileName || 'Untitled Document',
+        documentTitle: state.fileName || documentTitle || 'Untitled Document',
       },
       {
         onSuccess: () => {
@@ -360,7 +360,7 @@ export function AcrWorkflowPage() {
         },
       }
     );
-  }, [state.jobId, state.selectedEdition, state.verifications, state.documentTitle, state.fileName, analysisResults, initializeReport, navigate]);
+  }, [state.jobId, state.selectedEdition, state.verifications, documentTitle, state.fileName, analysisResults, initializeReport, navigate]);
 
   // Track the last applied URL job to detect navigation between jobs
   const lastAppliedJobRef = useRef<string | null>(null);
