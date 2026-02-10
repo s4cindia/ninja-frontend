@@ -1,10 +1,9 @@
 import { Outlet, NavLink } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Upload, 
-  BookOpen, 
-  Search, 
-  CheckSquare, 
+import {
+  LayoutDashboard,
+  Upload,
+  Search,
+  CheckSquare,
   FileText,
   FolderOpen,
 } from 'lucide-react';
@@ -13,7 +12,6 @@ const EDITORIAL_TABS = [
   { path: '/editorial', label: 'Overview', icon: LayoutDashboard, end: true },
   { path: '/editorial/upload', label: 'Upload', icon: Upload, end: false },
   { path: '/editorial/documents', label: 'Documents', icon: FolderOpen, end: false },
-  { path: '/editorial/citations', label: 'Citations', icon: BookOpen, end: false },
   { path: '/editorial/plagiarism', label: 'Plagiarism', icon: Search, end: false },
   { path: '/editorial/style', label: 'Style', icon: CheckSquare, end: false },
   { path: '/editorial/reports', label: 'Reports', icon: FileText, end: false },
@@ -29,7 +27,7 @@ export function EditorialLayout() {
               Editorial Services
             </h1>
             <p className="text-sm text-gray-500 mt-1">
-              Citation management, plagiarism detection, and style validation
+              AI-powered citation intelligence, plagiarism detection, and style validation
             </p>
           </div>
           <NavLink 

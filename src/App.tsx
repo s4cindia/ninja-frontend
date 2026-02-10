@@ -52,16 +52,23 @@ import BatchFileDetailsPage from '@/pages/BatchFileDetailsPage';
 import BatchListPage from '@/pages/BatchListPage';
 import Settings from '@/pages/Settings';
 import { EditorialLayout } from '@/components/editorial';
-import { 
-  EditorialDashboardPage, 
-  EditorialUploadPage, 
-  CitationsPage, 
-  PlagiarismPage, 
-  StylePage, 
+import {
+  EditorialDashboardPage,
+  EditorialUploadPage,
+  PlagiarismPage,
+  StylePage,
   ReportsPage,
   EditorialDocumentsPage,
   EditorialDocumentOverviewPage,
 } from '@/pages/editorial';
+import CitationUploadPage from '@/pages/CitationUploadPage';
+import CitationAnalysisPage from '@/pages/CitationAnalysisPage';
+import CitationReferencesPage from '@/pages/CitationReferencesPage';
+import CitationManuscriptPage from '@/pages/CitationManuscriptPage';
+import CitationStylePage from '@/pages/CitationStylePage';
+import CitationGhostDetectorPage from '@/pages/CitationGhostDetectorPage';
+import CitationDiffViewPage from '@/pages/CitationDiffViewPage';
+import CitationReviewQueuePage from '@/pages/CitationReviewQueuePage';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -201,8 +208,9 @@ function AppRoutes() {
             <Route path="upload" element={<EditorialUploadPage />} />
             <Route path="documents" element={<EditorialDocumentsPage />} />
             <Route path="documents/:documentId" element={<EditorialDocumentOverviewPage />} />
-            <Route path="citations" element={<CitationsPage />} />
-            <Route path="citations/:jobId" element={<CitationsPage />} />
+            {/* Redirect old citations to new Citation Intelligence Tool */}
+            <Route path="citations" element={<Navigate to="/citation/upload" replace />} />
+            <Route path="citations/:jobId" element={<Navigate to="/citation/upload" replace />} />
             <Route path="plagiarism" element={<PlagiarismPage />} />
             <Route path="plagiarism/:jobId" element={<PlagiarismPage />} />
             <Route path="style" element={<StylePage />} />
@@ -210,6 +218,16 @@ function AppRoutes() {
             <Route path="reports" element={<ReportsPage />} />
             <Route path="reports/:jobId" element={<ReportsPage />} />
           </Route>
+
+          {/* Citation Intelligence Tool Routes */}
+          <Route path="/citation/upload" element={<CitationUploadPage />} />
+          <Route path="/citation/analysis/:jobId" element={<CitationAnalysisPage />} />
+          <Route path="/citation/references/:jobId" element={<CitationReferencesPage />} />
+          <Route path="/citation/manuscript/:jobId" element={<CitationManuscriptPage />} />
+          <Route path="/citation/style/:jobId" element={<CitationStylePage />} />
+          <Route path="/citation/ghosts/:jobId" element={<CitationGhostDetectorPage />} />
+          <Route path="/citation/diff/:jobId" element={<CitationDiffViewPage />} />
+          <Route path="/citation/review-queue/:jobId" element={<CitationReviewQueuePage />} />
         </Route>
 
         <Route path="/unauthorized" element={<Unauthorized />} />
