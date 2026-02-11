@@ -1,0 +1,70 @@
+# CodeRabbit Configuration for Ninja Frontend
+language: en-US
+early_access: true
+enable_free_tier: true
+
+reviews:
+  auto_review:
+    enabled: true
+    drafts: false
+
+  request_changes_workflow: true
+
+  high_level_summary: true
+
+  poem: false
+
+  review_status: true
+
+  collapse_walkthrough: false
+
+  path_filters:
+    - "!**/node_modules/**"
+    - "!**/dist/**"
+    - "!**/coverage/**"
+    - "!**/*.md"
+    - "!**/public/**"
+
+  path_instructions:
+    - path: "src/components/**/*.tsx"
+      instructions: |
+        - Verify WCAG 2.1 AA accessibility compliance
+        - Check for proper React hooks usage
+        - Ensure components are properly typed
+        - Verify semantic HTML usage
+        - Check for keyboard navigation support
+
+    - path: "src/pages/**/*.tsx"
+      instructions: |
+        - Check for proper error boundaries
+        - Verify loading states are handled
+        - Ensure proper page metadata (titles, descriptions)
+        - Check accessibility of page layout
+
+    - path: "src/services/**/*.ts"
+      instructions: |
+        - Verify proper error handling
+        - Check for request/response type safety
+        - Ensure proper API client usage
+
+    - path: "src/hooks/**/*.ts"
+      instructions: |
+        - Verify React Query best practices
+        - Check for proper hook dependencies
+        - Ensure proper error handling
+        - Verify cache invalidation strategies
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  learnings:
+    scope: auto
+
+  opt_out: false
+
+tone_instructions: |
+  - Be concise and professional
+  - Focus on accessibility, performance, and user experience
+  - Suggest React and TypeScript best practices
+  - Highlight potential accessibility issues
