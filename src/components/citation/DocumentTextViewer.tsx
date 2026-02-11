@@ -1,8 +1,9 @@
-import { useMemo, useRef, useEffect, useCallback } from 'react';
-import { FileText, Upload } from 'lucide-react';
+import { useMemo, useRef, useEffect, useCallback, useState } from 'react';
+import { FileText, Upload, Keyboard } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { Button } from '@/components/ui/Button';
 import { SkeletonDocument } from '@/components/ui/Skeleton';
+import { useCitationKeyboardNav } from '@/hooks/useCitationKeyboardNav';
 
 interface DocumentTextViewerProps {
   highlightedHtml?: string | null;
@@ -178,6 +179,7 @@ export function DocumentTextViewer({
   onCitationClick,
 }: DocumentTextViewerProps): JSX.Element {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
 
   const sanitizedHtml = useMemo(() => {
     let rawHtml = highlightedHtml || fullHtml;
@@ -197,6 +199,22 @@ export function DocumentTextViewer({
     if (!fullText) return [];
     return fullText.split('\n');
   }, [fullText]);
+
+  // Keyboard navigation for citations
+  const { totalCitations } = useCitationKeyboardNav({
+    containerRef: scrollRef,
+    highlightedCitation,
+    onCitationSelect: onCitationClick,
+    enabled: !isLoading && (!!sanitizedHtml || !!fullText),
+  });
+
+  // Show keyboard help on first load if citations exist
+  useEffect(() => {
+    if (totalCitations > 0 && !showKeyboardHelp) {
+      const timer = setTimeout(() => setShowKeyboardHelp(true), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [totalCitations, showKeyboardHelp]);
 
   useEffect(() => {
     if (highlightedCitation == null || !scrollRef.current) return;
@@ -293,7 +311,7 @@ export function DocumentTextViewer({
     return (
       <div
         ref={scrollRef}
-        className="h-full overflow-auto bg-white"
+        className="h-full overflow-auto bg-white relative"
         role="document"
         aria-label="Document source with highlighted citations"
       >
@@ -301,6 +319,51 @@ export function DocumentTextViewer({
           className="document-panel px-10 py-8 max-w-none"
           dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
+
+        {/* Keyboard navigation help indicator */}
+        {totalCitations > 0 && showKeyboardHelp && (
+          <div
+            className="fixed bottom-4 right-4 bg-gradient-to-br from-blue-900 to-indigo-900 text-white px-4 py-3 rounded-lg shadow-xl border border-blue-700 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex items-start gap-3">
+              <Keyboard className="h-5 w-5 flex-shrink-0 mt-0.5" aria-hidden="true" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold mb-1">Keyboard Navigation</p>
+                <div className="text-xs text-blue-100 space-y-0.5">
+                  <p>
+                    <kbd className="px-1.5 py-0.5 bg-blue-700 rounded text-xs">↑</kbd> /{' '}
+                    <kbd className="px-1.5 py-0.5 bg-blue-700 rounded text-xs">↓</kbd> Navigate
+                    citations
+                  </p>
+                  <p>
+                    <kbd className="px-1.5 py-0.5 bg-blue-700 rounded text-xs">Enter</kbd> Select
+                    citation
+                  </p>
+                  <p>
+                    <kbd className="px-1.5 py-0.5 bg-blue-700 rounded text-xs">Esc</kbd> Clear
+                    selection
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowKeyboardHelp(false)}
+                className="text-blue-200 hover:text-white transition-colors"
+                aria-label="Close keyboard help"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
