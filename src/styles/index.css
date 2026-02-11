@@ -3,12 +3,16 @@
 @tailwind utilities;
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 
 /* Prism.js accessible syntax highlighting theme */
-code[class*="language-"],
-pre[class*="language-"] {
+code[class*='language-'],
+pre[class*='language-'] {
   color: #1e293b;
   text-shadow: none;
   font-family: 'JetBrains Mono', Consolas, Monaco, 'Andale Mono', monospace;
@@ -88,95 +92,273 @@ pre[class*="language-"] {
   line-height: 1.7;
   color: #1a1a1a;
 }
-.document-panel h1 { font-size: 24px; font-weight: 700; margin: 24px 0 12px; font-family: 'Georgia', serif; display: block; }
-.document-panel h2 { font-size: 20px; font-weight: 600; margin: 20px 0 10px; font-family: 'Georgia', serif; display: block; }
-.document-panel h3 { font-size: 17px; font-weight: 600; margin: 16px 0 8px; font-family: 'Georgia', serif; display: block; }
-.document-panel h4 { font-size: 15px; font-weight: 600; margin: 14px 0 6px; font-family: 'Georgia', serif; display: block; }
-.document-panel p { font-size: 14px; line-height: 1.7; margin: 0 0 12px; font-family: 'Georgia', serif; }
-.document-panel strong, .document-panel b { font-weight: 700; }
-.document-panel em, .document-panel i { font-style: italic; }
-.document-panel u { text-decoration: underline; }
-.document-panel s, .document-panel del { text-decoration: line-through; }
-.document-panel sup { vertical-align: super; font-size: 0.75em; }
-.document-panel sub { vertical-align: sub; font-size: 0.75em; }
-.document-panel table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+.document-panel h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 24px 0 12px;
+  font-family: 'Georgia', serif;
+  display: block;
+}
+.document-panel h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 20px 0 10px;
+  font-family: 'Georgia', serif;
+  display: block;
+}
+.document-panel h3 {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 16px 0 8px;
+  font-family: 'Georgia', serif;
+  display: block;
+}
+.document-panel h4 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 14px 0 6px;
+  font-family: 'Georgia', serif;
+  display: block;
+}
+.document-panel p {
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 0 0 12px;
+  font-family: 'Georgia', serif;
+}
+.document-panel strong,
+.document-panel b {
+  font-weight: 700;
+}
+.document-panel em,
+.document-panel i {
+  font-style: italic;
+}
+.document-panel u {
+  text-decoration: underline;
+}
+.document-panel s,
+.document-panel del {
+  text-decoration: line-through;
+}
+.document-panel sup {
+  vertical-align: super;
+  font-size: 0.75em;
+}
+.document-panel sub {
+  vertical-align: sub;
+  font-size: 0.75em;
+}
+.document-panel table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
 .document-panel th,
-.document-panel td { border: 1px solid #ccc; padding: 8px 12px; font-size: 13px; }
-.document-panel th { background: #f5f5f5; font-weight: 600; }
-.document-panel ul { list-style-type: disc; margin: 8px 0 12px 24px; padding-left: 0; }
-.document-panel ol { list-style-type: decimal; margin: 8px 0 12px 24px; padding-left: 0; }
-.document-panel li { font-size: 14px; line-height: 1.6; display: list-item; }
-.document-panel img { max-width: 100%; height: auto; margin: 12px 0; }
-.document-panel blockquote { border-left: 3px solid #ccc; padding-left: 16px; color: #555; margin: 12px 0; }
-.document-panel pre { background: #f5f5f5; padding: 12px; border-radius: 4px; overflow-x: auto; }
-.document-panel code { font-family: 'JetBrains Mono', Consolas, monospace; font-size: 13px; }
-.document-panel a { color: #2563eb; text-decoration: underline; }
+.document-panel td {
+  border: 1px solid #ccc;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.document-panel th {
+  background: #f5f5f5;
+  font-weight: 600;
+}
+.document-panel ul {
+  list-style-type: disc;
+  margin: 8px 0 12px 24px;
+  padding-left: 0;
+}
+.document-panel ol {
+  list-style-type: decimal;
+  margin: 8px 0 12px 24px;
+  padding-left: 0;
+}
+.document-panel li {
+  font-size: 14px;
+  line-height: 1.6;
+  display: list-item;
+}
+.document-panel img {
+  max-width: 100%;
+  height: auto;
+  margin: 12px 0;
+}
+.document-panel blockquote {
+  border-left: 3px solid #ccc;
+  padding-left: 16px;
+  color: #555;
+  margin: 12px 0;
+}
+.document-panel pre {
+  background: #f5f5f5;
+  padding: 12px;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+.document-panel code {
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 13px;
+}
+.document-panel a {
+  color: #2563eb;
+  text-decoration: underline;
+}
 
 /* Citation highlights — backend classes (cit-hl, cit-matched, cit-issue, cit-unmatched) */
 .document-panel .cit-hl {
   cursor: pointer;
-  border-radius: 2px;
+  border-radius: 3px;
+  transition: all 0.2s ease-in-out;
+  position: relative;
 }
+
+/* Matched citations (valid) */
 .document-panel .cit-matched {
-  background-color: rgba(61, 214, 140, 0.25) !important;
-  border-bottom: 2px solid #3dd68c !important;
-  padding: 1px 3px;
+  background-color: rgba(34, 197, 94, 0.15) !important;
+  border-bottom: 2px solid #22c55e !important;
+  padding: 2px 4px;
+  box-shadow: 0 1px 2px rgba(34, 197, 94, 0.1);
 }
+.document-panel .cit-matched:hover {
+  background-color: rgba(34, 197, 94, 0.25) !important;
+  box-shadow: 0 2px 4px rgba(34, 197, 94, 0.2);
+  transform: translateY(-1px);
+}
+
+/* Issue citations (invalid or problematic) */
 .document-panel .cit-issue {
-  background-color: rgba(255, 107, 107, 0.25) !important;
-  border-bottom: 2px solid #ff6b6b !important;
-  padding: 1px 3px;
+  background-color: rgba(239, 68, 68, 0.15) !important;
+  border-bottom: 2px solid #ef4444 !important;
+  padding: 2px 4px;
+  box-shadow: 0 1px 2px rgba(239, 68, 68, 0.1);
 }
+.document-panel .cit-issue:hover {
+  background-color: rgba(239, 68, 68, 0.25) !important;
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+  transform: translateY(-1px);
+}
+
+/* Unmatched citations (pending validation) */
 .document-panel .cit-unmatched {
-  background-color: rgba(250, 204, 21, 0.25) !important;
-  border-bottom: 2px solid #facc15 !important;
-  padding: 1px 3px;
+  background-color: rgba(251, 191, 36, 0.15) !important;
+  border-bottom: 2px solid #fbbf24 !important;
+  padding: 2px 4px;
+  box-shadow: 0 1px 2px rgba(251, 191, 36, 0.1);
 }
-.document-panel .cit-matched:hover { background-color: rgba(61, 214, 140, 0.4) !important; }
-.document-panel .cit-issue:hover { background-color: rgba(255, 107, 107, 0.4) !important; }
-.document-panel .cit-unmatched:hover { background-color: rgba(250, 204, 21, 0.4) !important; }
+.document-panel .cit-unmatched:hover {
+  background-color: rgba(251, 191, 36, 0.25) !important;
+  box-shadow: 0 2px 4px rgba(251, 191, 36, 0.2);
+  transform: translateY(-1px);
+}
 
 /* Legacy client-side highlight classes (fallback) */
 .citation-matched {
-  background-color: rgba(61, 214, 140, 0.25) !important;
-  border-bottom: 2px solid #3dd68c !important;
-  padding: 1px 3px;
-  border-radius: 2px;
+  background-color: rgba(34, 197, 94, 0.15) !important;
+  border-bottom: 2px solid #22c55e !important;
+  padding: 2px 4px;
+  border-radius: 3px;
   cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 1px 2px rgba(34, 197, 94, 0.1);
 }
 .citation-issue {
-  background-color: rgba(255, 107, 107, 0.25) !important;
-  border-bottom: 2px solid #ff6b6b !important;
-  padding: 1px 3px;
-  border-radius: 2px;
+  background-color: rgba(239, 68, 68, 0.15) !important;
+  border-bottom: 2px solid #ef4444 !important;
+  padding: 2px 4px;
+  border-radius: 3px;
   cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 1px 2px rgba(239, 68, 68, 0.1);
 }
-.citation-matched:hover { background-color: rgba(61, 214, 140, 0.4) !important; }
-.citation-issue:hover { background-color: rgba(255, 107, 107, 0.4) !important; }
+.citation-matched:hover {
+  background-color: rgba(34, 197, 94, 0.25) !important;
+  box-shadow: 0 2px 4px rgba(34, 197, 94, 0.2);
+  transform: translateY(-1px);
+}
+.citation-issue:hover {
+  background-color: rgba(239, 68, 68, 0.25) !important;
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+  transform: translateY(-1px);
+}
 
-/* Active citation highlight */
+/* Active citation highlight - enhanced with ring effect and pulse */
 .document-panel .cit-hl.citation-active,
 .citation-matched.citation-active,
 .citation-issue.citation-active {
-  outline: 2px solid #facc15;
-  outline-offset: 1px;
+  outline: none !important;
+  box-shadow:
+    0 0 0 3px rgba(59, 130, 246, 0.4),
+    0 2px 8px rgba(59, 130, 246, 0.2) !important;
+  transform: scale(1.02) !important;
+  z-index: 10;
 }
 
-/* Citation hover tooltip */
+/* Focus visible for keyboard navigation */
+.document-panel .cit-hl:focus-visible,
+.citation-matched:focus-visible,
+.citation-issue:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Citation hover tooltip - enhanced with animations and better styling */
 .citation-tooltip {
   position: fixed;
   z-index: 1000;
-  max-width: 450px;
-  padding: 10px 14px;
-  background: #1a1a2e;
-  color: #fff;
-  border-radius: 6px;
-  font-size: 12px;
-  line-height: 1.5;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  max-width: 480px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  color: #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  box-shadow:
+    0 10px 25px rgba(0, 0, 0, 0.3),
+    0 6px 12px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
   pointer-events: none;
   display: none;
   font-family: -apple-system, system-ui, sans-serif;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity 0.2s ease-out,
+    transform 0.2s ease-out;
+  backdrop-filter: blur(8px);
+}
+
+/* Tooltip visible state with fade-in animation */
+.citation-tooltip[style*='display: block'] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Tooltip arrow (pseudo-element) - points up by default */
+.citation-tooltip::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 20px;
+  width: 12px;
+  height: 12px;
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  transform: rotate(45deg);
+  z-index: -1;
+}
+
+/* Tooltip arrow pointing down when tooltip is above element */
+.citation-tooltip.tooltip-above::before {
+  top: auto;
+  bottom: -6px;
+  border-left: none;
+  border-top: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  transform: rotate(45deg);
 }
 
 /* Validation summary bar */
@@ -191,25 +373,47 @@ pre[class*="language-"] {
   flex-wrap: wrap;
   align-items: center;
 }
-.validation-summary .stat { font-weight: 600; }
-.validation-summary .stat.error { color: #e53e3e; }
-.validation-summary .stat.success { color: #38a169; }
-.validation-summary .stat.warning { color: #d69e2e; }
+.validation-summary .stat {
+  font-weight: 600;
+}
+.validation-summary .stat.error {
+  color: #e53e3e;
+}
+.validation-summary .stat.success {
+  color: #38a169;
+}
+.validation-summary .stat.warning {
+  color: #d69e2e;
+}
 
 /* Flash-highlight animations for cross-panel click interactions */
 @keyframes citation-flash {
-  0%, 100% { background: inherit; }
-  25% { background: rgba(250, 204, 21, 0.4); }
-  75% { background: rgba(250, 204, 21, 0.2); }
+  0%,
+  100% {
+    background: inherit;
+  }
+  25% {
+    background: rgba(250, 204, 21, 0.4);
+  }
+  75% {
+    background: rgba(250, 204, 21, 0.2);
+  }
 }
 .citation-flash {
   animation: citation-flash 1.5s ease-in-out;
 }
 
 @keyframes issue-card-flash {
-  0%, 100% { box-shadow: none; }
-  25% { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5); }
-  75% { box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
+  0%,
+  100% {
+    box-shadow: none;
+  }
+  25% {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+  }
+  75% {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+  }
 }
 .issue-card-flash {
   animation: issue-card-flash 1.5s ease-in-out;
@@ -217,8 +421,12 @@ pre[class*="language-"] {
 
 /* Indeterminate progress animation */
 @keyframes indeterminate {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(400%); }
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
 }
 
 .animate-indeterminate {

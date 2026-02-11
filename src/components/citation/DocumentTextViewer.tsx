@@ -87,23 +87,54 @@ function showTooltip(anchorEl: Element, text: string) {
     tooltip.className = 'citation-tooltip';
     document.body.appendChild(tooltip);
   }
+
   tooltip.textContent = text;
-  tooltip.style.display = 'block';
   const rect = anchorEl.getBoundingClientRect();
-  const tooltipWidth = 450;
+
+  // Smart positioning to avoid screen edges
+  const tooltipWidth = 480; // Match CSS max-width
+  const tooltipHeight = 60; // Approximate height
+  const padding = 12;
+
   let left = rect.left;
-  if (left + tooltipWidth > window.innerWidth) {
-    left = window.innerWidth - tooltipWidth - 10;
+  let top = rect.bottom + 8; // Space for arrow
+
+  // Adjust horizontal position if tooltip would overflow
+  if (left + tooltipWidth > window.innerWidth - padding) {
+    left = window.innerWidth - tooltipWidth - padding;
   }
-  if (left < 10) left = 10;
+  if (left < padding) {
+    left = padding;
+  }
+
+  // Flip tooltip above element if not enough space below
+  if (top + tooltipHeight > window.innerHeight - padding) {
+    top = rect.top - tooltipHeight - 8;
+    tooltip.classList.add('tooltip-above');
+  } else {
+    tooltip.classList.remove('tooltip-above');
+  }
+
   tooltip.style.left = `${left}px`;
-  tooltip.style.top = `${rect.bottom + 6}px`;
+  tooltip.style.top = `${top}px`;
+
+  // Trigger display with slight delay for smooth animation
+  requestAnimationFrame(() => {
+    tooltip!.style.display = 'block';
+  });
 }
 
 function hideTooltip() {
   if (typeof document === 'undefined') return;
   const tooltip = document.getElementById('citation-tooltip');
-  if (tooltip) tooltip.style.display = 'none';
+  if (tooltip) {
+    // Allow fade-out transition before hiding
+    tooltip.style.opacity = '0';
+    setTimeout(() => {
+      tooltip.style.display = 'none';
+      tooltip.style.opacity = '';
+    }, 200); // Match CSS transition duration
+  }
 }
 
 function escapeText(str: string): string {
