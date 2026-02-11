@@ -9,7 +9,7 @@
  * Then uncomment the react-pdf imports and PDF rendering code below.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   ZoomIn,
   ZoomOut,
@@ -20,23 +20,21 @@ import {
   EyeOff,
   Loader2,
   AlertCircle,
-  FileText,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '../ui/Button';
 import type { PdfAuditIssue } from '@/types/pdf.types';
+import { api } from '@/services/api';
 
-// TODO: Uncomment when react-pdf is installed
-// import { Document, Page, pdfjs } from 'react-pdf';
-// import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
-// import 'react-pdf/dist/esm/Page/TextLayer.css';
+import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
+import 'react-pdf/dist/esm/Page/TextLayer.css';
 
-// TODO: Uncomment when react-pdf is installed
 // Use local worker for better compatibility and to avoid CDN/CSP issues
-// pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-//   'pdfjs-dist/build/pdf.worker.min.js',
-//   import.meta.url
-// ).toString();
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.js',
+  import.meta.url
+).toString();
 
 export interface PdfPreviewPanelProps {
   pdfUrl: string;
@@ -142,7 +140,7 @@ const IssueOverlay: React.FC<{
 };
 
 export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
-  pdfUrl: _pdfUrl, // TODO: Use when react-pdf is installed
+  pdfUrl,
   currentPage,
   issues,
   selectedIssueId,
@@ -150,15 +148,36 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
   onIssueSelect,
   className,
 }) => {
-  const [numPages, _setNumPages] = useState<number | null>(null); // eslint-disable-line @typescript-eslint/no-unused-vars
+  const [numPages, setNumPages] = useState<number | null>(null);
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>(100);
   const [showHighlights, setShowHighlights] = useState(true);
-  const [isLoading, _setIsLoading] = useState(true); // eslint-disable-line @typescript-eslint/no-unused-vars
-  const [error, _setError] = useState<string | null>(null); // eslint-disable-line @typescript-eslint/no-unused-vars
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Prepare PDF file with auth headers
+  const pdfFile = useMemo(() => {
+    // Get token from localStorage (same method as api.ts)
+    let token: string | null = null;
+    try {
+      const stored = localStorage.getItem('ninja-auth');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        token = parsed.state?.accessToken || null;
+      }
+    } catch {
+      // Ignore parse errors
+    }
+
+    return {
+      url: pdfUrl,
+      httpHeaders: token ? { Authorization: `Bearer ${token}` } : {},
+      withCredentials: true,
+    };
+  }, [pdfUrl]);
 
   // Filter issues for current page and create highlights
   const currentPageIssues = useMemo(() => {
-    return issues.filter((issue) => issue.pageNumber === currentPage);
+    return issues?.filter((issue) => issue.pageNumber === currentPage) || [];
   }, [issues, currentPage]);
 
   const highlights = useMemo(() => {
@@ -167,18 +186,16 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
       .filter((h): h is IssueHighlight => h !== null);
   }, [currentPageIssues]);
 
-  // TODO: Uncomment when react-pdf is installed
-  // const handleDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
-  //   _setNumPages(numPages);
-  //   _setIsLoading(false);
-  //   _setError(null);
-  // }, []);
+  const handleDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
+    setNumPages(numPages);
+    setIsLoading(false);
+    setError(null);
+  }, []);
 
-  // TODO: Uncomment when react-pdf is installed
-  // const handleDocumentLoadError = useCallback((error: Error) => {
-  //   _setError(error.message || 'Failed to load PDF');
-  //   _setIsLoading(false);
-  // }, []);
+  const handleDocumentLoadError = useCallback((error: Error) => {
+    setError(error.message || 'Failed to load PDF');
+    setIsLoading(false);
+  }, []);
 
   const handleZoomIn = useCallback(() => {
     if (typeof zoomLevel === 'number') {
@@ -243,7 +260,15 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
 
           <select
             value={zoomLevel}
-            onChange={(e) => setZoomLevel(e.target.value as ZoomLevel)}
+            onChange={(e) => {
+              const value = e.target.value;
+              // Parse numeric values as numbers, keep string values as strings
+              if (value === 'fit-width' || value === 'fit-page') {
+                setZoomLevel(value);
+              } else {
+                setZoomLevel(Number(value) as ZoomLevel);
+              }
+            }}
             className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
             aria-label="Zoom level"
           >
@@ -338,26 +363,16 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
       {/* PDF viewer */}
       <div className="flex-1 overflow-auto bg-gray-100 p-4">
         <div className="flex justify-center">
-          {isLoading && (
-            <div className="flex flex-col items-center justify-center py-20">
-              <Loader2 className="h-12 w-12 text-primary-600 animate-spin mb-4" />
-              <p className="text-gray-600">Loading PDF...</p>
-            </div>
-          )}
-
-          {error && (
+          {error ? (
             <div className="flex flex-col items-center justify-center py-20">
               <AlertCircle className="h-12 w-12 text-red-600 mb-4" />
               <p className="text-red-600 font-medium mb-2">Failed to load PDF</p>
               <p className="text-sm text-gray-600">{error}</p>
             </div>
-          )}
-
-          {!isLoading && !error && (
+          ) : (
             <div className="relative bg-white shadow-lg p-8">
-              {/* TODO: Uncomment when react-pdf is installed */}
-              {/* <Document
-                file={pdfUrl}
+              <Document
+                file={pdfFile}
                 onLoadSuccess={handleDocumentLoadSuccess}
                 onLoadError={handleDocumentLoadError}
                 loading={
@@ -373,15 +388,7 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
                   renderTextLayer={true}
                   renderAnnotationLayer={true}
                 />
-              </Document> */}
-
-              {/* Placeholder until react-pdf is installed */}
-              <div className="flex flex-col items-center justify-center py-20 bg-gray-100 rounded">
-                <FileText className="h-16 w-16 text-gray-400 mb-4" />
-                <p className="text-gray-600 font-medium mb-2">PDF Preview Not Available</p>
-                <p className="text-sm text-gray-500">Install react-pdf to enable PDF viewing</p>
-                <p className="text-xs text-gray-400 mt-2 font-mono">npm install react-pdf pdfjs-dist</p>
-              </div>
+              </Document>
 
               {/* Issue highlights overlay */}
               {showHighlights && highlights.length > 0 && (
