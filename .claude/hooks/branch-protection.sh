@@ -18,37 +18,13 @@ if [ -z "$BRANCH" ]; then
   exit 0
 fi
 
-# Only protect main/master
-if [ "$BRANCH" != "main" ] && [ "$BRANCH" != "master" ]; then
-  exit 0
-fi
-
 # Determine what type of tool use triggered this hook
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
-# --- Check 1: Block git commit/push on main ---
-if echo "$COMMAND" | grep -qE "^git (commit|push)"; then
-  cat >&2 <<EOF
-
-🚫 Direct commits/pushes to '$BRANCH' are not allowed.
-
-Please create a feature branch first:
-  git checkout -b feat/your-feature-name
-  git checkout -b fix/your-bug-description
-
-Or if you have uncommitted changes:
-  git stash
-  git checkout -b feat/your-feature-name
-  git stash pop
-
-EOF
-  exit 2
-fi
-
-# --- Check 1b: Block pushes targeting main/master (catches "git push origin HEAD:main" bypasses) ---
+# --- Check 1b: Block pushes targeting main/master (runs for ALL branches to catch bypasses) ---
 if echo "$COMMAND" | grep -q "^git push"; then
-  if echo "$COMMAND" | grep -qE '(:|refs/heads/|/)(main|master)(\s|$)'; then
+  if echo "$COMMAND" | grep -qE '([:\s]|refs/heads/|/)(main|master)(\s|$)'; then
     cat >&2 <<EOF
 
 🚫 Direct pushes to 'main' or 'master' are not allowed.
@@ -67,6 +43,30 @@ Or if you have uncommitted changes:
 EOF
     exit 2
   fi
+fi
+
+# Only protect main/master for the remaining checks (commit/edit blocking when ON protected branch)
+if [ "$BRANCH" != "main" ] && [ "$BRANCH" != "master" ]; then
+  exit 0
+fi
+
+# --- Check 1: Block git commit/push on main ---
+if echo "$COMMAND" | grep -qE "^git (commit|push)"; then
+  cat >&2 <<EOF
+
+🚫 Direct commits/pushes to '$BRANCH' are not allowed.
+
+Please create a feature branch first:
+  git checkout -b feat/your-feature-name
+  git checkout -b fix/your-bug-description
+
+Or if you have uncommitted changes:
+  git stash
+  git checkout -b feat/your-feature-name
+  git stash pop
+
+EOF
+  exit 2
 fi
 
 # --- Check 2: Block file edits on main ---
