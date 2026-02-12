@@ -140,7 +140,8 @@ export const PdfAuditResultsPage: React.FC = () => {
 
       setAuditResult(data as PdfAuditResult);
       // Extract scan level from output metadata (default to 'basic' if not specified)
-      setCurrentScanLevel((data as any).scanLevel || 'basic');
+      const resultData = data as PdfAuditResult & { scanLevel?: string };
+      setCurrentScanLevel(resultData.scanLevel || 'basic');
       setIsLoading(false);
       setIsPolling(false);
       setIsReScanning(false);
@@ -241,7 +242,8 @@ export const PdfAuditResultsPage: React.FC = () => {
     // Filter by Matterhorn mapping only
     if (filters.showMatterhornOnly) {
       issues = issues.filter((issue) => {
-        const code = ((issue as any).code || issue.ruleId || '').toUpperCase();
+        const issueWithCode = issue as typeof issue & { code?: string };
+        const code = (issueWithCode.code || issue.ruleId || '').toUpperCase();
         return (
           (issue.matterhornCheckpoint != null && issue.matterhornCheckpoint !== '') ||
           code.startsWith('MATTERHORN-') ||
@@ -265,7 +267,8 @@ export const PdfAuditResultsPage: React.FC = () => {
     if (!auditResult || !auditResult.issues) return 0;
     return auditResult.issues.filter(
       (issue) => {
-        const code = ((issue as any).code || issue.ruleId || '').toUpperCase();
+        const issueWithCode = issue as typeof issue & { code?: string };
+        const code = (issueWithCode.code || issue.ruleId || '').toUpperCase();
         return (
           (issue.matterhornCheckpoint != null && issue.matterhornCheckpoint !== '') ||
           code.startsWith('MATTERHORN-') ||
@@ -455,14 +458,14 @@ export const PdfAuditResultsPage: React.FC = () => {
           jobId: report.jobId || jobId!,
           fileName: report.fileName,
           fileSize: auditResult?.fileSize || 0, // Preserve from previous result
-          pageCount: (report.metadata as any)?.pageCount || auditResult?.pageCount || 0,
+          pageCount: (report.metadata as Record<string, unknown>)?.pageCount as number || auditResult?.pageCount || 0,
           score: report.score,
           status: 'completed',
           createdAt: auditResult?.createdAt || new Date().toISOString(),
           completedAt: new Date().toISOString(),
           issues: report.issues || [],
-          matterhornSummary: (report.metadata as any)?.matterhornSummary || auditResult?.matterhornSummary,
-          metadata: report.metadata as any,
+          matterhornSummary: (report.metadata as Record<string, unknown>)?.matterhornSummary || auditResult?.matterhornSummary,
+          metadata: report.metadata as Record<string, unknown>,
         };
 
         setAuditResult(transformedResult);

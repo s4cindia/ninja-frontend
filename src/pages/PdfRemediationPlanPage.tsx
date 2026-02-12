@@ -100,13 +100,21 @@ export const PdfRemediationPlanPage: React.FC = () => {
       } else {
         toast.error(result.error || 'Auto-remediation failed', { id: toastId });
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('Auto-fix error:', err);
-      console.error('Error response:', err.response?.data);
+      const error = err as {
+        response?: {
+          data?: {
+            error?: { message?: string; code?: string }
+          }
+        };
+        message?: string;
+      };
+      console.error('Error response:', error.response?.data);
 
       // Extract error message from backend response
-      const errorData = err.response?.data?.error;
-      const message = errorData?.message || err.message || 'Failed to run auto-remediation';
+      const errorData = error.response?.data?.error;
+      const message = errorData?.message || error.message || 'Failed to run auto-remediation';
       const errorCode = errorData?.code;
 
       toast.error(`${message}${errorCode ? ` (${errorCode})` : ''}`, { id: toastId });
@@ -199,9 +207,9 @@ export const PdfRemediationPlanPage: React.FC = () => {
                   <p className="text-sm text-green-900 mb-1">Auto-fixable</p>
                   <p className="text-2xl font-bold text-green-600">
                     {plan.autoFixableCount}
-                    {(plan as any).completedAutoFixCount > 0 && (
+                    {(plan as typeof plan & { completedAutoFixCount?: number }).completedAutoFixCount! > 0 && (
                       <span className="text-sm text-green-700 ml-2">
-                        ({(plan as any).completedAutoFixCount} fixed)
+                        ({(plan as typeof plan & { completedAutoFixCount?: number }).completedAutoFixCount} fixed)
                       </span>
                     )}
                   </p>
