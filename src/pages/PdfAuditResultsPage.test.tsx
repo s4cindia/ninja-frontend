@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mocked } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import { PdfAuditResultsPage } from './PdfAuditResultsPage';
 import { api } from '@/services/api';
@@ -148,12 +149,23 @@ const createMockAuditResult = (overrides?: Partial<PdfAuditResult>): PdfAuditRes
 });
 
 const renderWithRouter = (jobId: string = 'job-123') => {
+  // Create a new QueryClient for each test with retry disabled for stability
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
   return render(
-    <MemoryRouter initialEntries={[`/pdf/audit/${jobId}`]}>
-      <Routes>
-        <Route path="/pdf/audit/:jobId" element={<PdfAuditResultsPage />} />
-      </Routes>
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[`/pdf/audit/${jobId}`]}>
+        <Routes>
+          <Route path="/pdf/audit/:jobId" element={<PdfAuditResultsPage />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 };
 
@@ -208,12 +220,22 @@ describe('PdfAuditResultsPage', () => {
     });
 
     it('handles missing job ID', async () => {
+      const queryClient = new QueryClient({
+        defaultOptions: {
+          queries: {
+            retry: false,
+          },
+        },
+      });
+
       render(
-        <MemoryRouter initialEntries={['/pdf/audit/']}>
-          <Routes>
-            <Route path="/pdf/audit/" element={<PdfAuditResultsPage />} />
-          </Routes>
-        </MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={['/pdf/audit/']}>
+            <Routes>
+              <Route path="/pdf/audit/" element={<PdfAuditResultsPage />} />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>
       );
 
       await waitFor(() => {
