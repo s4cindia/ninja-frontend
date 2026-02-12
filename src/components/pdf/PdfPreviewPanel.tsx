@@ -9,7 +9,7 @@
  * Then uncomment the react-pdf imports and PDF rendering code below.
  */
 
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   ZoomIn,
   ZoomOut,
@@ -24,7 +24,6 @@ import {
 import { cn } from '@/utils/cn';
 import { Button } from '../ui/Button';
 import type { PdfAuditIssue } from '@/types/pdf.types';
-import { api } from '@/services/api';
 
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
@@ -151,7 +150,6 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
   const [numPages, setNumPages] = useState<number | null>(null);
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>(100);
   const [showHighlights, setShowHighlights] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Prepare PDF file with auth headers
@@ -188,13 +186,13 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
 
   const handleDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
-    setIsLoading(false);
+    // setIsLoading(false);
     setError(null);
   }, []);
 
   const handleDocumentLoadError = useCallback((error: Error) => {
     setError(error.message || 'Failed to load PDF');
-    setIsLoading(false);
+    // setIsLoading(false);
   }, []);
 
   const handleZoomIn = useCallback(() => {

@@ -27,7 +27,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { useRemediationPlan } from '@/hooks/usePdfRemediation';
 import { pdfRemediationService } from '@/services/pdf-remediation.service';
-import { cn } from '@/utils/cn';
+// import { cn } from '@/utils/cn'; // Unused for now
 
 export const PdfRemediationPlanPage: React.FC = () => {
   const { jobId } = useParams<{ jobId: string }>();

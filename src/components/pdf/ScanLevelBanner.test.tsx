@@ -7,7 +7,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ScanLevelBanner } from './ScanLevelBanner';
-import type { ScanLevel, ValidatorType } from '@/types/scan-level.types';
 
 describe('ScanLevelBanner', () => {
   const mockOnReScan = vi.fn();
