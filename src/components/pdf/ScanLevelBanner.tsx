@@ -128,6 +128,7 @@ export const ScanLevelBanner: React.FC<ScanLevelBannerProps> = ({
                     checked={selectedLevel === 'comprehensive'}
                     onChange={() => setSelectedLevel('comprehensive')}
                     className="mt-1 h-4 w-4 text-primary-600 focus:ring-primary-500"
+                    aria-label="Comprehensive Scan"
                   />
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
@@ -211,6 +212,7 @@ export const ScanLevelBanner: React.FC<ScanLevelBannerProps> = ({
                     checked={selectedLevel === 'custom'}
                     onChange={() => setSelectedLevel('custom')}
                     className="mt-1 h-4 w-4 text-primary-600 focus:ring-primary-500"
+                    aria-label="Custom Scan"
                   />
                   <div className="flex-1">
                     <div className="flex items-center justify-between">

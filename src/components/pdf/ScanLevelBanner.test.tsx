@@ -65,7 +65,7 @@ describe('ScanLevelBanner', () => {
     const button = screen.getByRole('button', { name: /Run Comprehensive Scan/i });
     fireEvent.click(button);
 
-    expect(mockOnReScan).toHaveBeenCalledWith('comprehensive', undefined);
+    expect(mockOnReScan).toHaveBeenCalledWith('comprehensive');
   });
 
   it('allows switching to custom scan option', () => {
@@ -118,7 +118,7 @@ describe('ScanLevelBanner', () => {
     expect(button).toBeDisabled();
   });
 
-  it('disables button when custom selected with no validators', () => {
+  it('prevents unchecking the last validator', () => {
     render(
       <ScanLevelBanner
         currentScanLevel="basic"
@@ -127,15 +127,11 @@ describe('ScanLevelBanner', () => {
       />
     );
 
-    // Switch to custom
+    // Switch to custom (this auto-expands the custom details)
     const customRadio = screen.getByRole('radio', { name: /custom/i });
     fireEvent.click(customRadio);
 
-    // Expand custom details
-    const showDetailsButton = screen.getAllByRole('button', { name: /Show details/i })[1];
-    fireEvent.click(showDetailsButton);
-
-    // Uncheck all validators (need to find and uncheck the checkboxes)
+    // Try to uncheck all validators
     const checkboxes = screen.getAllByRole('checkbox');
     checkboxes.forEach((checkbox) => {
       if ((checkbox as HTMLInputElement).checked) {
@@ -143,9 +139,13 @@ describe('ScanLevelBanner', () => {
       }
     });
 
-    // Button should be disabled when no validators selected
+    // At least one validator should still be checked (component enforces minimum of 1)
+    const checkedCheckboxes = checkboxes.filter((cb) => (cb as HTMLInputElement).checked);
+    expect(checkedCheckboxes.length).toBeGreaterThan(0);
+
+    // Button should remain enabled since at least one validator is selected
     const button = screen.getByRole('button', { name: /Run Custom Scan/i });
-    expect(button).toBeDisabled();
+    expect(button).not.toBeDisabled();
   });
 
   it('expands comprehensive details when show details clicked', () => {
@@ -175,15 +175,11 @@ describe('ScanLevelBanner', () => {
       />
     );
 
-    // Switch to custom
+    // Switch to custom (this auto-expands the custom details)
     const customRadio = screen.getByRole('radio', { name: /custom/i });
     fireEvent.click(customRadio);
 
-    // Click show details for custom
-    const showDetailsButton = screen.getAllByRole('button', { name: /Show details/i })[1];
-    fireEvent.click(showDetailsButton);
-
-    // Should show validator checkboxes
+    // Custom details should already be expanded and showing validator checkboxes
     expect(screen.getByText('Structure & Tags')).toBeInTheDocument();
     expect(screen.getByText('Alternative Text')).toBeInTheDocument();
     expect(screen.getByText('Color Contrast')).toBeInTheDocument();
