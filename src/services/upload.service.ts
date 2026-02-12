@@ -117,15 +117,18 @@ class UploadService {
     let presigned: PresignedUploadResponse | null = null;
 
     try {
+      // Determine content type based on file extension if not provided
+      const contentType = file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'application/epub+zip');
+
       presigned = await this.getPresignedUrl(
         file.name,
         file.size,
-        file.type || 'application/epub+zip'
+        contentType
       );
     } catch (error) {
-      // Presign 500 = S3 not configured, fallback to direct upload
-      if (isAxiosError(error) && error.response?.status === 500) {
-        console.warn('Presign failed (500), using direct upload');
+      // Presign 500 = S3 not configured, 400 = validation error, fallback to direct upload
+      if (isAxiosError(error) && (error.response?.status === 500 || error.response?.status === 400)) {
+        console.warn(`Presign failed (${error.response?.status}), using direct upload`);
         const result = await this.uploadDirect(file, directUploadEndpoint, onProgress);
         return {
           fileId: result.fileId || result.jobId,
