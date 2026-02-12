@@ -59,6 +59,9 @@ export const PdfRemediationPlanPage: React.FC = () => {
   const handleAutoFix = async () => {
     if (!jobId) return;
 
+    // Clear previous result to prevent stale success banner
+    setAutoFixResult(null);
+
     setIsAutoFixing(true);
     const toastId = toast.loading('Running auto-remediation...');
 
@@ -125,7 +128,11 @@ export const PdfRemediationPlanPage: React.FC = () => {
 
   const handleDownloadRemediatedPDF = () => {
     if (autoFixResult?.fileUrl) {
-      window.open(autoFixResult.fileUrl, '_blank');
+      const newWindow = window.open(autoFixResult.fileUrl, '_blank', 'noopener,noreferrer');
+      // Set opener to null for older browsers to prevent tabnabbing
+      if (newWindow) {
+        newWindow.opener = null;
+      }
     }
   };
 
