@@ -27,6 +27,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { useRemediationPlan } from '@/hooks/usePdfRemediation';
 import { pdfRemediationService } from '@/services/pdf-remediation.service';
+import { QuickFixModal } from '@/components/pdf/QuickFixModal';
 // import { cn } from '@/utils/cn'; // Unused for now
 
 export const PdfRemediationPlanPage: React.FC = () => {
@@ -43,6 +44,18 @@ export const PdfRemediationPlanPage: React.FC = () => {
     fileUrl?: string;
     completedTasks: number;
   } | null>(null);
+  const [quickFixModalState, setQuickFixModalState] = useState<{
+    isOpen: boolean;
+    task: {
+      id: string;
+      issueId: string;
+      issueCode: string;
+      description: string;
+    } | null;
+  }>({
+    isOpen: false,
+    task: null,
+  });
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => {
@@ -134,6 +147,41 @@ export const PdfRemediationPlanPage: React.FC = () => {
         newWindow.opener = null;
       }
     }
+  };
+
+  // Determine fix field based on issue code
+  const getFixField = (issueCode: string): 'language' | 'title' | 'metadata' | 'creator' => {
+    const code = issueCode.toUpperCase();
+    if (code.includes('LANGUAGE') || code.includes('LANG')) return 'language';
+    if (code.includes('TITLE')) return 'title';
+    if (code.includes('METADATA') || code.includes('MARKED')) return 'metadata';
+    if (code.includes('CREATOR') || code.includes('PRODUCER')) return 'creator';
+    return 'title'; // Default
+  };
+
+  const handleOpenQuickFixModal = (task: typeof quickFixTasks[0]) => {
+    setQuickFixModalState({
+      isOpen: true,
+      task: {
+        id: task.id,
+        issueId: task.issueId,
+        issueCode: task.issueCode,
+        description: task.description,
+      },
+    });
+  };
+
+  const handleCloseQuickFixModal = () => {
+    setQuickFixModalState({
+      isOpen: false,
+      task: null,
+    });
+  };
+
+  const handleQuickFixSuccess = (remediatedFileUrl: string) => {
+    console.log('Quick fix applied, remediated file:', remediatedFileUrl);
+    // Refetch the plan to update task statuses
+    refetch();
   };
 
   // Loading state
@@ -373,11 +421,13 @@ export const PdfRemediationPlanPage: React.FC = () => {
                 <Button
                   variant="primary"
                   size="sm"
-                  disabled={plan.quickFixCount === 0}
+                  disabled={plan.quickFixCount === 0 || quickFixTasks.filter(t => t.status === 'PENDING').length === 0}
                   onClick={(e) => {
                     e.stopPropagation();
-                    // TODO: Implement quick-fix workflow
-                    alert('Quick-fix workflow will be implemented in next phase');
+                    const firstPendingTask = quickFixTasks.find(t => t.status === 'PENDING');
+                    if (firstPendingTask) {
+                      handleOpenQuickFixModal(firstPendingTask);
+                    }
                   }}
                 >
                   <Zap className="h-4 w-4 mr-2" />
@@ -416,39 +466,39 @@ export const PdfRemediationPlanPage: React.FC = () => {
               </div>
 
               {quickFixTasks.length > 0 ? (
-                <div className="space-y-3">
-                  <p className="text-sm font-medium text-gray-700 mb-3">
-                    Issues grouped by type:
-                  </p>
-
-                  {/* Group by issue code */}
-                  {Object.entries(
-                    quickFixTasks.reduce((acc, task) => {
-                      const code = task.issueCode;
-                      if (!acc[code]) acc[code] = [];
-                      acc[code].push(task);
-                      return acc;
-                    }, {} as Record<string, typeof quickFixTasks>)
-                  ).map(([code, tasks]) => (
-                    <div key={code} className="border border-gray-200 rounded-lg p-3 bg-white">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <AlertCircle className="h-4 w-4 text-blue-600" />
-                          <p className="font-medium text-gray-900">{code}</p>
-                          <Badge variant="info" size="sm">{tasks.length} issues</Badge>
-                        </div>
-                        <Badge variant="warning" size="sm">Quick Fix</Badge>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-gray-700 mb-3">Individual tasks:</p>
+                  {quickFixTasks.slice(0, 10).map((task) => (
+                    <div key={task.id} className="flex items-start gap-3 p-3 bg-white border border-gray-200 rounded">
+                      <AlertCircle className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">{task.issueCode}</p>
+                        <p className="text-sm text-gray-600">{task.description}</p>
                       </div>
-                      <p className="text-sm text-gray-600 ml-6">{tasks[0].description}</p>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="info" size="sm">Quick Fix</Badge>
+                        {task.status === 'PENDING' && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleOpenQuickFixModal(task)}
+                          >
+                            <Zap className="h-3 w-3 mr-1" />
+                            Fix
+                          </Button>
+                        )}
+                        {task.status === 'COMPLETED' && (
+                          <Badge variant="success" size="sm">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Done
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                  )).slice(0, 5)}
-
-                  {Object.keys(quickFixTasks.reduce((acc, task) => {
-                    acc[task.issueCode] = true;
-                    return acc;
-                  }, {} as Record<string, boolean>)).length > 5 && (
+                  ))}
+                  {quickFixTasks.length > 10 && (
                     <p className="text-sm text-gray-500 text-center py-2">
-                      + more issue types
+                      + {quickFixTasks.length - 10} more tasks
                     </p>
                   )}
                 </div>
@@ -582,6 +632,20 @@ export const PdfRemediationPlanPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Quick Fix Modal */}
+      {quickFixModalState.task && (
+        <QuickFixModal
+          isOpen={quickFixModalState.isOpen}
+          onClose={handleCloseQuickFixModal}
+          jobId={jobId!}
+          issueId={quickFixModalState.task.issueId}
+          issueCode={quickFixModalState.task.issueCode}
+          issueDescription={quickFixModalState.task.description}
+          fixField={getFixField(quickFixModalState.task.issueCode)}
+          onSuccess={handleQuickFixSuccess}
+        />
+      )}
     </div>
   );
 };
