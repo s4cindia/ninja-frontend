@@ -515,7 +515,7 @@ export const PdfAuditResultsPage: React.FC = () => {
       const message = err instanceof Error ? err.message : 'Failed to start re-scan';
       // Dismiss the loading toast before showing error
       if (toastId !== undefined) {
-        toast.dismiss(toastId);
+        toast.dismiss(String(toastId));
       }
       toast.error(message);
       setIsReScanning(false);
