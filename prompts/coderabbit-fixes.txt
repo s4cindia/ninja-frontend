@@ -1,46 +1,62 @@
-In `@src/pages/PdfAuditResultsPage.test.tsx`:
-- Around line 214-217: The test is asserting the wrong error string; update the
-expectation in PdfAuditResultsPage.test (the waitFor block using
-screen.getByText) to look for the component's actual error text "Invalid job ID"
-(set in PdfAuditResultsPage) instead of "No job ID provided" so the assertion
-matches the component's behavior.
-- Around line 172-174: The test currently asserts a progressbar role that
-doesn't exist for the Loader2 SVG; update the PdfAuditResultsPage.test.tsx to
-either remove the failing assertion expect(screen.getByRole('progressbar', {
-hidden: true })) or modify the component that renders Loader2 (e.g., the loader
-in PdfAuditResultsPage) to add role="progressbar" and appropriate ARIA
-attributes to the Loader2 element; pick one approach and update the test or the
-Loader2 rendering accordingly so the loading-state test only checks elements
-that actually exist (e.g., keep expect(screen.getByText('Loading audit
-results...')).toBeInTheDocument()).
+In `@src/components/acr/NACriteriaSection.tsx`:
+- Around line 244-256: The label "Rationale for N/A Status" is not
+programmatically linked to the textarea, so update the JSX in NACriteriaSection
+to add a unique id on the textarea (e.g., id="na-rationale" or similar) and set
+the label's htmlFor to that id; keep the existing bindings
+(value={editingReason}, onChange={e => setEditingReason(e.target.value)}) and
+other props unchanged to preserve behavior, and optionally add aria-describedby
+or aria-label only if additional context is required.
+- Around line 177-194: The toggle button in NACriteriaSection lacks ARIA
+attributes; update the button rendered in the category loop (the one that calls
+toggleCategory(category)) to include aria-expanded={isExpanded} and
+aria-controls pointing to a stable unique id for the content panel (e.g.,
+`na-panel-${category}`), and add a matching id attribute to the expanded content
+container that renders the criteria so screen readers can associate the control
+with the panel; ensure the id generation uses the category value (or a sanitized
+slug) so it stays consistent across renders.
 
-In `@src/services/api/pdfAuditApi.test.ts`:
-- Around line 508-512: The test uses two separate rejected assertions on the
-same promise (await expect(promise).rejects.toThrow(PdfApiError) and await
-expect(promise).rejects.toMatchObject({ code: 'POLLING_ABORTED' })), which is
-unreliable; replace them with a single assertion that inspects the rejected
-error object (e.g., await expect(promise).rejects.toMatchObject({ name:
-'PdfApiError', code: 'POLLING_ABORTED' })) or capture the error via try/catch
-(const err = await promise.catch(e => e);
-expect(err).toBeInstanceOf(PdfApiError);
-expect(err.code).toBe('POLLING_ABORTED')), referencing the promise variable and
-PdfApiError and the code property to ensure both type and payload are asserted
-in one check.
-- Around line 462-467: The test currently asserts the same rejected promise
-twice (await expect(promise).rejects.toThrow and then .rejects.toMatchObject),
-which can be flaky; update the assertions around the promise variable so the
-rejection is asserted only once — either replace both with a single assertion
-like await expect(promise).rejects.toMatchObject({ message: 'Audit failed',
-code: 'AUDIT_FAILED' }) and separately assert the error class via a try/catch
-where you await promise, catch err and assert err instanceof PdfApiError, or use
-a single try/catch to capture the thrown error and assert both err instanceof
-PdfApiError and err.message/err.code; reference the promise variable and
-PdfApiError in the test to implement the chosen approach.
-- Around line 479-483: The test currently consumes the same rejected promise
-twice with two awaits (await expect(promise).rejects.toThrow(PdfApiError); await
-expect(promise).rejects.toMatchObject({ code: 'POLLING_TIMEOUT' });), which is
-invalid; replace these with a single consumption that asserts both the error
-type and the payload, e.g. await promise.catch(err => {
-expect(err).toBeInstanceOf(PdfApiError); expect(err).toMatchObject({ code:
-'POLLING_TIMEOUT' }); }); so you check instanceof PdfApiError and the error.code
-in one pass using the existing promise and PdfApiError symbol.
+In `@src/components/acr/VersionHistory.tsx`:
+- Line 245: The component is accessing .version and .changes but the hooks
+return different shapes; normalize the hook outputs before use: after calling
+useVersionHistory map each ReportVersion (with versionNumber) to include a
+version field (e.g. create normalizedVersions = versions?.map(v => ({...v,
+version: v.versionNumber})) ?? [] and use normalizedVersions instead of versions
+and currentVersion), and after calling useVersionDetails map its ReportData to
+include a changes field (or default changes: [] when absent) so the component's
+accesses (currentVersion, usages at the places referencing .version and
+.changes) match the expected shape; update references to use the normalized
+objects and keep the original hook calls unchanged (refer to useVersionHistory,
+useVersionDetails, currentVersion, and versionDetails).
+
+In `@src/pages/acr/AcrReportReviewPage.tsx`:
+- Around line 412-426: The object passed to VerificationSummaryCard uses unsafe
+any casts for status and history; remove the "as any" and "as any[]" and instead
+import or define the exact types expected by VerificationSummaryCard (e.g. the
+Status union/enum and the HistoryItem[] type), then type the properties
+explicitly (status: <ImportedStatusType>, history: <ImportedHistoryItemType>[]),
+ensure confidenceScore remains a number 0-1 and confidenceLevel is typed as
+'high'|'medium'|'low'|'manual', and update the object literal (status,
+confidenceScore, confidenceLevel, automatedResult, automatedNotes, history) to
+use those concrete types rather than any.
+
+In `@src/pages/acr/AcrWorkflowPage.tsx`:
+- Around line 297-301: Replace the unsafe any cast on confidenceData.criteria
+with a proper type assertion or runtime guard so analysisResults receives a
+CriterionConfidence[]: in the useEffect where you call
+setAnalysisResults(confidenceData.criteria as any), change it to assert
+confidenceData.criteria as CriterionConfidence[] or (preferably)
+validate/transform confidenceData.criteria into an array of CriterionConfidence
+before calling setAnalysisResults (e.g., check
+Array.isArray(confidenceData.criteria) and map/verify required fields) so the
+types line up with the analysisResults state and the ESLint warning is resolved.
+
+In `@src/pages/acr/VerificationQueuePage.tsx`:
+- Line 108: The prop criteriaFromAnalysis is being forced to any because
+VerificationQueue expects CriterionConfidence[] but useConfidenceWithIssues
+returns CriterionConfidenceWithIssues[]; remove the cast and either (A) update
+the VerificationQueueProps type to accept CriterionConfidenceWithIssues[]
+(change the prop type in VerificationQueue component) or (B) add a small mapper
+(e.g., mapCriterionWithIssuesToCriterion) that converts
+CriterionConfidenceWithIssues[] to CriterionConfidence[] and pass the mapped
+array; locate usages around VerificationQueue (prop name criteriaFromAnalysis)
+and the hook useConfidenceWithIssues to implement the chosen fix.

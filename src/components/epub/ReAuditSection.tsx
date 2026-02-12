@@ -84,9 +84,10 @@ export const ReAuditSection: React.FC<ReAuditSectionProps> = ({
 
           // Map backend field names to frontend interface
           const mappedResult: ReauditResult = {
-            originalIssues: backendData.originalIssues,
+            originalIssues: backendData.originalIssues ?? 0,
             resolved: backendData.fixedIssues || 0,
             stillPending: backendData.remainingIssues || 0,
+            // TODO: Verify if remainingIssuesList represents new issues or unresolved issues
             newIssuesFound: backendData.remainingIssuesList || [],
             score: backendData.score,
             resolvedIssueCodes: backendData.resolvedIssueCodes,

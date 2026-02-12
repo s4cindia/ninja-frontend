@@ -43,6 +43,7 @@ const STATUS_CONFIG = {
   verified_fail: { label: 'Verified Fail', icon: XCircle, className: 'text-red-600' },
   verified_partial: { label: 'Partial', icon: AlertTriangle, className: 'text-yellow-600' },
   deferred: { label: 'Deferred', icon: Clock, className: 'text-blue-500' },
+  not_applicable: { label: 'Not Applicable', icon: AlertTriangle, className: 'text-blue-600' },
 };
 
 const VERIFICATION_METHODS: VerificationMethod[] = [

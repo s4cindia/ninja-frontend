@@ -29,7 +29,10 @@ import { AcrEditor } from '@/components/acr/AcrEditor';
 import { ExportDialog } from '@/components/acr/ExportDialog';
 import { VersionHistory } from '@/components/acr/VersionHistory';
 import { useEditions } from '@/hooks/useAcr';
+import { useConfidenceWithIssues } from '@/hooks/useConfidence';
+import { useInitializeReport } from '@/hooks/useAcrReport';
 import type { AcrEdition, AcrEditionCode } from '@/types/acr.types';
+import type { CriterionConfidenceWithIssues } from '@/types/confidence.types';
 
 interface WorkflowStep {
   id: number;
@@ -268,26 +271,97 @@ export function AcrWorkflowPage() {
   const [availableJobs, setAvailableJobs] = useState<AuditJob[]>([]);
   const [isLoadingJobs, setIsLoadingJobs] = useState(false);
   const [jobsError, setJobsError] = useState<string | null>(null);
-  const [analysisResults, setAnalysisResults] = useState<CriterionConfidence[]>([]);
+  const [analysisResults, setAnalysisResults] = useState<(CriterionConfidence | CriterionConfidenceWithIssues)[]>([]);
   const [documentTitle, setDocumentTitle] = useState<string>('Untitled Document');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [preFilledValuesApplied, setPreFilledValuesApplied] = useState(false);
-  
+  const [isInitializingReport, setIsInitializingReport] = useState(false);
+
   // Store actual File object for upload (not serializable to localStorage)
   const uploadedFileRef = useRef<File | null>(null);
   
   // Fetch available editions to match pre-filled edition code
   const { data: editions } = useEditions();
 
+  // Fetch confidence analysis data (for when page is refreshed on step 4)
+  const { data: confidenceData } = useConfidenceWithIssues(
+    state.jobId || '',
+    state.selectedEdition?.code || 'VPAT2.5-INT',
+    { enabled: !!state.jobId && state.currentStep === 4 && analysisResults.length === 0 && !!state.selectedEdition }
+  );
+
+  // Initialize report mutation for Review & Edit
+  const { mutate: initializeReport } = useInitializeReport();
+
+  // Populate analysisResults from confidence API if empty (e.g., after refresh)
+  useEffect(() => {
+    if (confidenceData?.criteria && analysisResults.length === 0 && state.currentStep === 4) {
+      setAnalysisResults(confidenceData.criteria);
+    }
+  }, [confidenceData, analysisResults.length, state.currentStep]);
+
   // Reset preFilledValuesApplied when query params or job ID change
   useEffect(() => {
     setPreFilledValuesApplied(false);
   }, [effectiveJobId, editionFromQuery, productNameFromQuery, vendorFromQuery, contactEmailFromState]);
 
-  const handleCriteriaLoaded = useCallback((criteria: CriterionConfidence[]) => {
+  const handleCriteriaLoaded = useCallback((criteria: CriterionConfidence[] | CriterionConfidenceWithIssues[]) => {
     setAnalysisResults(criteria);
   }, []);
+
+  // Handler for "Proceed to Review & Edit" button
+  const handleProceedToReviewEdit = useCallback(() => {
+    if (!state.jobId || !state.selectedEdition) {
+      alert('Missing job ID or edition');
+      return;
+    }
+
+    setIsInitializingReport(true);
+
+    // Include ALL criteria (applicable + N/A) from analysis results
+    const verificationData = analysisResults.map(criterion => {
+      const verification = state.verifications[criterion.criterionId];
+
+      // Check if criterion is N/A from AI suggestion
+      const isNA = criterion.naSuggestion?.suggestedStatus === 'not_applicable' &&
+                   (criterion.naSuggestion?.confidence || 0) >= 80;
+
+      return {
+        criterionId: criterion.criterionId,
+        verificationStatus: verification?.status || (isNA ? 'not_applicable' : 'pending'),
+        verificationMethod: verification?.method || 'Manual Review',
+        verificationNotes: verification?.notes || '',
+        isNotApplicable: isNA,
+        naReason: isNA ? criterion.naSuggestion?.rationale : undefined,
+        naSuggestion: isNA ? criterion.naSuggestion : undefined,
+        verifiedAt: verification?.verifiedAt || new Date().toISOString().slice(0, 16).replace('T', ' '),
+        confidence: Math.round((criterion.confidenceScore || 0) * 100), // Convert 0-1 to 0-100 and send to backend
+      };
+    });
+
+    // Call initialize report API
+    initializeReport(
+      {
+        jobId: state.jobId,
+        edition: state.selectedEdition.code,
+        verificationData,
+        documentTitle: state.fileName || documentTitle || 'Untitled Document',
+      },
+      {
+        onSuccess: () => {
+          setIsInitializingReport(false);
+          // Navigate to Review & Edit page
+          navigate(`/acr/report/review/${state.jobId}`);
+        },
+        onError: (error) => {
+          setIsInitializingReport(false);
+          console.error('Failed to initialize report:', error);
+          alert(`Failed to initialize report: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        },
+      }
+    );
+  }, [state.jobId, state.selectedEdition, state.verifications, documentTitle, state.fileName, analysisResults, initializeReport, navigate]);
 
   // Track the last applied URL job to detect navigation between jobs
   const lastAppliedJobRef = useRef<string | null>(null);
@@ -588,6 +662,12 @@ export function AcrWorkflowPage() {
 
   const handleNext = async () => {
     if (state.currentStep < WORKFLOW_STEPS.length) {
+      // If moving from Step 4 (Verification) to Step 5 (Review & Edit), initialize report
+      if (state.currentStep === 4 && state.verificationComplete) {
+        handleProceedToReviewEdit();
+        return;
+      }
+
       // If moving from Step 3 (AI Analysis) to Step 4, upload file and create ACR document
       if (state.currentStep === 3 && state.selectedEdition) {
         const fileToUpload = uploadedFileRef.current;
@@ -705,9 +785,10 @@ export function AcrWorkflowPage() {
   };
 
   const handleVerificationUpdate = (itemId: string, status: string, method: string, notes: string) => {
-    updateState({
+    setState(prev => ({
+      ...prev,
       verifications: {
-        ...state.verifications,
+        ...prev.verifications,  // Use prev.verifications, not state.verifications
         [itemId]: {
           status,
           method,
@@ -715,7 +796,7 @@ export function AcrWorkflowPage() {
           verifiedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
         },
       },
-    });
+    }));
   };
 
 
@@ -1050,14 +1131,27 @@ export function AcrWorkflowPage() {
       case 3:
         return (
           <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">AI Analysis Results</h2>
-              <p className="text-gray-600">
-                Review the automated accessibility analysis and confidence scores.
-              </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 mb-2">AI Analysis Results</h2>
+                <p className="text-gray-600">
+                  Review the automated accessibility analysis and confidence scores.
+                </p>
+              </div>
+              {state.jobId && (
+                <button
+                  onClick={() => navigate(`/acr/analysis/${state.jobId}`)}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  View Full ACR Analysis Report
+                </button>
+              )}
             </div>
-            <ConfidenceDashboard 
-              jobId={state.jobId || 'demo'} 
+            <ConfidenceDashboard
+              jobId={state.jobId || 'demo'}
               onCriteriaLoaded={handleCriteriaLoaded}
             />
           </div>
@@ -1072,8 +1166,8 @@ export function AcrWorkflowPage() {
                 Verify flagged criteria that require human review.
               </p>
             </div>
-            <VerificationQueue 
-              jobId={state.jobId || 'demo'} 
+            <VerificationQueue
+              jobId={state.jobId || 'demo'}
               onComplete={handleVerificationComplete}
               savedVerifications={state.verifications}
               onVerificationUpdate={handleVerificationUpdate}
@@ -1081,7 +1175,10 @@ export function AcrWorkflowPage() {
             />
             {state.verificationComplete && (
               <Alert variant="success">
-                All verification tasks completed. You can proceed to review.
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5" />
+                  <span>All verification tasks completed. Click "Next" to proceed to review.</span>
+                </div>
               </Alert>
             )}
           </div>
@@ -1327,12 +1424,17 @@ export function AcrWorkflowPage() {
           ) : (
             <Button
               onClick={handleNext}
-              disabled={!canProceed() || isUploading}
+              disabled={!canProceed() || isUploading || isInitializingReport}
             >
-              {isUploading ? (
+              {isUploading || isInitializingReport ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  Processing...
+                  {isInitializingReport ? 'Initializing...' : 'Processing...'}
+                </>
+              ) : state.currentStep === 4 ? (
+                <>
+                  Review & Edit
+                  <ChevronRight className="h-4 w-4 ml-1" />
                 </>
               ) : (
                 <>

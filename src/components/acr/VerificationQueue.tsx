@@ -9,9 +9,10 @@ import { useVerificationQueue, useSubmitVerification, useBulkVerification } from
 import { CONFIDENCE_THRESHOLD_HIGH, CONFIDENCE_THRESHOLDS, NA_QUICK_ACCEPT_THRESHOLD } from '@/constants/verification';
 import { MOCK_VERIFICATION_ITEMS } from '@/constants/mockVerificationData';
 import type { CriterionConfidence } from '@/services/api';
-import type { 
+import type { CriterionConfidenceWithIssues, IssueLocation } from '@/types/confidence.types';
+import type {
   VerificationItem as VerificationItemType,
-  VerificationStatus, 
+  VerificationStatus,
   VerificationMethod,
   Severity,
   ConfidenceLevel,
@@ -33,10 +34,10 @@ interface VerificationQueueProps {
   onComplete: (verified: boolean) => void;
   savedVerifications?: { [itemId: string]: SavedVerification };
   onVerificationUpdate?: (itemId: string, status: string, method: string, notes: string) => void;
-  criteriaFromAnalysis?: CriterionConfidence[];
+  criteriaFromAnalysis?: (CriterionConfidence | CriterionConfidenceWithIssues)[];
 }
 
-function needsHumanVerification(c: CriterionConfidence): boolean {
+function needsHumanVerification(c: CriterionConfidence | CriterionConfidenceWithIssues): boolean {
   if (c.needsVerification === true) return true;
   if (c.needsVerification === false) return false;
   if (c.status === 'not_applicable') return false;
@@ -45,13 +46,14 @@ function needsHumanVerification(c: CriterionConfidence): boolean {
 }
 
 function convertCriteriaToVerificationItems(
-  criteria: CriterionConfidence[],
+  criteria: (CriterionConfidence | CriterionConfidenceWithIssues)[],
   savedVerifications?: { [itemId: string]: SavedVerification }
 ): VerificationItemType[] {
   const filtered = criteria.filter(needsHumanVerification);
-  
+
   return filtered.map((c, index) => {
-      const saved = savedVerifications?.[c.id];
+      const itemId = 'id' in c ? c.id : c.criterionId;
+      const saved = savedVerifications?.[itemId];
       const score = typeof c.confidenceScore === 'number' ? c.confidenceScore : 0;
       
       const confidenceLevel: ConfidenceLevel = 
@@ -69,19 +71,28 @@ function convertCriteriaToVerificationItems(
         c.status === 'fail' ? 'fail' :
         c.status === 'not_tested' ? 'not_tested' : 'warning';
 
-      const issues: VerificationIssue[] | undefined = c.relatedIssues?.map((issue) => ({
-        id: issue.issueId,
-        issueId: issue.issueId,
-        ruleId: issue.ruleId,
-        impact: issue.impact,
-        message: issue.message,
-        severity: issue.impact as Severity | undefined,
-        location: issue.location,
-        filePath: issue.filePath,
-        html: issue.htmlSnippet,
-        htmlSnippet: issue.htmlSnippet,
-        suggestedFix: issue.suggestedFix,
-      }));
+      const issues: VerificationIssue[] | undefined = c.relatedIssues?.map((issue) => {
+        // Handle location: could be string or IssueLocation object
+        const locationStr = typeof issue.location === 'string'
+          ? issue.location
+          : issue.location
+            ? `Line ${(issue.location as IssueLocation).startLine || ''}, Column ${(issue.location as IssueLocation).startColumn || ''}`.trim()
+            : undefined;
+
+        return {
+          id: issue.issueId,
+          issueId: issue.issueId,
+          ruleId: issue.ruleId,
+          impact: issue.impact,
+          message: issue.message,
+          severity: issue.impact as Severity | undefined,
+          location: locationStr,
+          filePath: issue.filePath,
+          html: issue.htmlSnippet,
+          htmlSnippet: issue.htmlSnippet,
+          suggestedFix: 'suggestedFix' in issue ? issue.suggestedFix : undefined,
+        };
+      });
 
       const fixedIssues: FixedVerificationIssue[] | undefined = c.fixedIssues?.map((issue) => ({
         id: issue.issueId,
@@ -90,13 +101,13 @@ function convertCriteriaToVerificationItems(
         impact: issue.impact,
         message: issue.message,
         severity: issue.impact as Severity | undefined,
-        location: issue.location,
+        location: 'location' in issue ? issue.location : undefined,
         filePath: issue.filePath,
-        html: issue.htmlSnippet,
-        htmlSnippet: issue.htmlSnippet,
-        suggestedFix: issue.suggestedFix,
-        fixedAt: issue.fixedAt,
-        fixMethod: issue.fixMethod,
+        html: 'htmlSnippet' in issue ? issue.htmlSnippet : undefined,
+        htmlSnippet: 'htmlSnippet' in issue ? issue.htmlSnippet : undefined,
+        suggestedFix: 'suggestedFix' in issue ? issue.suggestedFix : undefined,
+        fixedAt: 'fixedAt' in issue ? issue.fixedAt : undefined,
+        fixMethod: 'fixMethod' in issue ? issue.fixMethod : undefined,
       }));
 
       const remainingCount = c.remainingCount ?? issues?.length ?? 0;
@@ -118,7 +129,7 @@ function convertCriteriaToVerificationItems(
       }
 
       const baseItem: VerificationItemType = {
-        id: c.id || `criterion-${index}`,
+        id: itemId || `criterion-${index}`,
         criterionId: c.criterionId || `Unknown-${index}`,
         criterionName: c.name || 'Unknown Criterion',
         wcagLevel: c.level || 'A',
@@ -133,7 +144,7 @@ function convertCriteriaToVerificationItems(
         fixedIssues: fixedIssues && fixedIssues.length > 0 ? fixedIssues : undefined,
         fixedCount,
         remainingCount,
-        naSuggestion: c.naSuggestion,
+        naSuggestion: c.naSuggestion && 'criterionId' in c.naSuggestion ? c.naSuggestion : undefined,
       };
 
       if (saved) {
@@ -141,7 +152,7 @@ function convertCriteriaToVerificationItems(
           ...baseItem,
           status: saved.status as VerificationStatus,
           history: [{
-            id: `h-saved-${c.id}`,
+            id: `h-saved-${itemId}`,
             status: saved.status as VerificationStatus,
             method: saved.method as VerificationMethod,
             notes: saved.notes,
@@ -196,7 +207,7 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
   const [bulkStatus, setBulkStatus] = useState<VerificationStatus>('verified_pass');
   const [bulkMethod, setBulkMethod] = useState<VerificationMethod>('Manual Review');
   const [bulkNotes, setBulkNotes] = useState('');
-  const [selectedCriterionForGuidance, setSelectedCriterionForGuidance] = useState<CriterionConfidence | null>(null);
+  const [selectedCriterionForGuidance, setSelectedCriterionForGuidance] = useState<CriterionConfidence | CriterionConfidenceWithIssues | null>(null);
   
   const hasCriteriaFromAnalysis = criteriaFromAnalysis && criteriaFromAnalysis.length > 0;
   
@@ -349,10 +360,11 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
   const progressPercent = totalCount > 0 ? Math.round((verifiedCount / totalCount) * 100) : 0;
 
   const criteriaMap = useMemo(() => {
-    const map = new Map<string, CriterionConfidence>();
+    const map = new Map<string, CriterionConfidence | CriterionConfidenceWithIssues>();
     if (criteriaFromAnalysis) {
       criteriaFromAnalysis.forEach((c) => {
-        map.set(c.id, c);
+        const key = 'id' in c ? c.id : c.criterionId;
+        map.set(key, c);
       });
     }
     return map;

@@ -151,6 +151,11 @@ export const MatterhornSummary: React.FC<MatterhornSummaryProps> = ({
   onCheckpointClick,
   collapsed = false,
 }) => {
+  // Return null if summary is not provided
+  if (!summary) {
+    return null;
+  }
+
   const passedPercentage = summary.totalCheckpoints > 0
     ? Math.round((summary.passed / summary.totalCheckpoints) * 100)
     : 0;

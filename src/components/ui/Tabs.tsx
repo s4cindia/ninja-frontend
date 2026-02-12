@@ -1,111 +1,87 @@
-import React, { createContext, useContext, useState, KeyboardEvent, useId } from 'react';
-import { clsx } from 'clsx';
+import React, { createContext, useContext, useState } from 'react';
+import { cn } from '@/lib/utils';
 
 interface TabsContextValue {
-  activeTab: string;
-  setActiveTab: (value: string) => void;
-  tabsId: string;
+  value: string;
+  onValueChange: (value: string) => void;
 }
 
-const TabsContext = createContext<TabsContextValue | null>(null);
+const TabsContext = createContext<TabsContextValue | undefined>(undefined);
+
+const useTabsContext = () => {
+  const context = useContext(TabsContext);
+  if (!context) {
+    throw new Error('Tabs components must be used within Tabs');
+  }
+  return context;
+};
 
 interface TabsProps {
-  defaultValue: string;
   value?: string;
+  defaultValue?: string;
   onValueChange?: (value: string) => void;
   children: React.ReactNode;
   className?: string;
 }
 
-export function Tabs({ 
-  defaultValue, 
-  value, 
-  onValueChange, 
-  children, 
-  className 
-}: TabsProps) {
-  const [internalValue, setInternalValue] = useState(defaultValue);
-  const activeTab = value ?? internalValue;
-  const tabsId = useId();
-  
-  const setActiveTab = (newValue: string) => {
-    if (!value) {
-      setInternalValue(newValue);
+export const Tabs: React.FC<TabsProps> = ({
+  value: controlledValue,
+  defaultValue,
+  onValueChange,
+  children,
+  className
+}) => {
+  const [uncontrolledValue, setUncontrolledValue] = useState(defaultValue || '');
+  const value = controlledValue !== undefined ? controlledValue : uncontrolledValue;
+
+  const handleValueChange = (newValue: string) => {
+    if (controlledValue === undefined) {
+      setUncontrolledValue(newValue);
     }
     onValueChange?.(newValue);
   };
 
   return (
-    <TabsContext.Provider value={{ activeTab, setActiveTab, tabsId }}>
-      <div className={className}>{children}</div>
+    <TabsContext.Provider value={{ value, onValueChange: handleValueChange }}>
+      <div className={cn('w-full', className)}>{children}</div>
     </TabsContext.Provider>
   );
-}
+};
 
 interface TabsListProps {
   children: React.ReactNode;
   className?: string;
 }
 
-export function TabsList({ children, className }: TabsListProps) {
+export const TabsList: React.FC<TabsListProps> = ({ children, className }) => {
   return (
-    <div 
-      className={clsx(
-        'inline-flex items-center gap-1 p-1 bg-gray-100 rounded-lg',
+    <div
+      role="tablist"
+      className={cn(
+        'inline-flex h-10 items-center justify-center rounded-md bg-gray-100 p-1 text-gray-600',
         className
       )}
-      role="tablist"
     >
       {children}
     </div>
   );
-}
+};
 
 interface TabsTriggerProps {
   value: string;
   children: React.ReactNode;
   className?: string;
-  disabled?: boolean;
 }
 
-export function TabsTrigger({ value, children, className, disabled }: TabsTriggerProps) {
-  const context = useContext(TabsContext);
-  if (!context) throw new Error('TabsTrigger must be used within Tabs');
-
-  const isActive = context.activeTab === value;
-  const tabId = `${context.tabsId}-tab-${value}`;
-  const panelId = `${context.tabsId}-panel-${value}`;
-
-  const handleKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
-    const tablist = e.currentTarget.parentElement;
-    if (!tablist) return;
-    
-    const tabs = Array.from(tablist.querySelectorAll('[role="tab"]:not([disabled])')) as HTMLButtonElement[];
-    const currentIndex = tabs.indexOf(e.currentTarget);
-    
-    let nextIndex: number | null = null;
-    
-    switch (e.key) {
-      case 'ArrowLeft':
-        nextIndex = currentIndex > 0 ? currentIndex - 1 : tabs.length - 1;
-        break;
-      case 'ArrowRight':
-        nextIndex = currentIndex < tabs.length - 1 ? currentIndex + 1 : 0;
-        break;
-      case 'Home':
-        nextIndex = 0;
-        break;
-      case 'End':
-        nextIndex = tabs.length - 1;
-        break;
-    }
-    
-    if (nextIndex !== null) {
-      e.preventDefault();
-      tabs[nextIndex].focus();
-      tabs[nextIndex].click();
-    }
-  };
+export const TabsTrigger: React.FC<TabsTriggerProps> = ({
+  value: triggerValue,
+  children,
+  className
+}) => {
+  const { value, onValueChange } = useTabsContext();
+  const isActive = value === triggerValue;
+  const panelId = `tab-panel-${triggerValue}`;
+  const tabId = `tab-${triggerValue}`;
 
   return (
     <button
@@ -114,23 +90,21 @@ export function TabsTrigger({ value, children, className, disabled }: TabsTrigge
       id={tabId}
       aria-selected={isActive}
       aria-controls={panelId}
-      tabIndex={isActive ? 0 : -1}
-      disabled={disabled}
-      onClick={() => context.setActiveTab(value)}
-      onKeyDown={handleKeyDown}
-      className={clsx(
-        'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
-        isActive 
-          ? 'bg-white text-gray-900 shadow-sm' 
-          : 'text-gray-600 hover:text-gray-900',
-        disabled && 'opacity-50 cursor-not-allowed',
+      onClick={() => onValueChange(triggerValue)}
+      className={cn(
+        'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-white transition-all',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2',
+        'disabled:pointer-events-none disabled:opacity-50',
+        isActive
+          ? 'bg-white text-gray-900 shadow-sm'
+          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
         className
       )}
     >
       {children}
     </button>
   );
-}
+};
 
 interface TabsContentProps {
   value: string;
@@ -138,29 +112,30 @@ interface TabsContentProps {
   className?: string;
 }
 
-export function TabsContent({ value, children, className }: TabsContentProps) {
-  const context = useContext(TabsContext);
-  if (!context) throw new Error('TabsContent must be used within Tabs');
+export const TabsContent: React.FC<TabsContentProps> = ({
+  value: contentValue,
+  children,
+  className
+}) => {
+  const { value } = useTabsContext();
+  const panelId = `tab-panel-${contentValue}`;
+  const tabId = `tab-${contentValue}`;
 
-  if (context.activeTab !== value) return null;
-
-  const tabId = `${context.tabsId}-tab-${value}`;
-  const panelId = `${context.tabsId}-panel-${value}`;
+  if (value !== contentValue) {
+    return null;
+  }
 
   return (
-    <div 
-      role="tabpanel" 
+    <div
+      role="tabpanel"
       id={panelId}
       aria-labelledby={tabId}
-      tabIndex={0}
-      className={className}
+      className={cn(
+        'mt-2 ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2',
+        className
+      )}
     >
       {children}
     </div>
   );
-}
-
-// Compound component pattern for alternative API
-Tabs.List = TabsList;
-Tabs.Trigger = TabsTrigger;
-Tabs.Content = TabsContent;
+};
