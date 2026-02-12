@@ -4,7 +4,7 @@
  * Unit tests for the ScanLevelBanner component.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ScanLevelBanner } from './ScanLevelBanner';
 

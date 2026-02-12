@@ -30,7 +30,7 @@ export interface ScanLevelConfig {
 /**
  * Scan level configurations (matches backend)
  */
-export const SCAN_LEVEL_CONFIGS: Record<ScanLevel, ScanLevelConfig> = {
+export const scanLevelConfigs: Record<ScanLevel, ScanLevelConfig> = {
   basic: {
     level: 'basic',
     name: 'Basic Scan',
@@ -98,7 +98,7 @@ export interface ValidatorMetadata {
   estimatedTime: string;
 }
 
-export const VALIDATOR_METADATA: Record<ValidatorType, ValidatorMetadata> = {
+export const validatorMetadata: Record<ValidatorType, ValidatorMetadata> = {
   structure: {
     id: 'structure',
     name: 'Structure & Tags',

@@ -19,9 +19,9 @@ import { Card, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import {
   ScanLevel,
-  SCAN_LEVEL_CONFIGS,
+  scanLevelConfigs,
   ValidatorType,
-  VALIDATOR_METADATA,
+  validatorMetadata,
 } from '@/types/scan-level.types';
 
 export interface ScanLevelBannerProps {
@@ -78,7 +78,7 @@ export const ScanLevelBanner: React.FC<ScanLevelBannerProps> = ({
     });
   };
 
-  const comprehensiveConfig = SCAN_LEVEL_CONFIGS.comprehensive;
+  const comprehensiveConfig = scanLevelConfigs.comprehensive;
   const allValidators: ValidatorType[] = [
     'structure',
     'alt-text',
@@ -103,7 +103,7 @@ export const ScanLevelBanner: React.FC<ScanLevelBannerProps> = ({
             <p className="text-sm text-gray-700 mb-4">
               You ran a{' '}
               <Badge variant="info" className="mx-1">
-                {SCAN_LEVEL_CONFIGS[currentScanLevel].name}
+                {scanLevelConfigs[currentScanLevel].name}
               </Badge>
               . Run a more comprehensive scan to uncover additional accessibility issues.
             </p>
@@ -255,7 +255,7 @@ export const ScanLevelBanner: React.FC<ScanLevelBannerProps> = ({
                         </p>
                         <div className="space-y-2">
                           {allValidators.map((validator) => {
-                            const meta = VALIDATOR_METADATA[validator];
+                            const meta = validatorMetadata[validator];
                             const isSelected = customValidators.includes(validator);
                             return (
                               <label
