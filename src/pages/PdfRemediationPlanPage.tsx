@@ -149,14 +149,37 @@ export const PdfRemediationPlanPage: React.FC = () => {
     }
   };
 
-  // Determine fix field based on issue code
-  const getFixField = (issueCode: string): 'language' | 'title' | 'metadata' | 'creator' => {
+  /**
+   * Determine which field the quick-fix modal should show based on issue code
+   * Returns null if the issue is not supported by the quick-fix API
+   */
+  const getFixField = (issueCode: string): 'language' | 'title' | 'metadata' | 'creator' | null => {
+    // Normalize to uppercase for consistent matching
     const code = issueCode.toUpperCase();
-    if (code.includes('LANGUAGE') || code.includes('LANG')) return 'language';
-    if (code.includes('TITLE')) return 'title';
-    if (code.includes('METADATA') || code.includes('MARKED')) return 'metadata';
-    if (code.includes('CREATOR') || code.includes('PRODUCER')) return 'creator';
-    return 'title'; // Default
+
+    // Language issues
+    if (code.includes('LANGUAGE') || code === 'MATTERHORN-11-001') {
+      return 'language';
+    }
+
+    // Title issues
+    if (code.includes('TITLE') || code === 'WCAG-2.4.2') {
+      return 'title';
+    }
+
+    // Metadata issues
+    if (code.includes('METADATA') || code.includes('MARKED') || code === 'MATTERHORN-07-001') {
+      return 'metadata';
+    }
+
+    // Creator issues
+    if (code.includes('CREATOR') || code.includes('PRODUCER')) {
+      return 'creator';
+    }
+
+    // Unsupported issue type - should not show Quick Fix button
+    console.warn(`Quick-fix not supported for issue code: ${issueCode}`);
+    return null;
   };
 
   const handleOpenQuickFixModal = (task: typeof quickFixTasks[0]) => {
@@ -424,7 +447,11 @@ export const PdfRemediationPlanPage: React.FC = () => {
                   disabled={plan.quickFixCount === 0 || quickFixTasks.filter(t => t.status === 'PENDING').length === 0}
                   onClick={(e) => {
                     e.stopPropagation();
-                    const firstPendingTask = quickFixTasks.find(t => t.status === 'PENDING');
+                    const firstPendingTask = quickFixTasks.find(t => {
+                      if (t.status !== 'PENDING') return false;
+                      const fixField = getFixField(t.issueCode);
+                      return fixField !== null;
+                    });
                     if (firstPendingTask) {
                       handleOpenQuickFixModal(firstPendingTask);
                     }
@@ -477,16 +504,29 @@ export const PdfRemediationPlanPage: React.FC = () => {
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="info" size="sm">Quick Fix</Badge>
-                        {task.status === 'PENDING' && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => handleOpenQuickFixModal(task)}
-                          >
-                            <Zap className="h-3 w-3 mr-1" />
-                            Fix
-                          </Button>
-                        )}
+                        {task.status === 'PENDING' && (() => {
+                          const fixField = getFixField(task.issueCode);
+
+                          // Only render button if we have a supported fix field
+                          if (!fixField) {
+                            return (
+                              <span className="text-xs text-gray-500 italic">
+                                Quick-fix not available for this issue type
+                              </span>
+                            );
+                          }
+
+                          return (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleOpenQuickFixModal(task)}
+                            >
+                              <Zap className="h-3 w-3 mr-1" />
+                              Fix
+                            </Button>
+                          );
+                        })()}
                         {task.status === 'COMPLETED' && (
                           <Badge variant="success" size="sm">
                             <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -634,18 +674,27 @@ export const PdfRemediationPlanPage: React.FC = () => {
       </div>
 
       {/* Quick Fix Modal */}
-      {quickFixModalState.task && (
-        <QuickFixModal
-          isOpen={quickFixModalState.isOpen}
-          onClose={handleCloseQuickFixModal}
-          jobId={jobId!}
-          issueId={quickFixModalState.task.issueId}
-          issueCode={quickFixModalState.task.issueCode}
-          issueDescription={quickFixModalState.task.description}
-          fixField={getFixField(quickFixModalState.task.issueCode)}
-          onSuccess={handleQuickFixSuccess}
-        />
-      )}
+      {quickFixModalState.task && (() => {
+        const fixField = getFixField(quickFixModalState.task.issueCode);
+
+        // Only render modal if the issue has a supported fix field
+        if (!fixField) {
+          return null;
+        }
+
+        return (
+          <QuickFixModal
+            isOpen={quickFixModalState.isOpen}
+            onClose={handleCloseQuickFixModal}
+            jobId={jobId!}
+            issueId={quickFixModalState.task.issueId}
+            issueCode={quickFixModalState.task.issueCode}
+            issueDescription={quickFixModalState.task.description}
+            fixField={fixField}
+            onSuccess={handleQuickFixSuccess}
+          />
+        );
+      })()}
     </div>
   );
 };
