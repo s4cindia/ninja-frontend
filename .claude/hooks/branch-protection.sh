@@ -46,6 +46,29 @@ EOF
   exit 2
 fi
 
+# --- Check 1b: Block pushes targeting main/master (catches "git push origin HEAD:main" bypasses) ---
+if echo "$COMMAND" | grep -q "^git push"; then
+  if echo "$COMMAND" | grep -qE '(:|refs/heads/|/)(main|master)(\s|$)'; then
+    cat >&2 <<EOF
+
+🚫 Direct pushes to 'main' or 'master' are not allowed.
+
+Detected push target in command: $COMMAND
+
+Please create a feature branch first:
+  git checkout -b feat/your-feature-name
+  git checkout -b fix/your-bug-description
+
+Or if you have uncommitted changes:
+  git stash
+  git checkout -b feat/your-feature-name
+  git stash pop
+
+EOF
+    exit 2
+  fi
+fi
+
 # --- Check 2: Block file edits on main ---
 if echo "$TOOL_NAME" | grep -qiE "^(Edit|MultiEdit|Write)$"; then
   FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // "unknown"')

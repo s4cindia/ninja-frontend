@@ -53,8 +53,8 @@ This project runs on **Windows with MSYS bash**. Always account for Windows-spec
 ### Multi-Repository Workspace
 
 The workspace contains multiple repositories:
-- **`ninja-backend`** - Express.js REST API at `C:\Users\avrve\projects\ninja-backend`
-- **`ninja-frontend`** - React + Vite SPA at `C:\Users\avrve\projects\ninja-frontend`
+- **`ninja-backend`** - Express.js REST API at `C:\Users\<username>\projects\ninja-backend`
+- **`ninja-frontend`** - React + Vite SPA at `C:\Users\<username>\projects\ninja-frontend`
 
 ### Critical Rules
 
