@@ -39,7 +39,7 @@ import { api } from '@/services/api';
 import { cn } from '@/utils/cn';
 import { validateJobId } from '@/utils/validation';
 import { useCreateRemediationPlan } from '@/hooks/usePdfRemediation';
-import type { PdfAuditResult, PdfAuditIssue } from '@/types/pdf.types';
+import type { PdfAuditResult, PdfAuditIssue, MatterhornSummary as MatterhornSummaryType, PdfMetadata } from '@/types/pdf.types';
 import type { IssueSeverity } from '@/types/accessibility.types';
 import type { ScanLevel, ValidatorType } from '@/types/scan-level.types';
 
@@ -60,6 +60,11 @@ const initialFilters: IssueFilters = {
   pageNumber: 'all',
   searchText: '',
   showMatterhornOnly: false,
+};
+
+// Type guard for ScanLevel validation
+const isScanLevel = (value: unknown): value is ScanLevel => {
+  return typeof value === 'string' && ['basic', 'comprehensive', 'custom'].includes(value);
 };
 
 // Score color helper
@@ -141,7 +146,7 @@ export const PdfAuditResultsPage: React.FC = () => {
       setAuditResult(data as PdfAuditResult);
       // Extract scan level from output metadata (default to 'basic' if not specified)
       const resultData = data as PdfAuditResult & { scanLevel?: string };
-      setCurrentScanLevel(resultData.scanLevel || 'basic');
+      setCurrentScanLevel(isScanLevel(resultData.scanLevel) ? resultData.scanLevel : 'basic');
       setIsLoading(false);
       setIsPolling(false);
       setIsReScanning(false);
@@ -432,6 +437,9 @@ export const PdfAuditResultsPage: React.FC = () => {
   const handleReScan = async (scanLevel: ScanLevel, customValidators?: ValidatorType[]) => {
     if (!jobId) return;
 
+    // Capture previous scan level for rollback on error
+    const previousScanLevel = currentScanLevel;
+
     setIsReScanning(true);
     setIsPolling(false); // Don't poll - we'll get the result directly from the POST response
     // Optimistically update scan level immediately
@@ -453,19 +461,40 @@ export const PdfAuditResultsPage: React.FC = () => {
         // Transform the audit report to match PdfAuditResult structure
         // Backend returns pageCount and matterhornSummary in metadata, but frontend expects them at root
         const report = data.auditReport;
+        // Extract metadata with proper typing
+        const reportMetadata = report.metadata as Record<string, unknown> | undefined;
+        const matterhornSummaryData = reportMetadata?.matterhornSummary as MatterhornSummaryType | undefined;
+        const metadataData = reportMetadata as PdfMetadata | undefined;
+
+        // Create default metadata if none available
+        const defaultMetadata: PdfMetadata = {
+          pdfVersion: '1.7',
+          isTagged: false,
+          hasStructureTree: false,
+        };
+
+        // Create default Matterhorn summary if none available
+        const defaultMatterhornSummary: MatterhornSummaryType = {
+          totalCheckpoints: 0,
+          passed: 0,
+          failed: 0,
+          notApplicable: 0,
+          categories: [],
+        };
+
         const transformedResult: PdfAuditResult = {
           id: report.jobId || jobId!,
           jobId: report.jobId || jobId!,
           fileName: report.fileName,
           fileSize: auditResult?.fileSize || 0, // Preserve from previous result
-          pageCount: (report.metadata as Record<string, unknown>)?.pageCount as number || auditResult?.pageCount || 0,
+          pageCount: (reportMetadata?.pageCount as number) || auditResult?.pageCount || 0,
           score: report.score,
           status: 'completed',
           createdAt: auditResult?.createdAt || new Date().toISOString(),
           completedAt: new Date().toISOString(),
           issues: report.issues || [],
-          matterhornSummary: (report.metadata as Record<string, unknown>)?.matterhornSummary || auditResult?.matterhornSummary,
-          metadata: report.metadata as Record<string, unknown>,
+          matterhornSummary: matterhornSummaryData || auditResult?.matterhornSummary || defaultMatterhornSummary,
+          metadata: metadataData || auditResult?.metadata || defaultMetadata,
         };
 
         setAuditResult(transformedResult);
@@ -483,8 +512,8 @@ export const PdfAuditResultsPage: React.FC = () => {
       toast.error(message);
       setIsReScanning(false);
       setIsPolling(false);
-      // Revert scan level on error
-      setCurrentScanLevel('basic');
+      // Revert scan level to previous value on error
+      setCurrentScanLevel(previousScanLevel);
     }
   };
 
@@ -553,8 +582,8 @@ export const PdfAuditResultsPage: React.FC = () => {
     );
   }
 
-  // Generate PDF URL (this would come from API in production)
-  const pdfUrl = `/api/v1/pdf/job/${encodeURIComponent(jobId!)}/file`;
+  // Generate PDF URL using API service configuration
+  const pdfUrl = `${api.defaults.baseURL}/pdf/job/${encodeURIComponent(jobId!)}/file`;
 
   return (
     <div className="min-h-screen bg-gray-50">
