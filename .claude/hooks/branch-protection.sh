@@ -24,7 +24,7 @@ COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
 # --- Check 1b: Block pushes targeting main/master (runs for ALL branches to catch bypasses) ---
 if echo "$COMMAND" | grep -q "^git push"; then
-  if echo "$COMMAND" | grep -qE '([:\s]|refs/heads/|/)(main|master)(\s|$)'; then
+  if echo "$COMMAND" | grep -qE '(:|[[:space:]]|refs/heads/|/)(main|master)([[:space:]]|$)'; then
     cat >&2 <<EOF
 
 🚫 Direct pushes to 'main' or 'master' are not allowed.
