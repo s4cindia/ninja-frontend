@@ -111,17 +111,18 @@ export function NaSuggestionBanner({
 
       <div className="mt-4">
         <button
+          type="button"
           onClick={() => setIsExpanded(!isExpanded)}
           className="flex items-center gap-1 text-sm text-blue-700 hover:text-blue-900 font-medium"
           aria-expanded={isExpanded}
-          aria-controls="detection-checks"
+          aria-controls={`detection-checks-${criterionId}`}
         >
           {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           Detection Checks ({naSuggestion.detectionChecks.length})
         </button>
 
         {isExpanded && (
-          <div id="detection-checks" className="mt-3 space-y-3">
+          <div id={`detection-checks-${criterionId}`} className="mt-3 space-y-3">
             <div className="bg-white rounded-lg p-3 border border-blue-200">
               <h5 className="text-sm font-medium text-gray-700 mb-2">What was checked:</h5>
               <ul className="space-y-2">

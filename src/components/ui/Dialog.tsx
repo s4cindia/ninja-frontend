@@ -1,5 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, createContext, useContext } from 'react';
 import { cn } from '@/lib/utils';
+
+interface DialogContextValue {
+  onOpenChange: (open: boolean) => void;
+}
+
+const DialogContext = createContext<DialogContextValue | null>(null);
 
 interface DialogProps {
   open: boolean;
@@ -8,36 +14,99 @@ interface DialogProps {
 }
 
 export const Dialog: React.FC<DialogProps> = ({ open, onOpenChange, children }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (open) {
       document.body.style.overflow = 'hidden';
+
+      // Focus management: move focus into dialog
+      const dialogElement = dialogRef.current;
+      if (dialogElement) {
+        const focusableElements = dialogElement.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+
+        if (focusableElements.length > 0) {
+          focusableElements[0].focus();
+        } else {
+          // No focusable elements - make dialog container focusable and focus it
+          dialogElement.setAttribute('tabindex', '-1');
+          dialogElement.focus();
+        }
+      }
+
+      // Escape key handler
+      const handleEscape = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          onOpenChange(false);
+        }
+      };
+
+      // Focus trap: prevent Tab from escaping dialog
+      const handleTab = (e: KeyboardEvent) => {
+        if (e.key === 'Tab' && dialogElement) {
+          const focusableElements = dialogElement.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          );
+
+          // If no focusable elements, prevent Tab and keep focus on container
+          if (focusableElements.length === 0) {
+            e.preventDefault();
+            dialogElement.focus();
+            return;
+          }
+
+          const firstElement = focusableElements[0];
+          const lastElement = focusableElements[focusableElements.length - 1];
+
+          if (e.shiftKey && document.activeElement === firstElement) {
+            e.preventDefault();
+            lastElement.focus();
+          } else if (!e.shiftKey && document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
+      };
+
+      document.addEventListener('keydown', handleEscape);
+      document.addEventListener('keydown', handleTab);
+
+      return () => {
+        document.removeEventListener('keydown', handleEscape);
+        document.removeEventListener('keydown', handleTab);
+        document.body.style.overflow = 'unset';
+      };
     } else {
       document.body.style.overflow = 'unset';
     }
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
-  }, [open]);
+  }, [open, onOpenChange]);
 
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      role="dialog"
-      aria-modal="true"
-    >
-      {/* Overlay */}
+    <DialogContext.Provider value={{ onOpenChange }}>
       <div
-        className="fixed inset-0 bg-black/50"
-        onClick={() => onOpenChange(false)}
-        aria-hidden="true"
-      />
-      {/* Content */}
-      {children}
-    </div>
+        ref={dialogRef}
+        className="fixed inset-0 z-50 flex items-center justify-center"
+        role="dialog"
+        aria-modal="true"
+      >
+        {/* Overlay */}
+        <div
+          className="fixed inset-0 bg-black/50"
+          onClick={() => onOpenChange(false)}
+          aria-hidden="true"
+        />
+        {/* Content */}
+        {children}
+      </div>
+    </DialogContext.Provider>
   );
 };
+
+Dialog.displayName = 'Dialog';
 
 interface DialogContentProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
@@ -123,11 +192,19 @@ interface DialogCloseProps extends React.ButtonHTMLAttributes<HTMLButtonElement>
 }
 
 export const DialogClose = React.forwardRef<HTMLButtonElement, DialogCloseProps>(
-  ({ className, children, ...props }, ref) => {
+  ({ className, children, onClick, ...props }, ref) => {
+    const context = useContext(DialogContext);
+
+    const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+      onClick?.(e);
+      context?.onOpenChange(false);
+    };
+
     return (
       <button
         ref={ref}
         type="button"
+        onClick={handleClick}
         className={cn(
           'absolute right-4 top-4 rounded-sm opacity-70 ring-offset-white transition-opacity',
           'hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2',

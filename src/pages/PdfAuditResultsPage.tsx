@@ -445,9 +445,12 @@ export const PdfAuditResultsPage: React.FC = () => {
     // Optimistically update scan level immediately
     setCurrentScanLevel(scanLevel);
 
+    // Declare toastId before try so it can be dismissed in catch
+    let toastId: string | number | undefined;
+
     try {
       // Show loading toast
-      const toastId = toast.loading(`Running ${scanLevel} scan... This may take a few minutes.`);
+      toastId = toast.loading(`Running ${scanLevel} scan... This may take a few minutes.`);
 
       // Call re-scan API - the response will contain the full audit results
       const response = await api.post(`/pdf/job/${encodeURIComponent(jobId)}/re-scan`, {
@@ -500,15 +503,20 @@ export const PdfAuditResultsPage: React.FC = () => {
         setAuditResult(transformedResult);
         setCurrentScanLevel(data.scanLevel || scanLevel);
         toast.success(`${scanLevel} scan complete! Found ${report.issues?.length || 0} issues.`, { id: toastId });
+        // Only clear isReScanning when we have immediate results
+        setIsReScanning(false);
       } else {
         // Fallback to polling if response doesn't contain audit report
         setIsPolling(true);
         toast.success(`${scanLevel} scan started. Loading results...`, { id: toastId });
+        // Don't clear isReScanning here - let fetchAuditResult clear it when polling completes
       }
-
-      setIsReScanning(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to start re-scan';
+      // Dismiss the loading toast before showing error
+      if (toastId !== undefined) {
+        toast.dismiss(String(toastId));
+      }
       toast.error(message);
       setIsReScanning(false);
       setIsPolling(false);

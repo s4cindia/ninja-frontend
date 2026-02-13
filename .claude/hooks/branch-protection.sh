@@ -10,6 +10,12 @@
 
 INPUT=$(cat)
 
+# Check for jq dependency
+if ! command -v jq >/dev/null 2>&1; then
+  echo "Error: jq is required for branch protection but not found" >&2
+  exit 1
+fi
+
 # Get current branch
 BRANCH=$(git branch --show-current 2>/dev/null)
 
