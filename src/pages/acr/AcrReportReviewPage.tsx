@@ -36,7 +36,7 @@ interface CriterionCardProps {
 
 function CriterionCard({ criterion, acrJobId, isExpanded, onToggleExpand }: CriterionCardProps) {
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editedStatus, setEditedStatus] = useState<string>(criterion.verificationStatus || 'pending');
+  const [editedStatus, setEditedStatus] = useState<string>(criterion.verificationStatus || 'needs_review');
   const [editedMethod, setEditedMethod] = useState<string>(criterion.verificationMethod || 'Manual Review');
   const [editedNotes, setEditedNotes] = useState<string>(criterion.verificationNotes || '');
 
@@ -76,7 +76,7 @@ function CriterionCard({ criterion, acrJobId, isExpanded, onToggleExpand }: Crit
     return 'border-gray-200 bg-white';
   };
 
-  const displayStatus = showEditModal ? editedStatus : (criterion.verificationStatus || 'pending');
+  const displayStatus = showEditModal ? editedStatus : (criterion.verificationStatus || 'needs_review');
 
   return (
     <div className={cn(

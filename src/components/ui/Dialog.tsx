@@ -23,10 +23,17 @@ export const Dialog: React.FC<DialogProps> = ({ open, onOpenChange, children }) 
       // Focus management: move focus into dialog
       const dialogElement = dialogRef.current;
       if (dialogElement) {
-        const firstFocusable = dialogElement.querySelector<HTMLElement>(
+        const focusableElements = dialogElement.querySelectorAll<HTMLElement>(
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
         );
-        firstFocusable?.focus();
+
+        if (focusableElements.length > 0) {
+          focusableElements[0].focus();
+        } else {
+          // No focusable elements - make dialog container focusable and focus it
+          dialogElement.setAttribute('tabindex', '-1');
+          dialogElement.focus();
+        }
       }
 
       // Escape key handler
@@ -42,15 +49,23 @@ export const Dialog: React.FC<DialogProps> = ({ open, onOpenChange, children }) 
           const focusableElements = dialogElement.querySelectorAll<HTMLElement>(
             'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
           );
+
+          // If no focusable elements, prevent Tab and keep focus on container
+          if (focusableElements.length === 0) {
+            e.preventDefault();
+            dialogElement.focus();
+            return;
+          }
+
           const firstElement = focusableElements[0];
           const lastElement = focusableElements[focusableElements.length - 1];
 
           if (e.shiftKey && document.activeElement === firstElement) {
             e.preventDefault();
-            lastElement?.focus();
+            lastElement.focus();
           } else if (!e.shiftKey && document.activeElement === lastElement) {
             e.preventDefault();
-            firstElement?.focus();
+            firstElement.focus();
           }
         }
       };
