@@ -10,7 +10,8 @@
     "type-check": "tsc --noEmit",
     "generate-wcag": "tsx scripts/generate-wcag-data.ts",
     "test": "vitest run",
-    "test:watch": "vitest --watch"
+    "test:watch": "vitest --watch",
+    "status": "bash .claude/bin/ninja-status.sh"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.8.0",
