@@ -91,7 +91,7 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
       const timer = setTimeout(() => setSubmitSuccess(false), 2000);
       return () => clearTimeout(timer);
     }
-  }, [historyLength, item.history]);
+  }, [item.history]);
 
   const severityConfig = SEVERITY_CONFIG[item.severity];
   const statusConfig = STATUS_CONFIG[item.status];

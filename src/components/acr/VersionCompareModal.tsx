@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   X,
   ArrowLeftRight,
@@ -86,7 +86,7 @@ export const VersionCompareModal: React.FC<VersionCompareModalProps> = ({
     );
   };
 
-  const findChangedCriteria = () => {
+  const changes = useMemo(() => {
     if (!version1 || !version2) return { added: [], removed: [], modified: [] };
 
     const v1Criteria = new Map((version1.criteria as unknown as VersionCriterion[]).map(c => [c.criterionId, c]));
@@ -105,9 +105,7 @@ export const VersionCompareModal: React.FC<VersionCompareModalProps> = ({
     });
 
     return { added, removed, modified };
-  };
-
-  const changes = findChangedCriteria();
+  }, [version1, version2]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
