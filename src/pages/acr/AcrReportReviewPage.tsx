@@ -36,7 +36,7 @@ interface CriterionCardProps {
 
 function CriterionCard({ criterion, acrJobId, isExpanded, onToggleExpand }: CriterionCardProps) {
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editedStatus, setEditedStatus] = useState<string>(criterion.verificationStatus || 'pass');
+  const [editedStatus, setEditedStatus] = useState<string>(criterion.verificationStatus || 'pending');
   const [editedMethod, setEditedMethod] = useState<string>(criterion.verificationMethod || 'Manual Review');
   const [editedNotes, setEditedNotes] = useState<string>(criterion.verificationNotes || '');
 
@@ -58,7 +58,7 @@ function CriterionCard({ criterion, acrJobId, isExpanded, onToggleExpand }: Crit
   };
 
   const handleCancel = () => {
-    setEditedStatus(criterion.verificationStatus || 'pass');
+    setEditedStatus(criterion.verificationStatus || 'pending');
     setEditedMethod(criterion.verificationMethod || 'Manual Review');
     setEditedNotes(criterion.verificationNotes || '');
     setShowEditModal(false);
@@ -76,10 +76,12 @@ function CriterionCard({ criterion, acrJobId, isExpanded, onToggleExpand }: Crit
     return 'border-gray-200 bg-white';
   };
 
+  const displayStatus = showEditModal ? editedStatus : (criterion.verificationStatus || 'pending');
+
   return (
     <div className={cn(
       'border rounded-lg overflow-hidden transition-shadow hover:shadow-sm',
-      getStatusBorderColor(editedStatus)
+      getStatusBorderColor(displayStatus)
     )}>
       {/* Card Header - Always Visible */}
       <div className="px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors cursor-pointer"
@@ -123,9 +125,9 @@ function CriterionCard({ criterion, acrJobId, isExpanded, onToggleExpand }: Crit
               </span>
             )}
 
-            <Badge variant="default" className={cn('text-xs px-2 py-0.5', getStatusColor(editedStatus))}>
-              {editedStatus === 'verified_pass' || editedStatus === 'pass' ? 'Pass' :
-               editedStatus === 'verified_fail' || editedStatus === 'fail' ? 'Fail' : editedStatus}
+            <Badge variant="default" className={cn('text-xs px-2 py-0.5', getStatusColor(displayStatus))}>
+              {displayStatus === 'verified_pass' || displayStatus === 'pass' ? 'Pass' :
+               displayStatus === 'verified_fail' || displayStatus === 'fail' ? 'Fail' : displayStatus}
             </Badge>
 
             {!showEditModal && !isExpanded && (

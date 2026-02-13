@@ -497,7 +497,7 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
     if (useMockData || useLocalItems || hasCriteriaFromAnalysis) {
       setLocalItems(prev => prev.map(item => {
         const suggestion = item.naSuggestion;
-        if (selectedItems.has(item.id) && suggestion?.suggestedStatus === 'not_applicable' && suggestion.confidence >= 80) {
+        if (selectedItems.has(item.id) && suggestion?.suggestedStatus === 'not_applicable' && suggestion.confidence >= NA_QUICK_ACCEPT_THRESHOLD) {
           const naNote = `AI-suggested Not Applicable (${suggestion.confidence}% confidence): ${suggestion.rationale}`;
           return {
             ...item,
