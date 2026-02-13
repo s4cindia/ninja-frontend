@@ -13,6 +13,7 @@ interface PreviewFixParams {
   issueId: string;
   field: 'language' | 'title' | 'metadata' | 'creator';
   value?: string;
+  enabled?: boolean;
 }
 
 interface ApplyFixParams {
@@ -52,7 +53,7 @@ export function usePreviewFix(params: PreviewFixParams) {
     queryKey: ['preview-fix', params],
     queryFn: async () => {
       const response = await api.get<{ success: boolean; data: PreviewResult }>(
-        `/pdf/${params.jobId}/remediation/preview/${params.issueId}`,
+        `/pdf/${encodeURIComponent(params.jobId)}/remediation/preview/${encodeURIComponent(params.issueId)}`,
         {
           params: {
             field: params.field,
@@ -62,7 +63,9 @@ export function usePreviewFix(params: PreviewFixParams) {
       );
       return response.data.data;
     },
-    enabled: !!params.jobId && !!params.issueId && !!params.field,
+    enabled: params.enabled !== undefined
+      ? params.enabled
+      : (!!params.jobId && !!params.issueId && !!params.field),
   });
 }
 
@@ -73,7 +76,7 @@ export function useApplyQuickFix() {
   return useMutation({
     mutationFn: async (params: ApplyFixParams) => {
       const response = await api.post<{ success: boolean; data: FixResult }>(
-        `/pdf/${params.jobId}/remediation/quick-fix/${params.issueId}`,
+        `/pdf/${encodeURIComponent(params.jobId)}/remediation/quick-fix/${encodeURIComponent(params.issueId)}`,
         {
           field: params.field,
           value: params.value,

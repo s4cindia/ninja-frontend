@@ -54,12 +54,13 @@ export const QuickFixModal: React.FC<QuickFixModalProps> = ({
 
   const applyFixMutation = useApplyQuickFix();
 
-  // Preview query (only runs when showPreview is true)
+  // Preview query (only runs when showPreview is true and value exists)
   const previewQuery = usePreviewFix({
     jobId,
     issueId,
     field: fixField,
     value: inputValue,
+    enabled: showPreview && Boolean(inputValue),
   });
 
   // Reset state when modal opens/closes
@@ -115,16 +116,22 @@ export const QuickFixModal: React.FC<QuickFixModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div
+        className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="quick-fix-title"
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <div>
-            <h2 className="text-xl font-semibold">Quick Fix</h2>
+            <h2 id="quick-fix-title" className="text-xl font-semibold">Quick Fix</h2>
             <p className="text-sm text-gray-600 mt-1">{issueCode}</p>
           </div>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
+            aria-label="Close quick fix"
           >
             <X className="h-5 w-5" />
           </button>

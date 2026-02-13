@@ -441,25 +441,29 @@ export const PdfRemediationPlanPage: React.FC = () => {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  disabled={plan.quickFixCount === 0 || quickFixTasks.filter(t => t.status === 'PENDING').length === 0}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const firstPendingTask = quickFixTasks.find(t => {
-                      if (t.status !== 'PENDING') return false;
-                      const fixField = getFixField(t.issueCode);
-                      return fixField !== null;
-                    });
-                    if (firstPendingTask) {
-                      handleOpenQuickFixModal(firstPendingTask);
-                    }
-                  }}
-                >
-                  <Zap className="h-4 w-4 mr-2" />
-                  Start Quick Fix
-                </Button>
+                {(() => {
+                  // Compute the first fixable pending task
+                  const firstFixable = quickFixTasks.find(t =>
+                    t.status === 'PENDING' && getFixField(t.issueCode) !== null
+                  );
+
+                  return (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={!firstFixable || plan.quickFixCount === 0}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (firstFixable) {
+                          handleOpenQuickFixModal(firstFixable);
+                        }
+                      }}
+                    >
+                      <Zap className="h-4 w-4 mr-2" />
+                      Start Quick Fix
+                    </Button>
+                  );
+                })()}
                 {expandedSections.has('quick') ? (
                   <ChevronDown className="h-5 w-5 text-gray-400" />
                 ) : (
