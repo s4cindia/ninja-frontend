@@ -71,8 +71,7 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
   const [showFixedIssues, setShowFixedIssues] = useState(false);
   
   const latestHistory = item.history.length > 0 ? item.history[item.history.length - 1] : null;
-  const historyLength = item.history.length;
-  
+
   const [formStatus, setFormStatus] = useState<VerificationStatus>(
     latestHistory?.status ?? 'verified_pass'
   );
@@ -91,7 +90,7 @@ export function VerificationItem({ item, isSelected, onSelect, onSubmit, isSubmi
       const timer = setTimeout(() => setSubmitSuccess(false), 2000);
       return () => clearTimeout(timer);
     }
-  }, [historyLength, item.history]);
+  }, [item.history]);
 
   const severityConfig = SEVERITY_CONFIG[item.severity];
   const statusConfig = STATUS_CONFIG[item.status];

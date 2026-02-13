@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Edit2, Save, X } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { useUpdateReportMetadata } from '@/hooks/useAcrReport';
 import type { AcrJob } from '@/types/acr-report.types';
@@ -25,7 +26,7 @@ export function ReportMetadataSection({ acrJob }: ReportMetadataSectionProps) {
         },
         onError: (error) => {
           console.error('Failed to update metadata:', error);
-          alert('Failed to save changes. Please try again.');
+          toast.error('Failed to save changes. Please try again.');
         },
       }
     );
@@ -45,8 +46,8 @@ export function ReportMetadataSection({ acrJob }: ReportMetadataSectionProps) {
             variant="outline"
             size="sm"
             onClick={() => setIsEditing(true)}
+            leftIcon={<Edit2 className="h-4 w-4" />}
           >
-            <Edit2 className="h-4 w-4 mr-2" />
             Edit
           </Button>
         )}

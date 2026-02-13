@@ -97,7 +97,7 @@ function DifferenceRow({ diff, isRemarks }: { diff: VersionDifference; isRemarks
 }
 
 export function VersionComparison({ acrId, version1, version2, onBack }: VersionComparisonProps) {
-  const { data: comparisonRaw, isLoading } = useCompareVersions(acrId, version1, version2);
+  const { data: comparisonRaw, isLoading } = useCompareVersions(acrId, version1, version2, { enabled: true });
   const comparison = comparisonRaw as ComparisonData | undefined;
 
   if (isLoading) {

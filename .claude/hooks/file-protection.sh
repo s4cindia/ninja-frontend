@@ -24,6 +24,13 @@ if [ -z "$FILE_PATH" ] || [ "$FILE_PATH" = "null" ]; then
   exit 0
 fi
 
+# Normalize Windows paths: convert backslashes to forward slashes and remove drive prefix
+NORMALIZED_PATH="$FILE_PATH"
+# Replace backslashes with forward slashes
+NORMALIZED_PATH="${NORMALIZED_PATH//\\//}"
+# Remove Windows drive prefix (e.g., C:/ -> /)
+NORMALIZED_PATH=$(echo "$NORMALIZED_PATH" | sed -E 's#^[A-Za-z]:/##')
+
 # ── Protected file patterns ─────────────────────────────────────────────────
 # Add patterns here. Patterns starting with ^ use regex, others use substring match.
 PROTECTED_PATTERNS=(
@@ -38,7 +45,7 @@ PROTECTED_PATTERNS=(
 for pattern in "${PROTECTED_PATTERNS[@]}"; do
   # Use regex for patterns starting with ^, substring match otherwise
   if [[ "$pattern" =~ ^\^ ]]; then
-    if echo "$FILE_PATH" | grep -qE "$pattern"; then
+    if echo "$NORMALIZED_PATH" | grep -qE "$pattern"; then
       echo "🔒 Protected file: '$FILE_PATH' matches pattern '$pattern'" >&2
       echo "" >&2
       echo "This file is protected from automated edits." >&2
@@ -46,7 +53,7 @@ for pattern in "${PROTECTED_PATTERNS[@]}"; do
       exit 2
     fi
   else
-    if echo "$FILE_PATH" | grep -qF "$pattern"; then
+    if echo "$NORMALIZED_PATH" | grep -qF "$pattern"; then
       echo "🔒 Protected file: '$FILE_PATH' matches pattern '$pattern'" >&2
       echo "" >&2
       echo "This file is protected from automated edits." >&2
