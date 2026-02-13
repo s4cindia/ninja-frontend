@@ -9,7 +9,10 @@ echo "────────────────────────"
 
 # 1. Repository and branch info
 REPO=$(basename "$(git remote get-url origin 2>/dev/null)" .git 2>/dev/null || echo "unknown")
-BRANCH=$(git branch --show-current 2>/dev/null || echo "detached")
+BRANCH=$(git branch --show-current 2>/dev/null || true)
+if [ -z "$BRANCH" ]; then
+    BRANCH="detached"
+fi
 echo "📦 Repo: $REPO"
 echo "📍 Branch: $BRANCH"
 echo "   Last: $(git log -1 --oneline 2>/dev/null || echo 'no commits')"
@@ -32,16 +35,17 @@ fi
 # 4. Detect work context from changed files
 #    Cascade: uncommitted → staged → last commit → modified files
 #    Only fall back if previous command produced no output (not just on failure)
+#    Use || true to prevent set -e from exiting on git command failures
 echo ""
-changed=$(git diff --name-only HEAD 2>/dev/null)
+changed=$(git diff --name-only HEAD 2>/dev/null || true)
 if [ -z "$changed" ]; then
-    changed=$(git diff --cached --name-only 2>/dev/null)
+    changed=$(git diff --cached --name-only 2>/dev/null || true)
 fi
 if [ -z "$changed" ]; then
-    changed=$(git diff --name-only HEAD~1 2>/dev/null)
+    changed=$(git diff --name-only HEAD~1 2>/dev/null || true)
 fi
 if [ -z "$changed" ]; then
-    changed=$(git ls-files -m 2>/dev/null)
+    changed=$(git ls-files -m 2>/dev/null || true)
 fi
 
 if [ -z "$changed" ]; then
