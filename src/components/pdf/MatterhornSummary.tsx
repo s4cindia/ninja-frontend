@@ -7,7 +7,7 @@ import { cn } from '@/utils/cn';
 import type { MatterhornSummary as MatterhornSummaryType, MatterhornCategory, MatterhornCheckpoint, MatterhornCheckpointStatus } from '@/types/pdf.types';
 
 export interface MatterhornSummaryProps {
-  summary: MatterhornSummaryType;
+  summary?: MatterhornSummaryType;
   onCheckpointClick?: (checkpointId: string) => void;
   collapsed?: boolean;
 }
@@ -151,6 +151,11 @@ export const MatterhornSummary: React.FC<MatterhornSummaryProps> = ({
   onCheckpointClick,
   collapsed = false,
 }) => {
+  // Return null if summary is not provided
+  if (!summary) {
+    return null;
+  }
+
   const passedPercentage = summary.totalCheckpoints > 0
     ? Math.round((summary.passed / summary.totalCheckpoints) * 100)
     : 0;

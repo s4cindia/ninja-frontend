@@ -42,6 +42,7 @@ import { EPUBRemediation } from '@/pages/EPUBRemediation';
 import { EPUBComparison } from '@/pages/EPUBComparison';
 import { PdfAccessibilityPage } from '@/pages/PdfAccessibilityPage';
 import { PdfAuditResultsPage } from '@/pages/PdfAuditResultsPage';
+import { PdfRemediationPlanPage } from '@/pages/PdfRemediationPlanPage';
 import { FeedbackDashboard } from '@/pages/FeedbackDashboard';
 import { RemediationPage } from '@/pages/Remediation';
 import { ComparisonPage } from '@/pages/ComparisonPage';
@@ -181,6 +182,11 @@ function AppRoutes() {
           <Route path="/pdf/audit/:jobId" element={
             <ErrorBoundary>
               <PdfAuditResultsPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/pdf/:jobId/remediation" element={
+            <ErrorBoundary>
+              <PdfRemediationPlanPage />
             </ErrorBoundary>
           } />
           <Route path="/feedback" element={<FeedbackDashboard />} />
