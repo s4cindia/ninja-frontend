@@ -45,7 +45,8 @@ class UploadService {
   async uploadToS3(
     presignedUrl: string,
     file: File,
-    onProgress?: ProgressCallback
+    onProgress?: ProgressCallback,
+    contentType?: string
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -73,7 +74,8 @@ class UploadService {
       });
 
       xhr.open('PUT', presignedUrl);
-      xhr.setRequestHeader('Content-Type', file.type || 'application/epub+zip');
+      // Use provided contentType, fallback to file.type, then to default
+      xhr.setRequestHeader('Content-Type', contentType || file.type || 'application/epub+zip');
       xhr.send(file);
     });
   }
@@ -116,16 +118,23 @@ class UploadService {
   ): Promise<UploadResult> {
     let presigned: PresignedUploadResponse | null = null;
 
+    // Determine content type based on file extension if browser doesn't provide it
+    const contentType = file.type ||
+      (file.name.toLowerCase().endsWith('.pdf')
+        ? 'application/pdf'
+        : 'application/epub+zip');
+
     try {
       presigned = await this.getPresignedUrl(
         file.name,
         file.size,
-        file.type || 'application/epub+zip'
+        contentType
       );
     } catch (error) {
-      // Presign 500 = S3 not configured, fallback to direct upload
-      if (isAxiosError(error) && error.response?.status === 500) {
-        console.warn('Presign failed (500), using direct upload');
+      // Presign 500 = S3 not configured, 400 = validation error
+      // Fallback to direct upload for both cases
+      if (isAxiosError(error) && (error.response?.status === 500 || error.response?.status === 400)) {
+        console.warn(`Presign failed (${error.response?.status}), using direct upload`);
         const result = await this.uploadDirect(file, directUploadEndpoint, onProgress);
         return {
           fileId: result.fileId || result.jobId,
@@ -138,7 +147,7 @@ class UploadService {
       throw error;
     }
 
-    await this.uploadToS3(presigned.uploadUrl, file, onProgress);
+    await this.uploadToS3(presigned.uploadUrl, file, onProgress, contentType);
     await this.confirmUpload(presigned.fileId);
 
     return {
