@@ -158,3 +158,6 @@ FE-PDF-*.txt
 
 # Local temporary files
 IMPLEMENTATION_SUMMARY.md
+
+# Claude Code audit logs
+.claude/audit-log.jsonl

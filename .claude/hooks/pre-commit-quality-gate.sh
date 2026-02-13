@@ -12,6 +12,13 @@
 # ============================================================================
 
 INPUT=$(cat)
+
+# Check for jq dependency
+if ! command -v jq >/dev/null 2>&1; then
+  echo "Error: jq is required for pre-commit quality gate but not found" >&2
+  exit 1
+fi
+
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
 # Only intercept git commit commands
@@ -25,7 +32,7 @@ WARNINGS=""
 
 # ── Step 1: TypeScript Compilation ──────────────────────────────────────────
 echo ""
-echo "📘 [1/3] TypeScript type checking..."
+echo "📘 [1/4] TypeScript type checking..."
 if [ -f "tsconfig.json" ]; then
   TSC_OUTPUT=$(npx tsc --noEmit 2>&1)
   TSC_EXIT=$?
@@ -41,7 +48,7 @@ fi
 
 # ── Step 2: ESLint ──────────────────────────────────────────────────────────
 echo ""
-echo "🔍 [2/3] Running ESLint on staged files..."
+echo "🔍 [2/4] Running ESLint on staged files..."
 
 # Detect ESLint config (supports flat config and legacy)
 HAS_ESLINT=false
@@ -88,9 +95,27 @@ else
   echo "  ⏭️  No ESLint config detected — skipping"
 fi
 
-# ── Step 3: CodeRabbit Review (non-blocking) ────────────────────────────────
+# ── Step 3: Run Tests ───────────────────────────────────────────────────────
 echo ""
-echo "🐰 [3/3] Running CodeRabbit review..."
+echo "🧪 [3/4] Running tests..."
+
+# Check if test script exists in package.json
+if [ -f "package.json" ] && grep -q '"test"' package.json 2>/dev/null; then
+  TEST_OUTPUT=$(npm test 2>&1)
+  TEST_EXIT=$?
+  if [ $TEST_EXIT -ne 0 ]; then
+    ERRORS="${ERRORS}\n━━━ Test Failures ━━━\n${TEST_OUTPUT}\n"
+    echo "  ❌ Tests failed"
+  else
+    echo "  ✅ All tests passed"
+  fi
+else
+  echo "  ⏭️  No test script found — skipping"
+fi
+
+# ── Step 4: CodeRabbit Review (non-blocking) ────────────────────────────────
+echo ""
+echo "🐰 [4/4] Running CodeRabbit review..."
 if command -v coderabbit &> /dev/null; then
   CR_OUTPUT=$(timeout 120 coderabbit --plain --type uncommitted 2>&1)
   CR_EXIT=$?
