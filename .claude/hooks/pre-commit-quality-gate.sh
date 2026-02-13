@@ -101,7 +101,7 @@ echo "🧪 [3/4] Running tests..."
 
 # Check if test script exists in package.json using jq
 if [ -f "package.json" ]; then
-  HAS_TEST_SCRIPT=$(echo "$INPUT" | jq -r 'if input.scripts.test then "true" else "false" end' < package.json 2>/dev/null || echo "false")
+  HAS_TEST_SCRIPT=$(jq -r 'if has("scripts") and (.scripts | has("test")) then "true" else "false" end' < package.json 2>/dev/null || echo "false")
   if [ "$HAS_TEST_SCRIPT" = "true" ]; then
     TEST_OUTPUT=$(npm test 2>&1)
     TEST_EXIT=$?
