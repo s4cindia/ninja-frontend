@@ -4,6 +4,7 @@
  * API service for PDF remediation workflow
  */
 
+import { useQuery } from '@tanstack/react-query';
 import { api } from './api';
 import type {
   RemediationPlan,
@@ -49,9 +50,36 @@ export async function executeAutoRemediation(jobId: string): Promise<AutoRemedia
   return response.data.data || response.data;
 }
 
+/**
+ * Download remediated PDF file
+ */
+export async function downloadRemediatedPdf(jobId: string): Promise<Blob> {
+  const response = await api.get(`/pdf/${jobId}/remediation/download`, {
+    responseType: 'blob',
+  });
+  return response.data;
+}
+
+/**
+ * React Query hook for downloading remediated PDF
+ *
+ * @param jobId - Job ID to download remediated PDF for
+ * @returns Query result with cached Blob data
+ */
+export function useDownloadRemediatedPdf(jobId: string) {
+  return useQuery({
+    queryKey: ['pdf-remediation-download', jobId],
+    queryFn: () => downloadRemediatedPdf(jobId),
+    enabled: !!jobId,
+    staleTime: 5 * 60 * 1000, // 5 minutes - PDFs don't change frequently
+    gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache for potential re-download
+  });
+}
+
 export const pdfRemediationService = {
   createRemediationPlan,
   getRemediationPlan,
   updateTaskStatus,
   executeAutoRemediation,
+  downloadRemediatedPdf,
 };
