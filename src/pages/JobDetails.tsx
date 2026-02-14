@@ -35,10 +35,7 @@ export function JobDetails() {
   const { data: job, isLoading, isError, error, refetch } = useJob(jobId || null);
   const cancelJob = useCancelJob();
 
-  if (job && CITATION_JOB_TYPES.includes(job.type)) {
-    return <Navigate to={`/editorial/citations/${job.id}`} replace />;
-  }
-
+  // useMemo must be called before any conditional returns (React hooks rules)
   const { parsedOutput, parseError } = useMemo(() => {
     if (!job?.output) {
       return { parsedOutput: null, parseError: null };
@@ -50,6 +47,10 @@ export function JobDetails() {
     }
     return { parsedOutput: result, parseError: null };
   }, [job?.output]);
+
+  if (job && CITATION_JOB_TYPES.includes(job.type)) {
+    return <Navigate to={`/editorial/citations/${job.id}`} replace />;
+  }
 
   const handleCancel = async () => {
     if (!jobId) return;
