@@ -55,6 +55,7 @@ export const PdfRemediationPlanPage: React.FC = () => {
     isOpen: false,
     task: null,
   });
+  const [showAllManualIssueTypes, setShowAllManualIssueTypes] = useState(false);
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => {
@@ -382,6 +383,11 @@ export const PdfRemediationPlanPage: React.FC = () => {
                 <div>
                   <CardTitle className="text-green-900">
                     Auto-fixable Issues ({plan.autoFixableCount})
+                    {(plan as any).completedAutoFixCount > 0 && (
+                      <span className="text-sm font-normal text-green-600 ml-2">
+                        ({(plan as any).completedAutoFixCount} completed)
+                      </span>
+                    )}
                   </CardTitle>
                   <p className="text-sm text-green-700 mt-1">
                     Can be fixed automatically without user input
@@ -696,15 +702,32 @@ export const PdfRemediationPlanPage: React.FC = () => {
                       </div>
                       <p className="text-sm text-gray-600 ml-6">{tasks[0].description}</p>
                     </div>
-                  )).slice(0, 5)}
+                  )).slice(0, showAllManualIssueTypes ? undefined : 5)}
 
                   {Object.keys(manualTasks.reduce((acc, task) => {
                     acc[task.issueCode] = true;
                     return acc;
+                  }, {} as Record<string, boolean>)).length > 5 && !showAllManualIssueTypes && (
+                    <button
+                      onClick={() => setShowAllManualIssueTypes(true)}
+                      className="text-sm text-blue-600 hover:text-blue-700 hover:underline text-center py-2 w-full cursor-pointer"
+                    >
+                      + {Object.keys(manualTasks.reduce((acc, task) => {
+                        acc[task.issueCode] = true;
+                        return acc;
+                      }, {} as Record<string, boolean>)).length - 5} more issue types
+                    </button>
+                  )}
+                  {showAllManualIssueTypes && Object.keys(manualTasks.reduce((acc, task) => {
+                    acc[task.issueCode] = true;
+                    return acc;
                   }, {} as Record<string, boolean>)).length > 5 && (
-                    <p className="text-sm text-gray-500 text-center py-2">
-                      + more issue types
-                    </p>
+                    <button
+                      onClick={() => setShowAllManualIssueTypes(false)}
+                      className="text-sm text-blue-600 hover:text-blue-700 hover:underline text-center py-2 w-full cursor-pointer"
+                    >
+                      Show less
+                    </button>
                   )}
                 </div>
               ) : (
