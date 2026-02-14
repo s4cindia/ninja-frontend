@@ -396,7 +396,7 @@ export default function DocumentViewer({ fullText, fullHtml, citations, onCitati
 
   // Use HTML to preserve formatting (bold, italic, fonts, etc.)
   // Highlighting works by finding citation text within HTML
-  let contentToDisplay = fullHtml || fullText || '';
+  const contentToDisplay = fullHtml || fullText || '';
 
   console.log('[DocumentViewer] Rendering with:', {
     hasFullText: !!fullText,
