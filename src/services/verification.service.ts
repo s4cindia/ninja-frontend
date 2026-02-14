@@ -200,4 +200,14 @@ export const verificationService = {
   async submitBulkVerification(data: BulkVerificationSubmission): Promise<void> {
     await api.post('/verification/bulk', data);
   },
+
+  async submitNaVerification(data: {
+    criterionId: string;
+    jobId: string;
+    status: 'not_applicable';
+    method: 'quick_accept';
+    notes: string;
+  }): Promise<void> {
+    await api.post('/verification/submit', data);
+  },
 };

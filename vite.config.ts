@@ -2,6 +2,9 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
 
+// Detect environment
+const isReplit = process.env.REPL_ID !== undefined;
+
 export default defineConfig({
   plugins: [
     react(),
@@ -11,7 +14,7 @@ export default defineConfig({
         server.middlewares.use((_req, res, next) => {
           res.setHeader(
             'Content-Security-Policy',
-            "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' wss: https:; object-src 'none';"
+            "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' http://localhost:5000 http://localhost:3001 http://localhost:5173 wss: https:; object-src 'none';"
           );
           next();
         });
@@ -36,15 +39,15 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5000,
+    port: isReplit ? 5000 : 5173, // Replit uses 5000, local dev uses 5173
     host: '0.0.0.0',
     allowedHosts: true,
-    hmr: {
+    hmr: isReplit ? {
       clientPort: 443,
-    },
+    } : undefined,
     proxy: {
       '/api/v1': {
-        target: process.env.VITE_BACKEND_URL || 'http://localhost:3001',
+        target: process.env.VITE_BACKEND_URL || (isReplit ? 'http://localhost:3001' : 'http://localhost:5000'),
         changeOrigin: true,
         secure: false,
       },

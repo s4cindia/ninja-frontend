@@ -23,7 +23,8 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FileText, Loader2, Download, Share2, RotateCw, Filter, X, ChevronDown } from 'lucide-react';
+import { FileText, Loader2, Download, Share2, RotateCw, Filter, X, ChevronDown, ListChecks } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
@@ -32,12 +33,15 @@ import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { MatterhornSummary } from '@/components/pdf/MatterhornSummary';
 import { PdfPageNavigator } from '@/components/pdf/PdfPageNavigator';
 import { PdfPreviewPanel } from '@/components/pdf/PdfPreviewPanel';
+import { ScanLevelBanner } from '@/components/pdf/ScanLevelBanner';
 import { IssueCard } from '@/components/remediation/IssueCard';
 import { api } from '@/services/api';
 import { cn } from '@/utils/cn';
 import { validateJobId } from '@/utils/validation';
-import type { PdfAuditResult, PdfAuditIssue } from '@/types/pdf.types';
+import { useCreateRemediationPlan } from '@/hooks/usePdfRemediation';
+import type { PdfAuditResult, PdfAuditIssue, MatterhornSummary as MatterhornSummaryType, PdfMetadata } from '@/types/pdf.types';
 import type { IssueSeverity } from '@/types/accessibility.types';
+import type { ScanLevel, ValidatorType } from '@/types/scan-level.types';
 
 // Filter state interface
 interface IssueFilters {
@@ -46,6 +50,7 @@ interface IssueFilters {
   matterhornCategory: string | 'all';
   pageNumber: number | 'all';
   searchText: string;
+  showMatterhornOnly: boolean;
 }
 
 const initialFilters: IssueFilters = {
@@ -54,6 +59,12 @@ const initialFilters: IssueFilters = {
   matterhornCategory: 'all',
   pageNumber: 'all',
   searchText: '',
+  showMatterhornOnly: false,
+};
+
+// Type guard for ScanLevel validation
+const isScanLevel = (value: unknown): value is ScanLevel => {
+  return typeof value === 'string' && ['basic', 'comprehensive', 'custom'].includes(value);
 };
 
 // Score color helper
@@ -81,6 +92,9 @@ export const PdfAuditResultsPage: React.FC = () => {
   // Track component mount status to prevent setState on unmounted component
   const isMountedRef = useRef(true);
 
+  // React Query hooks
+  const createPlanMutation = useCreateRemediationPlan();
+
   // State management
   const [auditResult, setAuditResult] = useState<PdfAuditResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -91,6 +105,8 @@ export const PdfAuditResultsPage: React.FC = () => {
   const [filters, setFilters] = useState<IssueFilters>(initialFilters);
   const [showFilters, setShowFilters] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isReScanning, setIsReScanning] = useState(false);
+  const [currentScanLevel, setCurrentScanLevel] = useState<ScanLevel>('basic');
 
   // Fetch audit result
   const fetchAuditResult = useCallback(async () => {
@@ -111,15 +127,16 @@ export const PdfAuditResultsPage: React.FC = () => {
       // Only update state if component is still mounted
       if (!isMountedRef.current) return;
 
-      // Check if still processing
-      if (data.status === 'processing' || data.status === 'pending') {
+      // Check if still processing (case-insensitive to handle backend uppercase values)
+      const statusLower = typeof data.status === 'string' ? data.status.toLowerCase() : '';
+      if (statusLower === 'processing' || statusLower === 'pending' || statusLower === 'queued') {
         setIsPolling(true);
         setIsLoading(false);
         return;
       }
 
       // Check if failed
-      if (data.status === 'failed') {
+      if (statusLower === 'failed') {
         setError('Audit failed. Please try again.');
         setIsLoading(false);
         setIsPolling(false);
@@ -127,8 +144,12 @@ export const PdfAuditResultsPage: React.FC = () => {
       }
 
       setAuditResult(data as PdfAuditResult);
+      // Extract scan level from output metadata (default to 'basic' if not specified)
+      const resultData = data as PdfAuditResult & { scanLevel?: string };
+      setCurrentScanLevel(isScanLevel(resultData.scanLevel) ? resultData.scanLevel : 'basic');
       setIsLoading(false);
       setIsPolling(false);
+      setIsReScanning(false);
       setError(null);
     } catch (err) {
       // Only update state if component is still mounted
@@ -223,8 +244,53 @@ export const PdfAuditResultsPage: React.FC = () => {
       );
     }
 
+    // Filter by Matterhorn mapping only
+    if (filters.showMatterhornOnly) {
+      issues = issues.filter((issue) => {
+        const issueWithCode = issue as typeof issue & { code?: string };
+        const code = (issueWithCode.code || issue.ruleId || '').toUpperCase();
+        return (
+          (issue.matterhornCheckpoint != null && issue.matterhornCheckpoint !== '') ||
+          code.startsWith('MATTERHORN-') ||
+          // Include related codes that map to Matterhorn checkpoints
+          code.startsWith('TABLE-') ||
+          code.startsWith('ALT-TEXT-') ||
+          code.startsWith('LIST-') ||
+          code.startsWith('PDF-LOW-CONTRAST') ||
+          code.startsWith('PDF-UNTAGGED') ||
+          code.startsWith('PDF-NO-LANGUAGE')
+        );
+      });
+    }
+
     return issues;
   }, [auditResult, filters]);
+
+  // Count Matterhorn-related issues
+  // Includes issues with explicit MATTERHORN codes and related codes that map to Matterhorn checkpoints
+  const matterhornIssueCount = useMemo(() => {
+    if (!auditResult || !auditResult.issues) return 0;
+    return auditResult.issues.filter(
+      (issue) => {
+        const issueWithCode = issue as typeof issue & { code?: string };
+        const code = (issueWithCode.code || issue.ruleId || '').toUpperCase();
+        return (
+          (issue.matterhornCheckpoint != null && issue.matterhornCheckpoint !== '') ||
+          code.startsWith('MATTERHORN-') ||
+          // Table-related codes (map to Matterhorn 15)
+          code.startsWith('TABLE-') ||
+          // Alt text codes (map to Matterhorn 13)
+          code.startsWith('ALT-TEXT-') ||
+          // List codes (map to Matterhorn structure)
+          code.startsWith('LIST-') ||
+          // PDF structure codes
+          code.startsWith('PDF-LOW-CONTRAST') ||
+          code.startsWith('PDF-UNTAGGED') ||
+          code.startsWith('PDF-NO-LANGUAGE')
+        );
+      }
+    ).length;
+  }, [auditResult]);
 
   // Get unique WCAG criteria
   const uniqueWcagCriteria = useMemo(() => {
@@ -355,6 +421,110 @@ export const PdfAuditResultsPage: React.FC = () => {
     setFilters(initialFilters);
   };
 
+  const handleCreatePlan = async () => {
+    if (!jobId) return;
+
+    try {
+      await createPlanMutation.mutateAsync(jobId);
+      toast.success('Remediation plan created successfully');
+      navigate(`/pdf/${jobId}/remediation`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create remediation plan';
+      toast.error(message);
+    }
+  };
+
+  const handleReScan = async (scanLevel: ScanLevel, customValidators?: ValidatorType[]) => {
+    if (!jobId) return;
+
+    // Capture previous scan level for rollback on error
+    const previousScanLevel = currentScanLevel;
+
+    setIsReScanning(true);
+    setIsPolling(false); // Don't poll - we'll get the result directly from the POST response
+    // Optimistically update scan level immediately
+    setCurrentScanLevel(scanLevel);
+
+    // Declare toastId before try so it can be dismissed in catch
+    let toastId: string | number | undefined;
+
+    try {
+      // Show loading toast
+      toastId = toast.loading(`Running ${scanLevel} scan... This may take a few minutes.`);
+
+      // Call re-scan API - the response will contain the full audit results
+      const response = await api.post(`/pdf/job/${encodeURIComponent(jobId)}/re-scan`, {
+        scanLevel,
+        customValidators,
+      });
+
+      // Extract audit report from response
+      const data = response.data.data || response.data;
+      if (data.auditReport) {
+        // Transform the audit report to match PdfAuditResult structure
+        // Backend returns pageCount and matterhornSummary in metadata, but frontend expects them at root
+        const report = data.auditReport;
+        // Extract metadata with proper typing
+        const reportMetadata = report.metadata as Record<string, unknown> | undefined;
+        const matterhornSummaryData = reportMetadata?.matterhornSummary as MatterhornSummaryType | undefined;
+        const metadataData = reportMetadata as PdfMetadata | undefined;
+
+        // Create default metadata if none available
+        const defaultMetadata: PdfMetadata = {
+          pdfVersion: '1.7',
+          isTagged: false,
+          hasStructureTree: false,
+        };
+
+        // Create default Matterhorn summary if none available
+        const defaultMatterhornSummary: MatterhornSummaryType = {
+          totalCheckpoints: 0,
+          passed: 0,
+          failed: 0,
+          notApplicable: 0,
+          categories: [],
+        };
+
+        const transformedResult: PdfAuditResult = {
+          id: report.jobId || jobId!,
+          jobId: report.jobId || jobId!,
+          fileName: report.fileName,
+          fileSize: auditResult?.fileSize || 0, // Preserve from previous result
+          pageCount: (reportMetadata?.pageCount as number) || auditResult?.pageCount || 0,
+          score: report.score,
+          status: 'completed',
+          createdAt: auditResult?.createdAt || new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+          issues: report.issues || [],
+          matterhornSummary: matterhornSummaryData || auditResult?.matterhornSummary || defaultMatterhornSummary,
+          metadata: metadataData || auditResult?.metadata || defaultMetadata,
+        };
+
+        setAuditResult(transformedResult);
+        setCurrentScanLevel(data.scanLevel || scanLevel);
+        toast.success(`${scanLevel} scan complete! Found ${report.issues?.length || 0} issues.`, { id: toastId });
+        // Only clear isReScanning when we have immediate results
+        setIsReScanning(false);
+      } else {
+        // Fallback to polling if response doesn't contain audit report
+        setIsPolling(true);
+        toast.success(`${scanLevel} scan started. Loading results...`, { id: toastId });
+        // Don't clear isReScanning here - let fetchAuditResult clear it when polling completes
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to start re-scan';
+      // Dismiss the loading toast before showing error
+      if (toastId !== undefined) {
+        toast.dismiss(String(toastId));
+      }
+      toast.error(message);
+      setIsReScanning(false);
+      setIsPolling(false);
+      // Revert scan level to previous value on error
+      setCurrentScanLevel(previousScanLevel);
+    }
+  };
+
   const hasActiveFilters =
     filters.severity !== 'all' ||
     filters.wcagCriterion !== 'all' ||
@@ -386,7 +556,9 @@ export const PdfAuditResultsPage: React.FC = () => {
           <CardContent className="py-12">
             <div className="flex flex-col items-center justify-center gap-3">
               <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
-              <p className="text-gray-700 font-medium text-lg">Audit in progress...</p>
+              <p className="text-gray-700 font-medium text-lg">
+                {isReScanning ? 'Re-scanning document...' : 'Audit in progress...'}
+              </p>
               <p className="text-gray-500">This may take a few moments</p>
               <Button variant="outline" size="sm" onClick={fetchAuditResult} className="mt-4">
                 Check Status
@@ -418,8 +590,8 @@ export const PdfAuditResultsPage: React.FC = () => {
     );
   }
 
-  // Generate PDF URL (this would come from API in production)
-  const pdfUrl = `/api/pdf/job/${encodeURIComponent(jobId!)}/file`;
+  // Generate PDF URL using API service configuration
+  const pdfUrl = `${api.defaults.baseURL}/pdf/job/${encodeURIComponent(jobId!)}/file`;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -439,9 +611,9 @@ export const PdfAuditResultsPage: React.FC = () => {
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">{auditResult.fileName}</h1>
                   <p className="text-sm text-gray-600 mt-1">
-                    {auditResult.pageCount} pages • {Math.round(auditResult.fileSize / 1024)} KB •
-                    PDF {auditResult.metadata.pdfVersion}
-                    {auditResult.metadata.isTagged && (
+                    {auditResult.pageCount} pages • {Math.round(auditResult.fileSize / 1024)} KB
+                    {auditResult.metadata?.pdfVersion && ` • PDF ${auditResult.metadata.pdfVersion}`}
+                    {auditResult.metadata?.isTagged && (
                       <Badge variant="success" className="ml-2">
                         Tagged
                       </Badge>
@@ -464,6 +636,15 @@ export const PdfAuditResultsPage: React.FC = () => {
           <div className="flex items-center gap-2 mt-4">
             <Button
               variant="primary"
+              size="sm"
+              onClick={handleCreatePlan}
+              disabled={createPlanMutation.isPending || (auditResult?.issues?.length ?? 0) === 0}
+            >
+              <ListChecks className="h-4 w-4 mr-1" />
+              {createPlanMutation.isPending ? 'Creating Plan...' : 'Create Remediation Plan'}
+            </Button>
+            <Button
+              variant="outline"
               size="sm"
               onClick={() => handleDownloadReport('json')}
               disabled={isDownloading}
@@ -490,7 +671,56 @@ export const PdfAuditResultsPage: React.FC = () => {
           onCheckpointClick={handleMatterhornCheckpointClick}
           collapsed={true}
         />
+
+        {/* Info Note: Matterhorn vs All Issues */}
+        {auditResult.issues && auditResult.issues.length > matterhornIssueCount && (
+          <Alert variant="info" className="mt-4">
+            <div className="flex items-start gap-2">
+              <ListChecks className="h-5 w-5 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium mb-1">
+                  Understanding Issue Counts
+                </p>
+                <p className="text-sm text-gray-700 mb-2">
+                  <strong>{matterhornIssueCount} issues</strong> relate to Matterhorn Protocol compliance (includes explicit MATTERHORN codes and related codes like TABLE-, ALT-TEXT-, LIST-),
+                  while <strong>{auditResult.issues.length} total issues</strong> were found across all validators.
+                </p>
+                <p className="text-sm text-gray-700 mb-2">
+                  The Matterhorn Summary above shows <strong>{auditResult.matterhornSummary?.failed || 0} failed checkpoints</strong> with a total of{' '}
+                  <strong>
+                    {auditResult.matterhornSummary?.categories?.reduce(
+                      (sum, cat) => sum + cat.checkpoints.reduce((s, cp) => s + (cp.status === 'failed' ? cp.issueCount : 0), 0),
+                      0
+                    ) || 0} checkpoint violations
+                  </strong>.
+                  {' '}Note that one issue can violate multiple checkpoints, so the violation count may be higher than the unique issue count.
+                </p>
+                <p className="text-xs text-gray-600 mt-1">
+                  <strong>Tip:</strong> Use the toggle in the Issues panel to switch between "All Issues" and "Matterhorn-Related Issues" views.
+                </p>
+              </div>
+            </div>
+          </Alert>
+        )}
       </div>
+
+      {/* Debug: Show scan level */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="px-6 py-2 bg-yellow-50 text-xs border-b">
+          Debug: scanLevel={currentScanLevel}, auditResult={auditResult ? 'loaded' : 'null'}, isReScanning={isReScanning}, bannerVisible={currentScanLevel !== 'comprehensive' && !!auditResult}
+        </div>
+      )}
+
+      {/* Scan Level Banner - offer deeper analysis if not already comprehensive */}
+      {currentScanLevel !== 'comprehensive' && auditResult && (
+        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+          <ScanLevelBanner
+            currentScanLevel={currentScanLevel}
+            onReScan={handleReScan}
+            isScanning={isReScanning}
+          />
+        </div>
+      )}
 
       {/* Three-column layout */}
       <div className="flex h-[calc(100vh-320px)]">
@@ -540,6 +770,33 @@ export const PdfAuditResultsPage: React.FC = () => {
                   )}
                 />
               </Button>
+            </div>
+
+            {/* Matterhorn Toggle */}
+            <div className="flex items-center gap-2 mb-3">
+              <button
+                onClick={() => setFilters((prev) => ({ ...prev, showMatterhornOnly: false }))}
+                className={cn(
+                  'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                  !filters.showMatterhornOnly
+                    ? 'bg-primary-100 text-primary-700 border border-primary-200'
+                    : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
+                )}
+              >
+                All Issues ({auditResult?.issues?.length || 0})
+              </button>
+              <button
+                onClick={() => setFilters((prev) => ({ ...prev, showMatterhornOnly: true }))}
+                className={cn(
+                  'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                  filters.showMatterhornOnly
+                    ? 'bg-primary-100 text-primary-700 border border-primary-200'
+                    : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
+                )}
+                title="Includes MATTERHORN-, TABLE-, ALT-TEXT-, LIST-, and related codes"
+              >
+                Matterhorn-Related ({matterhornIssueCount})
+              </button>
             </div>
 
             {hasActiveFilters && (

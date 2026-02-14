@@ -1,4 +1,6 @@
-export type VerificationStatus = 'pending' | 'verified_pass' | 'verified_fail' | 'verified_partial' | 'deferred';
+import type { ApplicabilitySuggestion } from './acr.types';
+
+export type VerificationStatus = 'pending' | 'verified_pass' | 'verified_fail' | 'verified_partial' | 'deferred' | 'not_applicable';
 export type Severity = 'critical' | 'serious' | 'moderate' | 'minor';
 export type ConfidenceLevel = 'high' | 'medium' | 'low' | 'manual';
 export type VerificationMethod = 'NVDA 2024.1' | 'JAWS 2024' | 'VoiceOver' | 'Manual Review' | 'Keyboard Only' | 'Axe DevTools' | 'WAVE';
@@ -47,6 +49,7 @@ export interface VerificationItem {
   fixedIssues?: FixedVerificationIssue[];
   fixedCount?: number;
   remainingCount?: number;
+  naSuggestion?: ApplicabilitySuggestion;
 }
 
 export interface VerificationQueueData {

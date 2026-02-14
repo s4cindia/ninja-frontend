@@ -26,6 +26,21 @@ export type ConformanceLevel = 'supports' | 'partially_supports' | 'does_not_sup
 
 export type AttributionTag = 'AUTOMATED' | 'AI-SUGGESTED' | 'HUMAN-VERIFIED';
 
+export interface DetectionCheck {
+  check: string;
+  result: 'pass' | 'fail' | 'warning';
+  details?: string;
+}
+
+export interface ApplicabilitySuggestion {
+  criterionId: string;
+  suggestedStatus: 'not_applicable' | 'applicable' | 'uncertain';
+  confidence: number;
+  detectionChecks: DetectionCheck[];
+  rationale: string;
+  edgeCases: string[];
+}
+
 export interface AcrCriterion {
   id: string;
 
@@ -43,6 +58,8 @@ export interface AcrCriterion {
   isSuspicious: boolean;
   lastModifiedBy?: string;
   lastModifiedAt?: string;
+
+  naSuggestion?: ApplicabilitySuggestion;
 }
 
 export interface AcrDocument {
@@ -102,12 +119,16 @@ export type ExportFormat = 'docx' | 'pdf' | 'html';
 export interface ExportOptions {
   format: ExportFormat;
   includeMethodology: boolean;
-  
   includeAttributionTags: boolean;
   includeLegalDisclaimer: boolean;
+  productInfo?: {
+    vendorName?: string;
+    contactEmail?: string;
+  };
   branding?: {
     companyName?: string;
     primaryColor?: string;
+    logoUrl?: string;
     footerText?: string;
   };
 }

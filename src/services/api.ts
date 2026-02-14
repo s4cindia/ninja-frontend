@@ -1,5 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '@/stores/auth.store';
+import type { ApplicabilitySuggestion } from '@/types/acr.types';
 
 // Use environment variable for production, fallback to proxy path for development
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
@@ -178,6 +179,7 @@ export interface CriterionConfidence {
   name: string;
   level: 'A' | 'AA' | 'AAA';
   confidenceScore: number;
+  confidence?: number;
   status: 'pass' | 'fail' | 'not_applicable' | 'not_tested';
   needsVerification: boolean;
   remarks?: string;
@@ -186,9 +188,14 @@ export interface CriterionConfidence {
   relatedIssues?: CriterionIssue[];
   issueCount?: number;
   fixedIssues?: FixedIssue[];
+  remediatedIssues?: FixedIssue[];
   fixedCount?: number;
+  remediatedCount?: number;
   remainingCount?: number;
   hasIssues?: boolean;
+  naSuggestion?: ApplicabilitySuggestion;
+  requiresManualVerification?: boolean;
+  automationCapability?: number;
 }
 
 export interface AcrAnalysisResponse {
@@ -204,11 +211,20 @@ export interface AcrAnalysisResponse {
   };
   otherIssues?: {
     count: number;
+    pendingCount?: number;
+    fixedCount?: number;
     issues: Array<{
       code: string;
       message: string;
       severity: string;
       location?: string;
+      status?: 'pending' | 'fixed' | 'failed' | 'skipped';
+      remediationInfo?: {
+        description: string;
+        fixedAt?: string;
+        fixType?: 'auto' | 'manual';
+        details?: Record<string, unknown>;
+      };
     }>;
   };
 }

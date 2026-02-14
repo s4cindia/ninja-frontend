@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, FileText, CheckCircle, Layers } from 'lucide-react';
+import { ArrowLeft, FileText, CheckCircle, Layers, TrendingUp, TrendingDown, ArrowRight, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -10,6 +10,7 @@ import { ModificationList } from './ModificationList';
 import { Modification } from './ComparisonDiff';
 import { api } from '@/services/api';
 import { normalizeCriteria } from '@/utils/wcag';
+import { clsx } from 'clsx';
 
 interface FileComparison {
   filePath: string;
@@ -36,10 +37,21 @@ interface ComparisonData {
   modifications: Modification[];
 }
 
+interface ImprovementMetrics {
+  scoreChange: number;
+  issuesFixed: number;
+  newIssuesFound: number;
+  beforeScore?: number;
+  afterScore?: number;
+  beforeIssueCount?: number;
+  afterIssueCount?: number;
+}
+
 interface ComparisonViewProps {
   jobId: string;
   contentType: 'pdf' | 'epub';
   criterionId?: string;
+  improvement?: ImprovementMetrics;
   onBack?: () => void;
   className?: string;
 }
@@ -168,6 +180,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
   jobId,
   contentType,
   criterionId,
+  improvement,
   onBack,
   className = '',
 }) => {
@@ -249,6 +262,89 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
           </Badge>
         </div>
       </div>
+
+      {/* Improvement Metrics */}
+      {improvement && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-green-500" />
+              Improvement Metrics
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {improvement.newIssuesFound > 0 && (
+              <Alert variant="warning" className="mb-4">
+                <AlertTriangle className="h-4 w-4" />
+                <div className="ml-2">
+                  <strong>{improvement.newIssuesFound}</strong> new issue{improvement.newIssuesFound !== 1 ? 's' : ''} discovered during re-audit.
+                </div>
+              </Alert>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Score Change */}
+              {improvement.beforeScore !== undefined && improvement.afterScore !== undefined && (
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="text-sm text-gray-500 mb-2">Accessibility Score</div>
+                  <div className="flex items-center justify-between">
+                    <span className={clsx(
+                      "text-2xl font-bold",
+                      improvement.scoreChange > 0 ? 'text-red-600' : improvement.scoreChange < 0 ? 'text-green-600' : 'text-gray-600'
+                    )}>
+                      {improvement.beforeScore}
+                    </span>
+                    <ArrowRight className="h-5 w-5 text-gray-400 mx-2" />
+                    <span className={clsx(
+                      "text-2xl font-bold",
+                      improvement.scoreChange > 0 ? 'text-green-600' : improvement.scoreChange < 0 ? 'text-red-600' : 'text-gray-600'
+                    )}>
+                      {improvement.afterScore}
+                    </span>
+                  </div>
+                  <div className={clsx(
+                    'mt-2 flex items-center gap-1 text-sm font-medium',
+                    improvement.scoreChange > 0 ? 'text-green-600' : improvement.scoreChange < 0 ? 'text-red-600' : 'text-gray-600'
+                  )}>
+                    {improvement.scoreChange > 0 ? (
+                      <TrendingUp className="h-4 w-4" />
+                    ) : improvement.scoreChange < 0 ? (
+                      <TrendingDown className="h-4 w-4" />
+                    ) : null}
+                    {improvement.scoreChange > 0 ? '+' : ''}{improvement.scoreChange}
+                  </div>
+                </div>
+              )}
+
+              {/* Issues Fixed */}
+              <div className="p-4 bg-green-50 rounded-lg">
+                <div className="text-sm text-green-600 mb-2">Issues Fixed</div>
+                <div className="text-3xl font-bold text-green-700">
+                  {improvement.issuesFixed}
+                </div>
+                {improvement.beforeIssueCount !== undefined && (
+                  <div className="mt-2 text-sm text-gray-600">
+                    of {improvement.beforeIssueCount} original
+                  </div>
+                )}
+              </div>
+
+              {/* New Issues */}
+              <div className="p-4 bg-orange-50 rounded-lg">
+                <div className="text-sm text-orange-600 mb-2">New Issues Found</div>
+                <div className="text-3xl font-bold text-orange-700">
+                  {improvement.newIssuesFound}
+                </div>
+                {improvement.afterIssueCount !== undefined && (
+                  <div className="mt-2 text-sm text-gray-600">
+                    {improvement.afterIssueCount} total remaining
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <Card className="lg:col-span-2">

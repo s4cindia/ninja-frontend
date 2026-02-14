@@ -342,7 +342,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
           <div className="space-y-4">
             <Loader2 className="h-12 w-12 mx-auto text-primary-600 animate-spin" />
             <p className="font-medium text-gray-900">
-              {state === 'uploading' && 'Uploading file...'}
+              {state === 'uploading' && 'Uploading and auditing...'}
               {state === 'queued' && 'Audit queued...'}
               {state === 'processing' && 'Running accessibility audit...'}
             </p>
@@ -350,7 +350,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
               <Progress value={progress} showLabel />
             </div>
             <p className="text-sm text-gray-500">
-              {state === 'uploading' && 'Please wait while your file is being uploaded'}
+              {state === 'uploading' && 'Please wait while your file is being uploaded and audited'}
               {state === 'queued' && 'Your audit is in the queue and will start shortly'}
               {state === 'processing' && 'Analyzing document structure and accessibility features'}
             </p>

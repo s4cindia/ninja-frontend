@@ -2,7 +2,6 @@ import React, { useState, useCallback } from "react";
 import {
   Upload,
   RefreshCw,
-  CheckCircle,
   AlertTriangle,
   XCircle,
 } from "lucide-react";
@@ -71,23 +70,49 @@ export const ReAuditSection: React.FC<ReAuditSectionProps> = ({
           onReauditComplete(demoResult);
         } else {
           const formData = new FormData();
-          formData.append("epub", file);
+          formData.append("file", file);
 
           const response = await api.post(
-            `/epub/remediation/${jobId}/reaudit`,
+            `/epub/job/${jobId}/reaudit`,
             formData,
             {
               headers: { "Content-Type": "multipart/form-data" },
             },
           );
 
-          const data = response.data.data || response.data;
-          setResult(data);
-          onReauditComplete(data);
+          const backendData = response.data.data || response.data;
+
+          // Map backend field names to frontend interface
+          const mappedResult: ReauditResult = {
+            originalIssues: backendData.originalIssues ?? 0,
+            resolved: backendData.fixedIssues || 0,
+            stillPending: backendData.remainingIssues || 0,
+            // TODO: Verify if remainingIssuesList represents new issues or unresolved issues
+            newIssuesFound: backendData.remainingIssuesList || [],
+            score: backendData.score,
+            resolvedIssueCodes: backendData.resolvedIssueCodes,
+          };
+
+          setResult(mappedResult);
+          onReauditComplete(mappedResult);
         }
       } catch (err) {
         console.error("Re-audit failed:", err);
-        setError("Failed to analyze EPUB. Please try again.");
+        let errorMessage = "Failed to analyze EPUB. Please try again.";
+
+        if (err && typeof err === "object") {
+          const error = err as {
+            response?: { data?: { error?: { message?: string }; message?: string } };
+            message?: string;
+          };
+          errorMessage =
+            error.response?.data?.error?.message ||
+            error.response?.data?.message ||
+            error.message ||
+            errorMessage;
+        }
+
+        setError(errorMessage);
       } finally {
         setIsUploading(false);
       }
@@ -102,24 +127,6 @@ export const ReAuditSection: React.FC<ReAuditSectionProps> = ({
     disabled: isUploading,
   });
 
-  if (pendingCount === 0 && !result) {
-    return (
-      <Card className="border-green-200 bg-green-50">
-        <CardContent className="py-6">
-          <div className="flex items-center gap-3 text-green-700">
-            <CheckCircle className="h-6 w-6" />
-            <div>
-              <p className="font-medium">All tasks completed!</p>
-              <p className="text-sm text-green-600">
-                Your EPUB is fully remediated.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <Card className="border-blue-200 bg-blue-50">
       <CardHeader>
@@ -130,10 +137,19 @@ export const ReAuditSection: React.FC<ReAuditSectionProps> = ({
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-gray-600">
-          After fixing the{" "}
-          <span className="font-medium text-blue-700">{pendingCount}</span>{" "}
-          pending issues manually, upload the fixed EPUB to verify the issues
-          are resolved.
+          {pendingCount > 0 ? (
+            <>
+              After fixing the{" "}
+              <span className="font-medium text-blue-700">{pendingCount}</span>{" "}
+              pending issues manually, upload the fixed EPUB to verify the
+              issues are resolved.
+            </>
+          ) : (
+            <>
+              Upload the remediated EPUB to verify all fixes and check for any
+              new accessibility issues that may have been introduced.
+            </>
+          )}
         </p>
 
         <div

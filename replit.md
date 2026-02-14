@@ -87,3 +87,31 @@ The application features a clean, responsive design built with Tailwind CSS. It 
 - **React Router DOM**: For client-side routing.
 - **Lucide React**: Icon library for UI elements.
 - **DOMPurify**: Used for sanitizing HTML content to prevent XSS vulnerabilities.
+
+## Recent Changes (February 2026)
+
+### Quick Accept N/A Feature (AI-Suggested Not Applicable)
+New feature allowing AI-suggested "Not Applicable" status for WCAG criteria with one-click acceptance:
+- **NaSuggestion Type**: Added to `confidence.types.ts` with `suggestedStatus`, `confidence`, `rationale`, `detectionChecks`, and `edgeCases` fields.
+- **NaSuggestionBanner Component**: Blue banner displayed in CriterionDetailsModal when AI suggests N/A status. Features:
+  - Confidence badge (High ≥90% green, Medium 60-89% yellow, Low <60% red)
+  - Quick Accept button for high-confidence suggestions (≥90%)
+  - Expandable detection checks section showing what was analyzed
+  - Edge cases warnings section
+- **Verification Service**: New `submitNaVerification` method sends AI-suggested N/A status to backend with auto-generated notes.
+- **CriterionDetailsModal Integration**: Banner appears at top of Overview tab; `onStatusChange` callback notifies parent when status changes.
+
+### ACR Post-Remediation Integration Complete
+The ACR AI Analysis step now correctly displays remediated data from the backend after EPUB remediation. Verified integration includes:
+- **Confidence Scores**: Backend returns deterministic scores (80-95%) based on remediation status. Frontend handles both `confidence` and `confidenceScore` field names.
+- **Verification Status**: `needsVerification: false` for fully remediated criteria (where `remainingIssues: 0`).
+- **Remediation Summary**: `remediationSummary` object with `totalIssues`, `fixedIssues`, `remainingIssues` counts.
+- **Remediated Issues Details**: Frontend handles both `remediatedIssues` and `fixedIssues` field names from backend. Includes `ruleId`, `impact`, `message`, `status`.
+- **Other Issues (Non-WCAG)**: Each issue now includes `status` field (`pending`, `fixed`, `failed`, `skipped`). Fixed issues show green background with "Fixed" badge and `remediationInfo.description`.
+
+### Previous ACR Enhancements
+- **Remediated Issues Bug Fix**: Fixed display of remediated issues in ACR AI Analysis step. Green badges now correctly appear on criteria rows that have fixed issues. Filter conditions updated to recognize both 'REMEDIATED' and 'completed' status formats.
+- **Other Issues (Non-WCAG) Status**: Enhanced to show fixed issues in green with "Fixed" badge, remediation details, and pending/fixed summary counts. Type definitions updated in `api.ts` and `ConfidenceDashboard.tsx`.
+- **Confidence Score Enhancement**: Frontend now provides minimum confidence boost (85%) for fully remediated criteria if backend returns 0. "Needs Verification" count excludes fully remediated criteria.
+- **Remediated Summary Card**: New dashboard card shows count of criteria with fixed issues when remediation has occurred.
+- **Backend API Specification**: Comprehensive spec created at `docs/BACKEND_ACR_REMEDIATION_SPEC.md` documenting required backend updates for confidence scores, verification status, and detailed remediation info (including alt-text values).

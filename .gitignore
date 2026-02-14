@@ -1,3 +1,10 @@
+# Claude Code
+.claude/
+!.claude/settings.json
+!.claude/bin/
+!.claude/hooks/
+.claude/.enable-status
+
 # Logs
 logs
 *.log
@@ -155,3 +162,8 @@ FE-PDF-*.txt
 prompts/
 FE-PDF-*.txt
 
+
+# Local temporary files
+IMPLEMENTATION_SUMMARY.md
+
+# Claude Code audit logs (now covered by .claude/ ignore above)

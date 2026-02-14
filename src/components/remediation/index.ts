@@ -16,3 +16,5 @@ export { RemediationTaskCard } from './RemediationTaskCard';
 export { RemediationSessionView } from './RemediationSessionView';
 export { BatchQuickFixPanel } from './BatchQuickFixPanel';
 export { IssueCard, AutoFixSummary } from './IssueCard';
+export { AuditCoverageDisplay } from './AuditCoverageDisplay';
+export { IssuesList } from './IssuesList';

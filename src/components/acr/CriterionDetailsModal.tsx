@@ -7,17 +7,33 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '@/services/api';
 import { cn } from '@/lib/utils';
 import { wcagDocumentationService } from '@/services/wcag-documentation.service';
-import type { CriterionConfidence } from '@/services/api';
-import type { IssueMapping, RemediatedIssue } from '@/types/confidence.types';
+import { verificationService } from '@/services/verification.service';
+import { NaSuggestionBanner } from './NaSuggestionBanner';
+import type { CriterionConfidence, CriterionCheck } from '@/services/api';
+import type { IssueMapping, RemediatedIssue, NaSuggestion, CriterionConfidenceWithIssues } from '@/types/confidence.types';
+
+function isFixedStatus(issue: RemediatedIssue): boolean {
+  const status = issue.remediationInfo?.status ?? issue.status;
+  return status === 'REMEDIATED' || status === 'completed' || status === 'remediated';
+}
+
+function isFailedStatus(issue: RemediatedIssue): boolean {
+  return issue.remediationInfo?.status === 'FAILED';
+}
+
+function isSkippedStatus(issue: RemediatedIssue): boolean {
+  return issue.remediationInfo?.status === 'SKIPPED';
+}
 
 interface CriterionDetailsModalProps {
-  criterion: CriterionConfidence;
+  criterion: CriterionConfidence | CriterionConfidenceWithIssues;
   relatedIssues?: IssueMapping[];
   remediatedIssues?: RemediatedIssue[];
   jobId?: string;
   isOpen: boolean;
   onClose: () => void;
   onVerifyClick?: (criterionId: string) => void;
+  onStatusChange?: (criterionId: string, newStatus: string) => void;
   mode?: 'preview' | 'interactive';
 }
 
@@ -29,11 +45,28 @@ export function CriterionDetailsModal({
   isOpen,
   onClose,
   onVerifyClick,
+  onStatusChange,
   mode = 'interactive'
 }: CriterionDetailsModalProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'issues' | 'testing' | 'remediation' | 'wcag'>('overview');
   const [epubTitle, setEpubTitle] = useState<string>('');
   const [hasRemediationData, setHasRemediationData] = useState<boolean>(false);
+  const [naAccepted, setNaAccepted] = useState<boolean>(false);
+
+  const handleQuickAcceptNa = async (data: {
+    criterionId: string;
+    jobId: string;
+    status: 'not_applicable';
+    method: 'quick_accept';
+    notes: string;
+  }) => {
+    await verificationService.submitNaVerification(data);
+  };
+
+  const handleNaAcceptSuccess = () => {
+    setNaAccepted(true);
+    onStatusChange?.(criterion.criterionId, 'not_applicable');
+  };
   const navigate = useNavigate();
   const wcagDocs = wcagDocumentationService.getDocumentation(criterion.criterionId);
 
@@ -49,8 +82,6 @@ export function CriterionDetailsModal({
         // Check if the job has remediation data (remediated file exists)
         const hasRemediated = Boolean(job.remediatedFile);
         setHasRemediationData(hasRemediated);
-
-        console.log('[CriterionDetailsModal] Has remediation:', hasRemediated);
       } catch (error) {
         console.error('Failed to fetch job data:', error);
       }
@@ -128,12 +159,8 @@ export function CriterionDetailsModal({
               Issues
               {(() => {
                 const pendingCount = relatedIssues?.length || 0;
-                const fixedCount = remediatedIssues?.filter(
-                  i => i.remediationInfo?.status === 'REMEDIATED' || !i.remediationInfo?.status
-                ).length || 0;
-                const failedCount = remediatedIssues?.filter(
-                  i => i.remediationInfo?.status === 'FAILED'
-                ).length || 0;
+                const fixedCount = remediatedIssues?.filter(isFixedStatus).length || 0;
+                const failedCount = remediatedIssues?.filter(isFailedStatus).length || 0;
                 
                 if (pendingCount === 0 && fixedCount === 0 && failedCount === 0) return null;
                 
@@ -174,6 +201,27 @@ export function CriterionDetailsModal({
 
           <div className="flex-1 overflow-y-auto mt-4">
             <TabsContent value="overview" className="space-y-4 mt-0">
+              {criterion.naSuggestion?.suggestedStatus === 'not_applicable' && jobId && !naAccepted && (
+                <NaSuggestionBanner
+                  naSuggestion={criterion.naSuggestion as NaSuggestion}
+                  criterionId={criterion.criterionId}
+                  jobId={jobId}
+                  onQuickAccept={handleQuickAcceptNa}
+                  onAcceptSuccess={handleNaAcceptSuccess}
+                />
+              )}
+
+              {naAccepted && (
+                <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-4 rounded-r-lg">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <span className="text-green-800 font-medium">
+                      Not Applicable status accepted and saved
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div className="bg-white border rounded-lg p-4">
                 <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                   {criterion.status === 'pass' ? (
@@ -242,11 +290,11 @@ export function CriterionDetailsModal({
                 </>
               )}
 
-              {criterion.automatedChecks && criterion.automatedChecks.length > 0 && (
+              {'automatedChecks' in criterion && criterion.automatedChecks && criterion.automatedChecks.length > 0 && (
                 <div className="border rounded-lg p-4">
                   <h3 className="font-semibold text-gray-900 mb-3">Automated Checks</h3>
                   <ul className="space-y-2">
-                    {criterion.automatedChecks.map((check) => (
+                    {criterion.automatedChecks.map((check: CriterionCheck) => (
                       <li key={check.id} className="flex items-start gap-2 text-sm">
                         {check.passed ? (
                           <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
@@ -279,12 +327,8 @@ export function CriterionDetailsModal({
               {/* Summary Banner - Only show if there are actual issues */}
               {(() => {
                 const pendingCount = relatedIssues?.length || 0;
-                const fixedCount = remediatedIssues?.filter(
-                  i => i.remediationInfo?.status === 'REMEDIATED' || !i.remediationInfo?.status
-                ).length || 0;
-                const failedCount = remediatedIssues?.filter(
-                  i => i.remediationInfo?.status === 'FAILED'
-                ).length || 0;
+                const fixedCount = remediatedIssues?.filter(isFixedStatus).length || 0;
+                const failedCount = remediatedIssues?.filter(isFailedStatus).length || 0;
                 const totalIssueCount = pendingCount + fixedCount + failedCount;
                 
                 if (totalIssueCount === 0) return null;
@@ -376,15 +420,9 @@ export function CriterionDetailsModal({
               {(() => {
                 if (!remediatedIssues || remediatedIssues.length === 0) return null;
                 
-                const fixedIssues = remediatedIssues.filter(
-                  i => i.remediationInfo?.status === 'REMEDIATED' || !i.remediationInfo?.status
-                );
-                const failedIssues = remediatedIssues.filter(
-                  i => i.remediationInfo?.status === 'FAILED'
-                );
-                const skippedIssues = remediatedIssues.filter(
-                  i => i.remediationInfo?.status === 'SKIPPED'
-                );
+                const fixedIssues = remediatedIssues.filter(isFixedStatus);
+                const failedIssues = remediatedIssues.filter(isFailedStatus);
+                const skippedIssues = remediatedIssues.filter(isSkippedStatus);
 
                 const formatDate = (dateStr?: string) => {
                   if (!dateStr) return 'Date unknown';
@@ -642,11 +680,11 @@ export function CriterionDetailsModal({
                     )}
                   </div>
 
-                  {criterion.manualChecks && criterion.manualChecks.length > 0 && (
+                  {'manualChecks' in criterion && criterion.manualChecks && criterion.manualChecks.length > 0 && (
                     <div className="border border-orange-200 bg-orange-50 rounded-lg p-4">
                       <h3 className="font-semibold text-orange-900 mb-3">Manual Checks Needed</h3>
                       <ul className="space-y-2">
-                        {criterion.manualChecks.map((check, idx) => (
+                        {criterion.manualChecks.map((check: string, idx: number) => (
                           <li key={idx} className="flex items-start gap-2 text-sm text-orange-800">
                             <span className="text-orange-500 mt-0.5">•</span>
                             {check}

@@ -39,7 +39,7 @@ export function EditorialLayout() {
           </NavLink>
         </div>
         
-        <nav className="flex flex-wrap gap-1 mt-4 -mb-px" role="tablist" aria-label="Editorial Services Navigation">
+        <nav className="flex flex-wrap gap-1 mt-4 -mb-px" aria-label="Editorial Services Navigation">
           {EDITORIAL_TABS.map((tab) => {
             const Icon = tab.icon;
             return (
@@ -47,7 +47,6 @@ export function EditorialLayout() {
                 key={tab.path}
                 to={tab.path}
                 end={tab.end}
-                role="tab"
                 className={({ isActive }) =>
                   `inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
                     isActive

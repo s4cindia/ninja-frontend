@@ -3,14 +3,15 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0 --port 5000",
+    "dev": "vite --host 0.0.0.0",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "type-check": "tsc --noEmit",
     "generate-wcag": "tsx scripts/generate-wcag-data.ts",
     "test": "vitest run",
-    "test:watch": "vitest --watch"
+    "test:watch": "vitest --watch",
+    "status": "bash .claude/bin/ninja-status.sh"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.8.0",
@@ -31,6 +32,9 @@
     "react-window": "^2.2.5",
     "tailwind-merge": "^3.4.0",
     "zustand": "^4.4.0"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-win32-x64-msvc": "^4.57.1"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

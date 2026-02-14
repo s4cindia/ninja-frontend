@@ -6,12 +6,13 @@ import { Spinner } from '@/components/ui/Spinner';
 import { VerificationItem } from './VerificationItem';
 import { CriterionDetailsModal } from './CriterionDetailsModal';
 import { useVerificationQueue, useSubmitVerification, useBulkVerification } from '@/hooks/useVerification';
-import { CONFIDENCE_THRESHOLD_HIGH, CONFIDENCE_THRESHOLDS } from '@/constants/verification';
+import { CONFIDENCE_THRESHOLD_HIGH, CONFIDENCE_THRESHOLDS, NA_QUICK_ACCEPT_THRESHOLD } from '@/constants/verification';
 import { MOCK_VERIFICATION_ITEMS } from '@/constants/mockVerificationData';
 import type { CriterionConfidence } from '@/services/api';
-import type { 
+import type { CriterionConfidenceWithIssues, IssueLocation } from '@/types/confidence.types';
+import type {
   VerificationItem as VerificationItemType,
-  VerificationStatus, 
+  VerificationStatus,
   VerificationMethod,
   Severity,
   ConfidenceLevel,
@@ -33,10 +34,10 @@ interface VerificationQueueProps {
   onComplete: (verified: boolean) => void;
   savedVerifications?: { [itemId: string]: SavedVerification };
   onVerificationUpdate?: (itemId: string, status: string, method: string, notes: string) => void;
-  criteriaFromAnalysis?: CriterionConfidence[];
+  criteriaFromAnalysis?: (CriterionConfidence | CriterionConfidenceWithIssues)[];
 }
 
-function needsHumanVerification(c: CriterionConfidence): boolean {
+function needsHumanVerification(c: CriterionConfidence | CriterionConfidenceWithIssues): boolean {
   if (c.needsVerification === true) return true;
   if (c.needsVerification === false) return false;
   if (c.status === 'not_applicable') return false;
@@ -45,13 +46,14 @@ function needsHumanVerification(c: CriterionConfidence): boolean {
 }
 
 function convertCriteriaToVerificationItems(
-  criteria: CriterionConfidence[],
+  criteria: (CriterionConfidence | CriterionConfidenceWithIssues)[],
   savedVerifications?: { [itemId: string]: SavedVerification }
 ): VerificationItemType[] {
   const filtered = criteria.filter(needsHumanVerification);
-  
+
   return filtered.map((c, index) => {
-      const saved = savedVerifications?.[c.id];
+      const itemId = 'id' in c ? c.id : c.criterionId;
+      const saved = savedVerifications?.[itemId];
       const score = typeof c.confidenceScore === 'number' ? c.confidenceScore : 0;
       
       const confidenceLevel: ConfidenceLevel = 
@@ -69,19 +71,28 @@ function convertCriteriaToVerificationItems(
         c.status === 'fail' ? 'fail' :
         c.status === 'not_tested' ? 'not_tested' : 'warning';
 
-      const issues: VerificationIssue[] | undefined = c.relatedIssues?.map((issue) => ({
-        id: issue.issueId,
-        issueId: issue.issueId,
-        ruleId: issue.ruleId,
-        impact: issue.impact,
-        message: issue.message,
-        severity: issue.impact as Severity | undefined,
-        location: issue.location,
-        filePath: issue.filePath,
-        html: issue.htmlSnippet,
-        htmlSnippet: issue.htmlSnippet,
-        suggestedFix: issue.suggestedFix,
-      }));
+      const issues: VerificationIssue[] | undefined = c.relatedIssues?.map((issue) => {
+        // Handle location: could be string or IssueLocation object
+        const locationStr = typeof issue.location === 'string'
+          ? issue.location
+          : issue.location
+            ? `Line ${(issue.location as IssueLocation).startLine || ''}, Column ${(issue.location as IssueLocation).startColumn || ''}`.trim()
+            : undefined;
+
+        return {
+          id: issue.issueId,
+          issueId: issue.issueId,
+          ruleId: issue.ruleId,
+          impact: issue.impact,
+          message: issue.message,
+          severity: issue.impact as Severity | undefined,
+          location: locationStr,
+          filePath: issue.filePath,
+          html: issue.htmlSnippet,
+          htmlSnippet: issue.htmlSnippet,
+          suggestedFix: 'suggestedFix' in issue ? issue.suggestedFix : undefined,
+        };
+      });
 
       const fixedIssues: FixedVerificationIssue[] | undefined = c.fixedIssues?.map((issue) => ({
         id: issue.issueId,
@@ -90,13 +101,13 @@ function convertCriteriaToVerificationItems(
         impact: issue.impact,
         message: issue.message,
         severity: issue.impact as Severity | undefined,
-        location: issue.location,
+        location: 'location' in issue ? issue.location : undefined,
         filePath: issue.filePath,
-        html: issue.htmlSnippet,
-        htmlSnippet: issue.htmlSnippet,
-        suggestedFix: issue.suggestedFix,
-        fixedAt: issue.fixedAt,
-        fixMethod: issue.fixMethod,
+        html: 'htmlSnippet' in issue ? issue.htmlSnippet : undefined,
+        htmlSnippet: 'htmlSnippet' in issue ? issue.htmlSnippet : undefined,
+        suggestedFix: 'suggestedFix' in issue ? issue.suggestedFix : undefined,
+        fixedAt: 'fixedAt' in issue ? issue.fixedAt : undefined,
+        fixMethod: 'fixMethod' in issue ? issue.fixMethod : undefined,
       }));
 
       const remainingCount = c.remainingCount ?? issues?.length ?? 0;
@@ -118,7 +129,7 @@ function convertCriteriaToVerificationItems(
       }
 
       const baseItem: VerificationItemType = {
-        id: c.id || `criterion-${index}`,
+        id: itemId || `criterion-${index}`,
         criterionId: c.criterionId || `Unknown-${index}`,
         criterionName: c.name || 'Unknown Criterion',
         wcagLevel: c.level || 'A',
@@ -133,6 +144,7 @@ function convertCriteriaToVerificationItems(
         fixedIssues: fixedIssues && fixedIssues.length > 0 ? fixedIssues : undefined,
         fixedCount,
         remainingCount,
+        naSuggestion: c.naSuggestion && 'criterionId' in c.naSuggestion ? c.naSuggestion : undefined,
       };
 
       if (saved) {
@@ -140,7 +152,7 @@ function convertCriteriaToVerificationItems(
           ...baseItem,
           status: saved.status as VerificationStatus,
           history: [{
-            id: `h-saved-${c.id}`,
+            id: `h-saved-${itemId}`,
             status: saved.status as VerificationStatus,
             method: saved.method as VerificationMethod,
             notes: saved.notes,
@@ -195,7 +207,7 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
   const [bulkStatus, setBulkStatus] = useState<VerificationStatus>('verified_pass');
   const [bulkMethod, setBulkMethod] = useState<VerificationMethod>('Manual Review');
   const [bulkNotes, setBulkNotes] = useState('');
-  const [selectedCriterionForGuidance, setSelectedCriterionForGuidance] = useState<CriterionConfidence | null>(null);
+  const [selectedCriterionForGuidance, setSelectedCriterionForGuidance] = useState<CriterionConfidence | CriterionConfidenceWithIssues | null>(null);
   
   const hasCriteriaFromAnalysis = criteriaFromAnalysis && criteriaFromAnalysis.length > 0;
   
@@ -305,6 +317,15 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
   const bulkRequiresNotes = bulkStatus === 'verified_fail' || bulkStatus === 'verified_partial';
   const canBulkSubmit = selectedItems.size > 0 && (!bulkRequiresNotes || bulkNotes.trim().length > 0);
 
+  // Count high-confidence N/A suggestions among selected items
+  const selectedHighConfidenceNACount = useMemo(() => {
+    return items.filter(item =>
+      selectedItems.has(item.id) &&
+      item.naSuggestion?.suggestedStatus === 'not_applicable' &&
+      item.naSuggestion.confidence >= NA_QUICK_ACCEPT_THRESHOLD
+    ).length;
+  }, [items, selectedItems]);
+
   const filteredItems = useMemo(() => {
     if (!useMockData) return items;
     return items.filter((item) => {
@@ -339,10 +360,11 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
   const progressPercent = totalCount > 0 ? Math.round((verifiedCount / totalCount) * 100) : 0;
 
   const criteriaMap = useMemo(() => {
-    const map = new Map<string, CriterionConfidence>();
+    const map = new Map<string, CriterionConfidence | CriterionConfidenceWithIssues>();
     if (criteriaFromAnalysis) {
       criteriaFromAnalysis.forEach((c) => {
-        map.set(c.id, c);
+        const key = 'id' in c ? c.id : c.criterionId;
+        map.set(key, c);
       });
     }
     return map;
@@ -427,15 +449,15 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
 
   const handleBulkSubmit = async () => {
     if (!canBulkSubmit) return;
-    
+
     const itemIds = Array.from(selectedItems);
     // Update local items when using mock data OR when using criteria from analysis
     if (useMockData || useLocalItems || hasCriteriaFromAnalysis) {
-      setLocalItems(prev => prev.map(item => 
+      setLocalItems(prev => prev.map(item =>
         selectedItems.has(item.id)
-          ? { 
-              ...item, 
-              status: bulkStatus, 
+          ? {
+              ...item,
+              status: bulkStatus,
               history: [...item.history, {
                 id: `h-${Date.now()}-${item.id}`,
                 status: bulkStatus,
@@ -444,22 +466,81 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
                 verifiedBy: 'Current User',
                 verifiedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
               }]
-            } 
+            }
           : item
       ));
       itemIds.forEach(itemId => {
         onVerificationUpdate?.(itemId, bulkStatus, bulkMethod, bulkNotes);
       });
     } else {
-      await bulkMutation.mutateAsync({ 
-        itemIds, 
-        status: bulkStatus, 
-        method: bulkMethod, 
-        notes: bulkNotes 
+      await bulkMutation.mutateAsync({
+        itemIds,
+        status: bulkStatus,
+        method: bulkMethod,
+        notes: bulkNotes
       });
     }
     setSelectedItems(new Set());
     setBulkNotes('');
+  };
+
+  const handleBulkAcceptNA = async () => {
+    const highConfidenceNAItems = items.filter(item =>
+      selectedItems.has(item.id) &&
+      item.naSuggestion?.suggestedStatus === 'not_applicable' &&
+      item.naSuggestion.confidence >= NA_QUICK_ACCEPT_THRESHOLD
+    );
+
+    if (highConfidenceNAItems.length === 0) return;
+
+    // Update local items when using mock data OR when using criteria from analysis
+    if (useMockData || useLocalItems || hasCriteriaFromAnalysis) {
+      setLocalItems(prev => prev.map(item => {
+        const suggestion = item.naSuggestion;
+        if (selectedItems.has(item.id) && suggestion?.suggestedStatus === 'not_applicable' && suggestion.confidence >= NA_QUICK_ACCEPT_THRESHOLD) {
+          const naNote = `AI-suggested Not Applicable (${suggestion.confidence}% confidence): ${suggestion.rationale}`;
+          return {
+            ...item,
+            status: 'verified_pass' as VerificationStatus,
+            history: [...item.history, {
+              id: `h-${Date.now()}-${item.id}`,
+              status: 'verified_pass' as VerificationStatus,
+              method: 'Manual Review' as VerificationMethod,
+              notes: naNote,
+              verifiedBy: 'Current User',
+              verifiedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+            }]
+          };
+        }
+        return item;
+      }));
+      highConfidenceNAItems.forEach(item => {
+        const naNote = `AI-suggested Not Applicable (${item.naSuggestion?.confidence}% confidence): ${item.naSuggestion?.rationale}`;
+        onVerificationUpdate?.(item.id, 'verified_pass', 'Manual Review', naNote);
+      });
+    } else {
+      // For API-based flow, submit all with proper error handling
+      const results = await Promise.allSettled(
+        highConfidenceNAItems.map(item => {
+          const naNote = `AI-suggested Not Applicable (${item.naSuggestion?.confidence}% confidence): ${item.naSuggestion?.rationale}`;
+          return submitMutation.mutateAsync({
+            itemId: item.id,
+            status: 'verified_pass',
+            method: 'Manual Review',
+            notes: naNote
+          });
+        })
+      );
+
+      const succeeded = results.filter(r => r.status === 'fulfilled').length;
+      const failed = results.filter(r => r.status === 'rejected').length;
+
+      if (failed > 0) {
+        console.warn(`[Bulk N/A Accept] ${succeeded} succeeded, ${failed} failed out of ${highConfidenceNAItems.length} items`);
+        // TODO: Show toast notification with success/failure counts
+      }
+    }
+    setSelectedItems(new Set());
   };
 
   const toggleFilter = <T extends string>(
@@ -640,10 +721,28 @@ export function VerificationQueue({ jobId, fileName, onComplete, savedVerificati
                   <CheckSquare className="h-4 w-4" />
                   Apply to Selected
                 </Button>
+                {selectedHighConfidenceNACount > 0 && (
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={handleBulkAcceptNA}
+                    disabled={isSubmitting}
+                    isLoading={isSubmitting}
+                    className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    <CheckSquare className="h-4 w-4" />
+                    Quick Accept {selectedHighConfidenceNACount} N/A
+                  </Button>
+                )}
               </div>
             </div>
             {bulkRequiresNotes && !bulkNotes.trim() && (
               <p className="text-xs text-red-600 mt-2">Notes are required for Fail status</p>
+            )}
+            {selectedHighConfidenceNACount > 0 && selectedHighConfidenceNACount < selectedItems.size && (
+              <p className="text-xs text-blue-700 mt-2 bg-blue-50 px-2 py-1 rounded">
+                {selectedHighConfidenceNACount} of {selectedItems.size} selected items have high-confidence (≥80%) N/A suggestions
+              </p>
             )}
           </div>
         )}
