@@ -46,12 +46,7 @@ export const PdfRemediationPlanPage: React.FC = () => {
   } | null>(null);
   const [quickFixModalState, setQuickFixModalState] = useState<{
     isOpen: boolean;
-    task: {
-      id: string;
-      issueId: string;
-      issueCode: string;
-      description: string;
-    } | null;
+    task: typeof quickFixTasks[0] | null;
   }>({
     isOpen: false,
     task: null,
@@ -230,12 +225,7 @@ export const PdfRemediationPlanPage: React.FC = () => {
   const handleOpenQuickFixModal = (task: typeof quickFixTasks[0]) => {
     setQuickFixModalState({
       isOpen: true,
-      task: {
-        id: task.id,
-        issueId: task.issueId,
-        issueCode: task.issueCode,
-        description: task.description,
-      },
+      task: task,
     });
   };
 
@@ -246,8 +236,8 @@ export const PdfRemediationPlanPage: React.FC = () => {
     });
   };
 
-  const handleQuickFixSuccess = (remediatedFileUrl: string) => {
-    console.log('Quick fix applied, remediated file:', remediatedFileUrl);
+  const handleQuickFixSuccess = () => {
+    console.log('Quick fix applied successfully');
     // Refetch the plan to update task statuses
     refetch();
   };
@@ -723,27 +713,15 @@ export const PdfRemediationPlanPage: React.FC = () => {
       </div>
 
       {/* Quick Fix Modal */}
-      {quickFixModalState.task && (() => {
-        const fixField = getFixField(quickFixModalState.task.issueCode);
-
-        // Only render modal if the issue has a supported fix field
-        if (!fixField) {
-          return null;
-        }
-
-        return (
-          <QuickFixModal
-            isOpen={quickFixModalState.isOpen}
-            onClose={handleCloseQuickFixModal}
-            jobId={jobId!}
-            issueId={quickFixModalState.task.issueId}
-            issueCode={quickFixModalState.task.issueCode}
-            issueDescription={quickFixModalState.task.description}
-            fixField={fixField}
-            onSuccess={handleQuickFixSuccess}
-          />
-        );
-      })()}
+      {quickFixModalState.task && (
+        <QuickFixModal
+          isOpen={quickFixModalState.isOpen}
+          onClose={handleCloseQuickFixModal}
+          jobId={jobId!}
+          task={quickFixModalState.task}
+          onSuccess={handleQuickFixSuccess}
+        />
+      )}
     </div>
   );
 };

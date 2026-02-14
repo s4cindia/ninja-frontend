@@ -147,3 +147,46 @@ export interface AutoRemediationResult {
   /** Error message if remediation failed */
   error?: string;
 }
+
+/**
+ * Preview of what will change before applying a quick fix
+ */
+export interface QuickFixPreview {
+  /** Current value of the field (null if empty) */
+  before: string;
+  /** Proposed new value */
+  after: string;
+  /** Field being modified */
+  field: string;
+}
+
+/**
+ * Request to apply a quick fix
+ */
+export interface QuickFixRequest {
+  /** Field to modify (language, title, metadata, creator) */
+  field: string;
+  /** New value for the field */
+  value: string;
+}
+
+/**
+ * Result of applying a quick fix
+ */
+export interface QuickFixResult {
+  /** Whether the fix was successful */
+  success: boolean;
+  /** Task ID that was updated */
+  taskId: string;
+  /** Details of the modification made */
+  modification: {
+    /** Description of what was changed */
+    description: string;
+    /** Previous value */
+    before: string;
+    /** New value */
+    after: string;
+  };
+  /** URL of the remediated PDF file */
+  remediatedFileUrl?: string;
+}
