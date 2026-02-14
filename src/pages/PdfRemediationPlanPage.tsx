@@ -163,7 +163,20 @@ export const PdfRemediationPlanPage: React.FC = () => {
       toast.success('PDF downloaded successfully', { id: toastId });
     } catch (error) {
       console.error('Download error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to download PDF';
+
+      // Extract error details from axios error
+      let errorMessage = 'Failed to download PDF';
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as { response?: { data?: { error?: { code?: string; message?: string } }; status?: number } };
+        if (axiosError.response?.data?.error) {
+          errorMessage = `${axiosError.response.data.error.code}: ${axiosError.response.data.error.message}`;
+        } else if (axiosError.response?.status) {
+          errorMessage = `Server error ${axiosError.response.status}`;
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
       toast.error(errorMessage, { id: toastId });
     }
   };
