@@ -167,9 +167,22 @@ export const PdfRemediationPlanPage: React.FC = () => {
       // Extract error details from axios error
       let errorMessage = 'Failed to download PDF';
       if (error && typeof error === 'object' && 'response' in error) {
-        const axiosError = error as { response?: { data?: { error?: { code?: string; message?: string } }; status?: number } };
-        if (axiosError.response?.data?.error) {
-          errorMessage = `${axiosError.response.data.error.code}: ${axiosError.response.data.error.message}`;
+        const axiosError = error as {
+          response?: {
+            data?: {
+              error?: { code?: string; message?: string };
+              message?: string;
+            };
+            status?: number;
+          }
+        };
+
+        const errorData = axiosError.response?.data?.error;
+        if (errorData) {
+          // Build message with available fields
+          const code = errorData.code;
+          const message = errorData.message || axiosError.response?.data?.message || 'Unknown error';
+          errorMessage = code ? `${code}: ${message}` : message;
         } else if (axiosError.response?.status) {
           errorMessage = `Server error ${axiosError.response.status}`;
         }
