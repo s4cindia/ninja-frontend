@@ -52,7 +52,7 @@ export function DownloadRemediatedButton({
     <Button
       onClick={handleDownload}
       disabled={!remediatedFileUrl || isDownloading}
-      variant="outline"
+      variant="primary"
       size="lg"
     >
       {isDownloading ? (

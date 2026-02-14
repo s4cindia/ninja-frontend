@@ -426,28 +426,18 @@ export const PdfRemediationPlanPage: React.FC = () => {
           </CardHeader>
           {expandedSections.has('auto') && (
             <CardContent>
-              {/* Success alert with download */}
+              {/* Success alert */}
               {autoFixResult?.success && (
                 <Alert variant="success" className="mb-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                    <div>
                       <p className="font-medium">Auto-remediation completed!</p>
                       <p className="text-sm mt-1">
                         Successfully fixed {autoFixResult.completedTasks} issue{autoFixResult.completedTasks === 1 ? '' : 's'}.
-                        Your remediated PDF is ready for download.
+                        Use the "Download Remediated PDF" button above to get your fixed PDF.
                       </p>
                     </div>
-                    {autoFixResult.fileUrl && (
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={handleDownloadRemediatedPDF}
-                        className="ml-4"
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Download PDF
-                      </Button>
-                    )}
                   </div>
                 </Alert>
               )}

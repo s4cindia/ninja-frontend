@@ -43,7 +43,7 @@ export function AutoFixButton({ jobId, autoFixableCount, onSuccess }: AutoFixBut
     <Button
       onClick={handleAutoFix}
       disabled={isLoading || isExecuting || autoFixableCount === 0}
-      variant="default"
+      variant="primary"
       size="lg"
     >
       {isExecuting ? (

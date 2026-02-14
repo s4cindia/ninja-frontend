@@ -68,7 +68,7 @@ export function ReauditButton({ jobId, onSuccess }: ReauditButtonProps) {
       <Button
         onClick={() => fileInputRef.current?.click()}
         disabled={isLoading || isUploading}
-        variant="outline"
+        variant="primary"
         size="lg"
       >
         {isUploading ? (
