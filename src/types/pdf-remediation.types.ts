@@ -190,3 +190,82 @@ export interface QuickFixResult {
   /** URL of the remediated PDF file */
   remediatedFileUrl?: string;
 }
+
+/**
+ * Result of re-auditing a remediated PDF
+ */
+export interface ReauditComparisonResult {
+  /** Whether the re-audit was successful */
+  success: boolean;
+  /** Job ID */
+  jobId: string;
+  /** Original audit ID */
+  originalAuditId: string;
+  /** New audit ID from re-audit */
+  reauditId: string;
+  /** File name */
+  fileName: string;
+  /** Issue comparison between original and re-audit */
+  comparison: IssueComparison;
+  /** Success metrics */
+  metrics: SuccessMetrics;
+  /** URL of the remediated PDF file */
+  remediatedFileUrl?: string;
+}
+
+/**
+ * Comparison of issues between original and re-audit
+ */
+export interface IssueComparison {
+  /** Issues that were successfully resolved */
+  resolved: Issue[];
+  /** Issues that still remain */
+  remaining: Issue[];
+  /** New issues introduced (regressions) */
+  regressions: Issue[];
+}
+
+/**
+ * Success metrics for remediation
+ */
+export interface SuccessMetrics {
+  /** Total issues in original audit */
+  totalOriginal: number;
+  /** Total issues in new audit */
+  totalNew: number;
+  /** Number of resolved issues */
+  resolvedCount: number;
+  /** Number of remaining issues */
+  remainingCount: number;
+  /** Number of regressions */
+  regressionCount: number;
+  /** Resolution rate (0-100) */
+  resolutionRate: number;
+  /** Critical issues resolved */
+  criticalResolved: number;
+  /** Critical issues remaining */
+  criticalRemaining: number;
+  /** Breakdown by severity */
+  severityBreakdown: {
+    critical: { resolved: number; remaining: number };
+    serious: { resolved: number; remaining: number };
+    moderate: { resolved: number; remaining: number };
+    minor: { resolved: number; remaining: number };
+  };
+}
+
+/**
+ * Accessibility issue
+ */
+interface Issue {
+  /** Issue code */
+  code: string;
+  /** Severity level */
+  severity: string;
+  /** Issue description */
+  message: string;
+  /** Page number */
+  page?: number;
+  /** Location details */
+  location?: string;
+}

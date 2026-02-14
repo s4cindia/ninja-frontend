@@ -28,6 +28,10 @@ import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { useRemediationPlan } from '@/hooks/usePdfRemediation';
 import { pdfRemediationService } from '@/services/pdf-remediation.service';
 import { QuickFixModal } from '@/components/pdf/QuickFixModal';
+import { AutoFixButton } from '@/components/pdf/AutoFixButton';
+import { ReauditButton } from '@/components/pdf/ReauditButton';
+import { ReauditComparison } from '@/components/pdf/ReauditComparison';
+import { DownloadRemediatedButton } from '@/components/pdf/DownloadRemediatedButton';
 // import { cn } from '@/utils/cn'; // Unused for now
 
 export const PdfRemediationPlanPage: React.FC = () => {
@@ -299,6 +303,35 @@ export const PdfRemediationPlanPage: React.FC = () => {
       />
 
       <div className="mt-6 space-y-6">
+        {/* Header with action buttons */}
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-bold">Remediation Plan</h1>
+          <div className="flex gap-3">
+            <AutoFixButton
+              jobId={jobId!}
+              autoFixableCount={plan.autoFixableCount}
+              onSuccess={refetch}
+            />
+            {(plan as typeof plan & { remediatedFileUrl?: string }).remediatedFileUrl && (
+              <>
+                <DownloadRemediatedButton
+                  jobId={jobId!}
+                  fileName={plan.fileName}
+                  remediatedFileUrl={(plan as typeof plan & { remediatedFileUrl?: string }).remediatedFileUrl}
+                />
+                <ReauditButton jobId={jobId!} onSuccess={refetch} />
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Re-audit comparison (if available) */}
+        {(plan as typeof plan & { reauditComparison?: any }).reauditComparison && (
+          <div className="mb-8">
+            <ReauditComparison comparison={(plan as typeof plan & { reauditComparison?: any }).reauditComparison} />
+          </div>
+        )}
+
         {/* Overview Card */}
         <Card>
           <CardHeader>

@@ -100,6 +100,20 @@ async function applyQuickFix(jobId: string, issueId: string, field: string, valu
   return response.data;
 }
 
+/**
+ * Re-audit a remediated PDF file
+ */
+async function reauditPdf(jobId: string, file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await api.post(`/pdf/${jobId}/remediation/re-audit`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+
+  return response.data;
+}
+
 export const pdfRemediationService = {
   createRemediationPlan,
   getRemediationPlan,
@@ -108,4 +122,5 @@ export const pdfRemediationService = {
   downloadRemediatedPdf,
   previewFix,
   applyQuickFix,
+  reauditPdf,
 };
