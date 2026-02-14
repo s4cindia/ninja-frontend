@@ -139,13 +139,32 @@ export const PdfRemediationPlanPage: React.FC = () => {
     }
   };
 
-  const handleDownloadRemediatedPDF = () => {
-    if (autoFixResult?.fileUrl) {
-      const newWindow = window.open(autoFixResult.fileUrl, '_blank', 'noopener,noreferrer');
-      // Set opener to null for older browsers to prevent tabnabbing
-      if (newWindow) {
-        newWindow.opener = null;
-      }
+  const handleDownloadRemediatedPDF = async () => {
+    if (!jobId) return;
+
+    const toastId = toast.loading('Downloading remediated PDF...');
+
+    try {
+      // Call API to get the PDF blob
+      const blob = await pdfRemediationService.downloadRemediatedPdf(jobId);
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = plan?.fileName?.replace('.pdf', '_remediated.pdf') || 'document_remediated.pdf';
+      document.body.appendChild(link);
+      link.click();
+
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success('PDF downloaded successfully', { id: toastId });
+    } catch (error) {
+      console.error('Download error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to download PDF';
+      toast.error(errorMessage, { id: toastId });
     }
   };
 

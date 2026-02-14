@@ -49,9 +49,20 @@ export async function executeAutoRemediation(jobId: string): Promise<AutoRemedia
   return response.data.data || response.data;
 }
 
+/**
+ * Download remediated PDF file
+ */
+export async function downloadRemediatedPdf(jobId: string): Promise<Blob> {
+  const response = await api.get(`/pdf/${jobId}/remediation/download`, {
+    responseType: 'blob',
+  });
+  return response.data;
+}
+
 export const pdfRemediationService = {
   createRemediationPlan,
   getRemediationPlan,
   updateTaskStatus,
   executeAutoRemediation,
+  downloadRemediatedPdf,
 };
