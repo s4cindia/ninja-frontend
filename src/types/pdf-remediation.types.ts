@@ -16,12 +16,16 @@ export interface RemediationPlan {
   totalIssues: number;
   /** Number of issues that can be automatically fixed */
   autoFixableCount: number;
+  /** Number of auto-fixable issues that have been completed */
+  completedAutoFixCount?: number;
   /** Number of issues requiring quick fixes (guided workflow) */
   quickFixCount: number;
   /** Number of issues requiring manual intervention */
   manualFixCount: number;
   /** List of remediation tasks */
   tasks: RemediationTask[];
+  /** URL to the remediated PDF file (if auto-fix has been run) */
+  remediatedFileUrl?: string;
   /** When the plan was created */
   createdAt: string;
 }

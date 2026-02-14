@@ -313,12 +313,12 @@ export const PdfRemediationPlanPage: React.FC = () => {
               autoFixableCount={plan.autoFixableCount}
               onSuccess={refetch}
             />
-            {(plan as typeof plan & { remediatedFileUrl?: string }).remediatedFileUrl && (
+            {plan.remediatedFileUrl && (
               <>
                 <DownloadRemediatedButton
                   jobId={jobId!}
                   fileName={plan.fileName}
-                  remediatedFileUrl={(plan as typeof plan & { remediatedFileUrl?: string }).remediatedFileUrl}
+                  remediatedFileUrl={plan.remediatedFileUrl}
                 />
                 <ReauditButton jobId={jobId!} onSuccess={refetch} />
               </>
@@ -354,9 +354,9 @@ export const PdfRemediationPlanPage: React.FC = () => {
                   <p className="text-sm text-green-900 mb-1">Auto-fixable</p>
                   <p className="text-2xl font-bold text-green-600">
                     {plan.autoFixableCount}
-                    {(plan as typeof plan & { completedAutoFixCount?: number }).completedAutoFixCount! > 0 && (
+                    {plan.completedAutoFixCount && plan.completedAutoFixCount > 0 && (
                       <span className="text-sm text-green-700 ml-2">
-                        ({(plan as typeof plan & { completedAutoFixCount?: number }).completedAutoFixCount} fixed)
+                        ({plan.completedAutoFixCount} fixed)
                       </span>
                     )}
                   </p>
@@ -383,9 +383,9 @@ export const PdfRemediationPlanPage: React.FC = () => {
                 <div>
                   <CardTitle className="text-green-900">
                     Auto-fixable Issues ({plan.autoFixableCount})
-                    {(plan as any).completedAutoFixCount > 0 && (
+                    {plan.completedAutoFixCount && plan.completedAutoFixCount > 0 && (
                       <span className="text-sm font-normal text-green-600 ml-2">
-                        ({(plan as any).completedAutoFixCount} completed)
+                        ({plan.completedAutoFixCount} completed)
                       </span>
                     )}
                   </CardTitle>
