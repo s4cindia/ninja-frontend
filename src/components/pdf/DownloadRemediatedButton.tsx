@@ -43,8 +43,14 @@ export function DownloadRemediatedButton({
       window.URL.revokeObjectURL(url);
 
       toast.success('Download started');
-    } catch (error: any) {
-      const errorMessage = error?.response?.data?.error?.message || error?.message || 'Failed to download file';
+    } catch (error) {
+      let errorMessage = 'Failed to download file';
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as { response?: { data?: { error?: { message?: string } } } };
+        errorMessage = axiosError.response?.data?.error?.message || errorMessage;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
       toast.error(errorMessage);
     } finally {
       setIsDownloading(false);

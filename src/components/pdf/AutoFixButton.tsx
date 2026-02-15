@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '../ui/Button';
-import { Loader2, Wand2, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, Wand2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { usePdfAutoRemediation } from '../../hooks/usePdfRemediation';
 

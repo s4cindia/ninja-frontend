@@ -263,7 +263,7 @@ export interface SuccessMetrics {
 /**
  * Accessibility issue
  */
-interface Issue {
+export interface Issue {
   /** Issue code */
   code: string;
   /** Severity level */

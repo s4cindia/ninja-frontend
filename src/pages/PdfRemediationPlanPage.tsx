@@ -17,8 +17,7 @@ import {
   CheckCircle2,
   AlertCircle,
   ChevronDown,
-  ChevronRight,
-  Download
+  ChevronRight
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
@@ -32,6 +31,7 @@ import { AutoFixButton } from '@/components/pdf/AutoFixButton';
 import { ReauditButton } from '@/components/pdf/ReauditButton';
 import { ReauditComparison } from '@/components/pdf/ReauditComparison';
 import { DownloadRemediatedButton } from '@/components/pdf/DownloadRemediatedButton';
+import type { RemediationTask, ReauditComparisonResult } from '@/types/pdf-remediation.types';
 // import { cn } from '@/utils/cn'; // Unused for now
 
 export const PdfRemediationPlanPage: React.FC = () => {
@@ -50,13 +50,13 @@ export const PdfRemediationPlanPage: React.FC = () => {
   } | null>(null);
   const [quickFixModalState, setQuickFixModalState] = useState<{
     isOpen: boolean;
-    task: typeof quickFixTasks[0] | null;
+    task: RemediationTask | null;
   }>({
     isOpen: false,
     task: null,
   });
   const [showAllManualIssueTypes, setShowAllManualIssueTypes] = useState(false);
-  const [reauditComparison, setReauditComparison] = useState<any>(null);
+  const [reauditComparison, setReauditComparison] = useState<ReauditComparisonResult | null>(null);
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => {
@@ -140,61 +140,6 @@ export const PdfRemediationPlanPage: React.FC = () => {
     }
   };
 
-  const handleDownloadRemediatedPDF = async () => {
-    if (!jobId) return;
-
-    const toastId = toast.loading('Downloading remediated PDF...');
-
-    try {
-      // Call API to get the PDF blob
-      const blob = await pdfRemediationService.downloadRemediatedPdf(jobId);
-
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = plan?.fileName?.replace('.pdf', '_remediated.pdf') || 'document_remediated.pdf';
-      document.body.appendChild(link);
-      link.click();
-
-      // Cleanup
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      toast.success('PDF downloaded successfully', { id: toastId });
-    } catch (error) {
-      console.error('Download error:', error);
-
-      // Extract error details from axios error
-      let errorMessage = 'Failed to download PDF';
-      if (error && typeof error === 'object' && 'response' in error) {
-        const axiosError = error as {
-          response?: {
-            data?: {
-              error?: { code?: string; message?: string };
-              message?: string;
-            };
-            status?: number;
-          }
-        };
-
-        const errorData = axiosError.response?.data?.error;
-        if (errorData) {
-          // Build message with available fields
-          const code = errorData.code;
-          const message = errorData.message || axiosError.response?.data?.message || 'Unknown error';
-          errorMessage = code ? `${code}: ${message}` : message;
-        } else if (axiosError.response?.status) {
-          errorMessage = `Server error ${axiosError.response.status}`;
-        }
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-
-      toast.error(errorMessage, { id: toastId });
-    }
-  };
-
   /**
    * Determine which field the quick-fix modal should show based on issue code
    * Returns null if the issue is not supported by the quick-fix API
@@ -228,7 +173,7 @@ export const PdfRemediationPlanPage: React.FC = () => {
     return null;
   };
 
-  const handleOpenQuickFixModal = (task: typeof quickFixTasks[0]) => {
+  const handleOpenQuickFixModal = (task: RemediationTask) => {
     setQuickFixModalState({
       isOpen: true,
       task: task,
@@ -294,6 +239,13 @@ export const PdfRemediationPlanPage: React.FC = () => {
   const quickFixTasks = plan.tasks.filter(t => t.type === 'QUICK_FIX');
   const manualTasks = plan.tasks.filter(t => t.type === 'MANUAL');
 
+  // Normalize counts to numbers to prevent string comparison issues
+  const autoFixableCount = Number(plan.autoFixableCount) || 0;
+  const quickFixCount = Number(plan.quickFixCount) || 0;
+  const manualFixCount = Number(plan.manualFixCount) || 0;
+  const completedAutoFixCount = Number(plan.completedAutoFixCount) || 0;
+  const completedQuickFixCount = Number(plan.completedQuickFixCount) || 0;
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <Breadcrumbs
@@ -311,7 +263,7 @@ export const PdfRemediationPlanPage: React.FC = () => {
           <div className="flex gap-3">
             <AutoFixButton
               jobId={jobId!}
-              autoFixableCount={plan.autoFixableCount}
+              autoFixableCount={autoFixableCount}
               onSuccess={refetch}
             />
             {plan.remediatedFileUrl && (
@@ -360,10 +312,10 @@ export const PdfRemediationPlanPage: React.FC = () => {
                 <div className="text-center p-4 bg-green-50 rounded-lg">
                   <p className="text-sm text-green-900 mb-1">Auto-fixable</p>
                   <p className="text-2xl font-bold text-green-600">
-                    {Number(plan.autoFixableCount) || 0}
-                    {plan.completedAutoFixCount != null && Number(plan.completedAutoFixCount) > 0 && (
+                    {autoFixableCount || 0}
+                    {completedAutoFixCount != null && completedAutoFixCount > 0 && (
                       <span className="text-sm text-green-700 ml-2">
-                        ({Number(plan.completedAutoFixCount)} fixed)
+                        ({completedAutoFixCount} fixed)
                       </span>
                     )}
                   </p>
@@ -371,17 +323,17 @@ export const PdfRemediationPlanPage: React.FC = () => {
                 <div className="text-center p-4 bg-blue-50 rounded-lg">
                   <p className="text-sm text-blue-900 mb-1">Quick-fix</p>
                   <p className="text-2xl font-bold text-blue-600">
-                    {Number(plan.quickFixCount) || 0}
-                    {plan.completedQuickFixCount != null && Number(plan.completedQuickFixCount) > 0 && (
+                    {quickFixCount || 0}
+                    {completedQuickFixCount != null && completedQuickFixCount > 0 && (
                       <span className="text-sm text-blue-700 ml-2">
-                        ({Number(plan.completedQuickFixCount)} fixed)
+                        ({completedQuickFixCount} fixed)
                       </span>
                     )}
                   </p>
                 </div>
                 <div className="text-center p-4 bg-orange-50 rounded-lg">
                   <p className="text-sm text-orange-900 mb-1">Manual</p>
-                  <p className="text-2xl font-bold text-orange-600">{Number(plan.manualFixCount) || 0}</p>
+                  <p className="text-2xl font-bold text-orange-600">{manualFixCount || 0}</p>
                 </div>
               </div>
             </div>
@@ -396,10 +348,10 @@ export const PdfRemediationPlanPage: React.FC = () => {
                 <Sparkles className="h-6 w-6 text-green-600" />
                 <div>
                   <CardTitle className="text-green-900">
-                    Auto-fixable Issues ({Number(plan.autoFixableCount) || 0})
-                    {plan.completedAutoFixCount != null && Number(plan.completedAutoFixCount) > 0 && (
+                    Auto-fixable Issues ({autoFixableCount || 0})
+                    {completedAutoFixCount != null && completedAutoFixCount > 0 && (
                       <span className="text-sm font-normal text-green-600 ml-2">
-                        ({Number(plan.completedAutoFixCount)} completed)
+                        ({completedAutoFixCount} completed)
                       </span>
                     )}
                   </CardTitle>
@@ -412,7 +364,7 @@ export const PdfRemediationPlanPage: React.FC = () => {
                 <Button
                   variant="primary"
                   size="sm"
-                  disabled={plan.autoFixableCount === 0 || isAutoFixing}
+                  disabled={autoFixableCount === 0 || isAutoFixing}
                   onClick={(e) => {
                     e.stopPropagation();
                     handleAutoFix();
@@ -511,7 +463,7 @@ export const PdfRemediationPlanPage: React.FC = () => {
                 <Zap className="h-6 w-6 text-blue-600" />
                 <div>
                   <CardTitle className="text-blue-900">
-                    Quick-fix Issues ({Number(plan.quickFixCount) || 0})
+                    Quick-fix Issues ({quickFixCount || 0})
                   </CardTitle>
                   <p className="text-sm text-blue-700 mt-1">
                     Require user input through guided workflow
@@ -529,7 +481,7 @@ export const PdfRemediationPlanPage: React.FC = () => {
                     <Button
                       variant="primary"
                       size="sm"
-                      disabled={!firstFixable || plan.quickFixCount === 0}
+                      disabled={!firstFixable || quickFixCount === 0}
                       onClick={(e) => {
                         e.stopPropagation();
                         if (firstFixable) {
@@ -639,7 +591,7 @@ export const PdfRemediationPlanPage: React.FC = () => {
                 <Wrench className="h-6 w-6 text-orange-600" />
                 <div>
                   <CardTitle className="text-orange-900">
-                    Manual Issues ({Number(plan.manualFixCount) || 0})
+                    Manual Issues ({manualFixCount || 0})
                   </CardTitle>
                   <p className="text-sm text-orange-700 mt-1">
                     Require manual intervention in PDF editor
@@ -760,7 +712,7 @@ export const PdfRemediationPlanPage: React.FC = () => {
             </Button>
             <Button
               variant="primary"
-              disabled={plan.autoFixableCount === 0 && plan.quickFixCount === 0}
+              disabled={autoFixableCount === 0 && quickFixCount === 0}
               onClick={() => {
                 // TODO: Start remediation workflow
                 alert('Remediation workflow will be implemented in next phase');

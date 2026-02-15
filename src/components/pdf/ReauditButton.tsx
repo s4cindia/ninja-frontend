@@ -1,12 +1,13 @@
 import { useRef, useState } from 'react';
 import { Button } from '../ui/Button';
-import { Upload, Loader2, CheckCircle } from 'lucide-react';
+import { Upload, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { usePdfReaudit } from '../../hooks/usePdfRemediation';
+import type { ReauditComparisonResult } from '../../types/pdf-remediation';
 
 interface ReauditButtonProps {
   jobId: string;
-  onSuccess?: (result: any) => void;
+  onSuccess?: (result: ReauditComparisonResult) => void;
 }
 
 export function ReauditButton({ jobId, onSuccess }: ReauditButtonProps) {

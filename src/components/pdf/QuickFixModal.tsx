@@ -50,18 +50,31 @@ export function QuickFixModal({ isOpen, onClose, jobId, task, onSuccess }: Quick
   const handlePreview = async () => {
     if (!value.trim()) return;
 
-    await previewFix(jobId, task.issueId, field, value);
-    setShowPreview(true);
+    try {
+      await previewFix(jobId, task.issueId, field, value);
+      setShowPreview(true);
+    } catch (error) {
+      console.error('Preview failed:', error);
+      // Error already handled by previewFix (shows toast)
+      // Don't advance modal state on error
+    }
   };
 
   const handleApply = async () => {
     if (!value.trim()) return;
 
-    const result = await applyQuickFix(jobId, task.issueId, field, value);
+    try {
+      const result = await applyQuickFix(jobId, task.issueId, field, value);
 
-    if (result.success) {
-      onSuccess?.();
-      onClose();
+      if (result.success) {
+        onSuccess?.();
+        onClose();
+      }
+      // If result.success is false, error toast already shown by applyQuickFix
+    } catch (error) {
+      console.error('Apply failed:', error);
+      // Error already handled by applyQuickFix (shows toast)
+      // Don't close modal on error
     }
   };
 
@@ -174,21 +187,33 @@ export function QuickFixModal({ isOpen, onClose, jobId, task, onSuccess }: Quick
 // Helper Functions
 
 function getFieldFromIssueCode(code: string): string {
-  const codeMap: Record<string, string> = {
-    'PDF-NO-LANGUAGE': 'language',
-    'MATTERHORN-11-001': 'language',
-    'PDF-NO-TITLE': 'title',
-    'WCAG-2.4.2': 'title',
-    'PDF-NO-METADATA': 'metadata',
-    'MATTERHORN-07-001': 'metadata',
-    'PDF-NO-CREATOR': 'creator',
-  };
-  return codeMap[code] || 'language';
+  // Normalize code to uppercase for case-insensitive matching
+  const normalizedCode = code?.toUpperCase() || '';
+
+  // Use substring matching to handle variations and avoid exact lookup brittleness
+  // This matches the strategy in PdfRemediationPlanPage.getFixField()
+  if (normalizedCode.includes('LANGUAGE') || normalizedCode === 'MATTERHORN-11-001') {
+    return 'language';
+  }
+  if (normalizedCode.includes('TITLE') || normalizedCode === 'MATTERHORN-01-003' || normalizedCode === 'WCAG-2.4.2') {
+    return 'title';
+  }
+  if (normalizedCode.includes('METADATA') || normalizedCode === 'MATTERHORN-07-001') {
+    return 'metadata';
+  }
+  if (normalizedCode.includes('CREATOR')) {
+    return 'creator';
+  }
+
+  // Default fallback
+  return 'language';
 }
 
 function shouldShowFieldSelector(code: string): boolean {
   // Only show field selector for generic metadata issues
-  return code === 'PDF-NO-METADATA' || code === 'MATTERHORN-07-001';
+  // Use normalized substring matching instead of exact equals
+  const normalizedCode = code?.toUpperCase() || '';
+  return normalizedCode.includes('METADATA') || normalizedCode === 'MATTERHORN-07-001';
 }
 
 function getFieldLabel(field: string): string {

@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { CheckCircle2, XCircle, AlertTriangle, TrendingUp } from 'lucide-react';
-import type { ReauditComparisonResult } from '../../types/pdf-remediation.types';
+import type { ReauditComparisonResult, Issue } from '../../types/pdf-remediation.types';
 
 interface ReauditComparisonProps {
   comparison: ReauditComparisonResult;
@@ -149,25 +149,34 @@ function MetricCard({ label, value, icon, variant }: {
 }
 
 function IssueRow({ issue, status }: {
-  issue: any;
+  issue: Issue;
   status: 'resolved' | 'remaining' | 'regression';
 }) {
   const statusConfig = {
-    resolved: { color: 'green', icon: CheckCircle2 },
-    remaining: { color: 'yellow', icon: AlertTriangle },
-    regression: { color: 'red', icon: XCircle },
+    resolved: { colorClass: 'text-green-600', icon: CheckCircle2 },
+    remaining: { colorClass: 'text-yellow-600', icon: AlertTriangle },
+    regression: { colorClass: 'text-red-600', icon: XCircle },
   };
 
   const config = statusConfig[status];
   const Icon = config.icon;
 
+  // Map severity to supported Badge variants
+  const getSeverityVariant = (severity: string): 'default' | 'success' | 'warning' | 'error' | 'info' => {
+    const normalizedSeverity = severity?.toUpperCase() || '';
+    if (normalizedSeverity === 'CRITICAL') return 'error';
+    if (normalizedSeverity === 'SERIOUS' || normalizedSeverity === 'HIGH') return 'warning';
+    if (normalizedSeverity === 'MODERATE' || normalizedSeverity === 'MEDIUM') return 'info';
+    return 'default';
+  };
+
   return (
     <div className="flex items-start gap-3 p-3 rounded-lg border bg-white">
-      <Icon className={`h-5 w-5 mt-0.5 text-${config.color}-600`} />
+      <Icon className={`h-5 w-5 mt-0.5 ${config.colorClass}`} />
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-1">
           <span className="font-medium">{issue.code}</span>
-          <Badge variant={issue.severity === 'CRITICAL' ? 'destructive' : 'secondary'}>
+          <Badge variant={getSeverityVariant(issue.severity)}>
             {issue.severity}
           </Badge>
         </div>
