@@ -25,9 +25,14 @@ export function DownloadRemediatedButton({
     try {
       setIsDownloading(true);
 
-      // Fetch the file
-      const response = await fetch(remediatedFileUrl);
-      if (!response.ok) throw new Error('Download failed');
+      // Use the backend API endpoint to download the file
+      const apiUrl = `/api/v1/pdf/${jobId}/remediation/download`;
+      const response = await fetch(apiUrl);
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error?.error?.message || 'Download failed');
+      }
 
       // Create blob and download
       const blob = await response.blob();
@@ -42,7 +47,8 @@ export function DownloadRemediatedButton({
 
       toast.success('Download started');
     } catch (error) {
-      toast.error('Failed to download file');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to download file';
+      toast.error(errorMessage);
     } finally {
       setIsDownloading(false);
     }
