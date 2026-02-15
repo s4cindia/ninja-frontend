@@ -4,6 +4,7 @@
  */
 
 import type { MouseEvent } from 'react';
+import DOMPurify from 'dompurify';
 import { Card } from '@/components/ui/Card';
 
 interface Citation {
@@ -221,7 +222,7 @@ export default function DocumentViewer({ fullText, fullHtml, citations, onCitati
         searchText = changeInfo.newText;
 
         // Show transition: old text struck through, arrow, new text
-        displayContent = `<span style="text-decoration: line-through; color: #9ca3af; font-size: 0.9em;">${escapedOld}</span><span style="color: #059669; font-weight: bold;"> → ${escapedNew}</span>`;
+        displayContent = `<span class="line-through text-gray-400 text-sm">${escapedOld}</span><span class="text-green-600 font-bold"> → ${escapedNew}</span>`;
 
         markTag = `<mark class="${bgColor} px-1 rounded ${hoverColor} transition-colors" title="${escapeHtml(refInfo)}">${displayContent}</mark>`;
 
@@ -241,7 +242,7 @@ export default function DocumentViewer({ fullText, fullHtml, citations, onCitati
 
         searchText = changeInfo?.oldText || citation.rawText;
         const escapedSearchText = escapeHtml(searchText);
-        displayContent = `<span style="text-decoration: line-through; color: #dc2626;">${escapedSearchText}</span> <span style="color: #dc2626; font-weight: bold;">⚠</span>`;
+        displayContent = `<span class="line-through text-red-600">${escapedSearchText}</span> <span class="text-red-600 font-bold">⚠</span>`;
 
         markTag = `<mark class="${bgColor} px-1 rounded ${hoverColor} transition-colors" title="${escapeHtml(refInfo)}">${displayContent}</mark>`;
         console.log(`[DocumentViewer] Orphaned citation detected: "${searchText}", changeType: ${changeInfo?.changeType}`);
@@ -252,7 +253,7 @@ export default function DocumentViewer({ fullText, fullHtml, citations, onCitati
         hoverColor = 'hover:bg-orange-300';
         refInfo = '⚠️ No matching reference found in reference list';
 
-        displayContent = `${escapeHtml(citation.rawText)} <span style="color: #ea580c; font-weight: bold;">⚠</span>`;
+        displayContent = `${escapeHtml(citation.rawText)} <span class="text-orange-600 font-bold">⚠</span>`;
 
         markTag = `<mark class="${bgColor} px-1 rounded ${hoverColor} transition-colors border border-orange-400" title="${escapeHtml(refInfo)}">${displayContent}</mark>`;
       }
@@ -351,7 +352,7 @@ export default function DocumentViewer({ fullText, fullHtml, citations, onCitati
 
         // Build mark tag for orphan
         const escapedOrphanText = escapeHtml(orphanText);
-        const orphanDisplay = `<span style="text-decoration: line-through; color: #dc2626;">${escapedOrphanText}</span> <span style="color: #dc2626; font-weight: bold;">⚠</span>`;
+        const orphanDisplay = `<span class="line-through text-red-600">${escapedOrphanText}</span> <span class="text-red-600 font-bold">⚠</span>`;
         const orphanMarkTag = `<mark class="bg-red-200 animate-pulse px-1 rounded hover:bg-red-300 transition-colors" title="Reference deleted - citation needs fixing">${orphanDisplay}</mark>`;
 
         // Try to find and replace in HTML
@@ -406,7 +407,9 @@ export default function DocumentViewer({ fullText, fullHtml, citations, onCitati
   });
 
   // Apply citation highlighting to HTML (preserves formatting)
-  const displayContent = highlightCitationsInHTML(contentToDisplay);
+  const highlightedContent = highlightCitationsInHTML(contentToDisplay);
+  // Sanitize HTML to prevent XSS attacks
+  const displayContent = DOMPurify.sanitize(highlightedContent, { USE_PROFILES: { html: true } });
 
   // Get orphaned citations from both the citations array and recentChanges
   const orphanedFromCitations = citations.filter(c => c.isOrphaned);

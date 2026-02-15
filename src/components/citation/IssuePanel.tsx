@@ -228,10 +228,13 @@ export function IssuePanel({ data, onHighlightCitation, onIssueClick, validation
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
 
   useEffect(() => {
+    // Update issues when validation or analysis results change
     if (validationIssues.length > 0) {
       setIssues(validationIssues);
+    } else {
+      setIssues(analysisIssues);
     }
-  }, [validationIssues]);
+  }, [validationIssues, analysisIssues]);
 
   const filteredIssues = useMemo(() => {
     if (filterTab === 'all') return issues;
@@ -328,19 +331,19 @@ export function IssuePanel({ data, onHighlightCitation, onIssueClick, validation
         </div>
 
         {summary && (
-          <div className="validation-summary" role="status" aria-label="Validation summary">
-            <span className="stat success">Matched: {summary.matched}/{summary.totalBodyCitations}</span>
+          <div className="flex flex-wrap gap-2 text-xs" role="status" aria-label="Validation summary">
+            <span className="px-2 py-1 rounded bg-green-100 text-green-700 font-medium">Matched: {summary.matched}/{summary.totalBodyCitations}</span>
             {summary.duplicates > 0 && (
-              <span className="stat error">Duplicates: {summary.duplicates}</span>
+              <span className="px-2 py-1 rounded bg-red-100 text-red-700 font-medium">Duplicates: {summary.duplicates}</span>
             )}
             {summary.orphanedCitations > 0 && (
-              <span className="stat error">Orphaned: {summary.orphanedCitations}</span>
+              <span className="px-2 py-1 rounded bg-red-100 text-red-700 font-medium">Orphaned: {summary.orphanedCitations}</span>
             )}
             {summary.uncitedReferences > 0 && (
-              <span className="stat warning">Uncited refs: {summary.uncitedReferences}</span>
+              <span className="px-2 py-1 rounded bg-yellow-100 text-yellow-700 font-medium">Uncited refs: {summary.uncitedReferences}</span>
             )}
             {summary.missingInSequence > 0 && (
-              <span className="stat error">Missing: {summary.missingInSequence}</span>
+              <span className="px-2 py-1 rounded bg-red-100 text-red-700 font-medium">Missing: {summary.missingInSequence}</span>
             )}
           </div>
         )}

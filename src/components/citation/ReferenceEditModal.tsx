@@ -3,11 +3,18 @@
  * Allows inline editing of citation references with change tracking
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Save, RotateCcw, History } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import type { CitationReference } from '@/types/citation-intel.types';
+
+interface ReferenceChange {
+  timestamp: string;
+  note?: string;
+  previousText: string;
+  newText: string;
+}
 
 interface ReferenceEditModalProps {
   reference: CitationReference;
@@ -29,6 +36,13 @@ export function ReferenceEditModal({
   const [editedText, setEditedText] = useState(reference.correctedText || reference.originalText);
   const [changeNote, setChangeNote] = useState('');
   const [showHistory, setShowHistory] = useState(false);
+
+  // Reset state when reference prop changes
+  useEffect(() => {
+    setEditedText(reference.correctedText || reference.originalText);
+    setChangeNote('');
+    setShowHistory(false);
+  }, [reference.id, reference.correctedText, reference.originalText]);
 
   const hasChanges = reference.correctedText && reference.correctedText !== reference.originalText;
   const isDirty = editedText !== (reference.correctedText || reference.originalText);
@@ -125,7 +139,7 @@ export function ReferenceEditModal({
 
               {showHistory && (
                 <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
-                  {(reference.changes as any[]).map((change, idx) => (
+                  {(reference.changes as ReferenceChange[]).map((change, idx) => (
                     <div key={idx} className="text-sm">
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-medium text-gray-900">

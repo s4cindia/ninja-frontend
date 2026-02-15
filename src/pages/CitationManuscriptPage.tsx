@@ -5,9 +5,10 @@
  * - Click reference → Highlight all instances
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, BookOpen, AlertCircle } from 'lucide-react';
+import DOMPurify from 'dompurify';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
@@ -19,6 +20,15 @@ export default function CitationManuscriptPage() {
   const { data, isLoading, error } = useManuscript(jobId);
 
   const manuscriptRef = useRef<HTMLDivElement>(null);
+
+  // Sanitize HTML content to prevent XSS
+  const sanitizedHtml = useMemo(() => {
+    if (!data?.highlightedHtml) return '';
+    return DOMPurify.sanitize(data.highlightedHtml, {
+      USE_PROFILES: { html: true },
+      ADD_ATTR: ['data-citation-number', 'data-citation-matched'],
+    });
+  }, [data?.highlightedHtml]);
 
   // Handle citation click - scroll to reference
   const handleCitationClick = (citationNumber: number) => {
@@ -64,7 +74,7 @@ export default function CitationManuscriptPage() {
 
   // Attach click handlers after HTML is rendered
   useEffect(() => {
-    if (!data?.highlightedHtml || !manuscriptRef.current) return;
+    if (!sanitizedHtml || !manuscriptRef.current) return;
 
     const manuscript = manuscriptRef.current;
 
@@ -93,7 +103,7 @@ export default function CitationManuscriptPage() {
         (el as HTMLElement).onclick = null;
       });
     };
-  }, [data?.highlightedHtml]);
+  }, [sanitizedHtml]);
 
   if (isLoading) {
     return (
@@ -163,7 +173,7 @@ export default function CitationManuscriptPage() {
           <div
             ref={manuscriptRef}
             className="prose prose-sm max-w-none citation-manuscript"
-            dangerouslySetInnerHTML={{ __html: data.highlightedHtml || '' }}
+            dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
             onClick={(e) => {
               // Allow normal link behavior
               const target = e.target as HTMLElement;

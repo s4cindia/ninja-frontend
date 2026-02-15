@@ -136,13 +136,20 @@ export function CitationWorkflowChecklist({
               !['completed', 'in_progress', 'error'].includes(step.status) && 'border-gray-200'
             )}
           >
-            <div 
+            <div
               className={cn(
                 'flex items-center gap-3 p-3',
                 step.expandable && 'cursor-pointer'
               )}
               onClick={() => step.expandable && toggleExpand(step.id)}
+              onKeyDown={(e) => {
+                if (step.expandable && (e.key === 'Enter' || e.key === ' ')) {
+                  e.preventDefault();
+                  toggleExpand(step.id);
+                }
+              }}
               role={step.expandable ? 'button' : undefined}
+              tabIndex={step.expandable ? 0 : undefined}
               aria-expanded={step.expandable ? expandedStep === step.id : undefined}
             >
               <span className="text-sm font-medium text-gray-400 w-5">
