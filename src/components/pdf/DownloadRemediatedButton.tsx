@@ -2,6 +2,7 @@ import { Button } from '../ui/Button';
 import { Download, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
+import { api } from '../../services/api';
 
 interface DownloadRemediatedButtonProps {
   jobId: string;
@@ -25,17 +26,13 @@ export function DownloadRemediatedButton({
     try {
       setIsDownloading(true);
 
-      // Use the backend API endpoint to download the file
-      const apiUrl = `/api/v1/pdf/${jobId}/remediation/download`;
-      const response = await fetch(apiUrl);
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error?.error?.message || 'Download failed');
-      }
+      // Use the backend API endpoint to download the file with authentication
+      const response = await api.get(`/pdf/${jobId}/remediation/download`, {
+        responseType: 'blob',
+      });
 
       // Create blob and download
-      const blob = await response.blob();
+      const blob = response.data;
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -46,8 +43,8 @@ export function DownloadRemediatedButton({
       window.URL.revokeObjectURL(url);
 
       toast.success('Download started');
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to download file';
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.error?.message || error?.message || 'Failed to download file';
       toast.error(errorMessage);
     } finally {
       setIsDownloading(false);
