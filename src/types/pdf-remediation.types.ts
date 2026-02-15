@@ -16,12 +16,18 @@ export interface RemediationPlan {
   totalIssues: number;
   /** Number of issues that can be automatically fixed */
   autoFixableCount: number;
+  /** Number of auto-fixable issues that have been completed */
+  completedAutoFixCount?: number;
   /** Number of issues requiring quick fixes (guided workflow) */
   quickFixCount: number;
+  /** Number of quick-fix issues that have been completed */
+  completedQuickFixCount?: number;
   /** Number of issues requiring manual intervention */
   manualFixCount: number;
   /** List of remediation tasks */
   tasks: RemediationTask[];
+  /** URL to the remediated PDF file (if auto-fix has been run) */
+  remediatedFileUrl?: string;
   /** When the plan was created */
   createdAt: string;
 }
@@ -146,4 +152,126 @@ export interface AutoRemediationResult {
   backupPath?: string;
   /** Error message if remediation failed */
   error?: string;
+}
+
+/**
+ * Preview of what will change before applying a quick fix
+ */
+export interface QuickFixPreview {
+  /** Current value of the field (null if empty) */
+  before: string;
+  /** Proposed new value */
+  after: string;
+  /** Field being modified */
+  field: string;
+}
+
+/**
+ * Request to apply a quick fix
+ */
+export interface QuickFixRequest {
+  /** Field to modify (language, title, metadata, creator) */
+  field: string;
+  /** New value for the field */
+  value: string;
+}
+
+/**
+ * Result of applying a quick fix
+ */
+export interface QuickFixResult {
+  /** Whether the fix was successful */
+  success: boolean;
+  /** Task ID that was updated */
+  taskId: string;
+  /** Details of the modification made */
+  modification: {
+    /** Description of what was changed */
+    description: string;
+    /** Previous value */
+    before: string;
+    /** New value */
+    after: string;
+  };
+  /** URL of the remediated PDF file */
+  remediatedFileUrl?: string;
+}
+
+/**
+ * Result of re-auditing a remediated PDF
+ */
+export interface ReauditComparisonResult {
+  /** Whether the re-audit was successful */
+  success: boolean;
+  /** Job ID */
+  jobId: string;
+  /** Original audit ID */
+  originalAuditId: string;
+  /** New audit ID from re-audit */
+  reauditId: string;
+  /** File name */
+  fileName: string;
+  /** Issue comparison between original and re-audit */
+  comparison: IssueComparison;
+  /** Success metrics */
+  metrics: SuccessMetrics;
+  /** URL of the remediated PDF file */
+  remediatedFileUrl?: string;
+}
+
+/**
+ * Comparison of issues between original and re-audit
+ */
+export interface IssueComparison {
+  /** Issues that were successfully resolved */
+  resolved: Issue[];
+  /** Issues that still remain */
+  remaining: Issue[];
+  /** New issues introduced (regressions) */
+  regressions: Issue[];
+}
+
+/**
+ * Success metrics for remediation
+ */
+export interface SuccessMetrics {
+  /** Total issues in original audit */
+  totalOriginal: number;
+  /** Total issues in new audit */
+  totalNew: number;
+  /** Number of resolved issues */
+  resolvedCount: number;
+  /** Number of remaining issues */
+  remainingCount: number;
+  /** Number of regressions */
+  regressionCount: number;
+  /** Resolution rate (0-100) */
+  resolutionRate: number;
+  /** Critical issues resolved */
+  criticalResolved: number;
+  /** Critical issues remaining */
+  criticalRemaining: number;
+  /** Breakdown by severity */
+  severityBreakdown: {
+    critical: { resolved: number; remaining: number };
+    serious: { resolved: number; remaining: number };
+    moderate: { resolved: number; remaining: number };
+    minor: { resolved: number; remaining: number };
+  };
+}
+
+/**
+ * Accessibility issue
+ */
+export interface Issue {
+  /** Issue code */
+  code: string;
+  /** Severity level */
+  severity: string;
+  /** Issue description */
+  message: string;
+  /** Page number */
+  page?: number;
+  /** Location details */
+  location?: string;
 }

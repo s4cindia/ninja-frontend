@@ -17,8 +17,7 @@ import {
   CheckCircle2,
   AlertCircle,
   ChevronDown,
-  ChevronRight,
-  Download
+  ChevronRight
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
@@ -28,6 +27,11 @@ import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { useRemediationPlan } from '@/hooks/usePdfRemediation';
 import { pdfRemediationService } from '@/services/pdf-remediation.service';
 import { QuickFixModal } from '@/components/pdf/QuickFixModal';
+import { AutoFixButton } from '@/components/pdf/AutoFixButton';
+import { ReauditButton } from '@/components/pdf/ReauditButton';
+import { ReauditComparison } from '@/components/pdf/ReauditComparison';
+import { DownloadRemediatedButton } from '@/components/pdf/DownloadRemediatedButton';
+import type { RemediationTask, ReauditComparisonResult } from '@/types/pdf-remediation.types';
 // import { cn } from '@/utils/cn'; // Unused for now
 
 export const PdfRemediationPlanPage: React.FC = () => {
@@ -46,16 +50,13 @@ export const PdfRemediationPlanPage: React.FC = () => {
   } | null>(null);
   const [quickFixModalState, setQuickFixModalState] = useState<{
     isOpen: boolean;
-    task: {
-      id: string;
-      issueId: string;
-      issueCode: string;
-      description: string;
-    } | null;
+    task: RemediationTask | null;
   }>({
     isOpen: false,
     task: null,
   });
+  const [showAllManualIssueTypes, setShowAllManualIssueTypes] = useState(false);
+  const [reauditComparison, setReauditComparison] = useState<ReauditComparisonResult | null>(null);
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => {
@@ -139,61 +140,6 @@ export const PdfRemediationPlanPage: React.FC = () => {
     }
   };
 
-  const handleDownloadRemediatedPDF = async () => {
-    if (!jobId) return;
-
-    const toastId = toast.loading('Downloading remediated PDF...');
-
-    try {
-      // Call API to get the PDF blob
-      const blob = await pdfRemediationService.downloadRemediatedPdf(jobId);
-
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = plan?.fileName?.replace('.pdf', '_remediated.pdf') || 'document_remediated.pdf';
-      document.body.appendChild(link);
-      link.click();
-
-      // Cleanup
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      toast.success('PDF downloaded successfully', { id: toastId });
-    } catch (error) {
-      console.error('Download error:', error);
-
-      // Extract error details from axios error
-      let errorMessage = 'Failed to download PDF';
-      if (error && typeof error === 'object' && 'response' in error) {
-        const axiosError = error as {
-          response?: {
-            data?: {
-              error?: { code?: string; message?: string };
-              message?: string;
-            };
-            status?: number;
-          }
-        };
-
-        const errorData = axiosError.response?.data?.error;
-        if (errorData) {
-          // Build message with available fields
-          const code = errorData.code;
-          const message = errorData.message || axiosError.response?.data?.message || 'Unknown error';
-          errorMessage = code ? `${code}: ${message}` : message;
-        } else if (axiosError.response?.status) {
-          errorMessage = `Server error ${axiosError.response.status}`;
-        }
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-
-      toast.error(errorMessage, { id: toastId });
-    }
-  };
-
   /**
    * Determine which field the quick-fix modal should show based on issue code
    * Returns null if the issue is not supported by the quick-fix API
@@ -227,15 +173,10 @@ export const PdfRemediationPlanPage: React.FC = () => {
     return null;
   };
 
-  const handleOpenQuickFixModal = (task: typeof quickFixTasks[0]) => {
+  const handleOpenQuickFixModal = (task: RemediationTask) => {
     setQuickFixModalState({
       isOpen: true,
-      task: {
-        id: task.id,
-        issueId: task.issueId,
-        issueCode: task.issueCode,
-        description: task.description,
-      },
+      task: task,
     });
   };
 
@@ -246,8 +187,8 @@ export const PdfRemediationPlanPage: React.FC = () => {
     });
   };
 
-  const handleQuickFixSuccess = (remediatedFileUrl: string) => {
-    console.log('Quick fix applied, remediated file:', remediatedFileUrl);
+  const handleQuickFixSuccess = () => {
+    console.log('Quick fix applied successfully');
     // Refetch the plan to update task statuses
     refetch();
   };
@@ -298,6 +239,13 @@ export const PdfRemediationPlanPage: React.FC = () => {
   const quickFixTasks = plan.tasks.filter(t => t.type === 'QUICK_FIX');
   const manualTasks = plan.tasks.filter(t => t.type === 'MANUAL');
 
+  // Normalize counts to numbers to prevent string comparison issues
+  const autoFixableCount = Number(plan.autoFixableCount) || 0;
+  const quickFixCount = Number(plan.quickFixCount) || 0;
+  const manualFixCount = Number(plan.manualFixCount) || 0;
+  const completedAutoFixCount = Number(plan.completedAutoFixCount) || 0;
+  const completedQuickFixCount = Number(plan.completedQuickFixCount) || 0;
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <Breadcrumbs
@@ -309,6 +257,41 @@ export const PdfRemediationPlanPage: React.FC = () => {
       />
 
       <div className="mt-6 space-y-6">
+        {/* Header with action buttons */}
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-bold">Remediation Plan</h1>
+          <div className="flex gap-3">
+            <AutoFixButton
+              jobId={jobId!}
+              autoFixableCount={autoFixableCount}
+              onSuccess={refetch}
+            />
+            {plan.remediatedFileUrl && (
+              <>
+                <DownloadRemediatedButton
+                  jobId={jobId!}
+                  fileName={plan.fileName}
+                  remediatedFileUrl={plan.remediatedFileUrl}
+                />
+                <ReauditButton
+                  jobId={jobId!}
+                  onSuccess={(comparisonData) => {
+                    setReauditComparison(comparisonData);
+                    refetch();
+                  }}
+                />
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Re-audit comparison (if available) */}
+        {reauditComparison && (
+          <div className="mb-8">
+            <ReauditComparison comparison={reauditComparison} />
+          </div>
+        )}
+
         {/* Overview Card */}
         <Card>
           <CardHeader>
@@ -329,21 +312,28 @@ export const PdfRemediationPlanPage: React.FC = () => {
                 <div className="text-center p-4 bg-green-50 rounded-lg">
                   <p className="text-sm text-green-900 mb-1">Auto-fixable</p>
                   <p className="text-2xl font-bold text-green-600">
-                    {plan.autoFixableCount}
-                    {(plan as typeof plan & { completedAutoFixCount?: number }).completedAutoFixCount! > 0 && (
+                    {autoFixableCount || 0}
+                    {completedAutoFixCount != null && completedAutoFixCount > 0 && (
                       <span className="text-sm text-green-700 ml-2">
-                        ({(plan as typeof plan & { completedAutoFixCount?: number }).completedAutoFixCount} fixed)
+                        ({completedAutoFixCount} fixed)
                       </span>
                     )}
                   </p>
                 </div>
                 <div className="text-center p-4 bg-blue-50 rounded-lg">
                   <p className="text-sm text-blue-900 mb-1">Quick-fix</p>
-                  <p className="text-2xl font-bold text-blue-600">{plan.quickFixCount}</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {quickFixCount || 0}
+                    {completedQuickFixCount != null && completedQuickFixCount > 0 && (
+                      <span className="text-sm text-blue-700 ml-2">
+                        ({completedQuickFixCount} fixed)
+                      </span>
+                    )}
+                  </p>
                 </div>
                 <div className="text-center p-4 bg-orange-50 rounded-lg">
                   <p className="text-sm text-orange-900 mb-1">Manual</p>
-                  <p className="text-2xl font-bold text-orange-600">{plan.manualFixCount}</p>
+                  <p className="text-2xl font-bold text-orange-600">{manualFixCount || 0}</p>
                 </div>
               </div>
             </div>
@@ -358,7 +348,12 @@ export const PdfRemediationPlanPage: React.FC = () => {
                 <Sparkles className="h-6 w-6 text-green-600" />
                 <div>
                   <CardTitle className="text-green-900">
-                    Auto-fixable Issues ({plan.autoFixableCount})
+                    Auto-fixable Issues ({autoFixableCount || 0})
+                    {completedAutoFixCount != null && completedAutoFixCount > 0 && (
+                      <span className="text-sm font-normal text-green-600 ml-2">
+                        ({completedAutoFixCount} completed)
+                      </span>
+                    )}
                   </CardTitle>
                   <p className="text-sm text-green-700 mt-1">
                     Can be fixed automatically without user input
@@ -369,7 +364,7 @@ export const PdfRemediationPlanPage: React.FC = () => {
                 <Button
                   variant="primary"
                   size="sm"
-                  disabled={plan.autoFixableCount === 0 || isAutoFixing}
+                  disabled={autoFixableCount === 0 || isAutoFixing}
                   onClick={(e) => {
                     e.stopPropagation();
                     handleAutoFix();
@@ -397,28 +392,18 @@ export const PdfRemediationPlanPage: React.FC = () => {
           </CardHeader>
           {expandedSections.has('auto') && (
             <CardContent>
-              {/* Success alert with download */}
+              {/* Success alert */}
               {autoFixResult?.success && (
                 <Alert variant="success" className="mb-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                    <div>
                       <p className="font-medium">Auto-remediation completed!</p>
                       <p className="text-sm mt-1">
                         Successfully fixed {autoFixResult.completedTasks} issue{autoFixResult.completedTasks === 1 ? '' : 's'}.
-                        Your remediated PDF is ready for download.
+                        Use the "Download Remediated PDF" button above to get your fixed PDF.
                       </p>
                     </div>
-                    {autoFixResult.fileUrl && (
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={handleDownloadRemediatedPDF}
-                        className="ml-4"
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Download PDF
-                      </Button>
-                    )}
                   </div>
                 </Alert>
               )}
@@ -478,7 +463,7 @@ export const PdfRemediationPlanPage: React.FC = () => {
                 <Zap className="h-6 w-6 text-blue-600" />
                 <div>
                   <CardTitle className="text-blue-900">
-                    Quick-fix Issues ({plan.quickFixCount})
+                    Quick-fix Issues ({quickFixCount || 0})
                   </CardTitle>
                   <p className="text-sm text-blue-700 mt-1">
                     Require user input through guided workflow
@@ -496,7 +481,7 @@ export const PdfRemediationPlanPage: React.FC = () => {
                     <Button
                       variant="primary"
                       size="sm"
-                      disabled={!firstFixable || plan.quickFixCount === 0}
+                      disabled={!firstFixable || quickFixCount === 0}
                       onClick={(e) => {
                         e.stopPropagation();
                         if (firstFixable) {
@@ -606,7 +591,7 @@ export const PdfRemediationPlanPage: React.FC = () => {
                 <Wrench className="h-6 w-6 text-orange-600" />
                 <div>
                   <CardTitle className="text-orange-900">
-                    Manual Issues ({plan.manualFixCount})
+                    Manual Issues ({manualFixCount || 0})
                   </CardTitle>
                   <p className="text-sm text-orange-700 mt-1">
                     Require manual intervention in PDF editor
@@ -673,15 +658,32 @@ export const PdfRemediationPlanPage: React.FC = () => {
                       </div>
                       <p className="text-sm text-gray-600 ml-6">{tasks[0].description}</p>
                     </div>
-                  )).slice(0, 5)}
+                  )).slice(0, showAllManualIssueTypes ? undefined : 5)}
 
                   {Object.keys(manualTasks.reduce((acc, task) => {
                     acc[task.issueCode] = true;
                     return acc;
+                  }, {} as Record<string, boolean>)).length > 5 && !showAllManualIssueTypes && (
+                    <button
+                      onClick={() => setShowAllManualIssueTypes(true)}
+                      className="text-sm text-blue-600 hover:text-blue-700 hover:underline text-center py-2 w-full cursor-pointer"
+                    >
+                      + {Object.keys(manualTasks.reduce((acc, task) => {
+                        acc[task.issueCode] = true;
+                        return acc;
+                      }, {} as Record<string, boolean>)).length - 5} more issue types
+                    </button>
+                  )}
+                  {showAllManualIssueTypes && Object.keys(manualTasks.reduce((acc, task) => {
+                    acc[task.issueCode] = true;
+                    return acc;
                   }, {} as Record<string, boolean>)).length > 5 && (
-                    <p className="text-sm text-gray-500 text-center py-2">
-                      + more issue types
-                    </p>
+                    <button
+                      onClick={() => setShowAllManualIssueTypes(false)}
+                      className="text-sm text-blue-600 hover:text-blue-700 hover:underline text-center py-2 w-full cursor-pointer"
+                    >
+                      Show less
+                    </button>
                   )}
                 </div>
               ) : (
@@ -710,7 +712,7 @@ export const PdfRemediationPlanPage: React.FC = () => {
             </Button>
             <Button
               variant="primary"
-              disabled={plan.autoFixableCount === 0 && plan.quickFixCount === 0}
+              disabled={autoFixableCount === 0 && quickFixCount === 0}
               onClick={() => {
                 // TODO: Start remediation workflow
                 alert('Remediation workflow will be implemented in next phase');
@@ -723,27 +725,15 @@ export const PdfRemediationPlanPage: React.FC = () => {
       </div>
 
       {/* Quick Fix Modal */}
-      {quickFixModalState.task && (() => {
-        const fixField = getFixField(quickFixModalState.task.issueCode);
-
-        // Only render modal if the issue has a supported fix field
-        if (!fixField) {
-          return null;
-        }
-
-        return (
-          <QuickFixModal
-            isOpen={quickFixModalState.isOpen}
-            onClose={handleCloseQuickFixModal}
-            jobId={jobId!}
-            issueId={quickFixModalState.task.issueId}
-            issueCode={quickFixModalState.task.issueCode}
-            issueDescription={quickFixModalState.task.description}
-            fixField={fixField}
-            onSuccess={handleQuickFixSuccess}
-          />
-        );
-      })()}
+      {quickFixModalState.task && (
+        <QuickFixModal
+          isOpen={quickFixModalState.isOpen}
+          onClose={handleCloseQuickFixModal}
+          jobId={jobId!}
+          task={quickFixModalState.task}
+          onSuccess={handleQuickFixSuccess}
+        />
+      )}
     </div>
   );
 };

@@ -76,10 +76,51 @@ export function useDownloadRemediatedPdf(jobId: string) {
   });
 }
 
+/**
+ * Preview what will change before applying a quick fix
+ */
+async function previewFix(jobId: string, issueId: string, field: string, value: string) {
+  const response = await api.get(
+    `/pdf/${jobId}/remediation/preview/${issueId}`,
+    {
+      params: { field, value },
+    }
+  );
+  return response.data;
+}
+
+/**
+ * Apply a quick fix to a specific issue
+ */
+async function applyQuickFix(jobId: string, issueId: string, field: string, value: string) {
+  const response = await api.post(
+    `/pdf/${jobId}/remediation/quick-fix/${issueId}`,
+    { field, value }
+  );
+  return response.data;
+}
+
+/**
+ * Re-audit a remediated PDF file
+ */
+async function reauditPdf(jobId: string, file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await api.post(`/pdf/${jobId}/remediation/re-audit`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+
+  return response.data;
+}
+
 export const pdfRemediationService = {
   createRemediationPlan,
   getRemediationPlan,
   updateTaskStatus,
   executeAutoRemediation,
   downloadRemediatedPdf,
+  previewFix,
+  applyQuickFix,
+  reauditPdf,
 };
