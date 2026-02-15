@@ -3,7 +3,7 @@ import { Button } from '../ui/Button';
 import { Upload, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { usePdfReaudit } from '../../hooks/usePdfRemediation';
-import type { ReauditComparisonResult } from '../../types/pdf-remediation';
+import type { ReauditComparisonResult } from '../../types/pdf-remediation.types';
 
 interface ReauditButtonProps {
   jobId: string;
@@ -31,9 +31,11 @@ export function ReauditButton({ jobId, onSuccess }: ReauditButtonProps) {
       return;
     }
 
+    let toastId: string | undefined;
+
     try {
       setIsUploading(true);
-      const toastId = toast.loading('Re-auditing PDF...');
+      toastId = toast.loading('Re-auditing PDF...');
 
       const result = await reauditPdf(jobId, file);
 
@@ -47,7 +49,12 @@ export function ReauditButton({ jobId, onSuccess }: ReauditButtonProps) {
         toast.error('Re-audit failed', { id: toastId });
       }
     } catch (error) {
-      toast.error('Failed to re-audit PDF');
+      // Dismiss/replace the loading toast with error message
+      if (toastId) {
+        toast.error('Failed to re-audit PDF', { id: toastId });
+      } else {
+        toast.error('Failed to re-audit PDF');
+      }
     } finally {
       setIsUploading(false);
       // Reset file input
