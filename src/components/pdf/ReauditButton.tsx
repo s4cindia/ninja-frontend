@@ -6,7 +6,7 @@ import { usePdfReaudit } from '../../hooks/usePdfRemediation';
 
 interface ReauditButtonProps {
   jobId: string;
-  onSuccess?: () => void;
+  onSuccess?: (result: any) => void;
 }
 
 export function ReauditButton({ jobId, onSuccess }: ReauditButtonProps) {
@@ -41,7 +41,7 @@ export function ReauditButton({ jobId, onSuccess }: ReauditButtonProps) {
           `Re-audit complete! ${result.data.metrics.resolvedCount} issues resolved`,
           { id: toastId }
         );
-        onSuccess?.();
+        onSuccess?.(result.data);
       } else {
         toast.error('Re-audit failed', { id: toastId });
       }

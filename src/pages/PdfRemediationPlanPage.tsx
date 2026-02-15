@@ -56,6 +56,7 @@ export const PdfRemediationPlanPage: React.FC = () => {
     task: null,
   });
   const [showAllManualIssueTypes, setShowAllManualIssueTypes] = useState(false);
+  const [reauditComparison, setReauditComparison] = useState<any>(null);
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => {
@@ -320,16 +321,22 @@ export const PdfRemediationPlanPage: React.FC = () => {
                   fileName={plan.fileName}
                   remediatedFileUrl={plan.remediatedFileUrl}
                 />
-                <ReauditButton jobId={jobId!} onSuccess={refetch} />
+                <ReauditButton
+                  jobId={jobId!}
+                  onSuccess={(comparisonData) => {
+                    setReauditComparison(comparisonData);
+                    refetch();
+                  }}
+                />
               </>
             )}
           </div>
         </div>
 
         {/* Re-audit comparison (if available) */}
-        {(plan as typeof plan & { reauditComparison?: any }).reauditComparison && (
+        {reauditComparison && (
           <div className="mb-8">
-            <ReauditComparison comparison={(plan as typeof plan & { reauditComparison?: any }).reauditComparison} />
+            <ReauditComparison comparison={reauditComparison} />
           </div>
         )}
 
