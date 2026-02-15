@@ -41,10 +41,10 @@ export function ReauditButton({ jobId, onSuccess }: ReauditButtonProps) {
 
       if (result.success) {
         toast.success(
-          `Re-audit complete! ${result.data.metrics.resolvedCount} issues resolved`,
+          `Re-audit complete! ${result.metrics.resolvedCount} issues resolved`,
           { id: toastId }
         );
-        onSuccess?.(result.data);
+        onSuccess?.(result);
       } else {
         toast.error('Re-audit failed', { id: toastId });
       }
