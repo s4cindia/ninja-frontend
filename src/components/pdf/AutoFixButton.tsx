@@ -54,7 +54,7 @@ export function AutoFixButton({ jobId, autoFixableCount, onSuccess }: AutoFixBut
       ) : (
         <>
           <Wand2 className="mr-2 h-4 w-4" />
-          Fix Automatically ({autoFixableCount})
+          Fix Automatically ({Number(autoFixableCount) || 0})
         </>
       )}
     </Button>

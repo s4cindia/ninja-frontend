@@ -20,6 +20,8 @@ export interface RemediationPlan {
   completedAutoFixCount?: number;
   /** Number of issues requiring quick fixes (guided workflow) */
   quickFixCount: number;
+  /** Number of quick-fix issues that have been completed */
+  completedQuickFixCount?: number;
   /** Number of issues requiring manual intervention */
   manualFixCount: number;
   /** List of remediation tasks */

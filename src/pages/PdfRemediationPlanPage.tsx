@@ -360,21 +360,28 @@ export const PdfRemediationPlanPage: React.FC = () => {
                 <div className="text-center p-4 bg-green-50 rounded-lg">
                   <p className="text-sm text-green-900 mb-1">Auto-fixable</p>
                   <p className="text-2xl font-bold text-green-600">
-                    {plan.autoFixableCount}
-                    {plan.completedAutoFixCount && plan.completedAutoFixCount > 0 && (
+                    {Number(plan.autoFixableCount) || 0}
+                    {plan.completedAutoFixCount != null && Number(plan.completedAutoFixCount) > 0 && (
                       <span className="text-sm text-green-700 ml-2">
-                        ({plan.completedAutoFixCount} fixed)
+                        ({Number(plan.completedAutoFixCount)} fixed)
                       </span>
                     )}
                   </p>
                 </div>
                 <div className="text-center p-4 bg-blue-50 rounded-lg">
                   <p className="text-sm text-blue-900 mb-1">Quick-fix</p>
-                  <p className="text-2xl font-bold text-blue-600">{plan.quickFixCount}</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {Number(plan.quickFixCount) || 0}
+                    {plan.completedQuickFixCount != null && Number(plan.completedQuickFixCount) > 0 && (
+                      <span className="text-sm text-blue-700 ml-2">
+                        ({Number(plan.completedQuickFixCount)} fixed)
+                      </span>
+                    )}
+                  </p>
                 </div>
                 <div className="text-center p-4 bg-orange-50 rounded-lg">
                   <p className="text-sm text-orange-900 mb-1">Manual</p>
-                  <p className="text-2xl font-bold text-orange-600">{plan.manualFixCount}</p>
+                  <p className="text-2xl font-bold text-orange-600">{Number(plan.manualFixCount) || 0}</p>
                 </div>
               </div>
             </div>
@@ -389,10 +396,10 @@ export const PdfRemediationPlanPage: React.FC = () => {
                 <Sparkles className="h-6 w-6 text-green-600" />
                 <div>
                   <CardTitle className="text-green-900">
-                    Auto-fixable Issues ({plan.autoFixableCount})
-                    {plan.completedAutoFixCount && plan.completedAutoFixCount > 0 && (
+                    Auto-fixable Issues ({Number(plan.autoFixableCount) || 0})
+                    {plan.completedAutoFixCount != null && Number(plan.completedAutoFixCount) > 0 && (
                       <span className="text-sm font-normal text-green-600 ml-2">
-                        ({plan.completedAutoFixCount} completed)
+                        ({Number(plan.completedAutoFixCount)} completed)
                       </span>
                     )}
                   </CardTitle>
@@ -504,7 +511,7 @@ export const PdfRemediationPlanPage: React.FC = () => {
                 <Zap className="h-6 w-6 text-blue-600" />
                 <div>
                   <CardTitle className="text-blue-900">
-                    Quick-fix Issues ({plan.quickFixCount})
+                    Quick-fix Issues ({Number(plan.quickFixCount) || 0})
                   </CardTitle>
                   <p className="text-sm text-blue-700 mt-1">
                     Require user input through guided workflow
@@ -632,7 +639,7 @@ export const PdfRemediationPlanPage: React.FC = () => {
                 <Wrench className="h-6 w-6 text-orange-600" />
                 <div>
                   <CardTitle className="text-orange-900">
-                    Manual Issues ({plan.manualFixCount})
+                    Manual Issues ({Number(plan.manualFixCount) || 0})
                   </CardTitle>
                   <p className="text-sm text-orange-700 mt-1">
                     Require manual intervention in PDF editor
