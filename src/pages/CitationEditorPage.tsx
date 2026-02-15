@@ -1,0 +1,756 @@
+/**
+ * Citation Editor Page
+ * Full-featured citation management with drag-drop reference editor
+ */
+
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+  FileText,
+  Download,
+  RefreshCw,
+  ArrowLeft,
+  CheckCircle2,
+  AlertTriangle,
+  Link as LinkIcon,
+  Eye
+} from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Alert } from '@/components/ui/Alert';
+import ReferenceEditor from '@/components/citation/ReferenceEditor';
+import DragDropGuide from '@/components/citation/DragDropGuide';
+import DocumentViewer from '@/components/citation/DocumentViewer';
+import { ExportOptionsModal } from '@/components/citation/ExportOptionsModal';
+import { api } from '@/services/api';
+
+interface AnalysisData {
+  document: {
+    id: string;
+    filename: string;
+    status: string;
+    wordCount: number;
+    pageCount?: number;
+    fullText?: string;
+    fullHtml?: string;
+    statistics: {
+      totalCitations: number;
+      totalReferences: number;
+    };
+  };
+  citations: any[];
+  references: any[];
+  detectedStyle: string;
+  validations?: any[];
+}
+
+interface RecentChange {
+  citationId: string;
+  oldNumber: number;
+  newNumber: number | null; // null means orphaned (reference deleted)
+  oldText?: string; // Original citation text (e.g., "[3–5]")
+  newText?: string; // New citation text after changes (e.g., "[3,4]")
+  changeType?: 'style' | 'renumber' | 'deleted' | 'unchanged'; // Type of change
+}
+
+export default function CitationEditorPage() {
+  const { documentId } = useParams();
+  const navigate = useNavigate();
+  const [data, setData] = useState<AnalysisData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedStyle, setSelectedStyle] = useState('APA');
+  const [converting, setConverting] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [showCitations, setShowCitations] = useState(false);
+  const [activeTab, setActiveTab] = useState<'document' | 'references'>('document');
+  const [recentChanges, setRecentChanges] = useState<RecentChange[]>([]);
+  const [showChangeHighlights, setShowChangeHighlights] = useState(true);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  useEffect(() => {
+    loadAnalysis();
+  }, [documentId]);
+
+  const loadAnalysis = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      console.log('[CitationEditorPage] Loading analysis for document:', documentId);
+
+      const response = await api.get(
+        `/citation-management/document/${documentId}/analysis`
+      );
+
+      console.log('[CitationEditorPage] API response:', {
+        success: response.data.success,
+        hasCitations: !!response.data.data?.citations,
+        citationsCount: response.data.data?.citations?.length || 0,
+        hasFullText: !!response.data.data?.document?.fullText,
+        fullTextLength: response.data.data?.document?.fullText?.length || 0
+      });
+
+      if (response.data.data?.citations && response.data.data.citations.length > 0) {
+        const citationsWithText = response.data.data.citations.filter((c: any) => c.rawText && c.rawText.trim() !== '');
+        console.log('[CitationEditorPage] Citations with rawText:', citationsWithText.length, '/', response.data.data.citations.length);
+
+        if (citationsWithText.length < response.data.data.citations.length) {
+          console.warn('[CitationEditorPage] Some citations missing rawText!');
+        }
+
+        console.log('[CitationEditorPage] Sample citations from API:', response.data.data.citations.slice(0, 3));
+      }
+
+      if (response.data.success) {
+        setData(response.data.data);
+        setSelectedStyle(response.data.data.detectedStyle || 'APA');
+      } else {
+        setError(response.data.error?.message || 'Failed to load analysis');
+      }
+    } catch (err: any) {
+      console.error('[CitationEditorPage] Error loading analysis:', err);
+      setError(err.response?.data?.error?.message || err.message || 'Failed to load analysis');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConvertStyle = async () => {
+    setConverting(true);
+    setError(null);
+    try {
+      const response = await api.post(
+        `/citation-management/document/${documentId}/convert-style`,
+        { targetStyle: selectedStyle }
+      );
+
+      if (response.data.success) {
+        await loadAnalysis();
+
+        // Fetch preview data to show style conversion changes
+        try {
+          const previewResponse = await api.get(
+            `/citation-management/document/${documentId}/preview`
+          );
+
+          if (previewResponse.data.success && previewResponse.data.data?.citations) {
+            const previews = previewResponse.data.data.citations;
+            console.log('[CitationEditorPage] Style conversion preview data:', previews.length, 'citations');
+            console.log('[CitationEditorPage] Preview summary:', previewResponse.data.data.summary);
+
+            // Convert preview data to RecentChange format for display
+            // Include both style changes and renumber changes
+            const changes: RecentChange[] = previews
+              .filter((p: any) => p.changeType !== 'unchanged')
+              .map((p: any) => ({
+                citationId: p.id,
+                oldNumber: 0,
+                newNumber: p.isOrphaned || p.changeType === 'deleted' ? null : p.referenceNumber,
+                oldText: p.originalText,
+                newText: p.isOrphaned || p.changeType === 'deleted' ? p.originalText : p.newText,
+                changeType: p.changeType as 'style' | 'renumber' | 'deleted' | 'unchanged'
+              }));
+
+            console.log('[CitationEditorPage] Style conversion changes to display:', changes.length);
+            console.log('[CitationEditorPage] Changes detail:', JSON.stringify(changes, null, 2));
+
+            if (changes.length > 0) {
+              setRecentChanges(changes);
+              setShowChangeHighlights(true);
+              console.log('[CitationEditorPage] Set recentChanges and showChangeHighlights=true');
+            }
+          }
+        } catch (previewErr) {
+          console.error('[CitationEditorPage] Failed to fetch preview after style conversion:', previewErr);
+        }
+
+        alert(`Successfully converted to ${selectedStyle} style!`);
+      } else {
+        setError(response.data.error?.message || 'Conversion failed');
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error?.message || err.message || 'Conversion failed');
+    } finally {
+      setConverting(false);
+    }
+  };
+
+  const handleValidateDOIs = async () => {
+    setValidating(true);
+    setError(null);
+    try {
+      const response = await api.post(
+        `/citation-management/document/${documentId}/validate-dois`
+      );
+
+      if (response.data.success) {
+        const summary = response.data.data.summary;
+        alert(
+          `DOI Validation Results:\n\n` +
+          `Total References: ${summary.total}\n` +
+          `Valid DOIs: ${summary.valid}\n` +
+          `Invalid DOIs: ${summary.invalid}\n` +
+          `With Discrepancies: ${summary.withDiscrepancies}`
+        );
+      } else {
+        setError(response.data.error?.message || 'Validation failed');
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error?.message || err.message || 'Validation failed');
+    } finally {
+      setValidating(false);
+    }
+  };
+
+  const handleExport = async (options: { includeOriginal: boolean; highlightChanges: boolean; acceptChanges: boolean }) => {
+    try {
+      setIsExporting(true);
+
+      // Build query params based on options
+      const params = new URLSearchParams();
+      if (options.acceptChanges) {
+        params.append('acceptChanges', 'true');
+      }
+      // Note: includeOriginal and highlightChanges are handled by the backend
+      // if acceptChanges is false (Track Changes mode)
+
+      const queryString = params.toString();
+      const url = `/citation-management/document/${documentId}/export${queryString ? `?${queryString}` : ''}`;
+
+      // Download the modified DOCX with updated citations
+      const response = await api.get(url, { responseType: 'blob' });
+
+      // Create download link
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+
+      // Use different filename based on export type
+      const suffix = options.acceptChanges ? '_corrected' : '_tracked_changes';
+      link.download = `${data?.document.filename.replace('.docx', '')}${suffix}.docx`;
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+
+      setShowExportModal(false);
+      alert('Document exported successfully! Check your downloads folder.');
+    } catch (error: any) {
+      console.error('Export failed:', error);
+      alert('Failed to export document. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleCitationClick = (referenceNumber: number) => {
+    // Switch to references tab and scroll to reference
+    setActiveTab('references');
+    setTimeout(() => {
+      const refElement = document.getElementById(`ref-${referenceNumber}`);
+      refElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  };
+
+  const handleReorderComplete = async (oldCitations: any[], newCitations: any[]) => {
+    console.log('[CitationEditorPage] handleReorderComplete called');
+    console.log('[CitationEditorPage] Old citations:', oldCitations.length);
+    console.log('[CitationEditorPage] New citations:', newCitations.length);
+
+    // Reload data first
+    await loadAnalysis();
+
+    // Fetch preview data from backend to get correctly computed changes
+    // This uses the backend's chaining logic: ORIGINAL DOCX → CURRENT → FINAL
+    try {
+      const previewResponse = await api.get(
+        `/citation-management/document/${documentId}/preview`
+      );
+
+      if (previewResponse.data.success && previewResponse.data.data?.citations) {
+        const previews = previewResponse.data.data.citations;
+        console.log('[CitationEditorPage] Got preview data:', previews.length, 'citations');
+
+        // Convert preview data to RecentChange format
+        // Only include changed or orphaned citations
+        const changes: RecentChange[] = previews
+          .filter((p: any) => p.changeType !== 'unchanged')
+          .map((p: any) => ({
+            citationId: p.id,
+            oldNumber: 0, // Not used for display, we use oldText/newText
+            newNumber: p.isOrphaned || p.changeType === 'deleted' ? null : p.referenceNumber,
+            oldText: p.originalText,
+            newText: p.isOrphaned || p.changeType === 'deleted' ? p.originalText : p.newText,
+            changeType: p.changeType as 'style' | 'renumber' | 'deleted' | 'unchanged'
+          }));
+
+        console.log('[CitationEditorPage] Computed changes from preview:', changes.length);
+
+        if (changes.length > 0) {
+          setRecentChanges(changes);
+          setShowChangeHighlights(true);
+        }
+      }
+    } catch (err) {
+      console.error('[CitationEditorPage] Failed to fetch preview:', err);
+      // Fall back to simple comparison if preview fails
+      const changes: RecentChange[] = [];
+      const oldMap = new Map<string, { referenceNumber: number; rawText: string }>();
+      oldCitations.forEach(c => {
+        if (c.id && c.referenceNumber !== null && c.referenceNumber !== undefined) {
+          oldMap.set(c.id, {
+            referenceNumber: c.referenceNumber,
+            rawText: c.rawText || ''
+          });
+        }
+      });
+
+      newCitations.forEach(c => {
+        if (!c.id) return;
+        const oldData = oldMap.get(c.id);
+        const newNum = c.referenceNumber;
+        const newText = c.rawText || '';
+
+        if (oldData) {
+          const oldNum = oldData.referenceNumber;
+          const oldText = oldData.rawText;
+
+          if (newNum === null || newNum === undefined) {
+            changes.push({
+              citationId: c.id,
+              oldNumber: oldNum,
+              newNumber: null,
+              oldText: oldText,
+              newText: newText
+            });
+          } else if (oldNum !== newNum || oldText !== newText) {
+            changes.push({
+              citationId: c.id,
+              oldNumber: oldNum,
+              newNumber: newNum,
+              oldText: oldText,
+              newText: newText
+            });
+          }
+        }
+      });
+
+      if (changes.length > 0) {
+        setRecentChanges(changes);
+        setShowChangeHighlights(true);
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <RefreshCw className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-2" />
+          <p className="text-gray-600">Loading citation analysis...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        <Alert variant="error" className="mb-4">
+          <AlertTriangle className="h-4 w-4" />
+          <span>{error}</span>
+        </Alert>
+        <Button onClick={() => navigate('/citation-management')}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Upload
+        </Button>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return (
+    <>
+      <DragDropGuide />
+      <div className="min-h-screen bg-gray-50">
+      <div className="border-b bg-white sticky top-0 z-10 shadow-sm">
+        <div className="container mx-auto px-4 py-4 max-w-7xl">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/citation-management')}
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">
+                  Citation Editor
+                </h1>
+                <p className="text-sm text-gray-600 flex items-center mt-1">
+                  <FileText className="h-3 w-3 mr-1" />
+                  {data.document.filename}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button variant="outline" size="sm" onClick={loadAnalysis}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+              <Button size="sm" onClick={() => setShowExportModal(true)}>
+                <Download className="h-4 w-4 mr-2" />
+                Export DOCX
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        {error && (
+          <Alert variant="error" className="mb-6">
+            <AlertTriangle className="h-4 w-4" />
+            <span>{error}</span>
+          </Alert>
+        )}
+
+        {/* Statistics Dashboard */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Citations</p>
+                <p className="text-3xl font-bold text-blue-600 mt-1">
+                  {data.document.statistics.totalCitations}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                <span className="text-2xl">📝</span>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">References</p>
+                <p className="text-3xl font-bold text-green-600 mt-1">
+                  {data.document.statistics.totalReferences}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                <span className="text-2xl">📚</span>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Word Count</p>
+                <p className="text-3xl font-bold text-purple-600 mt-1">
+                  {data.document.wordCount.toLocaleString()}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                <span className="text-2xl">📄</span>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Citation Style</p>
+                <Badge variant="success" className="mt-2 text-lg">
+                  {data.detectedStyle}
+                </Badge>
+              </div>
+              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                <span className="text-2xl">✨</span>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Action Panel */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <Card className="p-4">
+            <h3 className="font-semibold mb-3 text-gray-900">
+              Convert Citation Style
+            </h3>
+            <select
+              value={selectedStyle}
+              onChange={(e) => setSelectedStyle(e.target.value)}
+              className="w-full mb-3 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              disabled={converting}
+            >
+              <option value="APA">APA 7th Edition</option>
+              <option value="MLA">MLA 9th Edition</option>
+              <option value="Chicago">Chicago Manual</option>
+              <option value="Vancouver">Vancouver</option>
+              <option value="IEEE">IEEE</option>
+              <option value="Harvard">Harvard</option>
+              <option value="AMA">AMA</option>
+            </select>
+            <Button
+              className="w-full"
+              onClick={handleConvertStyle}
+              disabled={converting || selectedStyle === data.detectedStyle}
+            >
+              {converting ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Converting...
+                </>
+              ) : (
+                <>Convert to {selectedStyle}</>
+              )}
+            </Button>
+          </Card>
+
+          <Card className="p-4">
+            <h3 className="font-semibold mb-3 text-gray-900 flex items-center">
+              <LinkIcon className="h-4 w-4 mr-2" />
+              DOI Validation
+            </h3>
+            <p className="text-sm text-gray-600 mb-3">
+              Validate all DOIs and check metadata accuracy
+            </p>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={handleValidateDOIs}
+              disabled={validating}
+            >
+              {validating ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Validating...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Validate DOIs
+                </>
+              )}
+            </Button>
+          </Card>
+
+          <Card className="p-4">
+            <h3 className="font-semibold mb-3 text-gray-900 flex items-center">
+              <Eye className="h-4 w-4 mr-2" />
+              In-Text Citations
+            </h3>
+            <p className="text-sm text-gray-600 mb-3">
+              View {data.citations.length} citation{data.citations.length !== 1 ? 's' : ''} in document
+            </p>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setShowCitations(!showCitations)}
+            >
+              {showCitations ? 'Hide' : 'Show'} Citations
+            </Button>
+          </Card>
+        </div>
+
+        {/* In-Text Citations Preview */}
+        {showCitations && data.citations.length > 0 && (
+          <Card className="p-6 mb-6">
+            <h3 className="text-lg font-semibold mb-4">In-Text Citations</h3>
+            {/* Warning for citations without references */}
+            {data.citations.filter((c: any) => !c.referenceNumber && !c.isOrphaned).length > 0 && (
+              <div className="bg-orange-50 border border-orange-200 rounded p-3 mb-4">
+                <p className="text-sm text-orange-800">
+                  <AlertTriangle className="inline h-4 w-4 mr-1" />
+                  <strong>{data.citations.filter((c: any) => !c.referenceNumber && !c.isOrphaned).length} citation(s)</strong> don't have matching references in the reference list.
+                </p>
+              </div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
+              {data.citations.map((citation: any) => {
+                const hasNoReference = !citation.referenceNumber && !citation.isOrphaned;
+                return (
+                  <div
+                    key={citation.id}
+                    className={`p-3 border rounded-md transition-colors ${
+                      citation.isOrphaned
+                        ? 'border-red-300 bg-red-50 hover:bg-red-100'
+                        : hasNoReference
+                        ? 'border-orange-300 bg-orange-50 hover:bg-orange-100'
+                        : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <Badge variant="outline" className="text-xs">
+                        ¶{citation.paragraphIndex || citation.paragraphNumber || 0}
+                      </Badge>
+                      <span className="text-sm font-mono text-gray-700">
+                        {citation.rawText}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between mt-2">
+                      <p className="text-xs text-gray-500 italic">
+                        {citation.citationType || 'Citation'}
+                      </p>
+                      {citation.isOrphaned ? (
+                        <span className="text-xs text-red-600 font-medium">
+                          ⚠️ Reference deleted
+                        </span>
+                      ) : hasNoReference ? (
+                        <span className="text-xs text-orange-600 font-medium">
+                          ⚠️ No matching reference
+                        </span>
+                      ) : citation.referenceNumber ? (
+                        <button
+                          onClick={() => {
+                            setActiveTab('references');
+                            setTimeout(() => {
+                              const refElement = document.getElementById(`ref-${citation.referenceNumber}`);
+                              refElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }, 100);
+                          }}
+                          className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          → Reference #{citation.referenceNumber}
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        )}
+
+        {/* Tab Navigation */}
+        <div className="mb-6">
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setActiveTab('document')}
+                className={`${
+                  activeTab === 'document'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+              >
+                📄 Document Preview
+              </button>
+              <button
+                onClick={() => setActiveTab('references')}
+                className={`${
+                  activeTab === 'references'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+              >
+                📚 Reference List ({data.references.length})
+              </button>
+            </nav>
+          </div>
+        </div>
+
+        {/* Document Preview Tab */}
+        {activeTab === 'document' && (
+          <div>
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Document Preview</h2>
+                <p className="text-gray-600 mt-1">
+                  View your document with citations highlighted in context
+                </p>
+              </div>
+              {recentChanges.length > 0 && showChangeHighlights && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowChangeHighlights(false);
+                    setRecentChanges([]);
+                  }}
+                >
+                  ✓ Dismiss Changes ({recentChanges.length})
+                </Button>
+              )}
+            </div>
+            {(() => {
+              console.log('[CitationEditorPage] Rendering DocumentViewer with:');
+              console.log('[CitationEditorPage] fullText length:', data.document.fullText?.length || 0);
+              console.log('[CitationEditorPage] fullHtml length:', data.document.fullHtml?.length || 0);
+              console.log('[CitationEditorPage] citations count:', data.citations?.length || 0);
+              console.log('[CitationEditorPage] recentChanges count:', recentChanges?.length || 0);
+
+              if (data.citations && data.citations.length > 0) {
+                console.log('[CitationEditorPage] Sample citations:', data.citations.slice(0, 3).map(c => ({
+                  id: c.id,
+                  rawText: c.rawText,
+                  startOffset: c.startOffset,
+                  endOffset: c.endOffset,
+                  referenceNumber: c.referenceNumber
+                })));
+              }
+
+              return null;
+            })()}
+            {(() => {
+              console.log('[CitationEditorPage] Passing to DocumentViewer:');
+              console.log('[CitationEditorPage] - citations:', data.citations.map((c: any) => c.rawText));
+              console.log('[CitationEditorPage] - recentChanges:', recentChanges.map(c => ({ old: c.oldText, new: c.newText })));
+              console.log('[CitationEditorPage] - showChangeHighlights:', showChangeHighlights);
+              return null;
+            })()}
+            <DocumentViewer
+              fullText={data.document.fullText}
+              fullHtml={data.document.fullHtml}
+              citations={data.citations}
+              onCitationClick={handleCitationClick}
+              recentChanges={showChangeHighlights ? recentChanges : []}
+            />
+          </div>
+        )}
+
+        {/* Reference List Tab */}
+        {activeTab === 'references' && (
+          <div>
+            <div className="mb-4">
+              <h2 className="text-2xl font-bold text-gray-900">Reference List</h2>
+              <p className="text-gray-600 mt-1">
+                Drag and drop to reorder • All in-text citations update automatically
+              </p>
+            </div>
+            <ReferenceEditor
+              documentId={documentId!}
+              references={data.references}
+              citations={data.citations}
+              onReload={loadAnalysis}
+              onReorderComplete={handleReorderComplete}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+
+    {/* Export Options Modal */}
+    <ExportOptionsModal
+      isOpen={showExportModal}
+      onClose={() => setShowExportModal(false)}
+      onExport={handleExport}
+      isExporting={isExporting}
+    />
+    </>
+  );
+}

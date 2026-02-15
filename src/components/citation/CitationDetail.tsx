@@ -15,7 +15,7 @@ import { Card } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import { ParsedComponentsView } from './ParsedComponentsView';
-import { useCitationComponents, useParseCitation } from '@/hooks/useCitation';
+import { useCitation, useCitationComponents, useParseCitation } from '@/hooks/useCitation';
 import { cn } from '@/utils/cn';
 import { normalizeConfidence } from '@/utils/citation.utils';
 import { CONFIDENCE_THRESHOLDS } from '@/types/citation.types';
@@ -40,11 +40,14 @@ interface CitationDetailProps {
   onClose: () => void;
 }
 
-export function CitationDetail({ citation, onClose }: CitationDetailProps) {
+export function CitationDetail({ citation: initialCitation, onClose }: CitationDetailProps) {
   const [activeTab, setActiveTab] = useState<'current' | 'history'>('current');
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const previousActiveElement = useRef<Element | null>(null);
+
+  const { data: fetchedCitation } = useCitation(initialCitation.id);
+  const citation = fetchedCitation ?? initialCitation;
 
   const {
     data: components,
@@ -54,10 +57,10 @@ export function CitationDetail({ citation, onClose }: CitationDetailProps) {
   const { mutate: parseCitation, isPending: isParsing, isSuccess: parseSuccess, isError: parseError, error: parseErrorDetails } = useParseCitation();
 
   const handleParse = useCallback(() => {
-    parseCitation(citation.id);
-  }, [citation.id, parseCitation]);
+    parseCitation(initialCitation.id);
+  }, [initialCitation.id, parseCitation]);
 
-  const hasParsedComponent = !!citation.primaryComponent;
+  const hasParsedComponent = !!citation.primaryComponent || !!citation.primaryComponentId;
 
   useEffect(() => {
     previousActiveElement.current = document.activeElement;

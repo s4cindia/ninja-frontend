@@ -13,6 +13,7 @@ const VIRTUALIZATION_THRESHOLD = 50;
 
 interface IssuesTableProps {
   issues: DisplayIssue[];
+  isAccessible?: boolean;
 }
 
 type SortField = 'severity' | 'description' | 'location';
@@ -90,7 +91,7 @@ interface SortState {
   order: SortOrder;
 }
 
-export const IssuesTable = React.memo(function IssuesTable({ issues }: IssuesTableProps) {
+export const IssuesTable = React.memo(function IssuesTable({ issues, isAccessible }: IssuesTableProps) {
   const [sortState, setSortState] = useState<SortState>({ field: 'severity', order: 'asc' });
   const [filterSeverity, setFilterSeverity] = useState<FilterSeverity>('all');
 
@@ -142,6 +143,16 @@ export const IssuesTable = React.memo(function IssuesTable({ issues }: IssuesTab
   };
 
   if (issues.length === 0) {
+    if (isAccessible === false) {
+      return (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+          <XCircle className="w-12 h-12 text-yellow-500 mx-auto mb-3" />
+          <p className="text-yellow-800 font-medium">
+            No detailed issues available for this audit
+          </p>
+        </div>
+      );
+    }
     return (
       <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
         <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />

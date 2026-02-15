@@ -296,8 +296,12 @@ describe('useParseAllCitations', () => {
   it('should parse all citations in document', async () => {
     const mockResult: BulkParseResult = {
       documentId: 'doc-1',
+      message: 'Parsed 10 citations with 2 errors',
       parsed: 10,
+      skipped: 0,
       failed: 2,
+      averageConfidence: 0.85,
+      stats: { total: 12, parsed: 10, unparsed: 2 },
       results: [],
     };
     mockService.parseAll.mockResolvedValueOnce(mockResult);
@@ -322,6 +326,7 @@ describe('useDetectCitations', () => {
 
   it('should detect citations from file', async () => {
     const mockResult: DetectionResult = {
+      jobId: 'job-1',
       documentId: 'doc-1',
       citations: [],
       totalCount: 0,

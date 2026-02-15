@@ -1,6 +1,4 @@
-export { CitationList } from './CitationList';
-export { CitationDetail } from './CitationDetail';
-export { CitationStats } from './CitationStats';
-export { CitationTypeFilter } from './CitationTypeFilter';
-export { ParsedComponentsView } from './ParsedComponentsView';
 export { CitationsModule } from './CitationsModule';
+export { CitationEditorLayout } from './CitationEditorLayout';
+export { DocumentTextViewer } from './DocumentTextViewer';
+export { IssuePanel } from './IssuePanel';

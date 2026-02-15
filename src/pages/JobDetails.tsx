@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, Navigate } from 'react-router-dom';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { Button } from '@/components/ui/Button';
 import { ErrorBoundary } from '@/components/ui';
@@ -28,11 +28,14 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+const CITATION_JOB_TYPES = ['CITATION_DETECTION', 'CITATION_VALIDATION', 'EDITORIAL'];
+
 export function JobDetails() {
   const { jobId } = useParams<{ jobId: string }>();
   const { data: job, isLoading, isError, error, refetch } = useJob(jobId || null);
   const cancelJob = useCancelJob();
 
+  // useMemo must be called before any conditional returns (React hooks rules)
   const { parsedOutput, parseError } = useMemo(() => {
     if (!job?.output) {
       return { parsedOutput: null, parseError: null };
@@ -44,6 +47,10 @@ export function JobDetails() {
     }
     return { parsedOutput: result, parseError: null };
   }, [job?.output]);
+
+  if (job && CITATION_JOB_TYPES.includes(job.type)) {
+    return <Navigate to={`/editorial/citations/${job.id}`} replace />;
+  }
 
   const handleCancel = async () => {
     if (!jobId) return;
@@ -288,7 +295,7 @@ export function JobDetails() {
                   )}
                 </div>
 
-                <IssuesTable issues={parsedOutput.combinedIssues} />
+                <IssuesTable issues={parsedOutput.combinedIssues} isAccessible={parsedOutput.isAccessible} />
 
                 <div data-testid="job-actions">
                   <JobActions jobId={job.id} />

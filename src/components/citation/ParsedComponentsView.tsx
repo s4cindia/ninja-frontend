@@ -290,6 +290,33 @@ export function ParsedComponentsView({
           showConfidence={showConfidence}
           isLink={true}
         />
+
+        {/* Publisher */}
+        <FieldRow
+          icon={Building}
+          label="Publisher"
+          value={component.publisher}
+          confidence={fieldConfidence.publisher}
+          showConfidence={showConfidence}
+        />
+
+        {/* Edition */}
+        <FieldRow
+          icon={Hash}
+          label="Edition"
+          value={component.edition}
+          confidence={fieldConfidence.edition}
+          showConfidence={showConfidence}
+        />
+
+        {/* Access Date */}
+        <FieldRow
+          icon={Calendar}
+          label="Access Date"
+          value={component.accessDate}
+          confidence={fieldConfidence.accessDate}
+          showConfidence={showConfidence}
+        />
       </div>
 
       {/* Parsed date footer */}

@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { useJobs, useJobStats, useCancelJob } from '@/hooks/useJobs';
 import { Job } from '@/services/jobs.service';
-import { getJobTypeLabel, extractFileNameFromJob, JOB_TYPE_LABELS } from '@/utils/jobTypes';
+import { getJobTypeLabel, extractFileNameFromJob } from '@/utils/jobTypes';
 import { getStatusIcon, getStatusBadgeClass, formatRelativeTime } from '@/utils/jobHelpers';
 import { 
   AlertCircle,
@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { cn } from '@/utils/cn';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -27,10 +28,14 @@ const STATUS_OPTIONS = [
   { value: 'CANCELLED', label: 'Cancelled' },
 ];
 
-const TYPE_OPTIONS = [
-  { value: '', label: 'All Types' },
-  ...Object.entries(JOB_TYPE_LABELS).map(([value, label]) => ({ value, label })),
-];
+const CITATION_JOB_TYPES = ['CITATION_DETECTION', 'CITATION_VALIDATION', 'EDITORIAL'];
+
+function getJobDetailPath(job: Job): string {
+  if (CITATION_JOB_TYPES.includes(job.type)) {
+    return `/editorial/citations/${job.id}`;
+  }
+  return `/jobs/${job.id}`;
+}
 
 export function Jobs() {
   const [page, setPage] = useState(1);
@@ -71,6 +76,13 @@ export function Jobs() {
   const jobs = data?.jobs || [];
   const pagination = data?.pagination || { page: 1, limit, total: 0, pages: 1 };
 
+  const jobCounts = useMemo(() => ({
+    all: stats?.total ?? 0,
+    EPUB_ACCESSIBILITY: stats?.byType?.EPUB_ACCESSIBILITY ?? 0,
+    CITATION_DETECTION: stats?.byType?.CITATION_DETECTION ?? 0,
+    PDF_ACCESSIBILITY: stats?.byType?.PDF_ACCESSIBILITY ?? 0,
+  }), [stats]);
+
   return (
     <div>
       <Breadcrumbs items={[{ label: 'Jobs' }]} />
@@ -110,6 +122,62 @@ export function Jobs() {
         </div>
       </div>
 
+      {/* Job Type Filter Tabs */}
+      <div className="flex flex-wrap gap-2 mb-4" role="tablist" aria-label="Filter jobs by type">
+        <button
+          role="tab"
+          aria-selected={typeFilter === ''}
+          onClick={() => { setTypeFilter(''); setPage(1); }}
+          className={cn(
+            'px-3 py-1.5 text-sm rounded-md transition-colors',
+            typeFilter === ''
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          )}
+        >
+          All Jobs {jobCounts.all > 0 && `(${jobCounts.all})`}
+        </button>
+        <button
+          role="tab"
+          aria-selected={typeFilter === 'EPUB_ACCESSIBILITY'}
+          onClick={() => { setTypeFilter('EPUB_ACCESSIBILITY'); setPage(1); }}
+          className={cn(
+            'px-3 py-1.5 text-sm rounded-md transition-colors',
+            typeFilter === 'EPUB_ACCESSIBILITY'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          )}
+        >
+          EPUB Audit {jobCounts.EPUB_ACCESSIBILITY > 0 && `(${jobCounts.EPUB_ACCESSIBILITY})`}
+        </button>
+        <button
+          role="tab"
+          aria-selected={typeFilter === 'CITATION_DETECTION'}
+          onClick={() => { setTypeFilter('CITATION_DETECTION'); setPage(1); }}
+          className={cn(
+            'px-3 py-1.5 text-sm rounded-md transition-colors',
+            typeFilter === 'CITATION_DETECTION'
+              ? 'bg-purple-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          )}
+        >
+          Citation Detection {jobCounts.CITATION_DETECTION > 0 && `(${jobCounts.CITATION_DETECTION})`}
+        </button>
+        <button
+          role="tab"
+          aria-selected={typeFilter === 'PDF_ACCESSIBILITY'}
+          onClick={() => { setTypeFilter('PDF_ACCESSIBILITY'); setPage(1); }}
+          className={cn(
+            'px-3 py-1.5 text-sm rounded-md transition-colors',
+            typeFilter === 'PDF_ACCESSIBILITY'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          )}
+        >
+          PDF Audit {jobCounts.PDF_ACCESSIBILITY > 0 && `(${jobCounts.PDF_ACCESSIBILITY})`}
+        </button>
+      </div>
+
       {/* Filter Bar */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
         <div className="flex flex-wrap items-center gap-4">
@@ -120,23 +188,9 @@ export function Jobs() {
               setPage(1);
             }}
             className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            aria-label="Filter by status"
           >
             {STATUS_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={typeFilter}
-            onChange={(e) => {
-              setTypeFilter(e.target.value);
-              setPage(1);
-            }}
-            className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-          >
-            {TYPE_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
@@ -260,7 +314,7 @@ export function Jobs() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <Link to={`/jobs/${job.id}`}>
+                          <Link to={getJobDetailPath(job)}>
                             <Button variant="ghost" size="sm">
                               <Eye className="w-4 h-4 mr-1" />
                               View
