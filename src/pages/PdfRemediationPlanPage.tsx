@@ -17,7 +17,8 @@ import {
   CheckCircle2,
   AlertCircle,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  ListTree
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
@@ -268,6 +269,14 @@ export const PdfRemediationPlanPage: React.FC = () => {
             />
             {plan.remediatedFileUrl && (
               <>
+                <Button
+                  onClick={() => navigate(`/remediation/${jobId}/comparison`)}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  <ListTree className="h-4 w-4" />
+                  View All Changes
+                </Button>
                 <DownloadRemediatedButton
                   jobId={jobId!}
                   fileName={plan.fileName}
