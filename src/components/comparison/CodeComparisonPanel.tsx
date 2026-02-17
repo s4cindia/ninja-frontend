@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -119,12 +119,14 @@ export const CodeComparisonPanel: React.FC<CodeComparisonPanelProps> = ({ change
 
   // The /visual endpoint is EPUB-only; PDF jobs are expected to 404.
   // Log unexpected failures so EPUB issues don't go unnoticed.
-  if (visualError) {
-    const status = (visualError as { response?: { status?: number } }).response?.status;
-    if (status !== 404 && status !== 501) {
-      console.warn('[CodeComparisonPanel] Unexpected visual API error:', visualError);
+  useEffect(() => {
+    if (visualError) {
+      const status = (visualError as { response?: { status?: number } }).response?.status;
+      if (status !== 404 && status !== 501) {
+        console.warn('[CodeComparisonPanel] Unexpected visual API error:', visualError);
+      }
     }
-  }
+  }, [visualError]);
 
   // Use sourceHtml for code view (readable paths) instead of html (base64 images)
   const beforeHtml = visualData?.beforeContent?.sourceHtml || visualData?.beforeContent?.html;
