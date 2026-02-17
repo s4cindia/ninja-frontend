@@ -38,9 +38,10 @@ interface VerificationQueueProps {
 }
 
 function needsHumanVerification(c: CriterionConfidence | CriterionConfidenceWithIssues): boolean {
-  // Trust backend's needsVerification field completely
-  // Backend sets needsVerification = true only when there are unresolved issues
-  if (c.status === 'not_applicable') return false;
+  // Exclude truly N/A criteria (content detection or user-accepted).
+  // Manual-review-required criteria also use status='not_applicable' but have
+  // requiresManualVerification=true, so we must keep them in the queue.
+  if (c.status === 'not_applicable' && !c.requiresManualVerification) return false;
   return c.needsVerification === true;
 }
 
