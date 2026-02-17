@@ -6,7 +6,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { VerificationItem } from './VerificationItem';
 import { CriterionDetailsModal } from './CriterionDetailsModal';
 import { useVerificationQueue, useSubmitVerification, useBulkVerification } from '@/hooks/useVerification';
-import { CONFIDENCE_THRESHOLD_HIGH, CONFIDENCE_THRESHOLDS, NA_QUICK_ACCEPT_THRESHOLD } from '@/constants/verification';
+import { CONFIDENCE_THRESHOLDS, NA_QUICK_ACCEPT_THRESHOLD } from '@/constants/verification';
 import { MOCK_VERIFICATION_ITEMS } from '@/constants/mockVerificationData';
 import type { CriterionConfidence } from '@/services/api';
 import type { CriterionConfidenceWithIssues, IssueLocation } from '@/types/confidence.types';

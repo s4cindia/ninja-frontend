@@ -353,7 +353,7 @@ export function AcrWorkflowPage() {
         naReason: isNA ? criterion.naSuggestion?.rationale : undefined,
         naSuggestion: isNA ? criterion.naSuggestion : undefined,
         verifiedAt: verification?.verifiedAt || new Date().toISOString().slice(0, 16).replace('T', ' '),
-        confidence: Math.round((criterion.confidenceScore || 0) * 100), // Convert 0-1 to 0-100 and send to backend
+        confidence: Math.round(criterion.confidenceScore || 0),
       };
     });
 
