@@ -8,6 +8,7 @@ import { CriteriaTable, CriterionRow } from './CriteriaTable';
 import { WcagDocumentationModal } from './WcagDocumentationModal';
 import { CriterionDetailsModal } from './CriterionDetailsModal';
 import { useConfidenceWithIssues } from '@/hooks/useConfidence';
+import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { IssueMapping, RemediatedIssue, OtherIssuesData, NaSuggestion } from '@/types/confidence.types';
 import { confidenceService } from '@/services/confidence.service';
 import { ConfidenceBadge } from './ConfidenceBadge';
@@ -1212,7 +1213,17 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-lg border p-4">
-          <p className="text-sm text-gray-500 mb-1">Overall Confidence</p>
+          <div className="flex items-center gap-1 mb-1">
+            <p className="text-sm text-gray-500">Overall Confidence</p>
+            <InfoTooltip content={
+              <div>
+                <p className="font-semibold mb-1">How is this calculated?</p>
+                <p>Average confidence across all {criteria.length} WCAG 2.1 Level A & AA criteria based on AI analysis and automated checks.</p>
+              </div>
+            }>
+              <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+            </InfoTooltip>
+          </div>
           <div className="flex items-center gap-3">
             <div className="flex-1 bg-gray-200 rounded-full h-3">
               <div
@@ -1234,7 +1245,17 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
         </div>
 
         <div className="bg-white rounded-lg border p-4">
-          <p className="text-sm text-gray-500 mb-1">Needs Verification</p>
+          <div className="flex items-center gap-1 mb-1">
+            <p className="text-sm text-gray-500">Needs Verification</p>
+            <InfoTooltip content={
+              <div>
+                <p className="font-semibold mb-1">What requires verification?</p>
+                <p>Criteria with unresolved accessibility issues that need human review and confirmation.</p>
+              </div>
+            }>
+              <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+            </InfoTooltip>
+          </div>
           <p className="text-2xl font-semibold text-orange-600">{needsVerificationCount}</p>
           <p className="text-xs text-gray-500 mt-1">criteria require human review</p>
         </div>
@@ -1255,25 +1276,65 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
           <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
             <div className="text-3xl font-bold text-green-600">{confidenceCounts.high}</div>
-            <div className="text-sm text-gray-600">High Confidence (90%+)</div>
+            <div className="flex items-center justify-center gap-1">
+              <div className="text-sm text-gray-600">High Confidence (90%+)</div>
+              <InfoTooltip content={
+                <div>
+                  <p className="font-semibold mb-1">High Confidence (90%+)</p>
+                  <p>Criteria with reliable automated verification. These have been auto-verified by AI with high accuracy.</p>
+                </div>
+              }>
+                <HelpCircle className="h-3.5 w-3.5 text-gray-400 hover:text-gray-600" />
+              </InfoTooltip>
+            </div>
             <div className="text-xs text-gray-500 mt-1">Reliably automated</div>
           </div>
-          
+
           <div className="text-center p-4 bg-yellow-50 rounded-lg border border-yellow-200">
             <div className="text-3xl font-bold text-yellow-600">{confidenceCounts.medium}</div>
-            <div className="text-sm text-gray-600">Medium Confidence (60-89%)</div>
+            <div className="flex items-center justify-center gap-1">
+              <div className="text-sm text-gray-600">Medium Confidence (60-89%)</div>
+              <InfoTooltip content={
+                <div>
+                  <p className="font-semibold mb-1">Medium Confidence (60-89%)</p>
+                  <p>Criteria with partial automated verification. AI analysis is reasonably accurate but may benefit from spot checking.</p>
+                </div>
+              }>
+                <HelpCircle className="h-3.5 w-3.5 text-gray-400 hover:text-gray-600" />
+              </InfoTooltip>
+            </div>
             <div className="text-xs text-gray-500 mt-1">Partial automation</div>
           </div>
-          
+
           <div className="text-center p-4 bg-orange-50 rounded-lg border border-orange-200">
             <div className="text-3xl font-bold text-orange-600">{confidenceCounts.low}</div>
-            <div className="text-sm text-gray-600">Low Confidence (&lt;60%)</div>
+            <div className="flex items-center justify-center gap-1">
+              <div className="text-sm text-gray-600">Low Confidence (&lt;60%)</div>
+              <InfoTooltip content={
+                <div>
+                  <p className="font-semibold mb-1">Low Confidence (<60%)</p>
+                  <p>Criteria with limited automated capability. AI analysis has lower certainty and may need additional review.</p>
+                </div>
+              }>
+                <HelpCircle className="h-3.5 w-3.5 text-gray-400 hover:text-gray-600" />
+              </InfoTooltip>
+            </div>
             <div className="text-xs text-gray-500 mt-1">Limited automation</div>
           </div>
-          
+
           <div className="text-center p-4 bg-amber-50 rounded-lg border border-amber-300">
             <div className="text-3xl font-bold text-amber-600">{confidenceCounts.manual}</div>
-            <div className="text-sm text-gray-600">Manual Review Required</div>
+            <div className="flex items-center justify-center gap-1">
+              <div className="text-sm text-gray-600">Manual Review Required</div>
+              <InfoTooltip content={
+                <div>
+                  <p className="font-semibold mb-1">Manual Review Required</p>
+                  <p>Criteria with unresolved accessibility issues that must be verified by a human reviewer before finalizing the ACR report.</p>
+                </div>
+              }>
+                <HelpCircle className="h-3.5 w-3.5 text-gray-400 hover:text-gray-600" />
+              </InfoTooltip>
+            </div>
             <div className="text-xs text-gray-500 mt-1">Human verification needed</div>
           </div>
         </div>
