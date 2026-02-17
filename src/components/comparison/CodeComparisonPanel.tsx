@@ -168,25 +168,6 @@ export const CodeComparisonPanel: React.FC<CodeComparisonPanelProps> = ({ change
           <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
           <span className="ml-2 text-gray-600">Loading code comparison...</span>
         </div>
-      ) : error ? (
-        <div className="grid grid-cols-1 md:grid-cols-2">
-          <div className="border-b md:border-b-0 md:border-r border-gray-200">
-            <div className="bg-red-50 px-4 py-2 border-b border-gray-200">
-              <span className="text-sm font-semibold text-red-700">BEFORE</span>
-            </div>
-            <div className="p-4">
-              <p className="text-sm text-gray-500 italic">Code preview not available for this change type</p>
-            </div>
-          </div>
-          <div>
-            <div className="bg-green-50 px-4 py-2 border-b border-gray-200">
-              <span className="text-sm font-semibold text-green-700">AFTER</span>
-            </div>
-            <div className="p-4">
-              <p className="text-sm text-gray-500 italic">Code preview not available for this change type</p>
-            </div>
-          </div>
-        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2">
           <div className="border-b md:border-b-0 md:border-r border-gray-200">
