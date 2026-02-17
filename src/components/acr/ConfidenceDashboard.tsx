@@ -1312,7 +1312,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
               <div className="text-sm text-gray-600">Low Confidence (&lt;60%)</div>
               <InfoTooltip content={
                 <div>
-                  <p className="font-semibold mb-1">Low Confidence (<60%)</p>
+                  <p className="font-semibold mb-1">Low Confidence (&lt;60%)</p>
                   <p>Criteria with limited automated capability. AI analysis has lower certainty and may need additional review.</p>
                 </div>
               }>
