@@ -1295,16 +1295,17 @@ export const EPUBRemediation: React.FC = () => {
     const loadCompletedState = async () => {
       if (urlStatus === "completed" && jobId && !comparisonSummary) {
         try {
+          // Use Phase 4 comparison API endpoint which returns counts from RemediationChange table
           const response = await api.get(
-            `/epub/job/${jobId}/comparison/summary`,
+            `/jobs/${jobId}/comparison`,
           );
           const data = response.data.data || response.data;
           setComparisonSummary({
-            fixedCount: data.fixedCount ?? 0,
-            failedCount: data.failedCount ?? 0,
-            skippedCount: data.skippedCount ?? 0,
-            beforeScore: data.beforeScore ?? 45,
-            afterScore: data.afterScore ?? 85,
+            fixedCount: data.summary?.applied ?? 0,  // Phase 4 API uses "applied" instead of "fixedCount"
+            failedCount: data.summary?.failed ?? 0,
+            skippedCount: data.summary?.skipped ?? 0,
+            beforeScore: 45,  // TODO: Calculate from before/after audit results
+            afterScore: 85,
           });
         } catch {
           // Use defaults if API fails
@@ -1826,13 +1827,16 @@ export const EPUBRemediation: React.FC = () => {
 
     setPlan({ ...plan, tasks: updatedTasks });
 
-    setComparisonSummary((prev) => ({
-      fixedCount: (prev?.fixedCount || 0) + result.resolved,
-      failedCount: prev?.failedCount || 0,
-      skippedCount: prev?.skippedCount || 0,
-      beforeScore: prev?.beforeScore || 0,
-      afterScore: result.score || prev?.afterScore || 0,
-    }));
+    // Re-audit results are for verification only - don't modify comparisonSummary
+    // comparisonSummary represents the original remediation changes (7 fixes)
+    // Re-audit shows what's still pending (2 manual issues), not new fixes
+    // Only update the afterScore if provided by re-audit
+    if (result.score !== undefined && comparisonSummary) {
+      setComparisonSummary((prev) => ({
+        ...prev!,
+        afterScore: result.score!,
+      }));
+    }
   };
 
   if (pageState === "loading" || (pageState === "complete" && !plan)) {
@@ -1862,9 +1866,11 @@ export const EPUBRemediation: React.FC = () => {
     );
   }
 
-  const fixedCount = plan.tasks.filter((t) => t.status === "completed").length;
-  const failedCount = plan.tasks.filter((t) => t.status === "failed").length;
-  const skippedCount = plan.tasks.filter((t) => t.status === "skipped").length;
+  // Use actual change counts from database when available (more accurate than task counts)
+  // Task counts may not reflect additional fixes discovered during remediation
+  const fixedCount = comparisonSummary?.fixedCount ?? plan.tasks.filter((t) => t.status === "completed").length;
+  const failedCount = comparisonSummary?.failedCount ?? plan.tasks.filter((t) => t.status === "failed").length;
+  const skippedCount = comparisonSummary?.skippedCount ?? plan.tasks.filter((t) => t.status === "skipped").length;
   const pendingCount = plan.tasks.filter((t) => t.status === "pending").length;
   const pendingManualCount = plan.tasks.filter(
     (t) => t.type === "manual" && t.status === "pending",

@@ -255,6 +255,21 @@ export function CriterionDetailsModal({
                 </div>
               </div>
 
+              {criterion.remarks && (
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                  <h3 className="font-semibold text-purple-900 mb-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    AI Analysis Notes
+                  </h3>
+                  <p className="text-sm text-purple-800">{criterion.remarks}</p>
+                  {!criterion.needsVerification && (
+                    <p className="text-xs text-purple-600 mt-2 italic">
+                      This note will be included as reviewer remarks in the final ACR report.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {wcagDocs && (
                 <>
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
