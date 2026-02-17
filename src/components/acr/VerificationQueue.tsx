@@ -38,11 +38,10 @@ interface VerificationQueueProps {
 }
 
 function needsHumanVerification(c: CriterionConfidence | CriterionConfidenceWithIssues): boolean {
-  if (c.needsVerification === true) return true;
-  if (c.needsVerification === false) return false;
+  // Trust backend's needsVerification field completely
+  // Backend sets needsVerification = true only when there are unresolved issues
   if (c.status === 'not_applicable') return false;
-  if (c.confidenceScore < CONFIDENCE_THRESHOLD_HIGH) return true;
-  return false;
+  return c.needsVerification === true;
 }
 
 function convertCriteriaToVerificationItems(

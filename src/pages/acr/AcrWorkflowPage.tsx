@@ -327,11 +327,28 @@ export function AcrWorkflowPage() {
       const isNA = criterion.naSuggestion?.suggestedStatus === 'not_applicable' &&
                    (criterion.naSuggestion?.confidence || 0) >= 80;
 
+      // For auto-verified criteria: use AI's determination instead of defaults
+      const isAutoVerified = !verification && criterion.needsVerification === false;
+
       return {
         criterionId: criterion.criterionId,
-        verificationStatus: verification?.status || (isNA ? 'not_applicable' : 'pending'),
-        verificationMethod: verification?.method || 'Manual Review',
-        verificationNotes: verification?.notes || '',
+
+        // Use human verification if available, otherwise AI's determination
+        verificationStatus: verification?.status ||
+                           (isNA ? 'not_applicable' :
+                            isAutoVerified ? criterion.status :
+                            'pending'),
+
+        // Method: 'Automated' for auto-verified, 'Manual Review' otherwise
+        verificationMethod: verification?.method ||
+                           (isAutoVerified ? 'Automated' : 'Manual Review'),
+
+        // Notes: Include AI confidence and remarks for auto-verified
+        verificationNotes: verification?.notes ||
+                          (isAutoVerified
+                            ? `Automatically verified with ${Math.round(criterion.confidenceScore || 0)}% confidence. ${criterion.remarks || 'No issues found.'}`.trim()
+                            : ''),
+
         isNotApplicable: isNA,
         naReason: isNA ? criterion.naSuggestion?.rationale : undefined,
         naSuggestion: isNA ? criterion.naSuggestion : undefined,
