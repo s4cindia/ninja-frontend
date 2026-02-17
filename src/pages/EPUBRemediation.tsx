@@ -1862,9 +1862,11 @@ export const EPUBRemediation: React.FC = () => {
     );
   }
 
-  const fixedCount = plan.tasks.filter((t) => t.status === "completed").length;
-  const failedCount = plan.tasks.filter((t) => t.status === "failed").length;
-  const skippedCount = plan.tasks.filter((t) => t.status === "skipped").length;
+  // Use actual change counts from database when available (more accurate than task counts)
+  // Task counts may not reflect additional fixes discovered during remediation
+  const fixedCount = comparisonSummary?.fixedCount ?? plan.tasks.filter((t) => t.status === "completed").length;
+  const failedCount = comparisonSummary?.failedCount ?? plan.tasks.filter((t) => t.status === "failed").length;
+  const skippedCount = comparisonSummary?.skippedCount ?? plan.tasks.filter((t) => t.status === "skipped").length;
   const pendingCount = plan.tasks.filter((t) => t.status === "pending").length;
   const pendingManualCount = plan.tasks.filter(
     (t) => t.type === "manual" && t.status === "pending",
