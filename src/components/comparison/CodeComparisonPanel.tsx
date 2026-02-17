@@ -109,7 +109,7 @@ function formatHtml(html: string): string {
 }
 
 export const CodeComparisonPanel: React.FC<CodeComparisonPanelProps> = ({ change, jobId }) => {
-  const { data: visualData, isLoading, error } = useQuery({
+  const { data: visualData, isLoading } = useQuery({
     queryKey: ['visual-comparison', jobId, change.id],
     queryFn: () => getVisualComparison(jobId, change.id),
     enabled: !!jobId && !!change.id,
