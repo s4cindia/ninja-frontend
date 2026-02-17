@@ -109,13 +109,22 @@ function formatHtml(html: string): string {
 }
 
 export const CodeComparisonPanel: React.FC<CodeComparisonPanelProps> = ({ change, jobId }) => {
-  const { data: visualData, isLoading } = useQuery({
+  const { data: visualData, isLoading, error: visualError } = useQuery({
     queryKey: ['visual-comparison', jobId, change.id],
     queryFn: () => getVisualComparison(jobId, change.id),
     enabled: !!jobId && !!change.id,
     staleTime: 5 * 60 * 1000,
     retry: 1
   });
+
+  // The /visual endpoint is EPUB-only; PDF jobs are expected to 404.
+  // Log unexpected failures so EPUB issues don't go unnoticed.
+  if (visualError) {
+    const status = (visualError as { response?: { status?: number } }).response?.status;
+    if (status !== 404 && status !== 501) {
+      console.warn('[CodeComparisonPanel] Unexpected visual API error:', visualError);
+    }
+  }
 
   // Use sourceHtml for code view (readable paths) instead of html (base64 images)
   const beforeHtml = visualData?.beforeContent?.sourceHtml || visualData?.beforeContent?.html;
