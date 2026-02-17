@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/Badge';
 import { useAcrReport, useApproveReport, useUpdateCriterion, useUpdateReportMetadata } from '@/hooks/useAcrReport';
 // import { useExportAcr } from '@/hooks/useAcrExport';
 import { VerificationSummaryCard } from '@/components/acr/VerificationSummaryCard';
+import { NACriteriaSection } from '@/components/acr/NACriteriaSection';
 import { VersionTimelineSidebar } from '@/components/acr/VersionTimelineSidebar';
 import { VersionCompareModal } from '@/components/acr/VersionCompareModal';
 import { ExportDialog } from '@/components/acr/ExportDialog';
@@ -242,7 +243,7 @@ function CriterionCard({ criterion, acrJobId, isExpanded, onToggleExpand }: Crit
                 </div>
                 <div>
                   <div className="text-xs text-gray-500 mb-1">Verified By</div>
-                  <div className="text-sm text-gray-900">{criterion.reviewedBy || 'Pending Verification'}</div>
+                  <div className="text-sm text-gray-900">{criterion.reviewerName || criterion.reviewedBy || 'Pending Verification'}</div>
                 </div>
               </div>
 
@@ -730,26 +731,12 @@ export function AcrReportReviewPage() {
             </button>
 
             {showNACriteria && (
-              <div id="na-criteria-panel" className="border-t border-gray-200 p-4 space-y-2">
-                {naCriteria.map((criterion) => (
-                  <div key={criterion.id} className="border border-blue-200 rounded-lg p-4 bg-blue-50/30 hover:shadow-sm transition-shadow">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <span className="font-semibold text-gray-900">{criterion.criterionNumber}</span>
-                        <span className="text-sm text-gray-600 truncate">{criterion.criterionName || `WCAG ${criterion.criterionNumber}`}</span>
-                        {criterion.level && (
-                          <Badge variant="default" className="text-xs">Level {criterion.level}</Badge>
-                        )}
-                        <Badge variant="info" className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5">N/A</Badge>
-                      </div>
-                    </div>
-                    {criterion.naReason && (
-                      <div className="mt-3 ml-0 bg-white p-3 rounded text-sm text-gray-700 border border-blue-100">
-                        <strong className="text-blue-900">Reason:</strong> {criterion.naReason}
-                      </div>
-                    )}
-                  </div>
-                ))}
+              <div id="na-criteria-panel" className="border-t border-gray-200">
+                <NACriteriaSection
+                  naCriteria={naCriteria}
+                  acrJobId={acrJob.id}
+                  edition={acrJob.edition}
+                />
               </div>
             )}
           </div>
