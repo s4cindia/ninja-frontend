@@ -89,29 +89,30 @@ export interface CitationIssue {
 }
 
 export interface AnalysisResult {
-  jobId: string;
-  processingTime: number;
-  totalIssues: number;
-  breakdown: {
-    missingDois: number;
-    duplicates: number;
-    uncited: number;
-    mismatches: number;
-    formattingIssues: number;
-    numberingMismatches: number;
+  document: {
+    id: string;
+    filename: string;
+    status: string;
+    wordCount: number;
+    pageCount?: number;
+    fullText?: string;
+    fullHtml?: string;
+    statistics: {
+      totalCitations: number;
+      totalReferences: number;
+    };
   };
-  stats: {
-    totalReferences: number;
-    totalCitations: number;
-    detectedStyle: string;
-    confidence: number;
-  };
+  citations: any[];
+  references: any[];
+  detectedStyle: string;
+  validations?: any[];
 }
 
 export interface UploadResponse {
-  jobId: string;
-  status: CitationJobStatus;
-  message: string;
+  jobId?: string;
+  documentId?: string;
+  status: CitationJobStatus | 'COMPLETED';
+  message?: string;
 }
 
 export interface DOIVerificationResult {

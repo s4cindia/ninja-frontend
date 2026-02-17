@@ -11,7 +11,7 @@ import { Card } from '@/components/ui/Card';
 interface ExportOptionsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onExport: (options: { includeOriginal: boolean; highlightChanges: boolean }) => void;
+  onExport: (options: { includeOriginal: boolean; highlightChanges: boolean; acceptChanges: boolean }) => void;
   isExporting: boolean;
 }
 
@@ -23,11 +23,12 @@ export function ExportOptionsModal({
 }: ExportOptionsModalProps) {
   const [includeOriginal, setIncludeOriginal] = useState(false);
   const [highlightChanges, setHighlightChanges] = useState(true);
+  const [acceptChanges, setAcceptChanges] = useState(true);
 
   if (!isOpen) return null;
 
   const handleExport = () => {
-    onExport({ includeOriginal, highlightChanges });
+    onExport({ includeOriginal, highlightChanges, acceptChanges });
   };
 
   return (
@@ -93,6 +94,22 @@ export function ExportOptionsModal({
                 <div className="font-medium text-gray-900">Include original text</div>
                 <div className="text-sm text-gray-600 mt-1">
                   Show original reference text in gray next to corrections (useful for review)
+                </div>
+              </div>
+            </label>
+
+            {/* Accept Changes */}
+            <label className="flex items-start space-x-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={acceptChanges}
+                onChange={(e) => setAcceptChanges(e.target.checked)}
+                className="mt-1 h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <div className="flex-1">
+                <div className="font-medium text-gray-900">Accept all changes</div>
+                <div className="text-sm text-gray-600 mt-1">
+                  Apply changes cleanly without Track Changes. Uncheck to export with Track Changes enabled.
                 </div>
               </div>
             </label>

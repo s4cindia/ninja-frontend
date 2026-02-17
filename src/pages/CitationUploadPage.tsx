@@ -23,7 +23,7 @@ export default function CitationUploadPage() {
   const { data: recentJobs } = useQuery({
     queryKey: ['recent-citation-jobs'],
     queryFn: async () => {
-      const response = await api.get('/citation/jobs/recent?limit=3');
+      const response = await api.get('/citation-management/jobs/recent?limit=3');
       return response.data.data;
     },
     staleTime: 30000, // 30 seconds
@@ -70,12 +70,14 @@ export default function CitationUploadPage() {
       console.log('JobId:', result?.jobId);
       console.log('Has jobId?', !!result?.jobId);
 
-      if (result?.jobId) {
-        console.log('Navigating to:', `/citation/analysis/${result.jobId}`);
-        navigate(`/citation/analysis/${result.jobId}`);
+      // Use documentId for navigation (sync processing returns documentId directly)
+      const navigateId = result?.documentId || result?.jobId;
+      if (navigateId) {
+        console.log('Navigating to:', `/citation/editor/${navigateId}`);
+        navigate(`/citation/editor/${navigateId}`);
       } else {
-        console.error('No jobId in response:', result);
-        toast.error('Upload succeeded but no job ID returned');
+        console.error('No documentId/jobId in response:', result);
+        toast.error('Upload succeeded but no document ID returned');
       }
     } catch (error) {
       console.error('Upload error:', error);
@@ -161,14 +163,14 @@ export default function CitationUploadPage() {
             <div className="space-y-3">
               {recentJobs.map((job: any) => (
                 <div
-                  key={job.id}
-                  onClick={() => navigate(`/citation/analysis/${job.id}`)}
+                  key={job.jobId}
+                  onClick={() => navigate(`/citation/analysis/${job.documentId}`)}
                   className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"
                 >
                   <div className="flex items-center space-x-3">
                     <FileText className="h-5 w-5 text-gray-400" />
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{job.originalFilename}</p>
+                      <p className="text-sm font-medium text-gray-900">{job.filename}</p>
                       <p className="text-xs text-gray-500">{formatTimeAgo(job.createdAt)}</p>
                     </div>
                   </div>

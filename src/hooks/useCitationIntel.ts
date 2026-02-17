@@ -72,12 +72,12 @@ export function useAnalysisResults(jobId: string | undefined) {
         return false;
       }
 
-      // Only refetch while job is processing (zero issues means not done yet)
-      if (data?.totalIssues === 0) {
-        return 2000;
+      // Stop refetching once we have results (document data loaded)
+      if (data?.document) {
+        return false;
       }
-      // Stop refetching once we have results
-      return false;
+      // Keep polling if no data yet
+      return 2000;
     },
     refetchOnMount: false, // Don't refetch when component remounts
     refetchOnWindowFocus: false, // Don't refetch when window regains focus

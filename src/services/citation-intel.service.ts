@@ -20,7 +20,7 @@ export const citationIntelService = {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await api.post('/citation/upload', formData, {
+    const response = await api.post('/citation-management/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -47,8 +47,8 @@ export const citationIntelService = {
   /**
    * Get analysis results (dashboard data)
    */
-  async getAnalysis(jobId: string): Promise<AnalysisResult> {
-    const response = await api.get(`/citation/job/${jobId}/analysis`);
+  async getAnalysis(documentId: string): Promise<AnalysisResult> {
+    const response = await api.get(`/citation-management/document/${documentId}/analysis`);
     return response.data.data;
   },
 

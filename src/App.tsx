@@ -66,12 +66,8 @@ import {
 } from '@/pages/editorial';
 import CitationUploadPage from '@/pages/CitationUploadPage';
 import CitationAnalysisPage from '@/pages/CitationAnalysisPage';
-import CitationReferencesPage from '@/pages/CitationReferencesPage';
 import CitationManuscriptPage from '@/pages/CitationManuscriptPage';
-import CitationStylePage from '@/pages/CitationStylePage';
-import CitationGhostDetectorPage from '@/pages/CitationGhostDetectorPage';
-import CitationDiffViewPage from '@/pages/CitationDiffViewPage';
-import CitationReviewQueuePage from '@/pages/CitationReviewQueuePage';
+import CitationEditorPage from '@/pages/CitationEditorPage';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -231,13 +227,9 @@ function AppRoutes() {
 
           {/* Citation Intelligence Tool Routes */}
           <Route path="/citation/upload" element={<CitationUploadPage />} />
-          <Route path="/citation/analysis/:jobId" element={<CitationAnalysisPage />} />
-          <Route path="/citation/references/:jobId" element={<CitationReferencesPage />} />
-          <Route path="/citation/manuscript/:jobId" element={<CitationManuscriptPage />} />
-          <Route path="/citation/style/:jobId" element={<CitationStylePage />} />
-          <Route path="/citation/ghosts/:jobId" element={<CitationGhostDetectorPage />} />
-          <Route path="/citation/diff/:jobId" element={<CitationDiffViewPage />} />
-          <Route path="/citation/review-queue/:jobId" element={<CitationReviewQueuePage />} />
+          <Route path="/citation/analysis/:documentId" element={<CitationAnalysisPage />} />
+          <Route path="/citation/manuscript/:documentId" element={<CitationManuscriptPage />} />
+          <Route path="/citation/editor/:documentId" element={<CitationEditorPage />} />
         </Route>
 
         <Route path="/unauthorized" element={<Unauthorized />} />

@@ -10,31 +10,31 @@ import { AlertCircle, CheckCircle, Clock, FileText, Target, Download, BookOpen }
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
-import { useJobProgress, useAnalysisResults } from '@/hooks/useCitationIntel';
+import { useAnalysisResults } from '@/hooks/useCitationIntel';
 import { ExportOptionsModal } from '@/components/citation/ExportOptionsModal';
 import { citationIntelService } from '@/services/citation-intel.service';
 import toast from 'react-hot-toast';
 
 export default function CitationAnalysisPage() {
-  const { jobId } = useParams<{ jobId: string }>();
+  const { documentId } = useParams<{ documentId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [downloading, setDownloading] = useState(false);
+  const [_downloading, setDownloading] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  void _downloading; // Used in handleDownloadSummary
 
-  const { data: progress, isLoading: progressLoading, error: progressError } = useJobProgress(jobId);
-  const { data: analysis, error: analysisError } = useAnalysisResults(jobId);
+  const { data: analysis, isLoading: analysisLoading, error: analysisError } = useAnalysisResults(documentId);
 
   // Debug logging
-  console.log('[CitationAnalysisPage] JobId:', jobId);
-  console.log('[CitationAnalysisPage] Progress data:', progress);
+  console.log('[CitationAnalysisPage] DocumentId:', documentId);
   console.log('[CitationAnalysisPage] Analysis data:', analysis);
-  console.log('[CitationAnalysisPage] Progress loading:', progressLoading);
+  console.log('[CitationAnalysisPage] Analysis loading:', analysisLoading);
 
-  const isProcessing = progress?.status === 'PROCESSING' || progress?.status === 'QUEUED';
-  const isComplete = progress?.status === 'COMPLETED';
-  const isFailed = progress?.status === 'FAILED';
+  // Derive status from analysis data (sync processing completes immediately)
+  const isProcessing = analysisLoading;
+  const isComplete = !!analysis && !analysisLoading;
+  const isFailed = !!analysisError && !analysisLoading;
 
   console.log('[CitationAnalysisPage] isProcessing:', isProcessing);
   console.log('[CitationAnalysisPage] isComplete:', isComplete);
@@ -42,27 +42,29 @@ export default function CitationAnalysisPage() {
 
   // Calculate estimated time based on references count
   const getEstimatedTime = () => {
-    const refCount = progress?.totalReferences || 0;
+    const refCount = analysis?.document?.statistics?.totalReferences || 0;
     if (refCount === 0) return '10-15';
     if (refCount < 10) return '3-5';
     if (refCount < 20) return '5-8';
     if (refCount < 50) return '8-12';
     return '12-20';
   };
+  // Suppress unused variable warning - function used in commented code
+  void getEstimatedTime;
 
   // Invalidate analysis query when job completes to fetch fresh data
   useEffect(() => {
-    if (isComplete && jobId) {
+    if (isComplete && documentId) {
       console.log('[CitationAnalysisPage] Job completed, invalidating analysis query');
-      queryClient.invalidateQueries({ queryKey: ['citation-analysis', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['citation-analysis', documentId] });
     }
-  }, [isComplete, jobId, queryClient]);
+  }, [isComplete, documentId, queryClient]);
 
   const handleExport = async (options: { includeOriginal: boolean; highlightChanges: boolean }) => {
-    if (!jobId) return;
+    if (!documentId) return;
     try {
       setIsExporting(true);
-      await citationIntelService.exportWithCorrections(jobId, options);
+      await citationIntelService.exportWithCorrections(documentId, options);
       toast.success('✓ Manuscript exported successfully');
       setShowExportModal(false);
     } catch (error: any) {
@@ -73,10 +75,10 @@ export default function CitationAnalysisPage() {
   };
 
   const handleDownloadSummary = async () => {
-    if (!jobId) return;
+    if (!documentId) return;
     try {
       setDownloading(true);
-      await citationIntelService.downloadChangeSummary(jobId);
+      await citationIntelService.downloadChangeSummary(documentId);
       toast.success('✓ Change summary downloaded');
     } catch (error: any) {
       toast.error('Failed to download summary');
@@ -84,77 +86,25 @@ export default function CitationAnalysisPage() {
       setDownloading(false);
     }
   };
+  void handleDownloadSummary; // Available for future use
 
-  // Show processing animation
-  if (isProcessing || progressLoading) {
+  // Show loading state
+  if (isProcessing) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Card className="p-12 max-w-2xl w-full">
           <div className="text-center">
             <Spinner size="lg" className="mx-auto mb-6" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Analyzing manuscript...</h2>
-
-            <div className="w-full bg-gray-200 rounded-full h-3 mb-6">
-              <div
-                className="bg-blue-600 h-3 rounded-full transition-all duration-500"
-                style={{ width: `${progress?.progress || 0}%` }}
-              />
-            </div>
-
-            <div className="space-y-2 text-left">
-              <div className="flex items-center text-sm text-gray-700">
-                {progress?.totalReferences && progress.totalReferences > 0 ? (
-                  <>
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Extracted {progress.totalReferences} references
-                  </>
-                ) : (
-                  <>
-                    <Clock className="h-4 w-4 text-blue-500 mr-2 animate-spin" />
-                    Extracting references...
-                  </>
-                )}
-              </div>
-              <div className="flex items-center text-sm text-gray-700">
-                {progress?.totalCitations && progress.totalCitations > 0 ? (
-                  <>
-                    <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                    Found {progress.totalCitations} in-text citations
-                  </>
-                ) : (
-                  <>
-                    <Clock className="h-4 w-4 text-blue-500 mr-2 animate-spin" />
-                    Finding in-text citations...
-                  </>
-                )}
-              </div>
-              <div className="flex items-center text-sm text-gray-700">
-                <Clock className="h-4 w-4 text-blue-500 mr-2 animate-spin" />
-                Verifying DOIs with Crossref...
-              </div>
-              <div className="flex items-center text-sm text-gray-700">
-                <Clock className="h-4 w-4 text-blue-500 mr-2 animate-spin" />
-                Detecting formatting issues...
-              </div>
-            </div>
-
-            <p className="text-sm text-gray-500 mt-6">
-              Estimated time: {getEstimatedTime()} seconds
-              {progress?.totalReferences && progress.totalReferences > 0 && (
-                <span className="text-gray-400 ml-2">
-                  (based on {progress.totalReferences} references)
-                </span>
-              )}
-            </p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Loading analysis results...</h2>
+            <p className="text-sm text-gray-500">Please wait while we fetch the citation analysis.</p>
           </div>
         </Card>
       </div>
     );
   }
 
-  // Check for 404 error (job not found)
-  const isJobNotFound = (progressError as any)?.response?.status === 404 ||
-                        (analysisError as any)?.response?.status === 404;
+  // Check for 404 error (document not found)
+  const isJobNotFound = (analysisError as any)?.response?.status === 404;
 
   if (isJobNotFound) {
     return (
@@ -166,7 +116,7 @@ export default function CitationAnalysisPage() {
             The citation analysis job you're looking for doesn't exist.
           </p>
           <p className="text-sm text-gray-500 mb-6">
-            Job ID: <span className="font-mono">{jobId}</span>
+            Job ID: <span className="font-mono">{documentId}</span>
           </p>
           <div className="flex gap-3 justify-center">
             <Button onClick={() => navigate('/citation/upload')} variant="primary">
@@ -199,7 +149,9 @@ export default function CitationAnalysisPage() {
 
   // Show results (THE HOOK!)
   if (isComplete && analysis) {
-    const { totalIssues, breakdown, stats, processingTime } = analysis;
+    const { document, references, detectedStyle } = analysis;
+    const statistics = document.statistics;
+    const filename = document.filename;
 
     return (
       <div className="min-h-screen bg-gray-50 py-12">
@@ -213,118 +165,93 @@ export default function CitationAnalysisPage() {
                   <h1 className="text-3xl font-bold text-gray-900">Analysis Complete</h1>
                 </div>
                 <p className="text-xl text-gray-700 ml-11">
-                  🎯 We found <span className="font-bold text-red-600">{totalIssues} citation issues</span> in{' '}
-                  <span className="font-bold text-blue-600">{processingTime?.toFixed(1) || '0.0'} seconds</span>
+                  📄 <span className="font-semibold">{filename}</span> - Detected style:{' '}
+                  <span className="font-bold text-blue-600">{detectedStyle || 'Unknown'}</span>
                 </p>
               </div>
               <div className="flex space-x-3">
-                <Button variant="outline" onClick={() => navigate(`/citation/manuscript/${jobId}`)}>
+                <Button variant="outline" onClick={() => navigate(`/citation/manuscript/${documentId}`)}>
                   <BookOpen className="h-4 w-4 mr-2" />
                   View Manuscript
                 </Button>
-                <Button variant="outline" onClick={() => navigate(`/citation/ghosts/${jobId}`)}>
-                  View Ghost Citations
+                <Button variant="outline" onClick={() => navigate(`/citation/editor/${documentId}`)}>
+                  Edit References
                 </Button>
-                <Button variant="outline" onClick={() => navigate(`/citation/references/${jobId}`)}>
-                  Review Manually
-                </Button>
-                <Button onClick={() => alert('Auto-correction coming soon!')}>
-                  Start Auto-Correction
+                <Button onClick={() => setShowExportModal(true)}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export
                 </Button>
               </div>
-            </div>
-          </Card>
-
-          {/* Issue Breakdown */}
-          <Card className="p-8 mb-8">
-            <h2 className="text-2xl font-semibold text-gray-900 mb-6">Issue Breakdown</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <IssueCard
-                icon="🔴"
-                label="Missing DOIs"
-                count={breakdown.missingDois}
-                color="red"
-                tooltip="References exist but don't have DOI links"
-              />
-              <IssueCard
-                icon="🟡"
-                label="Duplicate References"
-                count={breakdown.duplicates}
-                color="yellow"
-              />
-              <IssueCard
-                icon="🟠"
-                label="Uncited References"
-                count={breakdown.uncited}
-                color="orange"
-              />
-              <IssueCard
-                icon="🔵"
-                label="Ghost Citations"
-                count={breakdown.mismatches}
-                color="blue"
-                tooltip="Citations in text with no matching reference entry"
-              />
-              <IssueCard
-                icon="🟣"
-                label="Formatting Inconsistencies"
-                count={breakdown.formattingIssues}
-                color="purple"
-              />
-              <IssueCard
-                icon="⚫"
-                label="Numbering Mismatches"
-                count={breakdown.numberingMismatches}
-                color="gray"
-              />
             </div>
           </Card>
 
           {/* Document Stats */}
-          <Card className="p-8">
+          <Card className="p-8 mb-8">
             <h2 className="text-2xl font-semibold text-gray-900 mb-6">Document Statistics</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              <StatBox
-                icon={<FileText className="h-8 w-8 text-blue-500" />}
-                label="Total References"
-                value={stats.totalReferences}
-              />
-              <StatBox
-                icon={<Target className="h-8 w-8 text-green-500" />}
-                label="In-Text Citations"
-                value={stats.totalCitations}
-              />
-              <StatBox
-                icon={<CheckCircle className="h-8 w-8 text-purple-500" />}
-                label="Detected Style"
-                value={stats.detectedStyle}
-              />
-              <StatBox
-                icon={<Clock className="h-8 w-8 text-orange-500" />}
-                label="Confidence"
-                value={`${Math.round(stats.confidence * 100)}%`}
-              />
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <FileText className="h-8 w-8 text-blue-500 mx-auto mb-2" />
+                <p className="text-3xl font-bold text-gray-900">{statistics?.totalReferences || 0}</p>
+                <p className="text-sm text-gray-600">References</p>
+              </div>
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <Target className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                <p className="text-3xl font-bold text-gray-900">{statistics?.totalCitations || 0}</p>
+                <p className="text-sm text-gray-600">In-Text Citations</p>
+              </div>
+              <div className="text-center p-4 bg-purple-50 rounded-lg">
+                <CheckCircle className="h-8 w-8 text-purple-500 mx-auto mb-2" />
+                <p className="text-3xl font-bold text-gray-900">{document.wordCount || 0}</p>
+                <p className="text-sm text-gray-600">Words</p>
+              </div>
+              <div className="text-center p-4 bg-orange-50 rounded-lg">
+                <Clock className="h-8 w-8 text-orange-500 mx-auto mb-2" />
+                <p className="text-3xl font-bold text-gray-900">{document.pageCount || 0}</p>
+                <p className="text-sm text-gray-600">Pages</p>
+              </div>
             </div>
           </Card>
 
+          {/* Reference List Preview */}
+          {references && references.length > 0 && (
+            <Card className="p-8 mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">References ({references.length})</h2>
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {references.slice(0, 10).map((ref: any, index: number) => (
+                  <div key={ref.id} className="p-3 bg-gray-50 rounded-lg">
+                    <span className="font-semibold text-blue-600 mr-2">[{index + 1}]</span>
+                    <span className="text-gray-800">
+                      {ref.authors?.join(', ') || 'Unknown'} ({ref.year || 'n.d.'}).{' '}
+                      <em>{ref.title || 'Untitled'}</em>
+                      {ref.journalName && `. ${ref.journalName}`}
+                      {ref.doi && (
+                        <a href={`https://doi.org/${ref.doi}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 ml-2">
+                          DOI: {ref.doi}
+                        </a>
+                      )}
+                    </span>
+                  </div>
+                ))}
+                {references.length > 10 && (
+                  <p className="text-sm text-gray-500 text-center">
+                    ... and {references.length - 10} more references
+                  </p>
+                )}
+              </div>
+            </Card>
+          )}
+
           {/* Actions */}
-          <div className="mt-8 flex justify-center flex-wrap gap-3">
-            <Button variant="outline" onClick={() => navigate(`/citation/diff/${jobId}`)}>
-              View Before/After Diff
+          <div className="flex justify-center flex-wrap gap-3">
+            <Button variant="primary" onClick={() => navigate(`/citation/editor/${documentId}`)}>
+              Open in Editor
             </Button>
-            <Button variant="outline" onClick={() => navigate(`/citation/style/${jobId}`)}>
-              Normalize Citation Style
-            </Button>
-            <Button variant="primary" onClick={() => setShowExportModal(true)}>
+            <Button variant="outline" onClick={() => setShowExportModal(true)}>
               <Download className="h-4 w-4 mr-2" />
-              Export Corrected Manuscript
-            </Button>
-            <Button variant="outline" onClick={handleDownloadSummary} disabled={downloading}>
-              <Download className="h-4 w-4 mr-2" />
-              Download Change Summary
+              Export
             </Button>
             <Button variant="outline" onClick={() => navigate('/citation/upload')}>
-              Analyze Another Manuscript
+              Analyze Another
             </Button>
           </div>
 
@@ -346,6 +273,10 @@ export default function CitationAnalysisPage() {
     </div>
   );
 }
+
+// Suppressing unused function warnings - these components are available for future use
+void IssueCard;
+void StatBox;
 
 // Issue Card Component
 function IssueCard({

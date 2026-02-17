@@ -3,7 +3,7 @@
  * Full-featured citation management with drag-drop reference editor
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   FileText,
@@ -13,7 +13,9 @@ import {
   CheckCircle2,
   AlertTriangle,
   Link as LinkIcon,
-  Eye
+  Eye,
+  ArrowUpDown,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -69,6 +71,74 @@ export default function CitationEditorPage() {
   const [showChangeHighlights, setShowChangeHighlights] = useState(true);
   const [showExportModal, setShowExportModal] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isResequencing, setIsResequencing] = useState(false);
+
+  // Detect out-of-sequence citations for Vancouver style
+  const sequenceAnalysis = useMemo(() => {
+    if (!data?.citations || data.citations.length === 0) {
+      return { isSequential: true, outOfOrder: [], expectedOrder: [] };
+    }
+
+    // Only check for numeric citation styles (Vancouver, IEEE)
+    const isNumericStyle = data.detectedStyle?.toLowerCase() === 'vancouver' ||
+                          data.detectedStyle?.toLowerCase() === 'ieee' ||
+                          data.citations.some((c: any) => /^\s*[\(\[]?\d+[\)\]]?\s*$/.test(c.rawText?.replace(/[,\-–]/g, '')));
+
+    if (!isNumericStyle) {
+      return { isSequential: true, outOfOrder: [], expectedOrder: [] };
+    }
+
+    // Extract citation numbers in order of appearance
+    const citationNumbers: number[] = [];
+    for (const citation of data.citations) {
+      const rawText = citation.rawText || '';
+      // Extract all numbers from the citation
+      const matches = rawText.match(/\d+/g);
+      if (matches) {
+        for (const match of matches) {
+          const num = parseInt(match, 10);
+          if (!isNaN(num) && num > 0 && num <= 1000) {
+            citationNumbers.push(num);
+          }
+        }
+      }
+    }
+
+    if (citationNumbers.length === 0) {
+      return { isSequential: true, outOfOrder: [], expectedOrder: [] };
+    }
+
+    // Track first occurrence of each number
+    const firstOccurrence: number[] = [];
+    const seen = new Set<number>();
+    for (const num of citationNumbers) {
+      if (!seen.has(num)) {
+        firstOccurrence.push(num);
+        seen.add(num);
+      }
+    }
+
+    // Check if citations are in sequence (1, 2, 3, 4...)
+    const outOfOrder: number[] = [];
+    let lastSeen = 0;
+    for (const num of firstOccurrence) {
+      if (num < lastSeen) {
+        outOfOrder.push(num);
+      } else {
+        lastSeen = num;
+      }
+    }
+
+    // Calculate expected order (sorted by first appearance)
+    const expectedOrder = [...firstOccurrence].sort((a, b) => a - b);
+
+    return {
+      isSequential: outOfOrder.length === 0,
+      outOfOrder,
+      expectedOrder,
+      actualOrder: firstOccurrence
+    };
+  }, [data?.citations, data?.detectedStyle]);
 
   useEffect(() => {
     loadAnalysis();
@@ -106,6 +176,38 @@ export default function CitationEditorPage() {
       if (response.data.success) {
         setData(response.data.data);
         setSelectedStyle(response.data.data.detectedStyle || 'APA');
+
+        // Also fetch preview data to show any pending track changes
+        try {
+          const previewResponse = await api.get(
+            `/citation-management/document/${documentId}/preview`
+          );
+
+          if (previewResponse.data.success && previewResponse.data.data?.citations) {
+            const previews = previewResponse.data.data.citations;
+            console.log('[CitationEditorPage] Preview data on load:', previews.length, 'changes');
+
+            // Convert preview data to RecentChange format
+            const changes: RecentChange[] = previews
+              .filter((p: any) => p.changeType !== 'unchanged')
+              .map((p: any) => ({
+                citationId: p.id,
+                oldNumber: 0,
+                newNumber: p.isOrphaned || p.changeType === 'deleted' ? null : p.referenceNumber,
+                oldText: p.originalText,
+                newText: p.isOrphaned || p.changeType === 'deleted' ? p.originalText : p.newText,
+                changeType: p.changeType as 'style' | 'renumber' | 'deleted' | 'unchanged'
+              }));
+
+            if (changes.length > 0) {
+              console.log('[CitationEditorPage] Setting recent changes on load:', changes.length);
+              setRecentChanges(changes);
+              setShowChangeHighlights(true);
+            }
+          }
+        } catch (previewErr) {
+          console.log('[CitationEditorPage] No preview data available (this is normal for fresh documents)');
+        }
       } else {
         setError(response.data.error?.message || 'Failed to load analysis');
       }
@@ -258,10 +360,8 @@ export default function CitationEditorPage() {
     }, 100);
   };
 
-  const handleReorderComplete = async (oldCitations: any[], newCitations: any[]) => {
+  const handleReorderComplete = async () => {
     console.log('[CitationEditorPage] handleReorderComplete called');
-    console.log('[CitationEditorPage] Old citations:', oldCitations.length);
-    console.log('[CitationEditorPage] New citations:', newCitations.length);
 
     // Reload data first
     await loadAnalysis();
@@ -299,52 +399,68 @@ export default function CitationEditorPage() {
       }
     } catch (err) {
       console.error('[CitationEditorPage] Failed to fetch preview:', err);
-      // Fall back to simple comparison if preview fails
-      const changes: RecentChange[] = [];
-      const oldMap = new Map<string, { referenceNumber: number; rawText: string }>();
-      oldCitations.forEach(c => {
-        if (c.id && c.referenceNumber !== null && c.referenceNumber !== undefined) {
-          oldMap.set(c.id, {
-            referenceNumber: c.referenceNumber,
-            rawText: c.rawText || ''
-          });
-        }
-      });
+      // Preview failed - changes won't be highlighted but data is still reloaded
+    }
+  };
 
-      newCitations.forEach(c => {
-        if (!c.id) return;
-        const oldData = oldMap.get(c.id);
-        const newNum = c.referenceNumber;
-        const newText = c.rawText || '';
+  // Handle resequencing citations by appearance order
+  const handleResequence = async () => {
+    setIsResequencing(true);
+    setError(null);
+    try {
+      console.log('[CitationEditorPage] Resequencing citations by appearance order');
 
-        if (oldData) {
-          const oldNum = oldData.referenceNumber;
-          const oldText = oldData.rawText;
+      // Call the resequence API
+      const response = await api.post(
+        `/citation-management/document/${documentId}/resequence`
+      );
 
-          if (newNum === null || newNum === undefined) {
-            changes.push({
-              citationId: c.id,
-              oldNumber: oldNum,
-              newNumber: null,
-              oldText: oldText,
-              newText: newText
-            });
-          } else if (oldNum !== newNum || oldText !== newText) {
-            changes.push({
-              citationId: c.id,
-              oldNumber: oldNum,
-              newNumber: newNum,
-              oldText: oldText,
-              newText: newText
-            });
+      if (response.data.success) {
+        console.log('[CitationEditorPage] Resequence successful:', response.data.data);
+
+        // Reload data to get updated references
+        await loadAnalysis();
+
+        // Fetch preview data to show track changes
+        try {
+          const previewResponse = await api.get(
+            `/citation-management/document/${documentId}/preview`
+          );
+
+          if (previewResponse.data.success && previewResponse.data.data?.citations) {
+            const previews = previewResponse.data.data.citations;
+            console.log('[CitationEditorPage] Got preview data after resequence:', previews.length, 'citations');
+
+            // Convert preview data to RecentChange format
+            const changes: RecentChange[] = previews
+              .filter((p: any) => p.changeType !== 'unchanged')
+              .map((p: any) => ({
+                citationId: p.id,
+                oldNumber: 0,
+                newNumber: p.isOrphaned || p.changeType === 'deleted' ? null : p.referenceNumber,
+                oldText: p.originalText,
+                newText: p.isOrphaned || p.changeType === 'deleted' ? p.originalText : p.newText,
+                changeType: p.changeType as 'style' | 'renumber' | 'deleted' | 'unchanged'
+              }));
+
+            console.log('[CitationEditorPage] Resequence changes to display:', changes.length);
+
+            if (changes.length > 0) {
+              setRecentChanges(changes);
+              setShowChangeHighlights(true);
+            }
           }
+        } catch (previewErr) {
+          console.error('[CitationEditorPage] Failed to fetch preview after resequence:', previewErr);
         }
-      });
-
-      if (changes.length > 0) {
-        setRecentChanges(changes);
-        setShowChangeHighlights(true);
+      } else {
+        setError(response.data.error?.message || 'Resequencing failed');
       }
+    } catch (err: any) {
+      console.error('[CitationEditorPage] Resequence failed:', err);
+      setError(err.response?.data?.error?.message || err.message || 'Failed to resequence citations');
+    } finally {
+      setIsResequencing(false);
     }
   };
 
@@ -485,6 +601,41 @@ export default function CitationEditorPage() {
           </Card>
         </div>
 
+        {/* Sequence Warning Banner */}
+        {!sequenceAnalysis.isSequential && (
+          <Alert variant="warning" className="mb-6">
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-3">
+                <ArrowUpDown className="h-5 w-5 text-amber-600" />
+                <div>
+                  <p className="font-semibold text-amber-800">Citations Out of Sequence</p>
+                  <p className="text-sm text-amber-700 mt-1">
+                    The following citations appear out of order: [{sequenceAnalysis.outOfOrder.join(', ')}].
+                    For Vancouver style, citations should appear in numerical order (1, 2, 3...).
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={handleResequence}
+                disabled={isResequencing}
+                className="ml-4 bg-amber-600 hover:bg-amber-700 text-white"
+              >
+                {isResequencing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Fixing...
+                  </>
+                ) : (
+                  <>
+                    <ArrowUpDown className="h-4 w-4 mr-2" />
+                    Fix Sequence
+                  </>
+                )}
+              </Button>
+            </div>
+          </Alert>
+        )}
+
         {/* Action Panel */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <Card className="p-4">
@@ -595,7 +746,7 @@ export default function CitationEditorPage() {
                     }`}
                   >
                     <div className="flex items-start justify-between mb-2">
-                      <Badge variant="outline" className="text-xs">
+                      <Badge variant="default" className="text-xs">
                         ¶{citation.paragraphIndex || citation.paragraphNumber || 0}
                       </Badge>
                       <span className="text-sm font-mono text-gray-700">
@@ -717,6 +868,12 @@ export default function CitationEditorPage() {
               fullText={data.document.fullText}
               fullHtml={data.document.fullHtml}
               citations={data.citations}
+              references={data.references.map((r: any) => ({
+                id: r.id,
+                number: r.number,
+                authors: r.authors,
+                year: r.year
+              }))}
               onCitationClick={handleCitationClick}
               recentChanges={showChangeHighlights ? recentChanges : []}
             />
