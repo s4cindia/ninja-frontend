@@ -785,6 +785,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
             requiresManualVerification?: boolean;
             automationCapability?: number;
             needsVerification?: boolean;
+            remarks?: string;
           }>();
           if (confidenceResponse?.criteria) {
             const naSuggestionCriteria: string[] = [];
@@ -797,6 +798,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
                 requiresManualVerification: c.requiresManualVerification,
                 automationCapability: c.automationCapability,
                 needsVerification: c.needsVerification,
+                remarks: c.remarks,
               });
               if (c.naSuggestion) {
                 naSuggestionCriteria.push(c.criterionId);
@@ -822,6 +824,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
               requiresManualVerification: confidenceData?.requiresManualVerification ?? c.requiresManualVerification,
               automationCapability: confidenceData?.automationCapability ?? c.automationCapability,
               needsVerification: confidenceData?.needsVerification ?? c.needsVerification,
+              remarks: confidenceData?.remarks ?? c.remarks,
             };
             return normalizeCriterion(mergedData as CriterionConfidence, i);
           });
