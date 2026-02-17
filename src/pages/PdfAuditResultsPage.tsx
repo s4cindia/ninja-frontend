@@ -660,6 +660,14 @@ export const PdfAuditResultsPage: React.FC = () => {
               <RotateCw className="h-4 w-4 mr-1" />
               Re-run Audit
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/acr/workflow?jobId=${jobId}&jobType=PDF_ACCESSIBILITY`)}
+            >
+              <FileText className="h-4 w-4 mr-1" />
+              Generate ACR
+            </Button>
           </div>
         </div>
       </div>
