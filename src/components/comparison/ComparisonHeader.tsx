@@ -10,6 +10,7 @@ interface ComparisonHeaderProps {
 
 export const ComparisonHeader: React.FC<ComparisonHeaderProps> = ({ summary, fileName }) => {
   const hasDiscoveredFixes = (summary.discovered ?? 0) > 0;
+  const derivedPlannedFixes = summary.plannedFixes ?? Math.max(0, (summary.totalChanges ?? 0) - (summary.discovered ?? 0));
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -57,7 +58,7 @@ export const ComparisonHeader: React.FC<ComparisonHeaderProps> = ({ summary, fil
             <div className="flex items-center gap-2">
               <Target className="h-4 w-4 text-blue-600" />
               <span className="text-sm font-medium text-gray-700">Planned Fixes:</span>
-              <Badge variant="default">{summary.plannedFixes ?? 0}</Badge>
+              <Badge variant="default">{derivedPlannedFixes}</Badge>
               <span className="text-xs text-gray-500">(from audit)</span>
             </div>
 
