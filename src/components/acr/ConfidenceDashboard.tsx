@@ -1099,7 +1099,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
             </span>
             <span className="font-medium text-gray-900">{criterion.criterionId}</span>
             {/* Show icon if there are any issues (pending or remediated) */}
-            {issueData && (issueData.count > 0 || (issueData.remediatedCount && issueData.remediatedCount > 0)) && (
+            {issueData && (issueData.count > 0 || (issueData.remediatedCount ?? 0) > 0) && (
               <span title={`${issueData.count} pending, ${issueData.remediatedCount || 0} fixed`}>
                 {issueData.count > 0 ? (
                   <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
