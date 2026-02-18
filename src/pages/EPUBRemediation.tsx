@@ -1668,28 +1668,35 @@ export const EPUBRemediation: React.FC = () => {
       return;
     }
 
-    const successCount = localFixes.filter((f) => f.success).length;
-    const failCount = localFixes.filter((f) => !f.success).length;
+    // Reload plan from server to get authoritative task statuses.
+    // The simulation loop above uses Math.random() for visual animation only —
+    // the backend has already determined the real success/failure for each task.
+    let actualFixed = localFixes.filter((f) => f.success).length;
+    let actualFailed = localFixes.filter((f) => !f.success).length;
+    let actualSkipped = totalAutoTasks - localFixes.length;
 
-    try {
-      const response = await api.get(`/epub/job/${jobId}/comparison/summary`);
-      const data = response.data.data || response.data;
-      setComparisonSummary({
-        fixedCount: data.fixedCount ?? successCount,
-        failedCount: data.failedCount ?? failCount,
-        skippedCount: data.skippedCount ?? totalAutoTasks - localFixes.length,
-        beforeScore: data.beforeScore ?? 45,
-        afterScore: data.afterScore ?? Math.min(95, 45 + successCount * 10),
-      });
-    } catch {
-      setComparisonSummary({
-        fixedCount: successCount,
-        failedCount: failCount,
-        skippedCount: totalAutoTasks - localFixes.length,
-        beforeScore: 45,
-        afterScore: Math.min(95, 45 + successCount * 10),
-      });
+    if (!isDemo && jobId) {
+      try {
+        const planResponse = await api.get(`/epub/job/${jobId}/remediation`);
+        const freshPlan = planResponse.data.data || planResponse.data;
+        if (freshPlan) {
+          setPlan(freshPlan);
+          actualFixed = freshPlan.tasks.filter((t: { status: string }) => t.status === "completed").length;
+          actualFailed = freshPlan.tasks.filter((t: { status: string }) => t.status === "failed").length;
+          actualSkipped = freshPlan.tasks.filter((t: { status: string }) => t.status === "skipped").length;
+        }
+      } catch {
+        // Keep simulation-based counts as fallback
+      }
     }
+
+    setComparisonSummary({
+      fixedCount: actualFixed,
+      failedCount: actualFailed,
+      skippedCount: actualSkipped,
+      beforeScore: 45,
+      afterScore: Math.min(95, 45 + actualFixed * 10),
+    });
 
     setPageState("complete");
     // Update URL to persist completion state
@@ -1866,11 +1873,13 @@ export const EPUBRemediation: React.FC = () => {
     );
   }
 
-  // Use actual change counts from database when available (more accurate than task counts)
-  // Task counts may not reflect additional fixes discovered during remediation
-  const fixedCount = comparisonSummary?.fixedCount ?? plan.tasks.filter((t) => t.status === "completed").length;
-  const failedCount = comparisonSummary?.failedCount ?? plan.tasks.filter((t) => t.status === "failed").length;
-  const skippedCount = comparisonSummary?.skippedCount ?? plan.tasks.filter((t) => t.status === "skipped").length;
+  // Plan task statuses are updated by the backend for all fix types (auto-fix, quick-fix,
+  // manual) and are the authoritative source for the tally tracker.
+  // comparisonSummary.fixedCount reflects RemediationChange table records, which are only
+  // populated for quick-fix (not auto-fix), so it can be 0 even when all tasks completed.
+  const fixedCount = plan.tasks.filter((t) => t.status === "completed").length;
+  const failedCount = plan.tasks.filter((t) => t.status === "failed").length;
+  const skippedCount = plan.tasks.filter((t) => t.status === "skipped").length;
   const pendingCount = plan.tasks.filter((t) => t.status === "pending").length;
   const pendingManualCount = plan.tasks.filter(
     (t) => t.type === "manual" && t.status === "pending",
