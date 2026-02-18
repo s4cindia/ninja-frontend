@@ -354,7 +354,13 @@ export function AcrWorkflowPage() {
 
         isNotApplicable: isNA,
         naReason: isNA ? criterion.naSuggestion?.rationale : undefined,
-        naSuggestion: isNA ? criterion.naSuggestion : undefined,
+        // Strip detectionChecks (large array) — send only fields the backend stores
+        naSuggestion: isNA && criterion.naSuggestion ? {
+          suggestedStatus: criterion.naSuggestion.suggestedStatus,
+          confidence: criterion.naSuggestion.confidence,
+          rationale: criterion.naSuggestion.rationale,
+          edgeCases: criterion.naSuggestion.edgeCases,
+        } : undefined,
         verifiedAt: verification?.verifiedAt || new Date().toISOString().slice(0, 16).replace('T', ' '),
         confidence: Math.round(criterion.confidenceScore || 0),
       };
