@@ -5,7 +5,12 @@ export const JOB_TYPE_LABELS: Record<string, string> = {
   'ACR_WORKFLOW': 'ACR Workflow',
   'ALT_TEXT_GENERATION': 'Alt Text Generation',
   'METADATA_EXTRACTION': 'Metadata Extraction',
-  'BATCH_VALIDATION': 'Batch Validation'
+  'BATCH_VALIDATION': 'Batch Validation',
+  'CITATION_DETECTION': 'Citation Detection',
+  'CITATION_VALIDATION': 'Citation Validation',
+  'PLAGIARISM_CHECK': 'Plagiarism Check',
+  'STYLE_VALIDATION': 'Style Validation',
+  'EDITORIAL_FULL': 'Editorial Full Check'
 };
 
 export const JOB_STATUS_COLORS: Record<string, string> = {
@@ -22,8 +27,10 @@ export function getJobTypeLabel(type: string): string {
 
 export function extractFileNameFromJob(job: { input?: Record<string, unknown>; output?: Record<string, unknown> }): string {
   if (job.output?.fileName) return String(job.output.fileName);
+  if (job.output?.filename) return String(job.output.filename);
   if (job.output?.originalName) return String(job.output.originalName);
   if (job.input?.originalName) return String(job.input.originalName);
   if (job.input?.fileName) return String(job.input.fileName);
+  if (job.input?.filename) return String(job.input.filename);
   return 'Unknown file';
 }

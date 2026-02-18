@@ -12,8 +12,19 @@ export function useUploadManuscript() {
     onSuccess: () => {
       toast.success('Manuscript uploaded successfully');
     },
-    onError: (error) => {
-      const message = (error as any)?.response?.data?.error?.message || 'Upload failed';
+    onError: (error: unknown) => {
+      // Handle both plain Error objects and Axios error responses
+      let message = 'Upload failed';
+
+      if (error instanceof Error) {
+        // Plain Error thrown by service (e.g., S3 config errors)
+        message = error.message;
+      } else {
+        // Axios error response
+        const axiosError = error as { response?: { data?: { error?: { message?: string } } } };
+        message = axiosError?.response?.data?.error?.message || 'Upload failed';
+      }
+
       toast.error(message);
     },
   });
