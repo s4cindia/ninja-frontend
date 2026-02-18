@@ -687,4 +687,71 @@ gh variable set VAR_NAME --body "value"
 
 ---
 
-*Last updated: February 12, 2026*
+*Last updated: February 19, 2026*
+
+---
+
+## Workflow Agent (Sprint 9-11)
+
+### Architecture
+- **Orchestration layer** — XState v5 state machine on backend, real-time UI on frontend
+- 14 states, 4 phases, 4 HITL gates
+- State persisted to PostgreSQL, cached in Redis
+- Real-time updates via Socket.IO
+
+### State Flow
+```
+UPLOAD_RECEIVED → PREPROCESSING → RUNNING_EPUBCHECK → RUNNING_ACE → RUNNING_AI_ANALYSIS
+→ AWAITING_AI_REVIEW (Gate 1) → AUTO_REMEDIATION → AWAITING_REMEDIATION_REVIEW (Gate 2)
+→ VERIFICATION_AUDIT → CONFORMANCE_MAPPING → AWAITING_CONFORMANCE_REVIEW (Gate 3)
+→ ACR_GENERATION → AWAITING_ACR_SIGNOFF (Gate 4) → COMPLETED
+```
+
+### HITL Gates
+- Gate 1 (AI Review): Conditionally skippable if all HIGH confidence
+- Gate 2 (Remediation Review): NEVER skippable — manual fixes required
+- Gate 3 (Conformance Review): NEVER skippable — legal requirement
+- Gate 4 (ACR Sign-off): NEVER skippable — attestation required
+
+### Key Directories (Frontend — T4 owns exclusively)
+- `src/pages/Workflow*` — WorkflowStatusPage
+- `src/components/workflow/` — PhaseProgressBar, WorkflowTimeline, StateIndicator, WorkflowStartDialog, WorkflowStartButton
+- `src/hooks/useWorkflow.ts` — React Query hooks for all workflow + HITL endpoints
+- `src/hooks/useWorkflowSocket.ts` — Socket.IO connection lifecycle hook
+- `src/services/workflow.service.ts` — API service wrapping all backend endpoints
+- `src/types/workflow.ts` — frontend re-exports from contracts
+
+### Terminal Ownership (T4)
+Branch: `feature/wf-frontend`
+This is the only frontend terminal. T4 is allowed to modify ONE existing file: `src/App.tsx` (add workflow route).
+
+### Backend API Endpoints (T4 consumes)
+- `POST /api/v1/workflows` — start workflow
+- `GET /api/v1/workflows/:id` — status
+- `GET /api/v1/workflows/:id/timeline` — event history
+- `POST /api/v1/workflows/:id/pause|resume|cancel|retry`
+- `GET /api/v1/workflows/:id/hitl/pending` — pending review items
+- `GET /api/v1/workflows/hitl/queue` — aggregated queue
+- `POST /api/v1/workflows/:id/hitl/ai-review` — Gate 1 decisions
+- `GET /api/v1/workflows/:id/hitl/remediation-items` — Gate 2 items
+- `POST /api/v1/workflows/:id/hitl/remediation-fix` — manual fix
+- `POST /api/v1/workflows/:id/hitl/remediation-complete` — complete Gate 2
+- `POST /api/v1/workflows/:id/hitl/conformance-review` — Gate 3
+- `POST /api/v1/workflows/:id/hitl/acr-signoff` — Gate 4 attestation
+
+### WebSocket
+- Namespace: `/workflow`
+- Install: `npm install socket.io-client`
+- Events: `workflow:state-change`, `workflow:hitl-required`, `workflow:remediation-progress`, `workflow:error`, `batch:progress`
+- CSP headers already configured in `vite.config.ts` for `ws:`/`wss:`
+
+### Service Pattern (functional, not class-based)
+```typescript
+export const workflowService = {
+  async startWorkflow(fileId: string, options?: StartWorkflowRequest) { ... },
+  async getWorkflow(id: string) { ... },
+};
+```
+
+### Merge Order
+T4 merges LAST — after T1 (state machine), T2 (HITL gateway), T3 (API + WebSocket) all merge to main.
