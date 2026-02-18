@@ -161,28 +161,53 @@ export default function CitationUploadPage() {
           <Card className="p-6 mb-8">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Uploads</h2>
             <div className="space-y-3">
-              {(recentJobs as RecentJob[]).map((job) => (
-                <Link
-                  key={job.jobId}
-                  to={`/citation/analysis/${job.documentId}`}
-                  className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center space-x-3">
-                    <FileText className="h-5 w-5 text-gray-400" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{job.filename}</p>
-                      <p className="text-xs text-gray-500">{formatTimeAgo(job.createdAt)}</p>
+              {(recentJobs as RecentJob[]).map((job) => {
+                // Only link to analysis if documentId exists
+                const hasDocument = job.documentId && job.documentId !== 'null';
+                const content = (
+                  <>
+                    <div className="flex items-center space-x-3">
+                      <FileText className="h-5 w-5 text-gray-400" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{job.filename}</p>
+                        <p className="text-xs text-gray-500">{formatTimeAgo(job.createdAt)}</p>
+                      </div>
                     </div>
+                    {job.status === 'COMPLETED' && hasDocument ? (
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    ) : job.status === 'PROCESSING' ? (
+                      <Clock className="h-4 w-4 text-blue-500 animate-spin" />
+                    ) : job.status === 'FAILED' ? (
+                      <span className="text-xs text-red-500">Failed</span>
+                    ) : (
+                      <Clock className="h-4 w-4 text-gray-400" />
+                    )}
+                  </>
+                );
+
+                if (hasDocument) {
+                  return (
+                    <Link
+                      key={job.jobId}
+                      to={`/citation/analysis/${job.documentId}`}
+                      className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"
+                    >
+                      {content}
+                    </Link>
+                  );
+                }
+
+                // Non-clickable for jobs without documents
+                return (
+                  <div
+                    key={job.jobId}
+                    className="flex items-center justify-between p-3 rounded-lg bg-gray-50 opacity-60"
+                    title="Document processing failed"
+                  >
+                    {content}
                   </div>
-                  {job.status === 'COMPLETED' ? (
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                  ) : job.status === 'PROCESSING' ? (
-                    <Clock className="h-4 w-4 text-blue-500 animate-spin" />
-                  ) : (
-                    <Clock className="h-4 w-4 text-gray-400" />
-                  )}
-                </Link>
-              ))}
+                );
+              })}
             </div>
           </Card>
         )}
