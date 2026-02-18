@@ -162,21 +162,30 @@ function ActionButtons({
     downloadCSV(csvContent, `${baseName}-issues-${formatDate(new Date())}.csv`);
   };
 
+  const isCompliant = issues.length === 0;
+
   return (
     <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t">
-      <Button 
-        onClick={onCreateRemediationPlan}
-        disabled={isCreatingPlan}
-      >
-        {isCreatingPlan ? (
-          <>Creating Plan...</>
-        ) : (
-          <>
-            <ClipboardList className="h-4 w-4 mr-2" />
-            Create Remediation Plan
-          </>
-        )}
-      </Button>
+      {isCompliant ? (
+        <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-md text-green-700 text-sm font-medium">
+          <CheckCircle className="h-4 w-4 flex-shrink-0" />
+          EPUB is fully compliant — no remediation needed
+        </div>
+      ) : (
+        <Button
+          onClick={onCreateRemediationPlan}
+          disabled={isCreatingPlan}
+        >
+          {isCreatingPlan ? (
+            <>Creating Plan...</>
+          ) : (
+            <>
+              <ClipboardList className="h-4 w-4 mr-2" />
+              Create Remediation Plan
+            </>
+          )}
+        </Button>
+      )}
       <Button 
         variant="secondary"
         onClick={() => {
