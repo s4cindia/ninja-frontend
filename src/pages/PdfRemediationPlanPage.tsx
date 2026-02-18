@@ -18,7 +18,8 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronRight,
-  ListTree
+  ListTree,
+  FileText
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
@@ -276,6 +277,14 @@ export const PdfRemediationPlanPage: React.FC = () => {
                 >
                   <ListTree className="h-4 w-4" />
                   View All Changes
+                </Button>
+                <Button
+                  onClick={() => navigate(`/acr/workflow?jobId=${jobId}&jobType=PDF_ACCESSIBILITY`)}
+                  variant="primary"
+                  className="flex items-center gap-2"
+                >
+                  <FileText className="h-4 w-4" />
+                  Generate ACR
                 </Button>
                 <DownloadRemediatedButton
                   jobId={jobId!}
