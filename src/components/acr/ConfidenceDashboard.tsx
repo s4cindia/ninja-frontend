@@ -945,8 +945,12 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
   // Manual verification overrides all other categories
   // Note: Computed synchronously (not useMemo) to avoid hooks after early return
   const isManualCriterion = (c: CriterionConfidence) => c.requiresManualVerification || c.confidenceScore === 0;
+  const criteriaWithIssuesCount = criteria.filter(c =>
+    (c.issueCount ?? 0) > 0 || (c.remainingCount ?? 0) > 0 || c.hasIssues === true
+  ).length;
   const confidenceCounts = {
     all: criteria.length,
+    withIssues: criteriaWithIssuesCount,
     high: criteria.filter(c => !isManualCriterion(c) && c.confidenceScore >= 90).length,
     medium: criteria.filter(c => !isManualCriterion(c) && c.confidenceScore >= 60 && c.confidenceScore < 90).length,
     low: criteria.filter(c => !isManualCriterion(c) && c.confidenceScore < 60 && c.confidenceScore > 0).length,
@@ -1279,6 +1283,26 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
       <div className="bg-white rounded-lg border shadow-sm p-6">
         <h2 className="text-lg font-bold mb-4 text-gray-900">Confidence Analysis Summary</h2>
         
+        {/* Per-EPUB dynamic stat: criteria with detected issues */}
+        <div className="mb-4 p-3 rounded-lg border flex items-center justify-between"
+          style={{ backgroundColor: criteriaWithIssuesCount > 0 ? '#fef2f2' : '#f0fdf4', borderColor: criteriaWithIssuesCount > 0 ? '#fecaca' : '#bbf7d0' }}>
+          <div>
+            <span className="font-semibold text-sm" style={{ color: criteriaWithIssuesCount > 0 ? '#dc2626' : '#16a34a' }}>
+              {criteriaWithIssuesCount === 0
+                ? 'No issues detected across all criteria for this document'
+                : `${criteriaWithIssuesCount} criteria have detected issues in this document`}
+            </span>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {criteriaWithIssuesCount === 0
+                ? 'All automated checks passed — review Manual criteria below to complete assessment'
+                : 'These criteria require attention — see the criteria list below for details'}
+            </p>
+          </div>
+          <span className="text-2xl font-bold ml-4" style={{ color: criteriaWithIssuesCount > 0 ? '#dc2626' : '#16a34a' }}>
+            {criteriaWithIssuesCount}/{criteria.length}
+          </span>
+        </div>
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
           <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
             <div className="text-3xl font-bold text-green-600">{confidenceCounts.high}</div>
@@ -1287,7 +1311,7 @@ export function ConfidenceDashboard({ jobId, onVerifyClick, onCriteriaLoaded }: 
               <InfoTooltip content={
                 <div>
                   <p className="font-semibold mb-1">High Confidence (90%+)</p>
-                  <p>Criteria with reliable automated verification. These have been auto-verified by AI with high accuracy.</p>
+                  <p>Criteria where automated tools can reliably verify compliance (e.g. contrast ratios, language tags, parsing). The count reflects tool capability for this category of criteria across all documents.</p>
                 </div>
               }>
                 <HelpCircle className="h-3.5 w-3.5 text-gray-400 hover:text-gray-600" />
