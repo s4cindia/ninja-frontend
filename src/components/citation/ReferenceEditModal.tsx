@@ -9,13 +9,6 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import type { CitationReference } from '@/types/citation-intel.types';
 
-interface ReferenceChange {
-  timestamp: string;
-  note?: string;
-  previousText: string;
-  newText: string;
-}
-
 interface ReferenceEditModalProps {
   reference: CitationReference;
   isOpen: boolean;
@@ -139,7 +132,7 @@ export function ReferenceEditModal({
 
               {showHistory && (
                 <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
-                  {(reference.changes as ReferenceChange[]).map((change, idx) => (
+                  {reference.changes.map((change, idx) => (
                     <div key={idx} className="text-sm">
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-medium text-gray-900">

@@ -16,6 +16,13 @@ export type CitationIssueType =
 
 export type IssueSeverity = 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
 
+export interface ReferenceChange {
+  timestamp: string;
+  note?: string;
+  previousText: string;
+  newText: string;
+}
+
 export interface CitationJob {
   id: string;
   tenantId: string;
@@ -45,7 +52,7 @@ export interface CitationReference {
   verificationStatus: VerificationStatus;
   confidence: number | null;
   metadata: ReferenceMetadata | null;
-  changes: string[] | null;
+  changes: ReferenceChange[] | null;
   needsReview: boolean;
   createdAt: string;
   updatedAt: string;
