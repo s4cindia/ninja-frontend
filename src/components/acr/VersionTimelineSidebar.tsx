@@ -119,8 +119,9 @@ export const VersionTimelineSidebar: React.FC<VersionTimelineSidebarProps> = ({
   };
 
   const calculateConformance = (version: ReportVersion) => {
-    if (version.applicableCriteria === 0) return 0;
-    return Math.round((version.passedCriteria / version.applicableCriteria) * 100);
+    const applicable = version.applicableCriteria ?? 0;
+    if (applicable === 0) return 0;
+    return Math.round(((version.passedCriteria ?? 0) / applicable) * 100);
   };
 
   if (isLoading) {
