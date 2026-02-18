@@ -5,22 +5,22 @@ import { Button } from '@/components/ui/Button';
 import { ErrorBoundary } from '@/components/ui';
 import { useJob, useCancelJob } from '@/hooks/useJobs';
 import { getJobTypeLabel, extractFileNameFromJob } from '@/utils/jobTypes';
-import { 
-  getStatusIcon, 
-  getStatusBadgeClass, 
-  formatDateTime, 
-  formatDuration 
+import {
+  getStatusIcon,
+  getStatusBadgeClass,
+  formatDateTime,
+  formatDuration
 } from '@/utils/jobHelpers';
-import { 
-  ComplianceScore, 
-  SeveritySummary, 
-  IssuesTable, 
-  JobActions, 
+import {
+  ComplianceScore,
+  SeveritySummary,
+  IssuesTable,
+  JobActions,
   RawDataToggle,
   JobDetailSkeleton
 } from '@/components/jobs';
 import { parseJobOutput, extractDownloadUrl } from '@/types/job-output.types';
-import { 
+import {
   AlertCircle,
   ArrowLeft,
   Download,
@@ -48,6 +48,7 @@ export function JobDetails() {
     return { parsedOutput: result, parseError: null };
   }, [job?.output]);
 
+  // Redirect citation jobs to the citation editor
   if (job && CITATION_JOB_TYPES.includes(job.type)) {
     return <Navigate to={`/editorial/citations/${job.id}`} replace />;
   }
@@ -117,7 +118,7 @@ export function JobDetails() {
   return (
     <div>
       <Breadcrumbs items={[{ label: 'Jobs', path: '/jobs' }, { label: fileName }]} />
-      
+
       <div className="flex items-center justify-between mb-6" data-testid="job-detail-header">
         <h1 className="text-2xl font-bold text-gray-900">{fileName}</h1>
         <div className="flex gap-2">
@@ -128,8 +129,8 @@ export function JobDetails() {
             </Button>
           </Link>
           {canCancel && (
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={handleCancel}
               disabled={cancelJob.isPending}
             >
@@ -257,7 +258,7 @@ export function JobDetails() {
           <div className="mt-6 space-y-6">
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-6">Audit Results</h2>
-              
+
               <div className="space-y-6" data-testid="job-results">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div className="lg:col-span-1 flex justify-center">

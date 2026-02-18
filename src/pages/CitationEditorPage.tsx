@@ -82,7 +82,7 @@ export default function CitationEditorPage() {
     // Only check for numeric citation styles (Vancouver, IEEE)
     const isNumericStyle = data.detectedStyle?.toLowerCase() === 'vancouver' ||
                           data.detectedStyle?.toLowerCase() === 'ieee' ||
-                          data.citations.some((c: any) => /^\s*[\(\[]?\d+[\)\]]?\s*$/.test(c.rawText?.replace(/[,\-–]/g, '')));
+                          data.citations.some((c: any) => /^\s*[([]?\d+[)\]]?\s*$/.test(c.rawText?.replace(/[,\-–]/g, '')));
 
     if (!isNumericStyle) {
       return { isSequential: true, outOfOrder: [], expectedOrder: [] };
