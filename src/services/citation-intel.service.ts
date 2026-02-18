@@ -50,14 +50,24 @@ export const citationIntelService = {
 
       return confirmResponse.data.data;
     } catch (presignError: unknown) {
-      // If presigned upload fails (S3 not configured, credentials missing, etc.), fall back to direct upload
-      const errorResponse = presignError as { response?: { status?: number; data?: { error?: { code?: string } } } };
+      const errorResponse = presignError as {
+        response?: {
+          status?: number;
+          data?: { error?: { code?: string; message?: string } }
+        }
+      };
       const errorCode = errorResponse?.response?.data?.error?.code;
+      const errorMessage = errorResponse?.response?.data?.error?.message;
       const statusCode = errorResponse?.response?.status;
 
-      // Fall back to direct upload for S3 configuration issues (503) or server errors (500)
-      if (errorCode === 'S3_NOT_CONFIGURED' || statusCode === 503 || statusCode === 500) {
-        console.log('S3 presign failed, falling back to direct upload');
+      // Check if running locally (no CloudFront WAF blocking multipart uploads)
+      const isLocalhost = window.location.hostname === 'localhost' ||
+                          window.location.hostname === '127.0.0.1';
+
+      // In localhost, fallback to direct upload for S3 config issues (503) or server errors (500)
+      // This allows local development without S3 configured
+      if (isLocalhost && (statusCode === 503 || statusCode === 500)) {
+        console.log('S3 presign failed in dev, falling back to direct upload');
         const formData = new FormData();
         formData.append('file', file);
 
@@ -69,6 +79,20 @@ export const citationIntelService = {
 
         return response.data.data;
       }
+
+      // In production (AWS), show user-friendly error - don't attempt direct upload
+      // CloudFront WAF blocks multipart/form-data requests
+      if (statusCode === 503) {
+        const friendlyMessage = errorMessage || 'File upload service is not available. Please contact support.';
+        console.error('S3 service unavailable:', errorCode, friendlyMessage);
+        throw new Error(friendlyMessage);
+      }
+
+      if (statusCode === 500) {
+        console.error('Upload service error. Direct upload not available in production.');
+        throw new Error('Upload service temporarily unavailable. Please try again later.');
+      }
+
       throw presignError;
     }
   },
