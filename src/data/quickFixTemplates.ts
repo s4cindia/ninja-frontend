@@ -1380,6 +1380,7 @@ const issueCodeAliases: Record<string, string> = {
 };
 
 function normalizeIssueCode(issueCode: string): string {
+  if (!issueCode) return '';
   const upperCode = issueCode.toUpperCase();
   if (issueCodeAliases[upperCode]) {
     return issueCodeAliases[upperCode];
@@ -1435,6 +1436,7 @@ export function getBackendFixInfo(issueCode: string): BackendFixInfo | undefined
 }
 
 export function hasQuickFixTemplate(issueCode: string): boolean {
+  if (!issueCode) return false;
   if (getQuickFixTemplate(issueCode) !== undefined) {
     return true;
   }
