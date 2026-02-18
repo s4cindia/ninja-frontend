@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import { Upload, FileText, Clock, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -13,6 +13,15 @@ import { useUploadManuscript } from '@/hooks/useCitationIntel';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import toast from 'react-hot-toast';
+
+// Type for recent citation jobs
+interface RecentJob {
+  jobId: string;
+  documentId: string;
+  filename: string;
+  createdAt: string;
+  status: 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+}
 
 export default function CitationUploadPage() {
   const navigate = useNavigate();
@@ -161,10 +170,10 @@ export default function CitationUploadPage() {
           <Card className="p-6 mb-8">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Uploads</h2>
             <div className="space-y-3">
-              {recentJobs.map((job: any) => (
-                <div
+              {(recentJobs as RecentJob[]).map((job) => (
+                <Link
                   key={job.jobId}
-                  onClick={() => navigate(`/citation/analysis/${job.documentId}`)}
+                  to={`/citation/analysis/${job.documentId}`}
                   className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"
                 >
                   <div className="flex items-center space-x-3">
@@ -181,7 +190,7 @@ export default function CitationUploadPage() {
                   ) : (
                     <Clock className="h-4 w-4 text-gray-400" />
                   )}
-                </div>
+                </Link>
               ))}
             </div>
           </Card>

@@ -447,7 +447,14 @@ export default function ReferenceEditor({
                         placeholder="e.g., 15(3)"
                         value={`${editForm.volume || ''}${editForm.issue ? `(${editForm.issue})` : ''}`}
                         onChange={(e) => {
-                          const match = e.target.value.match(/^(\d+)(?:\((\d+)\))?$/);
+                          const value = e.target.value;
+                          // Handle empty input - clear both volume and issue
+                          if (!value.trim()) {
+                            setEditForm({ ...editForm, volume: '', issue: '' });
+                            return;
+                          }
+                          // Parse volume and optional issue from format like "15(3)"
+                          const match = value.match(/^(\d+)(?:\((\d+)\))?$/);
                           if (match) {
                             setEditForm({
                               ...editForm,

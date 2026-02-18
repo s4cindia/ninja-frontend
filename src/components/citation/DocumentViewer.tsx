@@ -375,9 +375,9 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
         searchText = changeInfo.oldText;
 
         // Show transition: old text struck through, arrow, new clickable text
-        const oldDisplay = `<span class="track-change-deletion" style="font-size: 0.9em;">${escapeHtml(changeInfo.oldText)}</span>`;
+        const oldDisplay = `<span class="track-change-deletion-sm">${escapeHtml(changeInfo.oldText)}</span>`;
         const newDisplay = renderClickableNumbers(changeInfo.newText, 'track-change-addition');
-        displayContent = `${oldDisplay}<span style="color: #059669; font-weight: bold;"> → </span>${newDisplay}`;
+        displayContent = `${oldDisplay}<span class="track-change-arrow"> → </span>${newDisplay}`;
 
         markTag = `<mark class="px-1 rounded transition-colors" title="${escapeHtml(refInfo)}">${displayContent}</mark>`;
 
@@ -749,13 +749,7 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
       )}
       <div className="prose max-w-none">
         <div
-          className="document-content"
-          style={{
-            fontFamily: 'Georgia, "Times New Roman", serif',
-            fontSize: '16px',
-            lineHeight: '1.8',
-            color: '#1f2937'
-          }}
+          className="document-content font-serif text-base leading-relaxed text-gray-800"
           onClick={handleCitationClick}
           dangerouslySetInnerHTML={{ __html: displayContent }}
         />

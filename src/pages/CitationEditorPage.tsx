@@ -3,7 +3,7 @@
  * Full-featured citation management with drag-drop reference editor
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   FileText,
@@ -26,6 +26,7 @@ import DragDropGuide from '@/components/citation/DragDropGuide';
 import DocumentViewer from '@/components/citation/DocumentViewer';
 import { ExportOptionsModal } from '@/components/citation/ExportOptionsModal';
 import { api } from '@/services/api';
+import toast from 'react-hot-toast';
 
 interface AnalysisData {
   document: {
@@ -140,11 +141,7 @@ export default function CitationEditorPage() {
     };
   }, [data?.citations, data?.detectedStyle]);
 
-  useEffect(() => {
-    loadAnalysis();
-  }, [documentId]);
-
-  const loadAnalysis = async () => {
+  const loadAnalysis = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -163,7 +160,7 @@ export default function CitationEditorPage() {
       });
 
       if (response.data.data?.citations && response.data.data.citations.length > 0) {
-        const citationsWithText = response.data.data.citations.filter((c: any) => c.rawText && c.rawText.trim() !== '');
+        const citationsWithText = response.data.data.citations.filter((c: { rawText?: string }) => c.rawText && c.rawText.trim() !== '');
         console.log('[CitationEditorPage] Citations with rawText:', citationsWithText.length, '/', response.data.data.citations.length);
 
         if (citationsWithText.length < response.data.data.citations.length) {
@@ -188,12 +185,20 @@ export default function CitationEditorPage() {
             console.log('[CitationEditorPage] Preview data on load:', previews.length, 'changes');
 
             // Convert preview data to RecentChange format
-            const changes: RecentChange[] = previews
-              .filter((p: any) => p.changeType !== 'unchanged')
-              .map((p: any) => ({
+            interface PreviewCitation {
+              id: string;
+              changeType: string;
+              isOrphaned?: boolean;
+              referenceNumber?: number;
+              originalText?: string;
+              newText?: string;
+            }
+            const changes: RecentChange[] = (previews as PreviewCitation[])
+              .filter((p) => p.changeType !== 'unchanged')
+              .map((p) => ({
                 citationId: p.id,
                 oldNumber: 0,
-                newNumber: p.isOrphaned || p.changeType === 'deleted' ? null : p.referenceNumber,
+                newNumber: p.isOrphaned || p.changeType === 'deleted' ? null : (p.referenceNumber ?? null),
                 oldText: p.originalText,
                 newText: p.isOrphaned || p.changeType === 'deleted' ? p.originalText : p.newText,
                 changeType: p.changeType as 'style' | 'renumber' | 'deleted' | 'unchanged'
@@ -211,13 +216,19 @@ export default function CitationEditorPage() {
       } else {
         setError(response.data.error?.message || 'Failed to load analysis');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[CitationEditorPage] Error loading analysis:', err);
-      setError(err.response?.data?.error?.message || err.message || 'Failed to load analysis');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load analysis';
+      const apiError = err as { response?: { data?: { error?: { message?: string } } } };
+      setError(apiError.response?.data?.error?.message || errorMessage);
     } finally {
       setLoading(false);
     }
-  };
+  }, [documentId]);
+
+  useEffect(() => {
+    loadAnalysis();
+  }, [loadAnalysis]);
 
   const handleConvertStyle = async () => {
     setConverting(true);
@@ -268,7 +279,7 @@ export default function CitationEditorPage() {
           console.error('[CitationEditorPage] Failed to fetch preview after style conversion:', previewErr);
         }
 
-        alert(`Successfully converted to ${selectedStyle} style!`);
+        toast.success(`Successfully converted to ${selectedStyle} style!`);
       } else {
         setError(response.data.error?.message || 'Conversion failed');
       }
@@ -289,12 +300,8 @@ export default function CitationEditorPage() {
 
       if (response.data.success) {
         const summary = response.data.data.summary;
-        alert(
-          `DOI Validation Results:\n\n` +
-          `Total References: ${summary.total}\n` +
-          `Valid DOIs: ${summary.valid}\n` +
-          `Invalid DOIs: ${summary.invalid}\n` +
-          `With Discrepancies: ${summary.withDiscrepancies}`
+        toast.success(
+          `DOI Validation: ${summary.valid}/${summary.total} valid, ${summary.invalid} invalid, ${summary.withDiscrepancies} with discrepancies`
         );
       } else {
         setError(response.data.error?.message || 'Validation failed');
@@ -342,10 +349,10 @@ export default function CitationEditorPage() {
       window.URL.revokeObjectURL(downloadUrl);
 
       setShowExportModal(false);
-      alert('Document exported successfully! Check your downloads folder.');
-    } catch (error: any) {
+      toast.success('Document exported successfully! Check your downloads folder.');
+    } catch (error: unknown) {
       console.error('Export failed:', error);
-      alert('Failed to export document. Please try again.');
+      toast.error('Failed to export document. Please try again.');
     } finally {
       setIsExporting(false);
     }
@@ -838,32 +845,6 @@ export default function CitationEditorPage() {
                 </Button>
               )}
             </div>
-            {(() => {
-              console.log('[CitationEditorPage] Rendering DocumentViewer with:');
-              console.log('[CitationEditorPage] fullText length:', data.document.fullText?.length || 0);
-              console.log('[CitationEditorPage] fullHtml length:', data.document.fullHtml?.length || 0);
-              console.log('[CitationEditorPage] citations count:', data.citations?.length || 0);
-              console.log('[CitationEditorPage] recentChanges count:', recentChanges?.length || 0);
-
-              if (data.citations && data.citations.length > 0) {
-                console.log('[CitationEditorPage] Sample citations:', data.citations.slice(0, 3).map(c => ({
-                  id: c.id,
-                  rawText: c.rawText,
-                  startOffset: c.startOffset,
-                  endOffset: c.endOffset,
-                  referenceNumber: c.referenceNumber
-                })));
-              }
-
-              return null;
-            })()}
-            {(() => {
-              console.log('[CitationEditorPage] Passing to DocumentViewer:');
-              console.log('[CitationEditorPage] - citations:', data.citations.map((c: any) => c.rawText));
-              console.log('[CitationEditorPage] - recentChanges:', recentChanges.map(c => ({ old: c.oldText, new: c.newText })));
-              console.log('[CitationEditorPage] - showChangeHighlights:', showChangeHighlights);
-              return null;
-            })()}
             <DocumentViewer
               fullText={data.document.fullText}
               fullHtml={data.document.fullHtml}

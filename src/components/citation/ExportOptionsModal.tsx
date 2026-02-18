@@ -3,7 +3,7 @@
  * Allows user to configure export options for corrected manuscript
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Download, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -24,6 +24,20 @@ export function ExportOptionsModal({
   const [includeOriginal, setIncludeOriginal] = useState(false);
   const [highlightChanges, setHighlightChanges] = useState(true);
   const [acceptChanges, setAcceptChanges] = useState(true);
+
+  // Handle escape key to close modal
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isExporting) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isExporting, onClose]);
 
   if (!isOpen) return null;
 
@@ -49,6 +63,7 @@ export function ExportOptionsModal({
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
             disabled={isExporting}
+            aria-label="Close export options"
           >
             <X className="h-6 w-6" />
           </button>

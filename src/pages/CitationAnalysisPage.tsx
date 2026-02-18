@@ -15,6 +15,32 @@ import { ExportOptionsModal } from '@/components/citation/ExportOptionsModal';
 import { citationIntelService } from '@/services/citation-intel.service';
 import toast from 'react-hot-toast';
 
+// Type guard to check if error has a response with status
+interface HttpError {
+  response?: {
+    status?: number;
+  };
+}
+
+function isHttpError(error: unknown): error is HttpError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error &&
+    typeof (error as HttpError).response === 'object'
+  );
+}
+
+// Reference type for the references array in analysis results
+interface AnalysisReference {
+  id: string;
+  authors?: string[];
+  year?: string;
+  title?: string;
+  journalName?: string;
+  doi?: string;
+}
+
 export default function CitationAnalysisPage() {
   const { documentId } = useParams<{ documentId: string }>();
   const navigate = useNavigate();
@@ -67,8 +93,9 @@ export default function CitationAnalysisPage() {
       await citationIntelService.exportWithCorrections(documentId, options);
       toast.success('✓ Manuscript exported successfully');
       setShowExportModal(false);
-    } catch (error: any) {
-      toast.error('Failed to export manuscript');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to export manuscript';
+      toast.error(message);
     } finally {
       setIsExporting(false);
     }
@@ -80,8 +107,9 @@ export default function CitationAnalysisPage() {
       setDownloading(true);
       await citationIntelService.downloadChangeSummary(documentId);
       toast.success('✓ Change summary downloaded');
-    } catch (error: any) {
-      toast.error('Failed to download summary');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to download summary';
+      toast.error(message);
     } finally {
       setDownloading(false);
     }
@@ -104,7 +132,7 @@ export default function CitationAnalysisPage() {
   }
 
   // Check for 404 error (document not found)
-  const isJobNotFound = (analysisError as any)?.response?.status === 404;
+  const isJobNotFound = isHttpError(analysisError) && analysisError.response?.status === 404;
 
   if (isJobNotFound) {
     return (
@@ -217,7 +245,7 @@ export default function CitationAnalysisPage() {
             <Card className="p-8 mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">References ({references.length})</h2>
               <div className="space-y-3 max-h-96 overflow-y-auto">
-                {references.slice(0, 10).map((ref: any, index: number) => (
+                {(references as AnalysisReference[]).slice(0, 10).map((ref, index) => (
                   <div key={ref.id} className="p-3 bg-gray-50 rounded-lg">
                     <span className="font-semibold text-blue-600 mr-2">[{index + 1}]</span>
                     <span className="text-gray-800">

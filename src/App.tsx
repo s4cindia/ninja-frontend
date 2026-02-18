@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -144,6 +144,13 @@ function SessionExpiryHandler() {
   return null;
 }
 
+// Redirect component that preserves jobId parameter for citation routes
+function RedirectCitationWithJobId() {
+  const { jobId } = useParams<{ jobId: string }>();
+  // Redirect to the citation editor with the jobId as documentId
+  return <Navigate to={jobId ? `/citation/editor/${jobId}` : '/citation/upload'} replace />;
+}
+
 function AppRoutes() {
   return (
     <>
@@ -216,7 +223,7 @@ function AppRoutes() {
             <Route path="documents/:documentId" element={<EditorialDocumentOverviewPage />} />
             {/* Redirect old citations to new Citation Intelligence Tool */}
             <Route path="citations" element={<Navigate to="/citation/upload" replace />} />
-            <Route path="citations/:jobId" element={<Navigate to="/citation/upload" replace />} />
+            <Route path="citations/:jobId" element={<RedirectCitationWithJobId />} />
             <Route path="plagiarism" element={<PlagiarismPage />} />
             <Route path="plagiarism/:jobId" element={<PlagiarismPage />} />
             <Route path="style" element={<StylePage />} />

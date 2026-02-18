@@ -83,16 +83,16 @@ pre[class*="language-"] {
 
 /* Document panel — Word-like rendering for fullHtml */
 .document-panel {
-  font-family: 'Georgia', 'Times New Roman', serif;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 14px;
   line-height: 1.7;
   color: #1a1a1a;
 }
-.document-panel h1 { font-size: 24px; font-weight: 700; margin: 24px 0 12px; font-family: 'Georgia', serif; display: block; }
-.document-panel h2 { font-size: 20px; font-weight: 600; margin: 20px 0 10px; font-family: 'Georgia', serif; display: block; }
-.document-panel h3 { font-size: 17px; font-weight: 600; margin: 16px 0 8px; font-family: 'Georgia', serif; display: block; }
-.document-panel h4 { font-size: 15px; font-weight: 600; margin: 14px 0 6px; font-family: 'Georgia', serif; display: block; }
-.document-panel p { font-size: 14px; line-height: 1.7; margin: 0 0 12px; font-family: 'Georgia', serif; }
+.document-panel h1 { font-size: 24px; font-weight: 700; margin: 24px 0 12px; font-family: Georgia, serif; display: block; }
+.document-panel h2 { font-size: 20px; font-weight: 600; margin: 20px 0 10px; font-family: Georgia, serif; display: block; }
+.document-panel h3 { font-size: 17px; font-weight: 600; margin: 16px 0 8px; font-family: Georgia, serif; display: block; }
+.document-panel h4 { font-size: 15px; font-weight: 600; margin: 14px 0 6px; font-family: Georgia, serif; display: block; }
+.document-panel p { font-size: 14px; line-height: 1.7; margin: 0 0 12px; font-family: Georgia, serif; }
 .document-panel strong, .document-panel b { font-weight: 700; }
 .document-panel em, .document-panel i { font-style: italic; }
 .document-panel u { text-decoration: underline; }
@@ -282,4 +282,20 @@ pre[class*="language-"] {
 .reference-item {
   scroll-margin-top: 80px;
   transition: background-color 0.3s ease;
+}
+
+/* Track change arrow indicator */
+.track-change-arrow {
+  color: #059669;
+  font-weight: bold;
+}
+
+/* Track change deletion with smaller font */
+.track-change-deletion-sm {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #991b1b;
+  text-decoration: line-through;
+  padding: 1px 2px;
+  border-radius: 2px;
+  font-size: 0.9em;
 }
