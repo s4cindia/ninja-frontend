@@ -257,25 +257,30 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
       return html;
     }
 
-    // Look for "References" text to see what HTML structure is around it
-    const referencesTextIndex = html.toLowerCase().indexOf('references');
-    if (referencesTextIndex !== -1) {
-      // Log 200 characters around "References" to see the HTML structure
-      const start = Math.max(0, referencesTextIndex - 100);
-      const end = Math.min(html.length, referencesTextIndex + 100);
-      const sample = html.substring(start, end);
-      console.log('[DocumentViewer] HTML around "References":', sample);
+    // Look for reference section headings to see what HTML structure is around them
+    const lowerHtml = html.toLowerCase();
+    for (const heading of ['references', 'bibliography', 'footnotes', 'notes', 'works cited']) {
+      const textIndex = lowerHtml.indexOf(heading);
+      if (textIndex !== -1) {
+        // Log 200 characters around the heading to see the HTML structure
+        const start = Math.max(0, textIndex - 100);
+        const end = Math.min(html.length, textIndex + 100);
+        const sample = html.substring(start, end);
+        console.log(`[DocumentViewer] HTML around "${heading}":`, sample);
+        break;
+      }
     }
 
     // Find and remove References section from HTML
     // Try multiple patterns to catch different HTML structures
+    // Include Footnotes/Notes for Chicago/Turabian style
     const patterns = [
-      /<p[^>]*>\s*<strong[^>]*>\s*(References|Bibliography|Works Cited)\s*<\/strong>\s*<\/p>/i,
-      /<p[^>]*><b[^>]*>(References|Bibliography|Works Cited)<\/b><\/p>/i,
-      /<h[1-6][^>]*>(References|Bibliography|Works Cited)<\/h[1-6]>/i,
-      /<p[^>]*>\s*<em[^>]*>\s*(References|Bibliography|Works Cited)\s*<\/em>\s*<\/p>/i,
+      /<p[^>]*>\s*<strong[^>]*>\s*(References|Bibliography|Works Cited|Footnotes|Notes|Endnotes)\s*<\/strong>\s*<\/p>/i,
+      /<p[^>]*><b[^>]*>(References|Bibliography|Works Cited|Footnotes|Notes|Endnotes)<\/b><\/p>/i,
+      /<h[1-6][^>]*>(References|Bibliography|Works Cited|Footnotes|Notes|Endnotes)<\/h[1-6]>/i,
+      /<p[^>]*>\s*<em[^>]*>\s*(References|Bibliography|Works Cited|Footnotes|Notes|Endnotes)\s*<\/em>\s*<\/p>/i,
       // Plain text in paragraph
-      /<p[^>]*>\s*(References|Bibliography|Works Cited)\s*<\/p>/i
+      /<p[^>]*>\s*(References|Bibliography|Works Cited|Footnotes|Notes|Endnotes)\s*<\/p>/i
     ];
 
     let contentToHighlight = html;
