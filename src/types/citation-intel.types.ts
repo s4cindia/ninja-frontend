@@ -84,13 +84,21 @@ export interface InTextCitation {
   createdAt: string;
 }
 
+export interface IssueLocation {
+  paragraphIndex?: number;
+  citationIndex?: number;
+  referenceIndex?: number;
+  startOffset?: number;
+  endOffset?: number;
+}
+
 export interface CitationIssue {
   id: string;
   jobId: string;
   type: CitationIssueType;
   severity: IssueSeverity;
   description: string;
-  location: any;
+  location: IssueLocation | null;
   resolved: boolean;
   createdAt: string;
 }
@@ -109,10 +117,10 @@ export interface AnalysisResult {
       totalReferences: number;
     };
   };
-  citations: any[];
-  references: any[];
+  citations: InTextCitation[];
+  references: CitationReference[];
   detectedStyle: string;
-  validations?: any[];
+  validations?: CitationIssue[];
 }
 
 export interface UploadResponse {
