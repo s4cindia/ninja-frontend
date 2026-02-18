@@ -19,23 +19,26 @@ const createTestQueryClient = () => new QueryClient({
 });
 
 const renderWithRouter = (initialRoute: string) => {
+  const queryClient = createTestQueryClient();
   return render(
-    <MemoryRouter initialEntries={[initialRoute]}>
-      <Routes>
-        <Route path="/editorial" element={<EditorialLayout />}>
-          <Route index element={<EditorialDashboardPage />} />
-          <Route path="upload" element={<EditorialUploadPage />} />
-          <Route path="citations" element={<CitationsPage />} />
-          <Route path="citations/:jobId" element={<CitationsPage />} />
-          <Route path="plagiarism" element={<PlagiarismPage />} />
-          <Route path="plagiarism/:jobId" element={<PlagiarismPage />} />
-          <Route path="style" element={<StylePage />} />
-          <Route path="style/:jobId" element={<StylePage />} />
-          <Route path="reports" element={<ReportsPage />} />
-          <Route path="reports/:jobId" element={<ReportsPage />} />
-        </Route>
-      </Routes>
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[initialRoute]}>
+        <Routes>
+          <Route path="/editorial" element={<EditorialLayout />}>
+            <Route index element={<EditorialDashboardPage />} />
+            <Route path="upload" element={<EditorialUploadPage />} />
+            <Route path="citations" element={<CitationsPage />} />
+            <Route path="citations/:jobId" element={<CitationsPage />} />
+            <Route path="plagiarism" element={<PlagiarismPage />} />
+            <Route path="plagiarism/:jobId" element={<PlagiarismPage />} />
+            <Route path="style" element={<StylePage />} />
+            <Route path="style/:jobId" element={<StylePage />} />
+            <Route path="reports" element={<ReportsPage />} />
+            <Route path="reports/:jobId" element={<ReportsPage />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 };
 
@@ -49,7 +52,7 @@ describe('Editorial Services Shell', () => {
     renderWithRouter('/editorial');
     expect(screen.getByText('Overview')).toBeInTheDocument();
     expect(screen.getByText('Upload')).toBeInTheDocument();
-    expect(screen.getByText('Citations')).toBeInTheDocument();
+    expect(screen.getByText('Documents')).toBeInTheDocument();
     expect(screen.getByText('Plagiarism')).toBeInTheDocument();
     expect(screen.getByText('Style')).toBeInTheDocument();
     expect(screen.getByText('Reports')).toBeInTheDocument();
@@ -80,12 +83,12 @@ describe('Editorial Services Shell', () => {
         </MemoryRouter>
       </QueryClientProvider>
     );
-    expect(screen.getByText('Loading citation analysis, please wait...')).toBeInTheDocument();
+    expect(screen.getByText('Loading analysis...')).toBeInTheDocument();
   });
 
   it('renders citations job list without jobId', () => {
     renderWithRouter('/editorial/citations');
-    expect(screen.getByText('Citation Analyses')).toBeInTheDocument();
+    expect(screen.getByText('Citation Editor')).toBeInTheDocument();
   });
 
   it('renders plagiarism placeholder with sprint info', () => {
