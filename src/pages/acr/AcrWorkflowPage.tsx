@@ -236,11 +236,13 @@ function ProgressBar({ currentStep, totalSteps }: { currentStep: number; totalSt
 
 interface AuditJob {
   id: string;
+  type?: string;
   input?: { fileName?: string };
   output?: {
     fileName?: string;
     accessibilityScore?: number;
     score?: number;  // EPUB audit uses 'score'
+    auditReport?: unknown;  // PDF_ACCESSIBILITY jobs store results here
   };
   createdAt: string;
 }
@@ -253,6 +255,7 @@ export function AcrWorkflowPage() {
   const editionFromQuery = searchParams.get('edition');
   const productNameFromQuery = searchParams.get('productName');
   const vendorFromQuery = searchParams.get('vendor');
+  const jobTypeFromQuery = searchParams.get('jobType');
   // Read contactEmail from navigation state (not URL for security)
   const location = useLocation();
   const locationState = location.state as { contactEmail?: string } | null;
@@ -327,16 +330,33 @@ export function AcrWorkflowPage() {
       const isNA = criterion.naSuggestion?.suggestedStatus === 'not_applicable' &&
                    (criterion.naSuggestion?.confidence || 0) >= 80;
 
+      // For auto-verified criteria: use AI's determination instead of defaults
+      const isAutoVerified = !verification && criterion.needsVerification === false;
+
       return {
         criterionId: criterion.criterionId,
-        verificationStatus: verification?.status || (isNA ? 'not_applicable' : 'pending'),
-        verificationMethod: verification?.method || 'Manual Review',
-        verificationNotes: verification?.notes || '',
+
+        // Use human verification if available, otherwise AI's determination
+        verificationStatus: verification?.status ||
+                           (isNA ? 'not_applicable' :
+                            isAutoVerified ? criterion.status :
+                            'pending'),
+
+        // Method: 'Automated' for auto-verified, 'Manual Review' otherwise
+        verificationMethod: verification?.method ||
+                           (isAutoVerified ? 'Automated' : 'Manual Review'),
+
+        // Notes: Include AI confidence and remarks for auto-verified
+        verificationNotes: verification?.notes ||
+                          (isAutoVerified
+                            ? `Automatically verified with ${Math.round(criterion.confidenceScore || 0)}% confidence. ${criterion.remarks || 'No issues found.'}`.trim()
+                            : ''),
+
         isNotApplicable: isNA,
         naReason: isNA ? criterion.naSuggestion?.rationale : undefined,
         naSuggestion: isNA ? criterion.naSuggestion : undefined,
         verifiedAt: verification?.verifiedAt || new Date().toISOString().slice(0, 16).replace('T', ' '),
-        confidence: Math.round((criterion.confidenceScore || 0) * 100), // Convert 0-1 to 0-100 and send to backend
+        confidence: Math.round(criterion.confidenceScore || 0),
       };
     });
 
@@ -431,14 +451,16 @@ export function AcrWorkflowPage() {
         // Handle different response formats: { data: { jobs: [...] } } or { data: [...] }
         const responseData = response.data?.data;
         const jobs = responseData?.jobs || (Array.isArray(responseData) ? responseData : []);
-        const jobsWithAudit = Array.isArray(jobs) 
+        const jobsWithAudit = Array.isArray(jobs)
           ? jobs.filter((job: AuditJob) => {
               // Type guard: ensure job is a valid object before accessing properties
               if (!job || typeof job !== 'object') return false;
               // Check for either 'score' (EPUB audit) or 'accessibilityScore'
               const output = job.output;
               const hasScore = output?.score !== undefined || output?.accessibilityScore !== undefined;
-              return hasScore;
+              // Also include PDF accessibility jobs (they have auditReport in output)
+              const isPdfAudit = job.type === 'PDF_ACCESSIBILITY' && output?.auditReport !== undefined;
+              return hasScore || isPdfAudit;
             })
           : [];
         setAvailableJobs(jobsWithAudit);
@@ -467,7 +489,10 @@ export function AcrWorkflowPage() {
       }
 
       try {
-        const response = await api.get(`/epub/job/${state.jobId}`);
+        // Use PDF endpoint for PDF jobs, EPUB endpoint otherwise
+        const isPdfJob = jobTypeFromQuery === 'PDF_ACCESSIBILITY';
+        const endpoint = isPdfJob ? `/pdf/job/${state.jobId}` : `/epub/job/${state.jobId}`;
+        const response = await api.get(endpoint);
         const job = response.data.data || response.data;
 
         // Try multiple possible locations for the filename
@@ -486,7 +511,7 @@ export function AcrWorkflowPage() {
     };
 
     fetchJobTitle();
-  }, [state.jobId, state.fileName]);
+  }, [state.jobId, state.fileName, jobTypeFromQuery]);
 
   useEffect(() => {
     if (state.jobId) {
@@ -566,16 +591,20 @@ export function AcrWorkflowPage() {
     
     const fetchPreFilledValues = async () => {
       try {
-        // Try fetching from ACR job endpoint first, then fall back to EPUB job
+        // Try fetching from ACR job endpoint first, then fall back to job-type-specific endpoint
         let jobData = null;
-        
+
         try {
           const acrResponse = await api.get(`/acr/job/${effectiveJobId}`, { signal: controller.signal });
           jobData = acrResponse.data?.data || acrResponse.data;
         } catch {
-          // ACR endpoint may not exist, try EPUB job endpoint
-          const epubResponse = await api.get(`/epub/job/${effectiveJobId}`, { signal: controller.signal });
-          jobData = epubResponse.data?.data || epubResponse.data;
+          // ACR endpoint may not exist — try PDF or EPUB endpoint based on jobType
+          const isPdfJob = jobTypeFromQuery === 'PDF_ACCESSIBILITY';
+          const fallbackEndpoint = isPdfJob
+            ? `/pdf/job/${effectiveJobId}`
+            : `/epub/job/${effectiveJobId}`;
+          const fallbackResponse = await api.get(fallbackEndpoint, { signal: controller.signal });
+          jobData = fallbackResponse.data?.data || fallbackResponse.data;
         }
         
         if (controller.signal.aborted || !jobData) return;
@@ -635,7 +664,7 @@ export function AcrWorkflowPage() {
     return () => {
       controller.abort();
     };
-  }, [effectiveJobId, editions, preFilledValuesApplied, editionFromQuery, productNameFromQuery, vendorFromQuery, contactEmailFromState, state.selectedEdition, state.fileName, state.vendor, state.contactEmail, state.currentStep]);
+  }, [effectiveJobId, editions, preFilledValuesApplied, editionFromQuery, productNameFromQuery, vendorFromQuery, contactEmailFromState, jobTypeFromQuery, state.selectedEdition, state.fileName, state.vendor, state.contactEmail, state.currentStep]);
 
   // Handle return from verification - go directly to Review & Edit step (step 5)
   useEffect(() => {
@@ -978,7 +1007,7 @@ export function AcrWorkflowPage() {
               <Alert variant="success">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4" />
-                  Document pre-selected from EPUB Audit:
+                  Document pre-selected from {jobTypeFromQuery === 'PDF_ACCESSIBILITY' ? 'PDF Audit' : 'EPUB Audit'}:
                   <Badge variant="info">{effectiveJobId.slice(0, 12)}...</Badge>
                 </div>
               </Alert>

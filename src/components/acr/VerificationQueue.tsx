@@ -6,7 +6,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { VerificationItem } from './VerificationItem';
 import { CriterionDetailsModal } from './CriterionDetailsModal';
 import { useVerificationQueue, useSubmitVerification, useBulkVerification } from '@/hooks/useVerification';
-import { CONFIDENCE_THRESHOLD_HIGH, CONFIDENCE_THRESHOLDS, NA_QUICK_ACCEPT_THRESHOLD } from '@/constants/verification';
+import { CONFIDENCE_THRESHOLDS, NA_QUICK_ACCEPT_THRESHOLD } from '@/constants/verification';
 import { MOCK_VERIFICATION_ITEMS } from '@/constants/mockVerificationData';
 import type { CriterionConfidence } from '@/services/api';
 import type { CriterionConfidenceWithIssues, IssueLocation } from '@/types/confidence.types';
@@ -38,11 +38,11 @@ interface VerificationQueueProps {
 }
 
 function needsHumanVerification(c: CriterionConfidence | CriterionConfidenceWithIssues): boolean {
-  if (c.needsVerification === true) return true;
-  if (c.needsVerification === false) return false;
-  if (c.status === 'not_applicable') return false;
-  if (c.confidenceScore < CONFIDENCE_THRESHOLD_HIGH) return true;
-  return false;
+  // Exclude truly N/A criteria (content detection or user-accepted).
+  // Manual-review-required criteria also use status='not_applicable' but have
+  // requiresManualVerification=true, so we must keep them in the queue.
+  if (c.status === 'not_applicable' && !c.requiresManualVerification) return false;
+  return c.needsVerification === true;
 }
 
 function convertCriteriaToVerificationItems(

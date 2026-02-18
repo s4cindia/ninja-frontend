@@ -17,6 +17,7 @@ export interface AcrCriterionReview {
   reviewerNotes?: string;
   reviewedAt?: string;
   reviewedBy?: string;
+  reviewerName?: string;
   // Verification data (carried forward)
   verificationStatus?: string;
   verificationMethod?: string;

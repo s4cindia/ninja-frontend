@@ -58,3 +58,46 @@ export function useUpdateTaskStatus() {
     },
   });
 }
+
+/**
+ * Execute auto-remediation for all auto-fixable issues
+ */
+export function usePdfAutoRemediation() {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: (jobId: string) => pdfRemediationService.executeAutoRemediation(jobId),
+    onSuccess: (_data, jobId) => {
+      // Invalidate remediation plan to refresh task statuses
+      queryClient.invalidateQueries({ queryKey: ['pdf-remediation-plan', jobId] });
+    },
+  });
+
+  return {
+    executeAutoFix: mutation.mutateAsync,
+    isLoading: mutation.isPending,
+    error: mutation.error,
+  };
+}
+
+/**
+ * Re-audit a remediated PDF
+ */
+export function usePdfReaudit() {
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: ({ jobId, file }: { jobId: string; file: File }) =>
+      pdfRemediationService.reauditPdf(jobId, file),
+    onSuccess: (_data, { jobId }) => {
+      // Invalidate remediation plan to show re-audit results
+      queryClient.invalidateQueries({ queryKey: ['pdf-remediation-plan', jobId] });
+    },
+  });
+
+  return {
+    reauditPdf: (jobId: string, file: File) => mutation.mutateAsync({ jobId, file }),
+    isLoading: mutation.isPending,
+    error: mutation.error,
+  };
+}

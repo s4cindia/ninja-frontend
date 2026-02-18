@@ -220,7 +220,7 @@ export const EPUBAccessibility: React.FC = () => {
         stats: fixTypeStats ? { byFixType: fixTypeStats } : undefined,
       };
       setAuditResult(fullResult);
-      setIsDemo(isDemoJob || apiIssues.length === 0);
+      setIsDemo(isDemoJob); // A compliant file with 0 issues is NOT a demo
     } catch {
       console.warn('[EPUBAccessibility] Failed to fetch audit result, using summary data. isDemoJob:', isDemoJob);
       const fallbackResult: AuditResult = {

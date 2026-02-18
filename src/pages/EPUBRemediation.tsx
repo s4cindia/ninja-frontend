@@ -1295,16 +1295,17 @@ export const EPUBRemediation: React.FC = () => {
     const loadCompletedState = async () => {
       if (urlStatus === "completed" && jobId && !comparisonSummary) {
         try {
+          // Use Phase 4 comparison API endpoint which returns counts from RemediationChange table
           const response = await api.get(
-            `/epub/job/${jobId}/comparison/summary`,
+            `/jobs/${jobId}/comparison`,
           );
           const data = response.data.data || response.data;
           setComparisonSummary({
-            fixedCount: data.fixedCount ?? 0,
-            failedCount: data.failedCount ?? 0,
-            skippedCount: data.skippedCount ?? 0,
-            beforeScore: data.beforeScore ?? 45,
-            afterScore: data.afterScore ?? 85,
+            fixedCount: data.summary?.applied ?? 0,  // Phase 4 API uses "applied" instead of "fixedCount"
+            failedCount: data.summary?.failed ?? 0,
+            skippedCount: data.summary?.skipped ?? 0,
+            beforeScore: 45,  // TODO: Calculate from before/after audit results
+            afterScore: 85,
           });
         } catch {
           // Use defaults if API fails
@@ -1667,28 +1668,35 @@ export const EPUBRemediation: React.FC = () => {
       return;
     }
 
-    const successCount = localFixes.filter((f) => f.success).length;
-    const failCount = localFixes.filter((f) => !f.success).length;
+    // Reload plan from server to get authoritative task statuses.
+    // The simulation loop above uses Math.random() for visual animation only —
+    // the backend has already determined the real success/failure for each task.
+    let actualFixed = localFixes.filter((f) => f.success).length;
+    let actualFailed = localFixes.filter((f) => !f.success).length;
+    let actualSkipped = totalAutoTasks - localFixes.length;
 
-    try {
-      const response = await api.get(`/epub/job/${jobId}/comparison/summary`);
-      const data = response.data.data || response.data;
-      setComparisonSummary({
-        fixedCount: data.fixedCount ?? successCount,
-        failedCount: data.failedCount ?? failCount,
-        skippedCount: data.skippedCount ?? totalAutoTasks - localFixes.length,
-        beforeScore: data.beforeScore ?? 45,
-        afterScore: data.afterScore ?? Math.min(95, 45 + successCount * 10),
-      });
-    } catch {
-      setComparisonSummary({
-        fixedCount: successCount,
-        failedCount: failCount,
-        skippedCount: totalAutoTasks - localFixes.length,
-        beforeScore: 45,
-        afterScore: Math.min(95, 45 + successCount * 10),
-      });
+    if (!isDemo && jobId) {
+      try {
+        const planResponse = await api.get(`/epub/job/${jobId}/remediation`);
+        const freshPlan = planResponse.data.data || planResponse.data;
+        if (freshPlan) {
+          setPlan(freshPlan);
+          actualFixed = freshPlan.tasks.filter((t: { status: string }) => t.status === "completed").length;
+          actualFailed = freshPlan.tasks.filter((t: { status: string }) => t.status === "failed").length;
+          actualSkipped = freshPlan.tasks.filter((t: { status: string }) => t.status === "skipped").length;
+        }
+      } catch {
+        // Keep simulation-based counts as fallback
+      }
     }
+
+    setComparisonSummary({
+      fixedCount: actualFixed,
+      failedCount: actualFailed,
+      skippedCount: actualSkipped,
+      beforeScore: 45,
+      afterScore: Math.min(95, 45 + actualFixed * 10),
+    });
 
     setPageState("complete");
     // Update URL to persist completion state
@@ -1826,13 +1834,16 @@ export const EPUBRemediation: React.FC = () => {
 
     setPlan({ ...plan, tasks: updatedTasks });
 
-    setComparisonSummary((prev) => ({
-      fixedCount: (prev?.fixedCount || 0) + result.resolved,
-      failedCount: prev?.failedCount || 0,
-      skippedCount: prev?.skippedCount || 0,
-      beforeScore: prev?.beforeScore || 0,
-      afterScore: result.score || prev?.afterScore || 0,
-    }));
+    // Re-audit results are for verification only - don't modify comparisonSummary
+    // comparisonSummary represents the original remediation changes (7 fixes)
+    // Re-audit shows what's still pending (2 manual issues), not new fixes
+    // Only update the afterScore if provided by re-audit
+    if (result.score !== undefined && comparisonSummary) {
+      setComparisonSummary((prev) => ({
+        ...prev!,
+        afterScore: result.score!,
+      }));
+    }
   };
 
   if (pageState === "loading" || (pageState === "complete" && !plan)) {
@@ -1862,6 +1873,10 @@ export const EPUBRemediation: React.FC = () => {
     );
   }
 
+  // Plan task statuses are updated by the backend for all fix types (auto-fix, quick-fix,
+  // manual) and are the authoritative source for the tally tracker.
+  // comparisonSummary.fixedCount reflects RemediationChange table records, which are only
+  // populated for quick-fix (not auto-fix), so it can be 0 even when all tasks completed.
   const fixedCount = plan.tasks.filter((t) => t.status === "completed").length;
   const failedCount = plan.tasks.filter((t) => t.status === "failed").length;
   const skippedCount = plan.tasks.filter((t) => t.status === "skipped").length;

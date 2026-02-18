@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -109,13 +109,24 @@ function formatHtml(html: string): string {
 }
 
 export const CodeComparisonPanel: React.FC<CodeComparisonPanelProps> = ({ change, jobId }) => {
-  const { data: visualData, isLoading, error } = useQuery({
+  const { data: visualData, isLoading, error: visualError } = useQuery({
     queryKey: ['visual-comparison', jobId, change.id],
     queryFn: () => getVisualComparison(jobId, change.id),
     enabled: !!jobId && !!change.id,
     staleTime: 5 * 60 * 1000,
     retry: 1
   });
+
+  // The /visual endpoint is EPUB-only; PDF jobs are expected to 404.
+  // Log unexpected failures so EPUB issues don't go unnoticed.
+  useEffect(() => {
+    if (visualError) {
+      const status = (visualError as { response?: { status?: number } }).response?.status;
+      if (status !== 404 && status !== 501) {
+        console.warn('[CodeComparisonPanel] Unexpected visual API error:', visualError);
+      }
+    }
+  }, [visualError]);
 
   // Use sourceHtml for code view (readable paths) instead of html (base64 images)
   const beforeHtml = visualData?.beforeContent?.sourceHtml || visualData?.beforeContent?.html;
@@ -167,25 +178,6 @@ export const CodeComparisonPanel: React.FC<CodeComparisonPanelProps> = ({ change
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
           <span className="ml-2 text-gray-600">Loading code comparison...</span>
-        </div>
-      ) : error ? (
-        <div className="grid grid-cols-1 md:grid-cols-2">
-          <div className="border-b md:border-b-0 md:border-r border-gray-200">
-            <div className="bg-red-50 px-4 py-2 border-b border-gray-200">
-              <span className="text-sm font-semibold text-red-700">BEFORE</span>
-            </div>
-            <div className="p-4">
-              <p className="text-sm text-gray-500 italic">Code preview not available for this change type</p>
-            </div>
-          </div>
-          <div>
-            <div className="bg-green-50 px-4 py-2 border-b border-gray-200">
-              <span className="text-sm font-semibold text-green-700">AFTER</span>
-            </div>
-            <div className="p-4">
-              <p className="text-sm text-gray-500 italic">Code preview not available for this change type</p>
-            </div>
-          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2">
