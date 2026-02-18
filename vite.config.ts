@@ -39,7 +39,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: isReplit ? 5000 : 5173, // Replit uses 5000, local dev uses 5173
+    port: 5000, // Always use port 5000
     host: '0.0.0.0',
     allowedHosts: true,
     hmr: isReplit ? {
@@ -47,7 +47,7 @@ export default defineConfig({
     } : undefined,
     proxy: {
       '/api/v1': {
-        target: process.env.VITE_BACKEND_URL || (isReplit ? 'http://localhost:3001' : 'http://localhost:5000'),
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:3001',
         changeOrigin: true,
         secure: false,
       },

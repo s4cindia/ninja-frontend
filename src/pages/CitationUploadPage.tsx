@@ -3,7 +3,7 @@
  * "One-click manuscript analysis"
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import { Upload, FileText, Clock, CheckCircle } from 'lucide-react';
@@ -38,15 +38,6 @@ export default function CitationUploadPage() {
     staleTime: 30000, // 30 seconds
   });
 
-  // Calculate estimated time based on file size
-  const estimatedTime = useMemo(() => {
-    if (!selectedFile) return '2-3';
-    const sizeMB = selectedFile.size / 1024 / 1024;
-    if (sizeMB < 1) return '1-2';
-    if (sizeMB < 5) return '2-3';
-    if (sizeMB < 10) return '3-5';
-    return '5-8';
-  }, [selectedFile]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -197,13 +188,7 @@ export default function CitationUploadPage() {
         )}
 
         {/* Features Preview */}
-        <div className="mt-12 grid grid-cols-3 gap-6 text-center">
-          <div>
-            <div className="text-3xl font-bold text-blue-600 mb-2">{estimatedTime}s</div>
-            <p className="text-sm text-gray-600">
-              {selectedFile ? 'Estimated Analysis Time' : 'Average Analysis Time'}
-            </p>
-          </div>
+        <div className="mt-12 grid grid-cols-2 gap-6 text-center max-w-md mx-auto">
           <div>
             <div className="text-3xl font-bold text-green-600 mb-2">95%</div>
             <p className="text-sm text-gray-600">DOI Recovery Rate</p>

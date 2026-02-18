@@ -15,18 +15,62 @@ import type {
 export const citationIntelService = {
   /**
    * Upload and analyze manuscript
+   * Uses presigned S3 upload for production (bypasses CloudFront WAF)
+   * Falls back to direct upload for local development
    */
   async upload(file: File): Promise<UploadResponse> {
-    const formData = new FormData();
-    formData.append('file', file);
+    // Try presigned S3 upload first (required for production/AWS)
+    try {
+      // Step 1: Get presigned URL
+      const presignResponse = await api.post('/citation-management/presign-upload', {
+        fileName: file.name,
+        fileSize: file.size,
+      });
 
-    const response = await api.post('/citation-management/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+      const { uploadUrl, fileKey } = presignResponse.data.data;
 
-    return response.data.data;
+      // Step 2: Upload directly to S3
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        },
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(`S3 upload failed: ${uploadResponse.status}`);
+      }
+
+      // Step 3: Confirm upload and start analysis
+      const confirmResponse = await api.post('/citation-management/confirm-upload', {
+        fileKey,
+        fileName: file.name,
+      });
+
+      return confirmResponse.data.data;
+    } catch (presignError: unknown) {
+      // If presigned upload fails (S3 not configured, credentials missing, etc.), fall back to direct upload
+      const errorResponse = presignError as { response?: { status?: number; data?: { error?: { code?: string } } } };
+      const errorCode = errorResponse?.response?.data?.error?.code;
+      const statusCode = errorResponse?.response?.status;
+
+      // Fall back to direct upload for S3 configuration issues (503) or server errors (500)
+      if (errorCode === 'S3_NOT_CONFIGURED' || statusCode === 503 || statusCode === 500) {
+        console.log('S3 presign failed, falling back to direct upload');
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await api.post('/citation-management/upload', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
+        return response.data.data;
+      }
+      throw presignError;
+    }
   },
 
   /**
