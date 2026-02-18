@@ -81,6 +81,140 @@ pre[class*="language-"] {
   font-style: italic;
 }
 
+/* Document panel — Word-like rendering for fullHtml */
+.document-panel {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #1a1a1a;
+}
+.document-panel h1 { font-size: 24px; font-weight: 700; margin: 24px 0 12px; font-family: Georgia, serif; display: block; }
+.document-panel h2 { font-size: 20px; font-weight: 600; margin: 20px 0 10px; font-family: Georgia, serif; display: block; }
+.document-panel h3 { font-size: 17px; font-weight: 600; margin: 16px 0 8px; font-family: Georgia, serif; display: block; }
+.document-panel h4 { font-size: 15px; font-weight: 600; margin: 14px 0 6px; font-family: Georgia, serif; display: block; }
+.document-panel p { font-size: 14px; line-height: 1.7; margin: 0 0 12px; font-family: Georgia, serif; }
+.document-panel strong, .document-panel b { font-weight: 700; }
+.document-panel em, .document-panel i { font-style: italic; }
+.document-panel u { text-decoration: underline; }
+.document-panel s, .document-panel del { text-decoration: line-through; }
+.document-panel sup { vertical-align: super; font-size: 0.75em; }
+.document-panel sub { vertical-align: sub; font-size: 0.75em; }
+.document-panel table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+.document-panel th,
+.document-panel td { border: 1px solid #ccc; padding: 8px 12px; font-size: 13px; }
+.document-panel th { background: #f5f5f5; font-weight: 600; }
+.document-panel ul { list-style-type: disc; margin: 8px 0 12px 24px; padding-left: 0; }
+.document-panel ol { list-style-type: decimal; margin: 8px 0 12px 24px; padding-left: 0; }
+.document-panel li { font-size: 14px; line-height: 1.6; display: list-item; }
+.document-panel img { max-width: 100%; height: auto; margin: 12px 0; }
+.document-panel blockquote { border-left: 3px solid #ccc; padding-left: 16px; color: #555; margin: 12px 0; }
+.document-panel pre { background: #f5f5f5; padding: 12px; border-radius: 4px; overflow-x: auto; }
+.document-panel code { font-family: 'JetBrains Mono', Consolas, monospace; font-size: 13px; }
+.document-panel a { color: #2563eb; text-decoration: underline; }
+
+/* Citation highlights — backend classes (cit-hl, cit-matched, cit-issue, cit-unmatched) */
+.document-panel .cit-hl {
+  cursor: pointer;
+  border-radius: 2px;
+}
+.document-panel .cit-matched {
+  background-color: rgba(61, 214, 140, 0.25) !important;
+  border-bottom: 2px solid #3dd68c !important;
+  padding: 1px 3px;
+}
+.document-panel .cit-issue {
+  background-color: rgba(255, 107, 107, 0.25) !important;
+  border-bottom: 2px solid #ff6b6b !important;
+  padding: 1px 3px;
+}
+.document-panel .cit-unmatched {
+  background-color: rgba(250, 204, 21, 0.25) !important;
+  border-bottom: 2px solid #facc15 !important;
+  padding: 1px 3px;
+}
+.document-panel .cit-matched:hover { background-color: rgba(61, 214, 140, 0.4) !important; }
+.document-panel .cit-issue:hover { background-color: rgba(255, 107, 107, 0.4) !important; }
+.document-panel .cit-unmatched:hover { background-color: rgba(250, 204, 21, 0.4) !important; }
+
+/* Legacy client-side highlight classes (fallback) */
+.citation-matched {
+  background-color: rgba(61, 214, 140, 0.25) !important;
+  border-bottom: 2px solid #3dd68c !important;
+  padding: 1px 3px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.citation-issue {
+  background-color: rgba(255, 107, 107, 0.25) !important;
+  border-bottom: 2px solid #ff6b6b !important;
+  padding: 1px 3px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.citation-matched:hover { background-color: rgba(61, 214, 140, 0.4) !important; }
+.citation-issue:hover { background-color: rgba(255, 107, 107, 0.4) !important; }
+
+/* Active citation highlight */
+.document-panel .cit-hl.citation-active,
+.citation-matched.citation-active,
+.citation-issue.citation-active {
+  outline: 2px solid #facc15;
+  outline-offset: 1px;
+}
+
+/* Citation hover tooltip */
+.citation-tooltip {
+  position: fixed;
+  z-index: 1000;
+  max-width: 450px;
+  padding: 10px 14px;
+  background: #1a1a2e;
+  color: #fff;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  pointer-events: none;
+  display: none;
+  font-family: -apple-system, system-ui, sans-serif;
+}
+
+/* Validation summary bar */
+.validation-summary {
+  display: flex;
+  gap: 16px;
+  padding: 8px 16px;
+  background: #f0f4ff;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.validation-summary .stat { font-weight: 600; }
+.validation-summary .stat.error { color: #e53e3e; }
+.validation-summary .stat.success { color: #38a169; }
+.validation-summary .stat.warning { color: #d69e2e; }
+
+/* Flash-highlight animations for cross-panel click interactions */
+@keyframes citation-flash {
+  0%, 100% { background: inherit; }
+  25% { background: rgba(250, 204, 21, 0.4); }
+  75% { background: rgba(250, 204, 21, 0.2); }
+}
+.citation-flash {
+  animation: citation-flash 1.5s ease-in-out;
+}
+
+@keyframes issue-card-flash {
+  0%, 100% { box-shadow: none; }
+  25% { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5); }
+  75% { box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
+}
+.issue-card-flash {
+  animation: issue-card-flash 1.5s ease-in-out;
+}
+
 /* Indeterminate progress animation */
 @keyframes indeterminate {
   0% { transform: translateX(-100%); }
@@ -89,4 +223,79 @@ pre[class*="language-"] {
 
 .animate-indeterminate {
   animation: indeterminate 1.5s ease-in-out infinite;
+}
+
+/* Track Changes Colors - Word-style visual indicators */
+.track-change-addition {
+  background-color: rgba(34, 197, 94, 0.25); /* green-500 with opacity */
+  color: #166534; /* green-800 */
+  padding: 1px 2px;
+  border-radius: 2px;
+}
+
+.track-change-deletion {
+  background-color: rgba(239, 68, 68, 0.2); /* red-500 with opacity */
+  color: #991b1b; /* red-800 */
+  text-decoration: line-through;
+  padding: 1px 2px;
+  border-radius: 2px;
+}
+
+.track-change-swap {
+  background-color: rgba(234, 179, 8, 0.25); /* yellow-500 with opacity */
+  color: #854d0e; /* yellow-800 */
+  padding: 1px 2px;
+  border-radius: 2px;
+}
+
+.track-change-renumber {
+  background-color: rgba(59, 130, 246, 0.2); /* blue-500 with opacity */
+  color: #1e40af; /* blue-800 */
+  padding: 1px 2px;
+  border-radius: 2px;
+}
+
+/* Reference highlight flash when scrolled to */
+.highlight-flash {
+  animation: reference-flash 2s ease-out;
+}
+
+@keyframes reference-flash {
+  0% { background-color: rgba(234, 179, 8, 0.5); box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.3); }
+  100% { background-color: transparent; box-shadow: none; }
+}
+
+/* Clickable citation links */
+.citation-link {
+  color: #2563eb;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.15s, text-decoration 0.15s;
+}
+
+.citation-link:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+/* Reference anchor target styling */
+.reference-item {
+  scroll-margin-top: 80px;
+  transition: background-color 0.3s ease;
+}
+
+/* Track change arrow indicator */
+.track-change-arrow {
+  color: #059669;
+  font-weight: bold;
+}
+
+/* Track change deletion with smaller font */
+.track-change-deletion-sm {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #991b1b;
+  text-decoration: line-through;
+  padding: 1px 2px;
+  border-radius: 2px;
+  font-size: 0.9em;
 }

@@ -6,6 +6,10 @@ import { CitationDetail } from '../CitationDetail';
 import type { Citation, CitationType, CitationStyle, CitationComponent } from '@/types/citation.types';
 
 vi.mock('@/hooks/useCitation', () => ({
+  useCitation: vi.fn(() => ({
+    data: undefined,
+    isLoading: false,
+  })),
   useCitationComponents: vi.fn(() => ({
     data: [],
     isLoading: false,
@@ -18,7 +22,8 @@ vi.mock('@/hooks/useCitation', () => ({
   })),
 }));
 
-import { useCitationComponents, useParseCitation } from '@/hooks/useCitation';
+import { useCitation, useCitationComponents, useParseCitation } from '@/hooks/useCitation';
+const mockUseCitation = vi.mocked(useCitation);
 const mockUseCitationComponents = vi.mocked(useCitationComponents);
 const mockUseParseCitation = vi.mocked(useParseCitation);
 
@@ -92,6 +97,11 @@ describe('CitationDetail', () => {
     onClose = vi.fn() as unknown as () => void;
     originalBodyOverflow = document.body.style.overflow;
     vi.clearAllMocks();
+
+    mockUseCitation.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+    } as unknown as ReturnType<typeof useCitation>);
 
     mockUseCitationComponents.mockReturnValue({
       data: [],

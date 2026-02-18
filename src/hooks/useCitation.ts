@@ -141,15 +141,46 @@ export function useParseCitation() {
 
   return useMutation<CitationComponent, CitationServiceError, string>({
     mutationFn: (citationId: string) => citationService.parse(citationId),
-    onSuccess: async (_data, citationId) => {
-      // Invalidate all citation-related queries to avoid race conditions
-      // where getQueryData might return stale data before refetch completes
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: citationKeys.detail(citationId) }),
-        queryClient.invalidateQueries({ queryKey: citationKeys.components(citationId) }),
-        // Invalidate all document/job lists and stats since we don't know which document this belongs to
-        queryClient.invalidateQueries({ queryKey: citationKeys.all, exact: false }),
-      ]);
+    onSuccess: async (data, citationId) => {
+      console.log('[useParseCitation] Parse succeeded for:', citationId, 'Component:', data);
+      
+      // Update the specific citation in the cache with the new primaryComponentId
+      queryClient.setQueriesData(
+        { predicate: (query) => Array.isArray(query.queryKey) && query.queryKey[0] === 'citations' },
+        (oldData: unknown) => {
+          if (!oldData || typeof oldData !== 'object') return oldData;
+          
+          // Handle PaginatedCitations structure
+          if ('items' in oldData && Array.isArray((oldData as { items: unknown[] }).items)) {
+            const paginatedData = oldData as { items: Citation[] };
+            return {
+              ...paginatedData,
+              items: paginatedData.items.map((citation: Citation) =>
+                citation.id === citationId
+                  ? { ...citation, primaryComponentId: data.id, primaryComponent: data }
+                  : citation
+              ),
+            };
+          }
+          
+          // Handle single Citation
+          if ('id' in oldData && (oldData as Citation).id === citationId) {
+            return { ...oldData, primaryComponentId: data.id, primaryComponent: data };
+          }
+          
+          return oldData;
+        }
+      );
+      
+      // Also refetch stats to update the counts
+      await queryClient.refetchQueries({
+        predicate: (query) => {
+          const key = query.queryKey;
+          return Array.isArray(key) && key[0] === 'citations' && key[1] === 'stats';
+        },
+      });
+      
+      console.log('[useParseCitation] Cache updated and stats refetched');
     },
   });
 }

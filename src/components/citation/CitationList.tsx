@@ -59,7 +59,7 @@ const CitationRow = memo(function CitationRow({
   isParsing?: boolean;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const hasParsedComponent = !!citation.primaryComponent;
+  const hasParsedComponent = !!citation.primaryComponent || !!citation.primaryComponentId;
   const sanitizedText = DOMPurify.sanitize(citation.rawText);
 
   return (

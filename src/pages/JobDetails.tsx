@@ -1,26 +1,26 @@
 import { useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, Navigate } from 'react-router-dom';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { Button } from '@/components/ui/Button';
 import { ErrorBoundary } from '@/components/ui';
 import { useJob, useCancelJob } from '@/hooks/useJobs';
 import { getJobTypeLabel, extractFileNameFromJob } from '@/utils/jobTypes';
-import { 
-  getStatusIcon, 
-  getStatusBadgeClass, 
-  formatDateTime, 
-  formatDuration 
+import {
+  getStatusIcon,
+  getStatusBadgeClass,
+  formatDateTime,
+  formatDuration
 } from '@/utils/jobHelpers';
-import { 
-  ComplianceScore, 
-  SeveritySummary, 
-  IssuesTable, 
-  JobActions, 
+import {
+  ComplianceScore,
+  SeveritySummary,
+  IssuesTable,
+  JobActions,
   RawDataToggle,
   JobDetailSkeleton
 } from '@/components/jobs';
 import { parseJobOutput, extractDownloadUrl } from '@/types/job-output.types';
-import { 
+import {
   AlertCircle,
   ArrowLeft,
   Download,
@@ -28,11 +28,14 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+const CITATION_JOB_TYPES = ['CITATION_DETECTION', 'CITATION_VALIDATION', 'EDITORIAL'];
+
 export function JobDetails() {
   const { jobId } = useParams<{ jobId: string }>();
   const { data: job, isLoading, isError, error, refetch } = useJob(jobId || null);
   const cancelJob = useCancelJob();
 
+  // useMemo must be called before any conditional returns (React hooks rules)
   const { parsedOutput, parseError } = useMemo(() => {
     if (!job?.output) {
       return { parsedOutput: null, parseError: null };
@@ -44,6 +47,11 @@ export function JobDetails() {
     }
     return { parsedOutput: result, parseError: null };
   }, [job?.output]);
+
+  // Redirect citation jobs to the citation editor
+  if (job && CITATION_JOB_TYPES.includes(job.type)) {
+    return <Navigate to={`/editorial/citations/${job.id}`} replace />;
+  }
 
   const handleCancel = async () => {
     if (!jobId) return;
@@ -110,7 +118,7 @@ export function JobDetails() {
   return (
     <div>
       <Breadcrumbs items={[{ label: 'Jobs', path: '/jobs' }, { label: fileName }]} />
-      
+
       <div className="flex items-center justify-between mb-6" data-testid="job-detail-header">
         <h1 className="text-2xl font-bold text-gray-900">{fileName}</h1>
         <div className="flex gap-2">
@@ -121,8 +129,8 @@ export function JobDetails() {
             </Button>
           </Link>
           {canCancel && (
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={handleCancel}
               disabled={cancelJob.isPending}
             >
@@ -250,7 +258,7 @@ export function JobDetails() {
           <div className="mt-6 space-y-6">
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-6">Audit Results</h2>
-              
+
               <div className="space-y-6" data-testid="job-results">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div className="lg:col-span-1 flex justify-center">
@@ -288,7 +296,7 @@ export function JobDetails() {
                   )}
                 </div>
 
-                <IssuesTable issues={parsedOutput.combinedIssues} />
+                <IssuesTable issues={parsedOutput.combinedIssues} isAccessible={parsedOutput.isAccessible} />
 
                 <div data-testid="job-actions">
                   <JobActions jobId={job.id} />

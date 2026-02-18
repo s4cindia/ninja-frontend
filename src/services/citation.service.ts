@@ -10,6 +10,7 @@ import type {
   PaginatedCitations,
   CitationStats,
 } from '@/types/citation.types';
+import type { StylesheetDetectionResult, DocumentTextResponse, ValidationResult, ReferenceLookupResponse } from '@/types/stylesheet-detection.types';
 
 class CitationServiceError extends Error {
   public code?: string;
@@ -95,10 +96,13 @@ export const citationService = {
    * @returns Detection result with citations array and statistics by type/style
    * @throws {CitationServiceError} If file upload fails (413 for size, 415 for type) or parsing errors occur
    */
-  async detectFromFile(file: File, signal?: AbortSignal): Promise<DetectionResult> {
+  async detectFromFile(file: File, signal?: AbortSignal, styleCode?: string): Promise<DetectionResult> {
     try {
       const formData = new FormData();
       formData.append('file', file);
+      if (styleCode) {
+        formData.append('styleCode', styleCode);
+      }
 
       const response = await api.post<ApiResponse<DetectionResult>>(
         '/citation/detect',
@@ -169,10 +173,29 @@ export const citationService = {
     try {
       validateId(jobId, 'job ID');
       const params = buildFilterParams(filters);
-      const response = await api.get<ApiResponse<PaginatedCitations>>(
+      interface BackendJobResponse {
+        documentId: string;
+        jobId: string;
+        citations: Citation[];
+        totalCount: number;
+        byType: Record<string, number>;
+        byStyle: Record<string, number>;
+      }
+      const response = await api.get<ApiResponse<BackendJobResponse>>(
         `/citation/job/${jobId}?${params}`
       );
-      return response.data.data;
+      const backendData = response.data.data;
+      const page = filters?.page ?? 1;
+      const limit = filters?.limit ?? 20;
+      return {
+        items: backendData.citations,
+        total: backendData.totalCount,
+        page,
+        limit,
+        totalPages: Math.ceil(backendData.totalCount / limit),
+        documentId: backendData.documentId,
+        jobId: backendData.jobId,
+      };
     } catch (error) {
       handleError(error, 'CITATION_GET_BY_JOB');
     }
@@ -268,6 +291,95 @@ export const citationService = {
       return response.data.data;
     } catch (error) {
       handleError(error, 'CITATION_GET_STATS');
+    }
+  },
+
+  async getStylesheetDetection(documentId: string): Promise<StylesheetDetectionResult> {
+    try {
+      validateId(documentId, 'document ID');
+      const response = await api.get<ApiResponse<StylesheetDetectionResult>>(
+        `/citation/document/${documentId}`
+      );
+      return response.data.data;
+    } catch (error) {
+      handleError(error, 'STYLESHEET_DETECTION');
+    }
+  },
+
+  async getDocumentText(documentId: string, signal?: AbortSignal): Promise<DocumentTextResponse> {
+    try {
+      validateId(documentId, 'document ID');
+      const response = await api.get<ApiResponse<DocumentTextResponse>>(
+        `/editorial/document/${documentId}/text`,
+        { signal }
+      );
+      const raw = response.data.data ?? response.data;
+      const result: DocumentTextResponse = {
+        documentId: (raw as DocumentTextResponse).documentId ?? documentId,
+        fullText: (raw as DocumentTextResponse).fullText ?? '',
+        fullHtml: (raw as DocumentTextResponse).fullHtml ?? null,
+        highlightedHtml: (raw as DocumentTextResponse).highlightedHtml ?? null,
+        referenceLookup: (raw as DocumentTextResponse).referenceLookup ?? undefined,
+        filename: (raw as DocumentTextResponse).filename ?? undefined,
+      };
+      return result;
+    } catch (error) {
+      handleError(error, 'DOCUMENT_TEXT');
+    }
+  },
+
+  async regenerateHtml(documentId: string, file: File): Promise<{ documentId: string; htmlLength: number; warnings: number }> {
+    try {
+      validateId(documentId, 'document ID');
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await api.post<ApiResponse<{ documentId: string; htmlLength: number; warnings: number }>>(
+        `/editorial/document/${documentId}/regenerate-html`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+      return response.data.data;
+    } catch (error) {
+      handleError(error, 'REGENERATE_HTML');
+    }
+  },
+
+  async validateCitations(documentId: string, signal?: AbortSignal): Promise<ValidationResult> {
+    try {
+      validateId(documentId, 'document ID');
+      const response = await api.get<ApiResponse<ValidationResult>>(
+        `/editorial/document/${documentId}/validate-citations`,
+        { signal }
+      );
+      return response.data.data;
+    } catch (error) {
+      handleError(error, 'VALIDATE_CITATIONS');
+    }
+  },
+
+  async getReferenceLookup(documentId: string, signal?: AbortSignal): Promise<ReferenceLookupResponse> {
+    try {
+      validateId(documentId, 'document ID');
+      const response = await api.get<ApiResponse<ReferenceLookupResponse>>(
+        `/editorial/document/${documentId}/reference-lookup`,
+        { signal }
+      );
+      return response.data.data;
+    } catch (error) {
+      handleError(error, 'REFERENCE_LOOKUP');
+    }
+  },
+
+  async convertStyle(documentId: string, targetStyle: string): Promise<StylesheetDetectionResult> {
+    try {
+      validateId(documentId, 'document ID');
+      const response = await api.post<ApiResponse<StylesheetDetectionResult>>(
+        `/citation/detect`,
+        { documentId, styleCode: targetStyle }
+      );
+      return response.data.data;
+    } catch (error) {
+      handleError(error, 'STYLE_CONVERT');
     }
   },
 };
