@@ -587,7 +587,7 @@ export default function CitationEditorPage() {
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              <Button variant="outline" size="sm" onClick={loadAnalysis}>
+              <Button variant="outline" size="sm" onClick={() => loadAnalysis()}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh
               </Button>
