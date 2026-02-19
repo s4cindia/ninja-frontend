@@ -73,6 +73,21 @@ export default function CitationEditorPage() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isResequencing, setIsResequencing] = useState(false);
+  const [doiValidationResults, setDoiValidationResults] = useState<{
+    validated: number;
+    valid: number;
+    invalid: number;
+    withDiscrepancies: number;
+    results: Array<{
+      referenceId: string;
+      referenceNumber: number;
+      doi: string;
+      valid: boolean;
+      discrepancies?: Array<{ field: string; referenceValue: string; crossrefValue: string }>;
+      error?: string;
+    }>;
+  } | null>(null);
+  const [showDoiValidationResults, setShowDoiValidationResults] = useState(false);
 
   // Detect out-of-sequence citations for Vancouver style
   const sequenceAnalysis = useMemo(() => {
@@ -141,8 +156,11 @@ export default function CitationEditorPage() {
     };
   }, [data?.citations, data?.detectedStyle]);
 
-  const loadAnalysis = useCallback(async () => {
-    setLoading(true);
+  const loadAnalysis = useCallback(async (showLoadingSpinner = true) => {
+    // Only show loading spinner on initial load, not during polling
+    if (showLoadingSpinner) {
+      setLoading(true);
+    }
     setError(null);
     try {
       console.log('[CitationEditorPage] Loading analysis for document:', documentId);
@@ -226,9 +244,34 @@ export default function CitationEditorPage() {
     }
   }, [documentId]);
 
+  // Track poll count to prevent infinite polling
+  const [pollCount, setPollCount] = useState(0);
+  const MAX_POLLS = 30; // Max 60 seconds (30 * 2s)
+
+  // Initial load
   useEffect(() => {
     loadAnalysis();
+    setPollCount(0); // Reset poll count on initial load
   }, [loadAnalysis]);
+
+  // Polling effect - refetch when document is still being analyzed (with limit)
+  useEffect(() => {
+    if (!data?.document?.status) return;
+
+    const isProcessing = ['ANALYZING', 'QUEUED', 'PROCESSING'].includes(data.document.status);
+
+    if (isProcessing && pollCount < MAX_POLLS) {
+      console.log(`[CitationEditorPage] Document still processing, poll ${pollCount + 1}/${MAX_POLLS}...`);
+      const pollTimer = setTimeout(() => {
+        setPollCount(prev => prev + 1);
+        loadAnalysis(false); // Don't show loading spinner during polling
+      }, 2000);
+
+      return () => clearTimeout(pollTimer);
+    } else if (isProcessing && pollCount >= MAX_POLLS) {
+      console.log('[CitationEditorPage] Max polls reached, stopping auto-refresh');
+    }
+  }, [data?.document?.status, loadAnalysis, pollCount]);
 
   const handleConvertStyle = async () => {
     setConverting(true);
@@ -299,10 +342,26 @@ export default function CitationEditorPage() {
       );
 
       if (response.data.success) {
-        const summary = response.data.data.summary;
-        toast.success(
-          `DOI Validation: ${summary.valid}/${summary.total} valid, ${summary.invalid} invalid, ${summary.withDiscrepancies} with discrepancies`
-        );
+        const validationData = response.data.data;
+        console.log('[DOI Validation] Results:', validationData);
+        setDoiValidationResults(validationData);
+
+        // Build toast message
+        let message = `DOI Validation: ${validationData.valid}/${validationData.validated} valid`;
+        if (validationData.invalid > 0) {
+          message += `, ${validationData.invalid} invalid`;
+        }
+        if (validationData.withDiscrepancies > 0) {
+          message += `, ${validationData.withDiscrepancies} with metadata mismatches`;
+        }
+
+        // Always show the results modal if there are any results
+        if (validationData.validated > 0) {
+          toast.success(message, { duration: 5000 });
+          setShowDoiValidationResults(true); // Show results modal
+        } else {
+          toast.success(validationData.message || 'No DOIs found in references');
+        }
       } else {
         setError(response.data.error?.message || 'Validation failed');
       }
@@ -528,7 +587,7 @@ export default function CitationEditorPage() {
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              <Button variant="outline" size="sm" onClick={loadAnalysis}>
+              <Button variant="outline" size="sm" onClick={() => loadAnalysis()}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh
               </Button>
@@ -546,6 +605,22 @@ export default function CitationEditorPage() {
           <Alert variant="error" className="mb-6">
             <AlertTriangle className="h-4 w-4" />
             <span>{error}</span>
+          </Alert>
+        )}
+
+        {/* Processing indicator when document is being analyzed */}
+        {['ANALYZING', 'QUEUED', 'PROCESSING'].includes(data.document.status) && pollCount < MAX_POLLS && (
+          <Alert variant="info" className="mb-6">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>Document is being analyzed. This page will update automatically when complete...</span>
+          </Alert>
+        )}
+
+        {/* Timeout message when polling stopped */}
+        {['ANALYZING', 'QUEUED', 'PROCESSING'].includes(data.document.status) && pollCount >= MAX_POLLS && (
+          <Alert variant="warning" className="mb-6">
+            <AlertTriangle className="h-4 w-4" />
+            <span>Analysis is taking longer than expected. Click Refresh to check status.</span>
           </Alert>
         )}
 
@@ -705,6 +780,17 @@ export default function CitationEditorPage() {
                 </>
               )}
             </Button>
+            {doiValidationResults && doiValidationResults.validated > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full mt-2 text-blue-600 hover:text-blue-800"
+                onClick={() => setShowDoiValidationResults(true)}
+              >
+                View Results ({doiValidationResults.valid}/{doiValidationResults.validated} valid
+                {doiValidationResults.withDiscrepancies > 0 && `, ${doiValidationResults.withDiscrepancies} mismatches`})
+              </Button>
+            )}
           </Card>
 
           <Card className="p-4">
@@ -730,17 +816,17 @@ export default function CitationEditorPage() {
           <Card className="p-6 mb-6">
             <h3 className="text-lg font-semibold mb-4">In-Text Citations</h3>
             {/* Warning for citations without references */}
-            {data.citations.filter((c: any) => !c.referenceNumber && !c.isOrphaned).length > 0 && (
+            {data.citations.filter((c: any) => !c.referenceNumber && (!c.linkedReferenceNumbers || c.linkedReferenceNumbers.length === 0) && !c.isOrphaned).length > 0 && (
               <div className="bg-orange-50 border border-orange-200 rounded p-3 mb-4">
                 <p className="text-sm text-orange-800">
                   <AlertTriangle className="inline h-4 w-4 mr-1" />
-                  <strong>{data.citations.filter((c: any) => !c.referenceNumber && !c.isOrphaned).length} citation(s)</strong> don't have matching references in the reference list.
+                  <strong>{data.citations.filter((c: any) => !c.referenceNumber && (!c.linkedReferenceNumbers || c.linkedReferenceNumbers.length === 0) && !c.isOrphaned).length} citation(s)</strong> don't have matching references in the reference list.
                 </p>
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
               {data.citations.map((citation: any) => {
-                const hasNoReference = !citation.referenceNumber && !citation.isOrphaned;
+                const hasNoReference = !citation.referenceNumber && (!citation.linkedReferenceNumbers || citation.linkedReferenceNumbers.length === 0) && !citation.isOrphaned;
                 return (
                   <div
                     key={citation.id}
@@ -772,19 +858,28 @@ export default function CitationEditorPage() {
                         <span className="text-xs text-orange-600 font-medium">
                           ⚠️ No matching reference
                         </span>
-                      ) : citation.referenceNumber ? (
-                        <button
-                          onClick={() => {
-                            setActiveTab('references');
-                            setTimeout(() => {
-                              const refElement = document.getElementById(`ref-${citation.referenceNumber}`);
-                              refElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            }, 100);
-                          }}
-                          className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                        >
-                          → Reference #{citation.referenceNumber}
-                        </button>
+                      ) : (citation.linkedReferenceNumbers?.length > 0 || citation.referenceNumber) ? (
+                        <div className="flex flex-wrap gap-1">
+                          {/* Show all linked reference numbers as clickable buttons */}
+                          {(citation.linkedReferenceNumbers?.length > 0 ? citation.linkedReferenceNumbers : [citation.referenceNumber]).map((refNum: number, idx: number) => (
+                            <button
+                              key={refNum}
+                              onClick={() => {
+                                setActiveTab('references');
+                                setTimeout(() => {
+                                  const refElement = document.getElementById(`ref-${refNum}`);
+                                  refElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                  // Highlight the reference briefly
+                                  refElement?.classList.add('ring-2', 'ring-blue-500');
+                                  setTimeout(() => refElement?.classList.remove('ring-2', 'ring-blue-500'), 2000);
+                                }, 100);
+                              }}
+                              className="text-xs text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                            >
+                              {idx === 0 ? '→ ' : ''}#{refNum}
+                            </button>
+                          ))}
+                        </div>
                       ) : null}
                     </div>
                   </div>
@@ -889,6 +984,101 @@ export default function CitationEditorPage() {
       onExport={handleExport}
       isExporting={isExporting}
     />
+
+    {/* DOI Validation Results Modal */}
+    {showDoiValidationResults && doiValidationResults && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+          <div className="p-4 border-b flex items-center justify-between">
+            <h3 className="text-lg font-semibold">DOI Validation Results</h3>
+            <button
+              onClick={() => setShowDoiValidationResults(false)}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              ×
+            </button>
+          </div>
+          <div className="p-4 overflow-y-auto max-h-[60vh]">
+            <div className="grid grid-cols-4 gap-3 mb-4">
+              <div className="bg-gray-50 p-3 rounded-lg text-center">
+                <div className="text-2xl font-bold text-gray-900">{doiValidationResults.validated}</div>
+                <div className="text-sm text-gray-500">Total</div>
+              </div>
+              <div className="bg-green-50 p-3 rounded-lg text-center">
+                <div className="text-2xl font-bold text-green-600">{doiValidationResults.valid}</div>
+                <div className="text-sm text-gray-500">Valid</div>
+              </div>
+              <div className="bg-red-50 p-3 rounded-lg text-center">
+                <div className="text-2xl font-bold text-red-600">{doiValidationResults.invalid}</div>
+                <div className="text-sm text-gray-500">Invalid</div>
+              </div>
+              <div className="bg-amber-50 p-3 rounded-lg text-center">
+                <div className="text-2xl font-bold text-amber-600">{doiValidationResults.withDiscrepancies}</div>
+                <div className="text-sm text-gray-500">Mismatches</div>
+              </div>
+            </div>
+
+            {doiValidationResults.results.filter(r => r.discrepancies && r.discrepancies.length > 0).length > 0 && (
+              <div className="space-y-3">
+                <h4 className="font-medium text-gray-900">Metadata Mismatches (CrossRef vs Reference)</h4>
+                {doiValidationResults.results
+                  .filter(r => r.discrepancies && r.discrepancies.length > 0)
+                  .map(result => (
+                    <div key={result.referenceId} className="border rounded-lg p-3 bg-amber-50">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="font-medium">Reference #{result.referenceNumber}</span>
+                        <span className="text-xs text-gray-500">{result.doi}</span>
+                      </div>
+                      <div className="space-y-2">
+                        {result.discrepancies!.map((disc, idx) => (
+                          <div key={idx} className="text-sm grid grid-cols-3 gap-2">
+                            <div className="font-medium capitalize">{disc.field}:</div>
+                            <div className="text-red-700 line-through">{disc.referenceValue}</div>
+                            <div className="text-green-700">{disc.crossrefValue}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                }
+              </div>
+            )}
+
+            {doiValidationResults.results.filter(r => !r.valid).length > 0 && (
+              <div className="space-y-3 mt-4">
+                <h4 className="font-medium text-gray-900">Invalid DOIs</h4>
+                {doiValidationResults.results
+                  .filter(r => !r.valid)
+                  .map(result => (
+                    <div key={result.referenceId} className="border rounded-lg p-3 bg-red-50">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Reference #{result.referenceNumber}</span>
+                        <span className="text-xs text-gray-500">{result.doi}</span>
+                      </div>
+                      {result.error && (
+                        <div className="text-sm text-red-600 mt-1">{result.error}</div>
+                      )}
+                    </div>
+                  ))
+                }
+              </div>
+            )}
+
+            {doiValidationResults.results.filter(r => r.valid && (!r.discrepancies || r.discrepancies.length === 0)).length > 0 && (
+              <div className="mt-4">
+                <h4 className="font-medium text-gray-900 mb-2">Valid DOIs</h4>
+                <div className="text-sm text-green-600">
+                  {doiValidationResults.results.filter(r => r.valid && (!r.discrepancies || r.discrepancies.length === 0)).length} references have valid DOIs with matching metadata
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="p-4 border-t flex justify-end">
+            <Button onClick={() => setShowDoiValidationResults(false)}>Close</Button>
+          </div>
+        </div>
+      </div>
+    )}
     </>
   );
 }
