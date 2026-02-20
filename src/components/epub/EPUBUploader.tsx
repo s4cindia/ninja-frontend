@@ -6,6 +6,7 @@ import { Alert } from '../ui/Alert';
 import { cn } from '@/utils/cn';
 import { api } from '@/services/api';
 import { uploadService } from '@/services/upload.service';
+import { tenantConfigService } from '@/services/tenant-config.service';
 import { useJobPolling, JobData } from '@/hooks/useJobPolling';
 import { detectFileType, getAcceptedMimeTypes, DocumentFileType } from '@/utils/fileUtils';
 import type { AuditSummary } from '@/types/audit.types';
@@ -46,6 +47,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [workflowEnabled, setWorkflowEnabled] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileNameRef = useRef<string>('');
   const fileTypeRef = useRef<DocumentFileType>('epub');
@@ -97,6 +99,22 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
       setProgress(92);
     }
   }, [jobStatus]);
+
+  // Fetch workflow configuration on mount
+  useEffect(() => {
+    const fetchWorkflowConfig = async () => {
+      try {
+        const config = await tenantConfigService.getWorkflowConfig();
+        setWorkflowEnabled(config.enabled);
+      } catch (error) {
+        console.error('[DocumentUploader] Failed to fetch workflow config:', error);
+        // Default to false on error (manual audit button shown)
+        setWorkflowEnabled(false);
+      }
+    };
+
+    fetchWorkflowConfig();
+  }, []);
 
   const validateFile = useCallback((file: File): string | null => {
     const fileType = detectFileType(file);
@@ -323,18 +341,30 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
                 <p className="font-medium text-gray-900">{selectedFile.name}</p>
                 <p className="text-sm text-gray-500">{formatFileSize(selectedFile.size)}</p>
               </div>
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={handleReset}
                 className="ml-2"
               >
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <Button onClick={handleUpload} className="w-full max-w-xs">
-              Start Accessibility Audit
-            </Button>
+            {!workflowEnabled && (
+              <Button onClick={handleUpload} className="w-full max-w-xs">
+                Start Accessibility Audit
+              </Button>
+            )}
+            {workflowEnabled && (
+              <div className="text-center space-y-2">
+                <p className="text-sm text-gray-600 font-medium">
+                  Agentic workflow enabled
+                </p>
+                <p className="text-xs text-gray-500">
+                  File will be automatically processed through the accessibility workflow upon upload
+                </p>
+              </div>
+            )}
           </div>
         )}
 
