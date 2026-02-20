@@ -33,7 +33,7 @@ interface RecentChange {
   newNumber: number | null; // null means orphaned (reference deleted)
   oldText?: string; // Original citation text (e.g., "[3–5]")
   newText?: string; // New citation text after changes (e.g., "[3,4]")
-  changeType?: 'style' | 'renumber' | 'deleted' | 'unchanged'; // Type of change
+  changeType?: 'style' | 'renumber' | 'deleted' | 'unchanged' | 'reference_edit'; // Type of change
 }
 
 interface DocumentViewerProps {
@@ -107,6 +107,7 @@ function getTrackChangeClass(changeType?: string): string {
     case 'style': return 'track-change-addition';
     case 'renumber': return 'track-change-renumber';
     case 'swap': return 'track-change-swap';
+    case 'reference_edit': return 'track-change-addition'; // Reference metadata edit
     default: return '';
   }
 }
@@ -224,8 +225,15 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
     // First try to match by citationId
     let change = recentChanges.find(c => c.citationId && c.citationId === citation.id);
     if (change) {
-      console.log(`[DocumentViewer] Matched by citationId: "${change.oldText}" → "${change.newText}"`);
-      return change;
+      // Validate the match - the change record should relate to the current citation text
+      // If neither oldText nor newText matches the current rawText, the change record is stale
+      if (change.oldText !== citation.rawText && change.newText !== citation.rawText) {
+        console.log(`[DocumentViewer] Skipping stale change for "${citation.rawText}" (change is for "${change.oldText}" → "${change.newText}")`);
+        // Don't return this stale change - continue to look for other matches
+      } else {
+        console.log(`[DocumentViewer] Matched by citationId: "${change.oldText}" → "${change.newText}"`);
+        return change;
+      }
     }
 
     // Try to match by newText (after conversion, citation.rawText = newText)
@@ -364,42 +372,80 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
             return `[${clickableNumbers}]`;
           }
         }
+        // For non-numeric citations (e.g., parenthetical like "(Author, Year)"),
+        // apply the changeClass if provided for track change highlighting
+        if (changeClass) {
+          return `<span class="${changeClass}">${escapeHtml(text)}</span>`;
+        }
         return escapeHtml(text);
       };
 
       // Changed citation (style conversion or renumbering) - check this FIRST
       // This handles cases where oldText !== newText (style change or renumber)
+      console.log(`[DocumentViewer] Checking changeInfo for "${citation.rawText}":`, {
+        hasChangeInfo: !!changeInfo,
+        oldText: changeInfo?.oldText,
+        newText: changeInfo?.newText,
+        changeType: changeInfo?.changeType,
+        oldEqualsNew: changeInfo?.oldText === changeInfo?.newText
+      });
+
       if (changeInfo && changeInfo.oldText && changeInfo.newText && changeInfo.oldText !== changeInfo.newText) {
-        const trackClass = getTrackChangeClass(changeInfo.changeType);
-        bgColor = `${trackClass || 'track-change-addition'} animate-pulse`;
-        hoverColor = 'hover:bg-green-300';
-        refInfo = `Updated: ${escapeHtml(changeInfo.oldText)} → ${escapeHtml(changeInfo.newText)}`;
+        // Check if old text or new text exists in the HTML
+        // After renumbering, the backend updates the HTML with new numbers
+        const oldTextInHtml = fullHtml?.includes(changeInfo.oldText);
+        const newTextInHtml = fullHtml?.includes(changeInfo.newText);
 
-        // IMPORTANT: Search for the OLD text that's actually in the HTML
-        // The HTML document hasn't been updated yet - it still contains the original citation text
-        searchText = changeInfo.oldText;
+        if (oldTextInHtml) {
+          // Old text still in HTML - show track change format
+          const trackClass = getTrackChangeClass(changeInfo.changeType);
+          bgColor = `${trackClass || 'track-change-addition'} animate-pulse`;
+          hoverColor = 'hover:bg-green-300';
+          refInfo = `Updated: ${escapeHtml(changeInfo.oldText)} → ${escapeHtml(changeInfo.newText)}`;
+          searchText = changeInfo.oldText;
 
-        // Show transition: old text struck through, arrow, new clickable text
-        const oldDisplay = `<span class="track-change-deletion-sm">${escapeHtml(changeInfo.oldText)}</span>`;
-        const newDisplay = renderClickableNumbers(changeInfo.newText, 'track-change-addition');
-        displayContent = `${oldDisplay}<span class="track-change-arrow"> → </span>${newDisplay}`;
+          const oldDisplay = `<span class="track-change-deletion-sm">${escapeHtml(changeInfo.oldText)}</span>`;
+          const newDisplay = renderClickableNumbers(changeInfo.newText, 'track-change-addition');
+          displayContent = `${oldDisplay}<span class="track-change-arrow"> → </span>${newDisplay}`;
 
-        markTag = `<mark class="px-1 rounded transition-colors" title="${escapeHtml(refInfo)}">${displayContent}</mark>`;
-
-        console.log(`[DocumentViewer] Changed citation: "${changeInfo.oldText}" → "${changeInfo.newText}", searching for: "${searchText}"`);
+          markTag = `<mark class="px-1 rounded transition-colors" title="${escapeHtml(refInfo)}">${displayContent}</mark>`;
+          console.log(`[DocumentViewer] ✅ TRACK CHANGE (old text): "${changeInfo.oldText}" → "${changeInfo.newText}"`);
+        } else if (newTextInHtml) {
+          // HTML already updated with new text - just show as normal linked citation
+          // Don't show track change format since the change is already applied
+          searchText = changeInfo.newText;
+          displayContent = renderClickableNumbers(changeInfo.newText);
+          refInfo = `Renumbered from ${escapeHtml(changeInfo.oldText)}`;
+          markTag = `<mark class="${bgColor} px-1 rounded ${hoverColor} transition-colors" title="${escapeHtml(refInfo)}">${displayContent}</mark>`;
+          console.log(`[DocumentViewer] ✅ RENUMBERED (new text): "${changeInfo.oldText}" → "${changeInfo.newText}"`);
+        }
+      } else if (changeInfo) {
+        console.log(`[DocumentViewer] ⚠️ changeInfo exists but condition failed`);
       }
+
+      // If we already set a markTag above (track change or renumbered), skip all the other conditions
+      // This prevents overwriting the already-set markTag
+      const hasTrackChangeMarkTag = markTag.includes('track-change-deletion-sm') ||
+                                    markTag.includes('track-change-arrow') ||
+                                    markTag.includes('Renumbered from');
+
       // Check if referenced numbers exist in current reference list
       const existingRefNumbers = new Set(references?.map(r => r.number) || []);
       const citedNumbers = expandCitationRange(citation.rawText);
       const hasOrphanedRefs = citedNumbers.length > 0 && citedNumbers.some(n => !existingRefNumbers.has(n));
 
+      console.log(`[DocumentViewer] Citation "${citation.rawText}": hasTrackChangeMarkTag=${hasTrackChangeMarkTag}, citedNumbers=[${citedNumbers.join(',')}], existingRefNumbers=[${Array.from(existingRefNumbers).join(',')}]`);
+
       // Orphaned citation (reference was deleted) - check multiple indicators
+      // Skip if we already have a track change markTag
       if (
+        !hasTrackChangeMarkTag && (
         citation.isOrphaned ||
         (changeInfo && changeInfo.changeType === 'deleted') ||
         (changeInfo && changeInfo.newNumber === null && changeInfo.oldText === changeInfo.newText) ||
         (citation.referenceNumber && !existingRefNumbers.has(citation.referenceNumber)) ||
         (hasOrphanedRefs && existingRefNumbers.size > 0) // Only check if we have references to compare
+        )
       ) {
         const deletedNums = citedNumbers.filter(n => !existingRefNumbers.has(n));
         refInfo = changeInfo
@@ -415,9 +461,14 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
         console.log(`[DocumentViewer] Orphaned citation detected: "${searchText}", deletedNums: ${deletedNums.join(',')}`);
       }
       // Check if citation has valid references (either direct referenceNumber or numbers exist in reference list)
-      else if (!citation.referenceNumber && citation.referenceNumber !== 0) {
+      // Skip if we already have a track change markTag
+      // NOTE: Always check for valid refs regardless of referenceNumber - citations like [1,2] should be clickable
+      else if (!hasTrackChangeMarkTag) {
         // Use already calculated citedNumbers and existingRefNumbers
-        const hasValidRefs = citedNumbers.length > 0 && citedNumbers.some(n => existingRefNumbers.has(n));
+        const hasValidRefs = (citation.referenceNumber && existingRefNumbers.has(citation.referenceNumber)) ||
+          (citedNumbers.length > 0 && citedNumbers.some(n => existingRefNumbers.has(n)));
+
+        console.log(`[DocumentViewer] Citation "${citation.rawText}": hasValidRefs=${hasValidRefs}, citation.referenceNumber=${citation.referenceNumber}`);
 
         if (hasValidRefs) {
           // Citation numbers exist in references - render as clickable (normal case)
@@ -425,6 +476,7 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
           refInfo = `References: ${validNums.join(', ')}`;
           displayContent = renderClickableNumbers(citation.rawText);
           markTag = `<mark class="${bgColor} px-1 rounded ${hoverColor} transition-colors" title="${escapeHtml(refInfo)}">${displayContent}</mark>`;
+          console.log(`[DocumentViewer] ✅ Created clickable markTag for "${citation.rawText}": validNums=[${validNums.join(',')}]`);
         } else {
           // Try to parse as APA author-year citation(s)
           const apaMatches = references ? parseAllAPACitations(citation.rawText, references) : [];
@@ -459,15 +511,8 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
           }
         }
       }
-      // Changed citation with just number change
-      else if (changeInfo && changeInfo.newNumber !== null) {
-        refInfo = `Updated: [${changeInfo.oldNumber}] → [${changeInfo.newNumber}]`;
-        // Render clickable numbers with renumber track change styling
-        displayContent = renderClickableNumbers(citation.rawText, 'track-change-renumber');
-
-        markTag = `<mark class="track-change-renumber animate-pulse px-1 rounded hover:bg-blue-200 transition-colors" title="${escapeHtml(refInfo)}">${displayContent}</mark>`;
-      }
       // Unchanged citation (normal yellow highlight with clickable numbers)
+      // This is the fallback when hasTrackChangeMarkTag is true (already handled above)
       else {
         // Render clickable citation numbers
         displayContent = renderClickableNumbers(citation.rawText);
@@ -664,8 +709,18 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
 
   // Get orphaned citations from both the citations array and recentChanges
   const orphanedFromCitations = citations.filter(c => c.isOrphaned);
+  // Only include changes that represent truly orphaned citations (not renumbered ones)
+  // Renumber changes have both oldText and newText - they're not orphaned, just renumbered
   const orphanedFromChanges = (recentChanges || [])
-    .filter(c => c.changeType === 'deleted' || (c.newNumber === null && c.oldText === c.newText))
+    .filter(c => {
+      // Skip renumber changes - these have both old and new text and aren't orphaned
+      if (c.changeType === 'renumber' && c.oldText && c.newText && c.oldText !== c.newText) {
+        return false;
+      }
+      // For other changes, check if citation still exists
+      const citationExists = citations.some(cit => cit.rawText === c.oldText || cit.rawText === c.newText);
+      return !citationExists; // Only orphaned if citation doesn't exist anymore
+    })
     .map(c => ({ rawText: c.oldText || c.newText || '' }));
 
   // Combine and dedupe orphaned citations
