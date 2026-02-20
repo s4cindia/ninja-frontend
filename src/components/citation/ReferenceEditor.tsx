@@ -24,12 +24,28 @@ type PendingChange =
   | { type: 'delete'; referenceId: string }
   | { type: 'edit'; referenceId: string; data: Partial<Reference> };
 
+// Source type labels for display
+const SOURCE_TYPE_LABELS: Record<string, string> = {
+  'journal_article': 'Journal Article',
+  'book': 'Book',
+  'book_chapter': 'Book Chapter',
+  'conference_paper': 'Conference Paper',
+  'preprint': 'Preprint',
+  'website': 'Website',
+  'thesis': 'Thesis',
+  'report': 'Report',
+  'newspaper': 'Newspaper',
+  'magazine': 'Magazine',
+  'unknown': 'Unknown'
+};
+
 interface Reference {
   id: string;
   number: number;
   authors: string[];
   year: string;
   title: string;
+  sourceType?: string;
   journalName?: string;
   volume?: string;
   issue?: string;
@@ -176,8 +192,17 @@ export default function ReferenceEditor({
   }, []);
 
   // Count citations for each reference
-  const getCitationCount = (refId: string) => {
-    return citations?.filter(c => c.referenceId === refId).length || 0;
+  // Use ref.citationCount from backend (correct) or fallback to counting linkedReferenceIds
+  const getCitationCount = (refId: string, ref?: Reference) => {
+    // Backend already calculates correct citationCount including linkedReferenceIds
+    if (ref?.citationCount !== undefined) {
+      return ref.citationCount;
+    }
+    // Fallback: count citations that link to this reference via linkedReferenceIds
+    return citations?.filter(c =>
+      c.referenceId === refId ||
+      ((c as unknown as { linkedReferenceIds?: string[] }).linkedReferenceIds?.includes(refId))
+    ).length || 0;
   };
 
   // Handle drag start
@@ -246,8 +271,8 @@ export default function ReferenceEditor({
   };
 
   // Delete reference (optimistic + debounced save)
-  const handleDelete = (refId: string) => {
-    const citationCount = getCitationCount(refId);
+  const handleDelete = (refId: string, ref?: Reference) => {
+    const citationCount = getCitationCount(refId, ref);
     if (citationCount > 0) {
       const confirm = window.confirm(
         `This reference is cited ${citationCount} time(s) in the document. ` +
@@ -273,6 +298,7 @@ export default function ReferenceEditor({
       authors: ref.authors,
       year: ref.year,
       title: ref.title,
+      sourceType: ref.sourceType,
       journalName: ref.journalName,
       volume: ref.volume,
       issue: ref.issue,
@@ -369,7 +395,7 @@ export default function ReferenceEditor({
       <div className="space-y-2">
         {localReferences.map((ref, index) => {
           const isEditing = editingId === ref.id;
-          const citationCount = getCitationCount(ref.id);
+          const citationCount = getCitationCount(ref.id, ref);
           const isDragOver = dragOverIndex === index;
           const isDragging = draggedIndex === index;
 
@@ -420,25 +446,59 @@ export default function ReferenceEditor({
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="text-xs text-gray-600">Title</label>
-                    <input
-                      type="text"
-                      className="w-full px-2 py-1 text-sm border rounded"
-                      value={editForm.title || ''}
-                      onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                    />
-                  </div>
                   <div className="grid grid-cols-3 gap-3">
+                    <div className="col-span-2">
+                      <label className="text-xs text-gray-600">Title</label>
+                      <input
+                        type="text"
+                        className="w-full px-2 py-1 text-sm border rounded"
+                        value={editForm.title || ''}
+                        onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                      />
+                    </div>
                     <div>
-                      <label className="text-xs text-gray-600">Journal</label>
+                      <label className="text-xs text-gray-600">Source Type</label>
+                      <select
+                        className="w-full px-2 py-1 text-sm border rounded bg-white"
+                        value={editForm.sourceType || 'journal_article'}
+                        onChange={(e) => setEditForm({ ...editForm, sourceType: e.target.value })}
+                      >
+                        <option value="journal_article">Journal Article</option>
+                        <option value="book">Book</option>
+                        <option value="book_chapter">Book Chapter</option>
+                        <option value="conference_paper">Conference Paper</option>
+                        <option value="preprint">Preprint</option>
+                        <option value="website">Website</option>
+                        <option value="thesis">Thesis</option>
+                        <option value="report">Report</option>
+                        <option value="newspaper">Newspaper</option>
+                        <option value="magazine">Magazine</option>
+                        <option value="unknown">Unknown</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-600">Journal/Conference</label>
                       <input
                         type="text"
                         className="w-full px-2 py-1 text-sm border rounded"
                         value={editForm.journalName || ''}
                         onChange={(e) => setEditForm({ ...editForm, journalName: e.target.value })}
+                        placeholder={editForm.sourceType === 'book' || editForm.sourceType === 'book_chapter' ? 'N/A for books' : ''}
                       />
                     </div>
+                    <div>
+                      <label className="text-xs text-gray-600">Publisher</label>
+                      <input
+                        type="text"
+                        className="w-full px-2 py-1 text-sm border rounded"
+                        value={editForm.publisher || ''}
+                        onChange={(e) => setEditForm({ ...editForm, publisher: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
                     <div>
                       <label className="text-xs text-gray-600">Volume/Issue</label>
                       <input
@@ -472,6 +532,15 @@ export default function ReferenceEditor({
                         className="w-full px-2 py-1 text-sm border rounded"
                         value={editForm.pages || ''}
                         onChange={(e) => setEditForm({ ...editForm, pages: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-600">URL</label>
+                      <input
+                        type="text"
+                        className="w-full px-2 py-1 text-sm border rounded"
+                        value={editForm.url || ''}
+                        onChange={(e) => setEditForm({ ...editForm, url: e.target.value })}
                       />
                     </div>
                   </div>
@@ -514,9 +583,11 @@ export default function ReferenceEditor({
                       {'. '}
                       <span className="italic">{ref.title || 'Untitled'}</span>
                       {ref.journalName && <span className="text-gray-700">. {ref.journalName}</span>}
+                      {ref.publisher && <span className="text-gray-700">. {ref.publisher}</span>}
                       {ref.volume && <span>, {ref.volume}</span>}
                       {ref.issue && <span>({ref.issue})</span>}
                       {ref.pages && <span>, {ref.pages}</span>}
+                      {'.'}
                     </p>
                     {ref.doi && (
                       <a
@@ -530,6 +601,22 @@ export default function ReferenceEditor({
                       </a>
                     )}
                   </div>
+
+                  {/* Source type badge */}
+                  {ref.sourceType && (
+                    <span
+                      className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full border ${
+                        ref.sourceType === 'book' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                        ref.sourceType === 'conference_paper' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                        ref.sourceType === 'preprint' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                        ref.sourceType === 'thesis' ? 'bg-green-50 text-green-700 border-green-200' :
+                        ref.sourceType === 'website' ? 'bg-cyan-50 text-cyan-700 border-cyan-200' :
+                        'bg-blue-50 text-blue-700 border-blue-200'
+                      }`}
+                    >
+                      {SOURCE_TYPE_LABELS[ref.sourceType] || ref.sourceType}
+                    </span>
+                  )}
 
                   {/* Citation count badge */}
                   {citationCount > 0 && (
@@ -569,7 +656,7 @@ export default function ReferenceEditor({
 
                     {/* Delete */}
                     <button
-                      onClick={() => handleDelete(ref.id)}
+                      onClick={() => handleDelete(ref.id, ref)}
                       disabled={isDeleting === ref.id}
                       className="p-1 text-gray-400 hover:text-red-600"
                       title="Delete reference"

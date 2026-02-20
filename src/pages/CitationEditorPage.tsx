@@ -28,6 +28,46 @@ import { ExportOptionsModal } from '@/components/citation/ExportOptionsModal';
 import { api } from '@/services/api';
 import toast from 'react-hot-toast';
 
+interface AnalysisCitation {
+  id: string;
+  rawText: string;
+  referenceId?: string;
+  referenceNumber?: number;
+  citationType?: string;
+  paragraphIndex?: number;
+  paragraphNumber?: number;
+  startOffset: number;
+  endOffset: number;
+  citationNumber?: number | null;
+  linkedReferenceNumbers?: number[];
+  isOrphaned?: boolean;
+}
+
+interface AnalysisReference {
+  id: string;
+  number: number;
+  authors: string[];
+  year: string;
+  title: string;
+  sourceType?: string;
+  journalName?: string;
+  volume?: string;
+  issue?: string;
+  pages?: string;
+  doi?: string;
+  url?: string;
+  publisher?: string;
+  citationCount?: number;
+}
+
+interface AnalysisValidation {
+  id: string;
+  type: string;
+  message: string;
+  severity: string;
+  citationId?: string;
+}
+
 interface AnalysisData {
   document: {
     id: string;
@@ -42,10 +82,10 @@ interface AnalysisData {
       totalReferences: number;
     };
   };
-  citations: any[];
-  references: any[];
+  citations: AnalysisCitation[];
+  references: AnalysisReference[];
   detectedStyle: string;
-  validations?: any[];
+  validations?: AnalysisValidation[];
 }
 
 interface RecentChange {
@@ -54,7 +94,27 @@ interface RecentChange {
   newNumber: number | null; // null means orphaned (reference deleted)
   oldText?: string; // Original citation text (e.g., "[3–5]")
   newText?: string; // New citation text after changes (e.g., "[3,4]")
-  changeType?: 'style' | 'renumber' | 'deleted' | 'unchanged'; // Type of change
+  changeType?: 'style' | 'renumber' | 'deleted' | 'unchanged' | 'reference_edit'; // Type of change
+}
+
+interface PreviewCitation {
+  id: string;
+  changeType: string;
+  isOrphaned?: boolean;
+  referenceNumber?: number;
+  originalText?: string;
+  newText?: string;
+}
+
+interface ApiError {
+  response?: {
+    data?: {
+      error?: {
+        message?: string;
+      };
+    };
+  };
+  message?: string;
 }
 
 export default function CitationEditorPage() {
@@ -98,7 +158,7 @@ export default function CitationEditorPage() {
     // Only check for numeric citation styles (Vancouver, IEEE)
     const isNumericStyle = data.detectedStyle?.toLowerCase() === 'vancouver' ||
                           data.detectedStyle?.toLowerCase() === 'ieee' ||
-                          data.citations.some((c: any) => /^\s*[([]?\d+[)\]]?\s*$/.test(c.rawText?.replace(/[,\-–]/g, '')));
+                          data.citations.some((c: AnalysisCitation) => /^\s*[([]?\d+[)\]]?\s*$/.test(c.rawText?.replace(/[,\-–]/g, '')));
 
     if (!isNumericStyle) {
       return { isSequential: true, outOfOrder: [], expectedOrder: [] };
@@ -219,7 +279,7 @@ export default function CitationEditorPage() {
                 newNumber: p.isOrphaned || p.changeType === 'deleted' ? null : (p.referenceNumber ?? null),
                 oldText: p.originalText,
                 newText: p.isOrphaned || p.changeType === 'deleted' ? p.originalText : p.newText,
-                changeType: p.changeType as 'style' | 'renumber' | 'deleted' | 'unchanged'
+                changeType: p.changeType as 'style' | 'renumber' | 'deleted' | 'unchanged' | 'reference_edit'
               }));
 
             if (changes.length > 0) {
@@ -299,14 +359,14 @@ export default function CitationEditorPage() {
             // Convert preview data to RecentChange format for display
             // Include both style changes and renumber changes
             const changes: RecentChange[] = previews
-              .filter((p: any) => p.changeType !== 'unchanged')
-              .map((p: any) => ({
+              .filter((p: PreviewCitation) => p.changeType !== 'unchanged')
+              .map((p: PreviewCitation) => ({
                 citationId: p.id,
                 oldNumber: 0,
                 newNumber: p.isOrphaned || p.changeType === 'deleted' ? null : p.referenceNumber,
                 oldText: p.originalText,
                 newText: p.isOrphaned || p.changeType === 'deleted' ? p.originalText : p.newText,
-                changeType: p.changeType as 'style' | 'renumber' | 'deleted' | 'unchanged'
+                changeType: p.changeType as 'style' | 'renumber' | 'deleted' | 'unchanged' | 'reference_edit'
               }));
 
             console.log('[CitationEditorPage] Style conversion changes to display:', changes.length);
@@ -326,8 +386,9 @@ export default function CitationEditorPage() {
       } else {
         setError(response.data.error?.message || 'Conversion failed');
       }
-    } catch (err: any) {
-      setError(err.response?.data?.error?.message || err.message || 'Conversion failed');
+    } catch (err: unknown) {
+      const apiErr = err as ApiError;
+      setError(apiErr.response?.data?.error?.message || apiErr.message || 'Conversion failed');
     } finally {
       setConverting(false);
     }
@@ -365,8 +426,9 @@ export default function CitationEditorPage() {
       } else {
         setError(response.data.error?.message || 'Validation failed');
       }
-    } catch (err: any) {
-      setError(err.response?.data?.error?.message || err.message || 'Validation failed');
+    } catch (err: unknown) {
+      const apiErr = err as ApiError;
+      setError(apiErr.response?.data?.error?.message || apiErr.message || 'Validation failed');
     } finally {
       setValidating(false);
     }
@@ -446,14 +508,14 @@ export default function CitationEditorPage() {
         // Convert preview data to RecentChange format
         // Only include changed or orphaned citations
         const changes: RecentChange[] = previews
-          .filter((p: any) => p.changeType !== 'unchanged')
-          .map((p: any) => ({
+          .filter((p: PreviewCitation) => p.changeType !== 'unchanged')
+          .map((p: PreviewCitation) => ({
             citationId: p.id,
             oldNumber: 0, // Not used for display, we use oldText/newText
             newNumber: p.isOrphaned || p.changeType === 'deleted' ? null : p.referenceNumber,
             oldText: p.originalText,
             newText: p.isOrphaned || p.changeType === 'deleted' ? p.originalText : p.newText,
-            changeType: p.changeType as 'style' | 'renumber' | 'deleted' | 'unchanged'
+            changeType: p.changeType as 'style' | 'renumber' | 'deleted' | 'unchanged' | 'reference_edit'
           }));
 
         console.log('[CitationEditorPage] Computed changes from preview:', changes.length);
@@ -499,14 +561,14 @@ export default function CitationEditorPage() {
 
             // Convert preview data to RecentChange format
             const changes: RecentChange[] = previews
-              .filter((p: any) => p.changeType !== 'unchanged')
-              .map((p: any) => ({
+              .filter((p: PreviewCitation) => p.changeType !== 'unchanged')
+              .map((p: PreviewCitation) => ({
                 citationId: p.id,
                 oldNumber: 0,
                 newNumber: p.isOrphaned || p.changeType === 'deleted' ? null : p.referenceNumber,
                 oldText: p.originalText,
                 newText: p.isOrphaned || p.changeType === 'deleted' ? p.originalText : p.newText,
-                changeType: p.changeType as 'style' | 'renumber' | 'deleted' | 'unchanged'
+                changeType: p.changeType as 'style' | 'renumber' | 'deleted' | 'unchanged' | 'reference_edit'
               }));
 
             console.log('[CitationEditorPage] Resequence changes to display:', changes.length);
@@ -522,11 +584,45 @@ export default function CitationEditorPage() {
       } else {
         setError(response.data.error?.message || 'Resequencing failed');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[CitationEditorPage] Resequence failed:', err);
-      setError(err.response?.data?.error?.message || err.message || 'Failed to resequence citations');
+      const apiErr = err as ApiError;
+      setError(apiErr.response?.data?.error?.message || apiErr.message || 'Failed to resequence citations');
     } finally {
       setIsResequencing(false);
+    }
+  };
+
+  // Handle dismiss/reset all changes
+  const [isResetting, setIsResetting] = useState(false);
+  const handleDismissChanges = async () => {
+    if (!documentId) return;
+
+    const confirmed = window.confirm(
+      'This will revert ALL changes (reference edits, style conversions, reordering) to original values. Continue?'
+    );
+    if (!confirmed) return;
+
+    setIsResetting(true);
+    try {
+      const response = await api.post(`/citation-management/document/${documentId}/reset-changes`);
+
+      if (response.data.success) {
+        toast.success(response.data.data?.message || 'All changes reverted successfully');
+        // Clear local state
+        setShowChangeHighlights(false);
+        setRecentChanges([]);
+        // Reload data from server to get reverted values
+        await loadAnalysis();
+      } else {
+        toast.error(response.data.error?.message || 'Failed to reset changes');
+      }
+    } catch (err: unknown) {
+      console.error('[CitationEditorPage] Reset changes failed:', err);
+      const apiErr = err as ApiError;
+      toast.error(apiErr.response?.data?.error?.message || 'Failed to reset changes');
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -578,7 +674,7 @@ export default function CitationEditorPage() {
               </Button>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">
-                  Citation Editor
+                  Citation Management
                 </h1>
                 <p className="text-sm text-gray-600 flex items-center mt-1">
                   <FileText className="h-3 w-3 mr-1" />
@@ -816,16 +912,16 @@ export default function CitationEditorPage() {
           <Card className="p-6 mb-6">
             <h3 className="text-lg font-semibold mb-4">In-Text Citations</h3>
             {/* Warning for citations without references */}
-            {data.citations.filter((c: any) => !c.referenceNumber && (!c.linkedReferenceNumbers || c.linkedReferenceNumbers.length === 0) && !c.isOrphaned).length > 0 && (
+            {data.citations.filter((c: AnalysisCitation) => !c.referenceNumber && (!c.linkedReferenceNumbers || c.linkedReferenceNumbers.length === 0) && !c.isOrphaned).length > 0 && (
               <div className="bg-orange-50 border border-orange-200 rounded p-3 mb-4">
                 <p className="text-sm text-orange-800">
                   <AlertTriangle className="inline h-4 w-4 mr-1" />
-                  <strong>{data.citations.filter((c: any) => !c.referenceNumber && (!c.linkedReferenceNumbers || c.linkedReferenceNumbers.length === 0) && !c.isOrphaned).length} citation(s)</strong> don't have matching references in the reference list.
+                  <strong>{data.citations.filter((c: AnalysisCitation) => !c.referenceNumber && (!c.linkedReferenceNumbers || c.linkedReferenceNumbers.length === 0) && !c.isOrphaned).length} citation(s)</strong> don't have matching references in the reference list.
                 </p>
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
-              {data.citations.map((citation: any) => {
+              {data.citations.map((citation: AnalysisCitation) => {
                 const hasNoReference = !citation.referenceNumber && (!citation.linkedReferenceNumbers || citation.linkedReferenceNumbers.length === 0) && !citation.isOrphaned;
                 return (
                   <div
@@ -858,10 +954,10 @@ export default function CitationEditorPage() {
                         <span className="text-xs text-orange-600 font-medium">
                           ⚠️ No matching reference
                         </span>
-                      ) : (citation.linkedReferenceNumbers?.length > 0 || citation.referenceNumber) ? (
+                      ) : ((citation.linkedReferenceNumbers?.length ?? 0) > 0 || citation.referenceNumber) ? (
                         <div className="flex flex-wrap gap-1">
                           {/* Show all linked reference numbers as clickable buttons */}
-                          {(citation.linkedReferenceNumbers?.length > 0 ? citation.linkedReferenceNumbers : [citation.referenceNumber]).map((refNum: number, idx: number) => (
+                          {((citation.linkedReferenceNumbers?.length ?? 0) > 0 ? citation.linkedReferenceNumbers! : [citation.referenceNumber]).map((refNum: number | undefined, idx: number) => refNum !== undefined && (
                             <button
                               key={refNum}
                               onClick={() => {
@@ -931,12 +1027,17 @@ export default function CitationEditorPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    setShowChangeHighlights(false);
-                    setRecentChanges([]);
-                  }}
+                  onClick={handleDismissChanges}
+                  disabled={isResetting}
                 >
-                  ✓ Dismiss Changes ({recentChanges.length})
+                  {isResetting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Reverting...
+                    </>
+                  ) : (
+                    `✓ Dismiss Changes (${recentChanges.length})`
+                  )}
                 </Button>
               )}
             </div>
@@ -944,7 +1045,7 @@ export default function CitationEditorPage() {
               fullText={data.document.fullText}
               fullHtml={data.document.fullHtml}
               citations={data.citations}
-              references={data.references.map((r: any) => ({
+              references={data.references.map((r: AnalysisReference) => ({
                 id: r.id,
                 number: r.number,
                 authors: r.authors,

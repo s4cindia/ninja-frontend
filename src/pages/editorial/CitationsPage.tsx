@@ -61,7 +61,7 @@ function CitationsJobListPlaceholder() {
             <BookOpen className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Citation Editor</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Citation Management</h2>
             <p className="text-sm text-gray-500">View document text with highlighted citations and fix detected issues</p>
           </div>
         </div>

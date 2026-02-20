@@ -137,7 +137,7 @@ export function CitationEditorLayout({ data, textLookupId }: CitationEditorLayou
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-gray-800 text-white rounded-t-lg">
         <div className="flex items-center gap-3">
           <BookOpen className="h-4 w-4 text-blue-400" aria-hidden="true" />
-          <span className="text-sm font-medium">Citation Editor</span>
+          <span className="text-sm font-medium">Citation Management</span>
           {data.filename && (
             <span className="text-xs text-gray-400 flex items-center gap-1">
               <FileText className="h-3 w-3" aria-hidden="true" />

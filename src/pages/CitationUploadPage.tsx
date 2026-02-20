@@ -6,11 +6,11 @@
 import { useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
-import { Upload, FileText, Clock, CheckCircle } from 'lucide-react';
+import { Upload, FileText, Clock, CheckCircle, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { useUploadManuscript } from '@/hooks/useCitationIntel';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import toast from 'react-hot-toast';
 
@@ -25,8 +25,10 @@ interface RecentJob {
 
 export default function CitationUploadPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const uploadMutation = useUploadManuscript();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
 
   // Fetch recent citation jobs
   const { data: recentJobs } = useQuery({
@@ -37,6 +39,33 @@ export default function CitationUploadPage() {
     },
     staleTime: 30000, // 30 seconds
   });
+
+  // Delete job mutation
+  const deleteJobMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      const response = await api.delete(`/citation-management/job/${jobId}`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recent-citation-jobs'] });
+      toast.success('Job deleted successfully');
+      setDeletingJobId(null);
+    },
+    onError: (error) => {
+      console.error('Delete job error:', error);
+      toast.error('Failed to delete job');
+      setDeletingJobId(null);
+    },
+  });
+
+  const handleDeleteJob = (e: React.MouseEvent, jobId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (confirm('Are you sure you want to delete this job and all its data?')) {
+      setDeletingJobId(jobId);
+      deleteJobMutation.mutate(jobId);
+    }
+  };
 
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -164,36 +193,69 @@ export default function CitationUploadPage() {
               {(recentJobs as RecentJob[]).map((job) => {
                 // Only link to analysis if documentId exists
                 const hasDocument = job.documentId && job.documentId !== 'null';
+                const isDeleting = deletingJobId === job.jobId;
+
+                const statusIcon = job.status === 'COMPLETED' && hasDocument ? (
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                ) : job.status === 'PROCESSING' ? (
+                  <Clock className="h-4 w-4 text-blue-500 animate-spin" />
+                ) : job.status === 'FAILED' ? (
+                  <span className="text-xs text-red-500">Failed</span>
+                ) : (
+                  <Clock className="h-4 w-4 text-gray-400" />
+                );
+
                 const content = (
                   <>
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-3 flex-1">
                       <FileText className="h-5 w-5 text-gray-400" />
                       <div>
                         <p className="text-sm font-medium text-gray-900">{job.filename}</p>
                         <p className="text-xs text-gray-500">{formatTimeAgo(job.createdAt)}</p>
                       </div>
                     </div>
-                    {job.status === 'COMPLETED' && hasDocument ? (
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                    ) : job.status === 'PROCESSING' ? (
-                      <Clock className="h-4 w-4 text-blue-500 animate-spin" />
-                    ) : job.status === 'FAILED' ? (
-                      <span className="text-xs text-red-500">Failed</span>
-                    ) : (
-                      <Clock className="h-4 w-4 text-gray-400" />
-                    )}
+                    <div className="flex items-center space-x-2">
+                      {statusIcon}
+                      <button
+                        onClick={(e) => handleDeleteJob(e, job.jobId)}
+                        disabled={isDeleting}
+                        className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+                        title="Delete job"
+                      >
+                        <Trash2 className={`h-4 w-4 ${isDeleting ? 'animate-spin' : ''}`} />
+                      </button>
+                    </div>
                   </>
                 );
 
                 if (hasDocument) {
                   return (
-                    <Link
+                    <div
                       key={job.jobId}
-                      to={`/citation/analysis/${job.documentId}`}
-                      className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"
+                      className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors"
                     >
-                      {content}
-                    </Link>
+                      <Link
+                        to={`/citation/analysis/${job.documentId}`}
+                        className="flex items-center space-x-3 flex-1 cursor-pointer"
+                      >
+                        <FileText className="h-5 w-5 text-gray-400" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{job.filename}</p>
+                          <p className="text-xs text-gray-500">{formatTimeAgo(job.createdAt)}</p>
+                        </div>
+                      </Link>
+                      <div className="flex items-center space-x-2">
+                        {statusIcon}
+                        <button
+                          onClick={(e) => handleDeleteJob(e, job.jobId)}
+                          disabled={isDeleting}
+                          className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+                          title="Delete job"
+                        >
+                          <Trash2 className={`h-4 w-4 ${isDeleting ? 'animate-spin' : ''}`} />
+                        </button>
+                      </div>
+                    </div>
                   );
                 }
 
