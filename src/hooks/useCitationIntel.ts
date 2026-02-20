@@ -6,6 +6,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { citationIntelService } from '@/services/citation-intel.service';
 import toast from 'react-hot-toast';
 
+interface ApiErrorResponse {
+  response?: {
+    status?: number;
+    data?: {
+      error?: {
+        message?: string;
+      };
+    };
+  };
+}
+
 export function useUploadManuscript() {
   return useMutation({
     mutationFn: (file: File) => citationIntelService.upload(file),
@@ -35,9 +46,10 @@ export function useJobProgress(jobId: string | undefined, enabled = true) {
     queryKey: ['citation-job-progress', jobId],
     queryFn: () => citationIntelService.getProgress(jobId!),
     enabled: !!jobId && enabled,
-    retry: (failureCount, error: any) => {
+    retry: (failureCount, error: unknown) => {
       // Don't retry on 404 (job not found)
-      if (error?.response?.status === 404) {
+      const apiErr = error as ApiErrorResponse;
+      if (apiErr?.response?.status === 404) {
         return false;
       }
       // Retry up to 3 times for other errors
@@ -45,10 +57,10 @@ export function useJobProgress(jobId: string | undefined, enabled = true) {
     },
     refetchInterval: (query) => {
       const data = query.state.data;
-      const error = query.state.error as any;
+      const apiErr = query.state.error as ApiErrorResponse | null;
 
       // Stop polling if job not found
-      if (error?.response?.status === 404) {
+      if (apiErr?.response?.status === 404) {
         return false;
       }
 
@@ -65,9 +77,10 @@ export function useAnalysisResults(jobId: string | undefined) {
     queryKey: ['citation-analysis', jobId],
     queryFn: () => citationIntelService.getAnalysis(jobId!),
     enabled: !!jobId,
-    retry: (failureCount, error: any) => {
+    retry: (failureCount, error: unknown) => {
       // Don't retry on 404 (job not found)
-      if (error?.response?.status === 404) {
+      const apiErr = error as ApiErrorResponse;
+      if (apiErr?.response?.status === 404) {
         return false;
       }
       // Retry up to 3 times for other errors
@@ -76,10 +89,10 @@ export function useAnalysisResults(jobId: string | undefined) {
     staleTime: Infinity, // Cache forever - results don't change after job completes
     refetchInterval: (query) => {
       const data = query.state.data;
-      const error = query.state.error as any;
+      const apiErr = query.state.error as ApiErrorResponse | null;
 
       // Stop polling if job not found
-      if (error?.response?.status === 404) {
+      if (apiErr?.response?.status === 404) {
         return false;
       }
 
@@ -120,7 +133,7 @@ export function useVerifyDOI() {
       }
     },
     onError: (error) => {
-      const message = (error as any)?.response?.data?.error?.message || 'Verification failed';
+      const message = (error as ApiErrorResponse)?.response?.data?.error?.message || 'Verification failed';
       toast.error(message);
     },
   });
@@ -161,7 +174,7 @@ export function useUpdateReference() {
       toast.success('Reference updated successfully');
     },
     onError: (error) => {
-      const message = (error as any)?.response?.data?.error?.message || 'Update failed';
+      const message = (error as ApiErrorResponse)?.response?.data?.error?.message || 'Update failed';
       toast.error(message);
     },
   });
@@ -185,7 +198,7 @@ export function useFlagReferenceForReview() {
       toast.success('Reference flagged for review');
     },
     onError: (error) => {
-      const message = (error as any)?.response?.data?.error?.message || 'Failed to flag reference';
+      const message = (error as ApiErrorResponse)?.response?.data?.error?.message || 'Failed to flag reference';
       toast.error(message);
     },
   });
@@ -201,7 +214,7 @@ export function useRevertReference() {
       toast.success('Reference reverted to original');
     },
     onError: (error) => {
-      const message = (error as any)?.response?.data?.error?.message || 'Failed to revert reference';
+      const message = (error as ApiErrorResponse)?.response?.data?.error?.message || 'Failed to revert reference';
       toast.error(message);
     },
   });
