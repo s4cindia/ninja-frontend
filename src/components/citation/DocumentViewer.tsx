@@ -7,6 +7,9 @@ import type { MouseEvent } from 'react';
 import DOMPurify from 'dompurify';
 import { Card } from '@/components/ui/Card';
 
+// Debug flag - set to true for verbose logging during development
+const DEBUG_CITATIONS = process.env.NODE_ENV === 'development' && false;
+
 // Reference type for APA citation matching
 interface ReferenceData {
   id: string;
@@ -219,8 +222,10 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
   const getChangeInfo = (citation: Citation) => {
     if (!recentChanges || recentChanges.length === 0) return null;
 
-    console.log(`[DocumentViewer] getChangeInfo for citation rawText: "${citation.rawText}"`);
-    console.log(`[DocumentViewer] recentChanges count: ${recentChanges.length}`);
+    if (DEBUG_CITATIONS) {
+      console.log(`[DocumentViewer] getChangeInfo for citation rawText: "${citation.rawText}"`);
+      console.log(`[DocumentViewer] recentChanges count: ${recentChanges.length}`);
+    }
 
     // First try to match by citationId
     let change = recentChanges.find(c => c.citationId && c.citationId === citation.id);
@@ -228,10 +233,14 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
       // Validate the match - the change record should relate to the current citation text
       // If neither oldText nor newText matches the current rawText, the change record is stale
       if (change.oldText !== citation.rawText && change.newText !== citation.rawText) {
-        console.log(`[DocumentViewer] Skipping stale change for "${citation.rawText}" (change is for "${change.oldText}" → "${change.newText}")`);
+        if (DEBUG_CITATIONS) {
+          console.log(`[DocumentViewer] Skipping stale change for "${citation.rawText}" (change is for "${change.oldText}" → "${change.newText}")`);
+        }
         // Don't return this stale change - continue to look for other matches
       } else {
-        console.log(`[DocumentViewer] Matched by citationId: "${change.oldText}" → "${change.newText}"`);
+        if (DEBUG_CITATIONS) {
+          console.log(`[DocumentViewer] Matched by citationId: "${change.oldText}" → "${change.newText}"`);
+        }
         return change;
       }
     }
@@ -239,43 +248,55 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
     // Try to match by newText (after conversion, citation.rawText = newText)
     change = recentChanges.find(c => c.newText === citation.rawText);
     if (change) {
-      console.log(`[DocumentViewer] Matched by newText: "${change.oldText}" → "${change.newText}"`);
+      if (DEBUG_CITATIONS) {
+        console.log(`[DocumentViewer] Matched by newText: "${change.oldText}" → "${change.newText}"`);
+      }
       return change;
     }
 
     // Try oldText match for cases where rawText hasn't been updated yet
     change = recentChanges.find(c => c.oldText === citation.rawText);
     if (change) {
-      console.log(`[DocumentViewer] Matched by oldText: "${change.oldText}" → "${change.newText}"`);
+      if (DEBUG_CITATIONS) {
+        console.log(`[DocumentViewer] Matched by oldText: "${change.oldText}" → "${change.newText}"`);
+      }
       return change;
     }
 
-    console.log(`[DocumentViewer] No match found for "${citation.rawText}"`);
+    if (DEBUG_CITATIONS) {
+      console.log(`[DocumentViewer] No match found for "${citation.rawText}"`);
+    }
     return null;
   };
 
   // Highlight citations in HTML (preserves formatting)
   const highlightCitationsInHTML = (html: string) => {
-    console.log('[DocumentViewer] highlightCitationsInHTML called');
-    console.log('[DocumentViewer] HTML length:', html?.length || 0);
-    console.log('[DocumentViewer] Citations array:', citations?.length || 0);
+    if (DEBUG_CITATIONS) {
+      console.log('[DocumentViewer] highlightCitationsInHTML called');
+      console.log('[DocumentViewer] HTML length:', html?.length || 0);
+      console.log('[DocumentViewer] Citations array:', citations?.length || 0);
+    }
 
     if (!citations || citations.length === 0) {
-      console.log('[DocumentViewer] No citations to highlight - returning original HTML');
+      if (DEBUG_CITATIONS) {
+        console.log('[DocumentViewer] No citations to highlight - returning original HTML');
+      }
       return html;
     }
 
     // Look for reference section headings to see what HTML structure is around them
-    const lowerHtml = html.toLowerCase();
-    for (const heading of ['references', 'bibliography', 'footnotes', 'notes', 'works cited']) {
-      const textIndex = lowerHtml.indexOf(heading);
-      if (textIndex !== -1) {
-        // Log 200 characters around the heading to see the HTML structure
-        const start = Math.max(0, textIndex - 100);
-        const end = Math.min(html.length, textIndex + 100);
-        const sample = html.substring(start, end);
-        console.log(`[DocumentViewer] HTML around "${heading}":`, sample);
-        break;
+    if (DEBUG_CITATIONS) {
+      const lowerHtml = html.toLowerCase();
+      for (const heading of ['references', 'bibliography', 'footnotes', 'notes', 'works cited']) {
+        const textIndex = lowerHtml.indexOf(heading);
+        if (textIndex !== -1) {
+          // Log 200 characters around the heading to see the HTML structure
+          const start = Math.max(0, textIndex - 100);
+          const end = Math.min(html.length, textIndex + 100);
+          const sample = html.substring(start, end);
+          console.log(`[DocumentViewer] HTML around "${heading}":`, sample);
+          break;
+        }
       }
     }
 
@@ -298,14 +319,16 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
       const match = html.match(pattern);
       if (match && match.index !== undefined) {
         referencesStart = match.index;
-        console.log('[DocumentViewer] Found References section with pattern:', pattern.toString().substring(0, 50), 'at position:', match.index);
-        console.log('[DocumentViewer] Matched text:', match[0]);
+        if (DEBUG_CITATIONS) {
+          console.log('[DocumentViewer] Found References section with pattern:', pattern.toString().substring(0, 50), 'at position:', match.index);
+          console.log('[DocumentViewer] Matched text:', match[0]);
+        }
         contentToHighlight = html.substring(0, referencesStart);
         break;
       }
     }
 
-    if (referencesStart === -1) {
+    if (referencesStart === -1 && DEBUG_CITATIONS) {
       console.log('[DocumentViewer] References section not found with any pattern');
     }
 
@@ -322,12 +345,14 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
         return true;
       });
 
-    console.log('[DocumentViewer] Sample citations:', sortedCitations.slice(0, 3).map(c => ({
-      id: c.id,
-      rawText: c.rawText,
-      referenceNumber: c.referenceNumber
-    })));
-    console.log(`[DocumentViewer] Processing ${sortedCitations.length} unique citations (from ${citations.length} total)`);
+    if (DEBUG_CITATIONS) {
+      console.log('[DocumentViewer] Sample citations:', sortedCitations.slice(0, 3).map(c => ({
+        id: c.id,
+        rawText: c.rawText,
+        referenceNumber: c.referenceNumber
+      })));
+      console.log(`[DocumentViewer] Processing ${sortedCitations.length} unique citations (from ${citations.length} total)`);
+    }
 
     // TWO-PHASE REPLACEMENT to prevent nested replacements:
     // Phase 1: Replace all citation texts with unique placeholders
@@ -338,7 +363,9 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
 
     sortedCitations.forEach(citation => {
       if (!citation.rawText) {
-        console.log('[DocumentViewer] Skipping citation with no rawText:', citation.id);
+        if (DEBUG_CITATIONS) {
+          console.log('[DocumentViewer] Skipping citation with no rawText:', citation.id);
+        }
         return;
       }
 
@@ -356,6 +383,8 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
       let searchText = citation.rawText;
       let displayContent = escapeHtml(citation.rawText);
       let markTag = '';
+      // Boolean flag to track if markTag was set for track change (avoids fragile string inspection)
+      let isTrackChangeMarkTag = false;
 
       // Helper to render citation numbers as clickable links
       const renderClickableNumbers = (text: string, changeClass?: string): string => {
@@ -382,13 +411,15 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
 
       // Changed citation (style conversion or renumbering) - check this FIRST
       // This handles cases where oldText !== newText (style change or renumber)
-      console.log(`[DocumentViewer] Checking changeInfo for "${citation.rawText}":`, {
-        hasChangeInfo: !!changeInfo,
-        oldText: changeInfo?.oldText,
-        newText: changeInfo?.newText,
-        changeType: changeInfo?.changeType,
-        oldEqualsNew: changeInfo?.oldText === changeInfo?.newText
-      });
+      if (DEBUG_CITATIONS) {
+        console.log(`[DocumentViewer] Checking changeInfo for "${citation.rawText}":`, {
+          hasChangeInfo: !!changeInfo,
+          oldText: changeInfo?.oldText,
+          newText: changeInfo?.newText,
+          changeType: changeInfo?.changeType,
+          oldEqualsNew: changeInfo?.oldText === changeInfo?.newText
+        });
+      }
 
       if (changeInfo && changeInfo.oldText && changeInfo.newText && changeInfo.oldText !== changeInfo.newText) {
         // Check if old text or new text exists in the HTML
@@ -409,7 +440,10 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
           displayContent = `${oldDisplay}<span class="track-change-arrow"> → </span>${newDisplay}`;
 
           markTag = `<mark class="px-1 rounded transition-colors" title="${escapeHtml(refInfo)}">${displayContent}</mark>`;
-          console.log(`[DocumentViewer] ✅ TRACK CHANGE (old text): "${changeInfo.oldText}" → "${changeInfo.newText}"`);
+          isTrackChangeMarkTag = true;
+          if (DEBUG_CITATIONS) {
+            console.log(`[DocumentViewer] ✅ TRACK CHANGE (old text): "${changeInfo.oldText}" → "${changeInfo.newText}"`);
+          }
         } else if (newTextInHtml) {
           // HTML already updated with new text - just show as normal linked citation
           // Don't show track change format since the change is already applied
@@ -417,24 +451,27 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
           displayContent = renderClickableNumbers(changeInfo.newText);
           refInfo = `Renumbered from ${escapeHtml(changeInfo.oldText)}`;
           markTag = `<mark class="${bgColor} px-1 rounded ${hoverColor} transition-colors" title="${escapeHtml(refInfo)}">${displayContent}</mark>`;
-          console.log(`[DocumentViewer] ✅ RENUMBERED (new text): "${changeInfo.oldText}" → "${changeInfo.newText}"`);
+          isTrackChangeMarkTag = true;
+          if (DEBUG_CITATIONS) {
+            console.log(`[DocumentViewer] ✅ RENUMBERED (new text): "${changeInfo.oldText}" → "${changeInfo.newText}"`);
+          }
         }
-      } else if (changeInfo) {
+      } else if (changeInfo && DEBUG_CITATIONS) {
         console.log(`[DocumentViewer] ⚠️ changeInfo exists but condition failed`);
       }
 
       // If we already set a markTag above (track change or renumbered), skip all the other conditions
-      // This prevents overwriting the already-set markTag
-      const hasTrackChangeMarkTag = markTag.includes('track-change-deletion-sm') ||
-                                    markTag.includes('track-change-arrow') ||
-                                    markTag.includes('Renumbered from');
+      // Using boolean flag instead of fragile string inspection
+      const hasTrackChangeMarkTag = isTrackChangeMarkTag;
 
       // Check if referenced numbers exist in current reference list
       const existingRefNumbers = new Set(references?.map(r => r.number) || []);
       const citedNumbers = expandCitationRange(citation.rawText);
       const hasOrphanedRefs = citedNumbers.length > 0 && citedNumbers.some(n => !existingRefNumbers.has(n));
 
-      console.log(`[DocumentViewer] Citation "${citation.rawText}": hasTrackChangeMarkTag=${hasTrackChangeMarkTag}, citedNumbers=[${citedNumbers.join(',')}], existingRefNumbers=[${Array.from(existingRefNumbers).join(',')}]`);
+      if (DEBUG_CITATIONS) {
+        console.log(`[DocumentViewer] Citation "${citation.rawText}": hasTrackChangeMarkTag=${hasTrackChangeMarkTag}, citedNumbers=[${citedNumbers.join(',')}], existingRefNumbers=[${Array.from(existingRefNumbers).join(',')}]`);
+      }
 
       // Orphaned citation (reference was deleted) - check multiple indicators
       // Skip if we already have a track change markTag
@@ -458,7 +495,9 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
         displayContent = `<span class="track-change-deletion">${escapeHtml(searchText)}</span> <span style="color: #dc2626; font-weight: bold;">⚠</span>`;
 
         markTag = `<mark class="track-change-deletion animate-pulse px-1 rounded hover:bg-red-300 transition-colors" title="${escapeHtml(refInfo)}">${displayContent}</mark>`;
-        console.log(`[DocumentViewer] Orphaned citation detected: "${searchText}", deletedNums: ${deletedNums.join(',')}`);
+        if (DEBUG_CITATIONS) {
+          console.log(`[DocumentViewer] Orphaned citation detected: "${searchText}", deletedNums: ${deletedNums.join(',')}`);
+        }
       }
       // Check if citation has valid references (either direct referenceNumber or numbers exist in reference list)
       // Skip if we already have a track change markTag
@@ -468,7 +507,9 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
         const hasValidRefs = (citation.referenceNumber && existingRefNumbers.has(citation.referenceNumber)) ||
           (citedNumbers.length > 0 && citedNumbers.some(n => existingRefNumbers.has(n)));
 
-        console.log(`[DocumentViewer] Citation "${citation.rawText}": hasValidRefs=${hasValidRefs}, citation.referenceNumber=${citation.referenceNumber}`);
+        if (DEBUG_CITATIONS) {
+          console.log(`[DocumentViewer] Citation "${citation.rawText}": hasValidRefs=${hasValidRefs}, citation.referenceNumber=${citation.referenceNumber}`);
+        }
 
         if (hasValidRefs) {
           // Citation numbers exist in references - render as clickable (normal case)
@@ -476,7 +517,9 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
           refInfo = `References: ${validNums.join(', ')}`;
           displayContent = renderClickableNumbers(citation.rawText);
           markTag = `<mark class="${bgColor} px-1 rounded ${hoverColor} transition-colors" title="${escapeHtml(refInfo)}">${displayContent}</mark>`;
-          console.log(`[DocumentViewer] ✅ Created clickable markTag for "${citation.rawText}": validNums=[${validNums.join(',')}]`);
+          if (DEBUG_CITATIONS) {
+            console.log(`[DocumentViewer] ✅ Created clickable markTag for "${citation.rawText}": validNums=[${validNums.join(',')}]`);
+          }
         } else {
           // Try to parse as APA author-year citation(s)
           const apaMatches = references ? parseAllAPACitations(citation.rawText, references) : [];
@@ -511,14 +554,8 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
           }
         }
       }
-      // Unchanged citation (normal yellow highlight with clickable numbers)
-      // This is the fallback when hasTrackChangeMarkTag is true (already handled above)
-      else {
-        // Render clickable citation numbers
-        displayContent = renderClickableNumbers(citation.rawText);
-
-        markTag = `<mark class="${bgColor} px-1 rounded ${hoverColor} transition-colors" title="${escapeHtml(refInfo)}">${displayContent}</mark>`;
-      }
+      // When hasTrackChangeMarkTag is true, markTag is already set above - don't overwrite it
+      // The track change or renumbered formatting should be preserved
 
       // Try to find citation text in HTML and replace with placeholder
       // For changed citations, we may need to search for either oldText or newText depending on
@@ -543,7 +580,9 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
           const extractedText = fullText.substring(startOffset, endOffset);
           if (extractedText && extractedText !== searchText && !textsToTry.includes(extractedText)) {
             textsToTry.push(extractedText);
-            console.log(`[DocumentViewer] Added position-based fallback: "${extractedText}" for citation "${searchText}"`);
+            if (DEBUG_CITATIONS) {
+              console.log(`[DocumentViewer] Added position-based fallback: "${extractedText}" for citation "${searchText}"`);
+            }
           }
         }
       }
@@ -603,14 +642,16 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
             const matchCount = (result.match(regex) || []).length;
             result = result.replace(regex, placeholder);
             highlightedCount += matchCount;
-            console.log(`[DocumentViewer] Replaced citation: "${textToSearch}" with placeholder (matched ${matchCount}x)`);
+            if (DEBUG_CITATIONS) {
+              console.log(`[DocumentViewer] Replaced citation: "${textToSearch}" with placeholder (matched ${matchCount}x)`);
+            }
             found = true;
             break;
           }
         }
       }
 
-      if (!found) {
+      if (!found && DEBUG_CITATIONS) {
         console.log(`[DocumentViewer] Citation text not found in HTML: "${textsToTry.join('" or "')}"`);
       }
     });
@@ -646,7 +687,9 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
           const regex = new RegExp(escapedVariant, 'g');
           if (result.match(regex)) {
             result = result.replace(regex, orphanMarkTag);
-            console.log(`[DocumentViewer] Orphan change highlighted: "${textToSearch}"`);
+            if (DEBUG_CITATIONS) {
+              console.log(`[DocumentViewer] Orphan change highlighted: "${textToSearch}"`);
+            }
             seenTexts.add(orphanText);
             highlightedCount++;
             break;
@@ -655,8 +698,10 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
       }
     }
 
-    console.log(`[DocumentViewer] Highlighting complete - ${highlightedCount}/${citations.length} citations highlighted`);
-    console.log('[DocumentViewer] Contains <mark> tags:', result.includes('<mark'));
+    if (DEBUG_CITATIONS) {
+      console.log(`[DocumentViewer] Highlighting complete - ${highlightedCount}/${citations.length} citations highlighted`);
+      console.log('[DocumentViewer] Contains <mark> tags:', result.includes('<mark'));
+    }
 
     // Don't include References section in result
     return result;
@@ -695,12 +740,14 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
   // Highlighting works by finding citation text within HTML
   const contentToDisplay = fullHtml || fullText || '';
 
-  console.log('[DocumentViewer] Rendering with:', {
-    hasFullText: !!fullText,
-    hasFullHtml: !!fullHtml,
-    contentLength: contentToDisplay?.length || 0,
-    usingHTML: !!fullHtml
-  });
+  if (DEBUG_CITATIONS) {
+    console.log('[DocumentViewer] Rendering with:', {
+      hasFullText: !!fullText,
+      hasFullHtml: !!fullHtml,
+      contentLength: contentToDisplay?.length || 0,
+      usingHTML: !!fullHtml
+    });
+  }
 
   // Apply citation highlighting to HTML (preserves formatting)
   const highlightedContent = highlightCitationsInHTML(contentToDisplay);
