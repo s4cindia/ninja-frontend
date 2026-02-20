@@ -68,6 +68,7 @@ import CitationUploadPage from '@/pages/CitationUploadPage';
 import CitationAnalysisPage from '@/pages/CitationAnalysisPage';
 import CitationManuscriptPage from '@/pages/CitationManuscriptPage';
 import CitationEditorPage from '@/pages/CitationEditorPage';
+import { WorkflowPage } from '@/pages/workflow/WorkflowPage';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -214,6 +215,7 @@ function AppRoutes() {
           <Route path="/batches" element={<BatchListPage />} />
           <Route path="/batches/new" element={<BatchCreationPage />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/workflow/:workflowId" element={<WorkflowPage />} />
 
           {/* Editorial Services Routes */}
           <Route path="/editorial" element={<EditorialLayout />}>
