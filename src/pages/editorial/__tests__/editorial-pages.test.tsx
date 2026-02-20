@@ -88,7 +88,7 @@ describe('Editorial Services Shell', () => {
 
   it('renders citations job list without jobId', () => {
     renderWithRouter('/editorial/citations');
-    expect(screen.getByText('Citation Editor')).toBeInTheDocument();
+    expect(screen.getByText('Citation Management')).toBeInTheDocument();
   });
 
   it('renders plagiarism placeholder with sprint info', () => {

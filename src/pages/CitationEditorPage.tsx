@@ -674,7 +674,7 @@ export default function CitationEditorPage() {
               </Button>
               <div>
                 <h1 className="text-xl font-bold text-gray-900">
-                  Citation Editor
+                  Citation Management
                 </h1>
                 <p className="text-sm text-gray-600 flex items-center mt-1">
                   <FileText className="h-3 w-3 mr-1" />
