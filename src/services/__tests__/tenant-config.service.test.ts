@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { tenantConfigService, WorkflowConfig } from '../tenant-config.service';
 import { api } from '../api';

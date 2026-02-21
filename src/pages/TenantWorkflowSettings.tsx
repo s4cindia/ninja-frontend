@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Button } from '../components/ui/Button';
-import { Alert } from '../components/ui/Alert';
 import { tenantConfigService, WorkflowConfig } from '../services/tenant-config.service';
-import { Loader2, Save, X, CheckCircle, AlertCircle } from 'lucide-react';
+import { Loader2, Save, X } from 'lucide-react';
 
 export const TenantWorkflowSettings: React.FC = () => {
   const [config, setConfig] = useState<WorkflowConfig | null>(null);
@@ -96,8 +95,10 @@ export const TenantWorkflowSettings: React.FC = () => {
         duration: 3000,
         icon: '✅',
       });
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to save configuration. Please try again.', {
+    } catch (err: unknown) {
+      const errorMessage = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        || 'Failed to save configuration. Please try again.';
+      toast.error(errorMessage, {
         duration: 5000,
       });
       console.error('Failed to save config:', err);
