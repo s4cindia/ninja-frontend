@@ -54,8 +54,9 @@ export function WorkflowTimeline({ workflowId }: WorkflowTimelineProps) {
     queryKey: ['workflow-timeline', workflowId],
     queryFn: () => workflowService.getTimeline(workflowId),
     refetchInterval: () => {
-      // Keep polling while the workflow is still active
-      return ACTIVE_STATES.has(currentStateRef.current) ? 10_000 : false;
+      // With WebSocket, only poll every 30s as backup
+      // WebSocket provides instant updates via workflow:state-change events
+      return ACTIVE_STATES.has(currentStateRef.current) ? 30_000 : false;
     },
   });
 

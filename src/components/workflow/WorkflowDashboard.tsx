@@ -33,6 +33,27 @@ function formatTimestamp(ts: string | undefined): string {
   return new Date(ts).toLocaleString();
 }
 
+function computeProgressFromState(state: string): number {
+  const progressMap: Record<string, number> = {
+    UPLOAD_RECEIVED: 5,
+    PREPROCESSING: 10,
+    RUNNING_EPUBCHECK: 20,
+    RUNNING_ACE: 30,
+    RUNNING_AI_ANALYSIS: 40,
+    AWAITING_AI_REVIEW: 45,
+    AUTO_REMEDIATION: 55,
+    AWAITING_REMEDIATION_REVIEW: 60,
+    VERIFICATION_AUDIT: 65,
+    CONFORMANCE_MAPPING: 70,
+    AWAITING_CONFORMANCE_REVIEW: 75,
+    ACR_GENERATION: 85,
+    AWAITING_ACR_SIGNOFF: 90,
+    COMPLETED: 100,
+    FAILED: 0,
+  };
+  return progressMap[state] ?? 50;
+}
+
 // Gate → HITL page path mapping
 const GATE_ROUTES: Record<string, string> = {
   'ai-review': '/workflow/hitl/ai-review',
@@ -74,18 +95,25 @@ export function WorkflowDashboard({ workflowId }: WorkflowDashboardProps) {
     };
   }, [workflowId]);
 
-  // Socket: state change
+  // Socket: state change (with deduplication)
   useEffect(() => {
     if (!stateChange) return;
-    setStatus(prev =>
-      prev
+
+    setStatus(prev => {
+      // Deduplicate: ignore if state hasn't actually changed
+      if (prev && prev.currentState === stateChange.to) {
+        return prev;
+      }
+
+      return prev
         ? {
             ...prev,
             currentState: stateChange.to,
             phase: stateChange.phase,
+            progress: computeProgressFromState(stateChange.to),
           }
-        : prev
-    );
+        : prev;
+    });
   }, [stateChange]);
 
   // Socket: HITL required

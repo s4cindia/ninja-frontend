@@ -1,3 +1,4 @@
+import { useBatchSocket } from '@/hooks/useBatchSocket';
 import type { Batch } from '@/types/batch.types';
 
 interface BatchProgressCardProps {
@@ -5,12 +6,15 @@ interface BatchProgressCardProps {
 }
 
 export function BatchProgressCard({ batch }: BatchProgressCardProps) {
-  const progressPercent =
-    batch.totalFiles > 0
-      ? Math.round(
-          ((batch.filesRemediated + batch.filesFailed) / batch.totalFiles) * 100
-        )
-      : 0;
+  const { progress: wsProgress } = useBatchSocket(batch.batchId);
+
+  // Use WebSocket data if available, otherwise use props
+  const completed = wsProgress?.completed ?? (batch.filesRemediated + batch.filesFailed);
+  const total = wsProgress?.total ?? batch.totalFiles;
+  const failed = wsProgress?.failedCount ?? batch.filesFailed;
+  const remediated = completed - failed;
+
+  const progressPercent = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   const circumference = 2 * Math.PI * 45;
   const strokeDashoffset = circumference - (progressPercent / 100) * circumference;
@@ -55,7 +59,7 @@ export function BatchProgressCard({ batch }: BatchProgressCardProps) {
           <div>
             <p className="text-2xl font-bold text-gray-900">{progressPercent}%</p>
             <p className="text-sm text-gray-600">
-              {batch.filesRemediated + batch.filesFailed} of {batch.totalFiles} complete
+              {completed} of {total} complete
             </p>
           </div>
         </div>
@@ -63,11 +67,11 @@ export function BatchProgressCard({ batch }: BatchProgressCardProps) {
         <div className="grid grid-cols-3 gap-4">
           <div>
             <p className="text-sm text-gray-600">Remediated Files</p>
-            <p className="text-2xl font-bold text-green-600">{batch.filesRemediated}</p>
+            <p className="text-2xl font-bold text-green-600">{remediated}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Failed</p>
-            <p className="text-2xl font-bold text-red-600">{batch.filesFailed}</p>
+            <p className="text-2xl font-bold text-red-600">{failed}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Issues Found</p>
