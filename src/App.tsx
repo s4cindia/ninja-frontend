@@ -68,6 +68,8 @@ import CitationUploadPage from '@/pages/CitationUploadPage';
 import CitationAnalysisPage from '@/pages/CitationAnalysisPage';
 import CitationManuscriptPage from '@/pages/CitationManuscriptPage';
 import CitationEditorPage from '@/pages/CitationEditorPage';
+import TestEditorPage from '@/pages/TestEditorPage';
+import FullEditorPage from '@/pages/FullEditorPage';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -237,7 +239,20 @@ function AppRoutes() {
           <Route path="/citation/analysis/:documentId" element={<CitationAnalysisPage />} />
           <Route path="/citation/manuscript/:documentId" element={<CitationManuscriptPage />} />
           <Route path="/citation/editor/:documentId" element={<CitationEditorPage />} />
+
+          {/* Test Editor Page (protected) */}
+          <Route path="/test/editor" element={<TestEditorPage />} />
         </Route>
+
+        {/* Full-screen editor (no layout wrapper, opens in new tab) */}
+        <Route
+          path="/editor/:documentId"
+          element={
+            <ProtectedRoute>
+              <FullEditorPage />
+            </ProtectedRoute>
+          }
+        />
 
         <Route path="/unauthorized" element={<Unauthorized />} />
 
