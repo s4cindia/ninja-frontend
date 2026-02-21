@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
 import { tenantConfigService, WorkflowConfig } from '../services/tenant-config.service';
@@ -8,8 +9,6 @@ export const TenantWorkflowSettings: React.FC = () => {
   const [config, setConfig] = useState<WorkflowConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
 
   // Form state
@@ -27,7 +26,6 @@ export const TenantWorkflowSettings: React.FC = () => {
   const loadConfig = async () => {
     try {
       setLoading(true);
-      setError(null);
       const currentConfig = await tenantConfigService.getWorkflowConfig();
       setConfig(currentConfig);
 
@@ -42,7 +40,7 @@ export const TenantWorkflowSettings: React.FC = () => {
 
       setIsDirty(false);
     } catch (err) {
-      setError('Failed to load configuration. Please try again.');
+      toast.error('Failed to load configuration. Please try again.');
       console.error('Failed to load config:', err);
     } finally {
       setLoading(false);
@@ -52,8 +50,6 @@ export const TenantWorkflowSettings: React.FC = () => {
   const handleSave = async () => {
     try {
       setSaving(true);
-      setError(null);
-      setSuccess(null);
 
       // Validate inputs
       const errors: string[] = [];
@@ -77,7 +73,7 @@ export const TenantWorkflowSettings: React.FC = () => {
       }
 
       if (errors.length > 0) {
-        setError(errors.join('. '));
+        toast.error(errors.join('. '), { duration: 5000 });
         return;
       }
 
@@ -94,13 +90,16 @@ export const TenantWorkflowSettings: React.FC = () => {
 
       const updatedConfig = await tenantConfigService.updateWorkflowConfig(updates);
       setConfig(updatedConfig);
-      setSuccess('Configuration saved successfully!');
       setIsDirty(false);
 
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(null), 3000);
+      toast.success('Configuration saved successfully!', {
+        duration: 3000,
+        icon: '✅',
+      });
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to save configuration. Please try again.');
+      toast.error(err.response?.data?.error || 'Failed to save configuration. Please try again.', {
+        duration: 5000,
+      });
       console.error('Failed to save config:', err);
     } finally {
       setSaving(false);
@@ -117,8 +116,6 @@ export const TenantWorkflowSettings: React.FC = () => {
         config.hitlGates?.AWAITING_ACR_SIGNOFF === null ? 'null' : String(config.hitlGates?.AWAITING_ACR_SIGNOFF)
       );
       setIsDirty(false);
-      setError(null);
-      setSuccess(null);
     }
   };
 
@@ -153,24 +150,6 @@ export const TenantWorkflowSettings: React.FC = () => {
           Configure agentic workflow behavior and HITL (Human-in-the-Loop) gate timeouts
         </p>
       </div>
-
-      {error && (
-        <Alert variant="error" onClose={() => setError(null)} className="mb-6">
-          <div className="flex items-start gap-2">
-            <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
-            <span>{error}</span>
-          </div>
-        </Alert>
-      )}
-
-      {success && (
-        <Alert variant="success" onClose={() => setSuccess(null)} className="mb-6">
-          <div className="flex items-start gap-2">
-            <CheckCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
-            <span>{success}</span>
-          </div>
-        </Alert>
-      )}
 
       <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
         {/* Workflow Enabled Toggle */}
