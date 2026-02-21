@@ -14,7 +14,7 @@ export default defineConfig({
         server.middlewares.use((_req, res, next) => {
           res.setHeader(
             'Content-Security-Policy',
-            "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' ws: wss: http: https:; object-src 'none';"
+            "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:8080; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com http://localhost:8080; img-src 'self' data: blob: https: http://localhost:8080; font-src 'self' data: https://fonts.gstatic.com http://localhost:8080; connect-src 'self' ws: wss: http: https:; frame-src 'self' http://localhost:8080; object-src 'none';"
           );
           next();
         });
