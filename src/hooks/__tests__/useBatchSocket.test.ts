@@ -164,11 +164,11 @@ describe('useBatchSocket', () => {
   });
 
   it('should handle null to batchId transition', () => {
-    const batchId = '12345678-1234-1234-1234-123456789012';
+    const batchId: string | null = '12345678-1234-1234-1234-123456789012';
 
     const { rerender } = renderHook(
-      ({ batchId }) => useBatchSocket(batchId),
-      { initialProps: { batchId: null } }
+      ({ batchId }: { batchId: string | null }) => useBatchSocket(batchId),
+      { initialProps: { batchId: null as string | null } }
     );
 
     expect(io).not.toHaveBeenCalled();
@@ -182,8 +182,8 @@ describe('useBatchSocket', () => {
     const batchId = '12345678-1234-1234-1234-123456789012';
 
     const { rerender } = renderHook(
-      ({ batchId }) => useBatchSocket(batchId),
-      { initialProps: { batchId } }
+      ({ batchId }: { batchId: string | null }) => useBatchSocket(batchId),
+      { initialProps: { batchId: batchId as string | null } }
     );
 
     expect(io).toHaveBeenCalledTimes(1);

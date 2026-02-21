@@ -28,14 +28,16 @@ describe('BatchProgressCard E2E Integration Tests', () => {
   describe('Complete Batch Workflow Journey', () => {
     it('should show real-time progress updates as files complete', async () => {
       const batchId = '12345678-1234-1234-1234-123456789012';
-      let socketProgress = {
+      let socketProgress: { connected: boolean; progress: Record<string, unknown> | null } = {
         connected: true,
         progress: null,
       };
 
       const batch = {
+        filesUploaded: 10,
+        filesAudited: 10,
+        filesPlanned: 10,
         batchId,
-        id: batchId,
         name: 'Weekly EPUB Batch',
         totalFiles: 10,
         filesRemediated: 0,
@@ -45,7 +47,8 @@ describe('BatchProgressCard E2E Integration Tests', () => {
         quickFixIssues: 0,
         manualIssues: 0,
         createdAt: new Date().toISOString(),
-        status: 'in_progress' as const,
+        status: 'PROCESSING' as const,
+        files: [],
       };
 
       mockUseBatchSocket.mockReturnValue(socketProgress);
@@ -119,8 +122,10 @@ describe('BatchProgressCard E2E Integration Tests', () => {
       const batchId = '12345678-1234-1234-1234-123456789012';
 
       const batch = {
+        filesUploaded: 10,
+        filesAudited: 10,
+        filesPlanned: 10,
         batchId,
-        id: batchId,
         name: 'Mixed Results Batch',
         totalFiles: 15,
         filesRemediated: 10,
@@ -130,7 +135,8 @@ describe('BatchProgressCard E2E Integration Tests', () => {
         quickFixIssues: 10,
         manualIssues: 10,
         createdAt: new Date().toISOString(),
-        status: 'in_progress' as const,
+        status: 'PROCESSING' as const,
+        files: [],
       };
 
       mockUseBatchSocket.mockReturnValue({
@@ -167,8 +173,10 @@ describe('BatchProgressCard E2E Integration Tests', () => {
       const batchId = '12345678-1234-1234-1234-123456789012';
 
       const batch = {
+        filesUploaded: 10,
+        filesAudited: 10,
+        filesPlanned: 10,
         batchId,
-        id: batchId,
         name: 'Test Batch',
         totalFiles: 10,
         filesRemediated: 3,
@@ -178,7 +186,8 @@ describe('BatchProgressCard E2E Integration Tests', () => {
         quickFixIssues: 5,
         manualIssues: 5,
         createdAt: new Date().toISOString(),
-        status: 'in_progress' as const,
+        status: 'PROCESSING' as const,
+        files: [],
       };
 
       // WebSocket provides different data than props
@@ -207,8 +216,10 @@ describe('BatchProgressCard E2E Integration Tests', () => {
       const batchId = '12345678-1234-1234-1234-123456789012';
 
       const batch = {
+        filesUploaded: 10,
+        filesAudited: 10,
+        filesPlanned: 10,
         batchId,
-        id: batchId,
         name: 'Test Batch',
         totalFiles: 10,
         filesRemediated: 3,
@@ -218,7 +229,8 @@ describe('BatchProgressCard E2E Integration Tests', () => {
         quickFixIssues: 5,
         manualIssues: 5,
         createdAt: new Date().toISOString(),
-        status: 'in_progress' as const,
+        status: 'PROCESSING' as const,
+        files: [],
       };
 
       // WebSocket not connected, no progress data
@@ -241,8 +253,10 @@ describe('BatchProgressCard E2E Integration Tests', () => {
       const batchId = '12345678-1234-1234-1234-123456789012';
 
       const batch = {
+        filesUploaded: 10,
+        filesAudited: 10,
+        filesPlanned: 10,
         batchId,
-        id: batchId,
         name: 'Test Batch',
         totalFiles: 10,
         filesRemediated: 2,
@@ -252,11 +266,12 @@ describe('BatchProgressCard E2E Integration Tests', () => {
         quickFixIssues: 3,
         manualIssues: 2,
         createdAt: new Date().toISOString(),
-        status: 'in_progress' as const,
+        status: 'PROCESSING' as const,
+        files: [],
       };
 
       // Start disconnected
-      let socketState = {
+      let socketState: { connected: boolean; progress: Record<string, unknown> | null } = {
         connected: false,
         progress: null,
       };
@@ -296,8 +311,10 @@ describe('BatchProgressCard E2E Integration Tests', () => {
       const batchId = '12345678-1234-1234-1234-123456789012';
 
       const batch = {
+        filesUploaded: 10,
+        filesAudited: 10,
+        filesPlanned: 10,
         batchId,
-        id: batchId,
         name: 'Test Batch',
         totalFiles: 20,
         filesRemediated: 0,
@@ -307,7 +324,8 @@ describe('BatchProgressCard E2E Integration Tests', () => {
         quickFixIssues: 0,
         manualIssues: 0,
         createdAt: new Date().toISOString(),
-        status: 'in_progress' as const,
+        status: 'PROCESSING' as const,
+        files: [],
       };
 
       mockUseBatchSocket.mockReturnValue({
@@ -339,8 +357,10 @@ describe('BatchProgressCard E2E Integration Tests', () => {
       const batchId = '12345678-1234-1234-1234-123456789012';
 
       const batch = {
+        filesUploaded: 10,
+        filesAudited: 10,
+        filesPlanned: 10,
         batchId,
-        id: batchId,
         name: 'Empty Batch',
         totalFiles: 0,
         filesRemediated: 0,
@@ -350,7 +370,8 @@ describe('BatchProgressCard E2E Integration Tests', () => {
         quickFixIssues: 0,
         manualIssues: 0,
         createdAt: new Date().toISOString(),
-        status: 'created' as const,
+        status: 'DRAFT' as const,
+        files: [],
       };
 
       mockUseBatchSocket.mockReturnValue({
@@ -379,8 +400,10 @@ describe('BatchProgressCard E2E Integration Tests', () => {
       const batchId = '12345678-1234-1234-1234-123456789012';
 
       const batch = {
+        filesUploaded: 10,
+        filesAudited: 10,
+        filesPlanned: 10,
         batchId,
-        id: batchId,
         name: 'Fast Batch',
         totalFiles: 20,
         filesRemediated: 0,
@@ -390,10 +413,11 @@ describe('BatchProgressCard E2E Integration Tests', () => {
         quickFixIssues: 0,
         manualIssues: 0,
         createdAt: new Date().toISOString(),
-        status: 'in_progress' as const,
+        status: 'PROCESSING' as const,
+        files: [],
       };
 
-      let socketProgress = {
+      let socketProgress: { connected: boolean; progress: Record<string, unknown> | null } = {
         connected: true,
         progress: {
           batchId,
@@ -441,8 +465,10 @@ describe('BatchProgressCard E2E Integration Tests', () => {
       const batchId = '12345678-1234-1234-1234-123456789012';
 
       const batch = {
+        filesUploaded: 10,
+        filesAudited: 10,
+        filesPlanned: 10,
         batchId,
-        id: batchId,
         name: 'Test Batch',
         totalFiles: 10,
         filesRemediated: 0,
@@ -452,7 +478,8 @@ describe('BatchProgressCard E2E Integration Tests', () => {
         quickFixIssues: 0,
         manualIssues: 0,
         createdAt: new Date().toISOString(),
-        status: 'in_progress' as const,
+        status: 'PROCESSING' as const,
+        files: [],
       };
 
       mockUseBatchSocket.mockReturnValue({

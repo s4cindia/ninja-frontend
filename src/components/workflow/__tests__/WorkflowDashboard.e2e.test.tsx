@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, waitFor } from '@testing-library/react';
 import { WorkflowDashboard } from '../WorkflowDashboard';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -9,6 +8,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
  * E2E-style integration tests for complete workflow monitoring journeys
  * Tests real-time WebSocket updates throughout the workflow lifecycle
  */
+
+// Type for socket state in tests
+type SocketState = {
+  stateChange: Record<string, unknown> | null;
+  hitlRequired: Record<string, unknown> | null;
+  workflowError: Record<string, unknown> | null;
+  connected: boolean;
+};
 
 // Mock hooks and services
 const mockUseWorkflowSocket = vi.fn();
@@ -59,7 +66,12 @@ describe('WorkflowDashboard E2E Integration Tests', () => {
   describe('Complete Workflow Journey: Upload to Completion', () => {
     it('should show real-time progress updates via WebSocket throughout workflow lifecycle', async () => {
       const workflowId = '12345678-1234-1234-1234-123456789012';
-      let socketState = {
+      let socketState: {
+        stateChange: Record<string, unknown> | null;
+        hitlRequired: Record<string, unknown> | null;
+        workflowError: Record<string, unknown> | null;
+        connected: boolean;
+      } = {
         stateChange: null,
         hitlRequired: null,
         workflowError: null,
@@ -169,7 +181,7 @@ describe('WorkflowDashboard E2E Integration Tests', () => {
 
     it('should handle HITL gate notification and user interaction', async () => {
       const workflowId = '12345678-1234-1234-1234-123456789012';
-      let socketState = {
+      let socketState: SocketState = {
         stateChange: null,
         hitlRequired: null,
         workflowError: null,
@@ -240,7 +252,7 @@ describe('WorkflowDashboard E2E Integration Tests', () => {
 
     it('should display error notification when workflow fails', async () => {
       const workflowId = '12345678-1234-1234-1234-123456789012';
-      let socketState = {
+      let socketState: SocketState = {
         stateChange: null,
         hitlRequired: null,
         workflowError: null,
@@ -347,7 +359,7 @@ describe('WorkflowDashboard E2E Integration Tests', () => {
 
     it('should resume WebSocket updates after reconnection', async () => {
       const workflowId = '12345678-1234-1234-1234-123456789012';
-      let socketState = {
+      let socketState: SocketState = {
         stateChange: null,
         hitlRequired: null,
         workflowError: null,
@@ -408,7 +420,7 @@ describe('WorkflowDashboard E2E Integration Tests', () => {
   describe('Deduplication and Performance', () => {
     it('should not re-render when receiving duplicate state events', async () => {
       const workflowId = '12345678-1234-1234-1234-123456789012';
-      let socketState = {
+      let socketState: SocketState = {
         stateChange: null,
         hitlRequired: null,
         workflowError: null,
@@ -461,7 +473,7 @@ describe('WorkflowDashboard E2E Integration Tests', () => {
 
     it('should handle rapid state transitions without UI thrashing', async () => {
       const workflowId = '12345678-1234-1234-1234-123456789012';
-      let socketState = {
+      let socketState: SocketState = {
         stateChange: null,
         hitlRequired: null,
         workflowError: null,
@@ -605,7 +617,7 @@ describe('WorkflowDashboard E2E Integration Tests', () => {
 
     it('should handle workflow with multiple retry attempts', async () => {
       const workflowId = '12345678-1234-1234-1234-123456789012';
-      let socketState = {
+      let socketState: SocketState = {
         stateChange: null,
         hitlRequired: null,
         workflowError: null,
@@ -654,8 +666,9 @@ describe('WorkflowDashboard E2E Integration Tests', () => {
       });
 
       // Error event should trigger toast (tested implicitly through state update)
-      expect(socketState.workflowError.retryable).toBe(true);
-      expect(socketState.workflowError.retryCount).toBe(2);
+      expect(socketState.workflowError).toBeTruthy();
+      expect((socketState.workflowError as Record<string, unknown>).retryable).toBe(true);
+      expect((socketState.workflowError as Record<string, unknown>).retryCount).toBe(2);
     });
   });
 });
