@@ -20,6 +20,9 @@ export interface OnlyOfficeConfig {
     };
   };
   documentType: string;
+  type?: string;
+  width?: string;
+  height?: string;
   editorConfig: {
     callbackUrl: string;
     lang: string;
