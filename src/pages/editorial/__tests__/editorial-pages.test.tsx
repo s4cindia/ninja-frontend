@@ -42,9 +42,9 @@ describe('Editorial Services Dashboard', () => {
     expect(screen.getByText('Validator')).toBeInTheDocument();
   });
 
-  it('renders Recent Activity section', () => {
+  it('renders Recent Documents section', () => {
     renderWithRouter('/editorial');
-    expect(screen.getByText('Recent Activity')).toBeInTheDocument();
+    expect(screen.getByText('Recent Documents')).toBeInTheDocument();
   });
 
   it('shows upload buttons for both modules', () => {
