@@ -2,10 +2,10 @@ import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth.store';
 import { Logo } from '@/components/ui/Logo';
 import { FeedbackButton } from '@/components/feedback';
-import { 
-  Home, 
-  FileText, 
-  CheckCircle, 
+import {
+  Home,
+  FileText,
+  CheckCircle,
   LogOut,
   Upload,
   BookOpen,
@@ -14,7 +14,8 @@ import {
   Wrench,
   Layers,
   MessageSquare,
-  PenTool
+  PenTool,
+  Settings
 } from 'lucide-react';
 
 type NavItem = {
@@ -68,6 +69,7 @@ export function MainLayout() {
         { to: '/remediation', icon: Wrench, label: 'Remediation' },
         { to: '/batches', icon: Layers, label: 'Batch Processing' },
         { to: '/feedback', icon: MessageSquare, label: 'Feedback' },
+        { to: '/settings/workflow', icon: Settings, label: 'Workflow Settings' },
       ],
     },
   ];

@@ -54,6 +54,7 @@ import BatchResultsPage from '@/pages/BatchResultsPage';
 import BatchFileDetailsPage from '@/pages/BatchFileDetailsPage';
 import BatchListPage from '@/pages/BatchListPage';
 import Settings from '@/pages/Settings';
+import { TenantWorkflowSettings } from '@/pages/TenantWorkflowSettings';
 import { EditorialLayout } from '@/components/editorial';
 import { EditorialDashboardPage } from '@/pages/editorial';
 import { ValidatorUploadPage } from '@/pages/validator';
@@ -202,6 +203,8 @@ function AppRoutes() {
           <Route path="/batches" element={<BatchListPage />} />
           <Route path="/batches/new" element={<BatchCreationPage />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/settings/workflow" element={<TenantWorkflowSettings />} />
+          <Route path="/workflow/:workflowId" element={<WorkflowPage />} />
 
           {/* Editorial Services Routes */}
           <Route path="/editorial" element={<EditorialLayout />}>
