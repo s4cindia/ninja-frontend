@@ -46,15 +46,21 @@ export default function FullEditorPage() {
         // Create editor session
         const response = await editorService.createSession(documentId, 'edit');
 
-        // Load OnlyOffice script
-        await loadOnlyOfficeScript(response.documentServerUrl);
+        // Ensure documentServerUrl uses HTTPS to avoid mixed content issues
+        let serverUrl = response.documentServerUrl;
+        if (serverUrl && !serverUrl.startsWith('http://localhost')) {
+          serverUrl = serverUrl.replace(/^http:/, 'https:');
+        }
+
+        // Load OnlyOffice script (must use HTTPS for the iframe to work)
+        await loadOnlyOfficeScript(serverUrl);
 
         // Store session info
         sessionIdRef.current = response.sessionId;
         setSession({
           sessionId: response.sessionId,
           config: response.config,
-          documentServerUrl: response.documentServerUrl,
+          documentServerUrl: serverUrl,
         });
 
         // Now ready to show the editor container
