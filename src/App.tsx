@@ -55,6 +55,7 @@ import BatchFileDetailsPage from '@/pages/BatchFileDetailsPage';
 import BatchListPage from '@/pages/BatchListPage';
 import Settings from '@/pages/Settings';
 import { TenantWorkflowSettings } from '@/pages/TenantWorkflowSettings';
+import { WorkflowPage } from '@/pages/workflow/WorkflowPage';
 import { EditorialLayout } from '@/components/editorial';
 import { EditorialDashboardPage } from '@/pages/editorial';
 import { ValidatorUploadPage } from '@/pages/validator';
