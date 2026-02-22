@@ -54,6 +54,7 @@ import BatchResultsPage from '@/pages/BatchResultsPage';
 import BatchFileDetailsPage from '@/pages/BatchFileDetailsPage';
 import BatchListPage from '@/pages/BatchListPage';
 import Settings from '@/pages/Settings';
+import HouseRulesSettingsPage from '@/pages/HouseRulesSettingsPage';
 import { TenantWorkflowSettings } from '@/pages/TenantWorkflowSettings';
 import { WorkflowPage } from '@/pages/workflow/WorkflowPage';
 import { EditorialLayout } from '@/components/editorial';
@@ -64,7 +65,8 @@ import CitationAnalysisPage from '@/pages/CitationAnalysisPage';
 import CitationManuscriptPage from '@/pages/CitationManuscriptPage';
 import CitationEditorPage from '@/pages/CitationEditorPage';
 import TestEditorPage from '@/pages/TestEditorPage';
-import FullEditorPage from '@/pages/FullEditorPage';
+import DocumentEditorPage from '@/pages/DocumentEditorPage';
+import PdfViewerPage from '@/pages/PdfViewerPage';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -204,6 +206,7 @@ function AppRoutes() {
           <Route path="/batches" element={<BatchListPage />} />
           <Route path="/batches/new" element={<BatchCreationPage />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/settings/house-rules" element={<HouseRulesSettingsPage />} />
           <Route path="/settings/workflow" element={<TenantWorkflowSettings />} />
           <Route path="/workflow/:workflowId" element={<WorkflowPage />} />
 
@@ -214,7 +217,8 @@ function AppRoutes() {
 
           {/* Validator Routes */}
           <Route path="/validator/upload" element={<ValidatorUploadPage />} />
-          <Route path="/validator/editor/:documentId" element={<FullEditorPage />} />
+          <Route path="/validator/editor/:documentId" element={<DocumentEditorPage />} />
+          <Route path="/validator/pdf/:documentId" element={<PdfViewerPage />} />
 
           {/* Citation Intelligence Tool Routes */}
           <Route path="/citation/upload" element={<CitationUploadPage />} />
@@ -231,7 +235,7 @@ function AppRoutes() {
           path="/editor/:documentId"
           element={
             <ProtectedRoute>
-              <FullEditorPage />
+              <DocumentEditorPage />
             </ProtectedRoute>
           }
         />
