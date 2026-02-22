@@ -78,6 +78,7 @@ export interface StyleValidationJob {
 export interface ValidationSummary {
   jobId: string;
   documentId: string;
+  fileName?: string;
   status: string;
   progress: number;
   totalViolations: number;
@@ -120,16 +121,19 @@ export interface HouseStyleRule {
 // Custom Rule Set - A named collection of rules
 export interface HouseRuleSet {
   id: string;
-  tenantId: string;
+  tenantId?: string;
   name: string;
   description?: string;
   baseStyleGuide?: StyleGuideType;
-  source: string; // 'manual', 'uploaded', 'imported'
+  styleGuide?: StyleGuideType;
+  source?: string; // 'manual', 'uploaded', 'imported', 'built-in'
   sourceFile?: string;
-  isActive: boolean;
-  isDefault: boolean;
-  createdAt: string;
-  updatedAt: string;
+  isActive?: boolean;
+  isDefault?: boolean;
+  isBuiltIn?: boolean;
+  ruleCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
   createdBy?: string;
   rules?: HouseStyleRule[];
   _count?: { rules: number };

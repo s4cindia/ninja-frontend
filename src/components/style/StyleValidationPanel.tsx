@@ -96,7 +96,7 @@ export function StyleValidationPanel({
     }
   );
 
-  const { data: summary, isLoading: isLoadingSummary } = useValidationSummary(documentId);
+  const { data: summary, isLoading: isLoadingSummary, refetch: refetchSummary } = useValidationSummary(documentId);
 
   const { data: jobProgress } = useJobStatus(activeJobId, {
     refetchInterval: activeJobId ? 2000 : undefined,
@@ -114,13 +114,14 @@ export function StyleValidationPanel({
   const applyFix = useApplyFix(documentId);
   const ignoreViolation = useIgnoreViolation(documentId);
 
-  // Clear active job when completed
+  // Clear active job when completed and refetch data
   useMemo(() => {
     if (jobProgress?.status === 'COMPLETED' || jobProgress?.status === 'FAILED') {
       setActiveJobId(null);
       refetchViolations();
+      refetchSummary();
     }
-  }, [jobProgress?.status, refetchViolations]);
+  }, [jobProgress?.status, refetchViolations, refetchSummary]);
 
   const violations = violationsData?.violations || [];
   const totalViolations = violationsData?.total || 0;
@@ -207,8 +208,8 @@ export function StyleValidationPanel({
         </div>
 
         {/* Document Info */}
-        <div className="mt-2 text-xs text-gray-500">
-          Document ID: <span className="font-mono">{documentId.slice(0, 8)}...</span>
+        <div className="mt-2 text-sm font-medium text-gray-700 truncate" title={summary?.fileName || documentId}>
+          {summary?.fileName || `Document ${documentId.slice(0, 8)}...`}
         </div>
 
         {/* Rule Set Picker */}

@@ -573,7 +573,7 @@ export function HouseRulesManager({ className }: HouseRulesManagerProps) {
       name: ruleSet.name,
       description: ruleSet.description || '',
       baseStyleGuide: ruleSet.baseStyleGuide || '',
-      isDefault: ruleSet.isDefault,
+      isDefault: ruleSet.isDefault ?? false,
     });
     setEditingRuleSet(ruleSet);
     setShowRuleSetForm(true);
@@ -1526,7 +1526,7 @@ export function HouseRulesManager({ className }: HouseRulesManagerProps) {
                               <p className="text-sm text-gray-500 mt-1 ml-7">{ruleSet.description}</p>
                             )}
                             <p className="text-xs text-gray-400 mt-1 ml-7">
-                              {ruleSet._count?.rules || 0} rules • {ruleSet.source}
+                              {ruleSet.ruleCount ?? ruleSet._count?.rules ?? 0} rules • {ruleSet.source || 'custom'}
                               {ruleSet.sourceFile && ` • ${ruleSet.sourceFile}`}
                             </p>
                           </div>
