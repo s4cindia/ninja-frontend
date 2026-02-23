@@ -39,7 +39,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000, // Frontend on port 3000 (backend uses 5000)
+    port: 5173, // Ninja frontend (Blueprint uses 3000/3001, backend uses 5000)
     host: '0.0.0.0',
     allowedHosts: true,
     hmr: isReplit ? {
@@ -55,7 +55,7 @@ export default defineConfig({
   },
   preview: {
     host: '0.0.0.0',
-    port: 3000,
+    port: 5173,
   },
   build: {
     outDir: 'dist',

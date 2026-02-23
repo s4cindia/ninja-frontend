@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mocked } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { WorkflowDashboard } from '../WorkflowDashboard';
 import { BrowserRouter } from 'react-router-dom';
@@ -50,13 +50,13 @@ const createWrapper = () => {
 };
 
 describe('WorkflowDashboard E2E Integration Tests', () => {
-  let mockWorkflowService: any;
+  let mockWorkflowService: Mocked<typeof import('@/services/workflowService').workflowService>;
 
   beforeEach(async () => {
     vi.clearAllMocks();
     // Get the mocked service
     const module = await import('@/services/workflowService');
-    mockWorkflowService = module.workflowService;
+    mockWorkflowService = vi.mocked(module.workflowService);
   });
 
   afterEach(() => {

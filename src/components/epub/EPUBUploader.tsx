@@ -51,6 +51,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileNameRef = useRef<string>('');
   const fileTypeRef = useRef<DocumentFileType>('epub');
+  const workflowIdRef = useRef<string | undefined>(undefined);
 
   const handleJobComplete = useCallback((jobData: JobData) => {
     setState('complete');
@@ -74,6 +75,8 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
         moderate: 0,
         minor: 0,
       },
+      // Use workflowId from upload response (stored in ref), not from job output
+      workflowId: workflowIdRef.current,
     };
     onUploadComplete?.(result);
   }, [onUploadComplete]);
@@ -145,6 +148,18 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     setSelectedFile(file);
     setError(null);
   }, [validateFile, onError]);
+
+  // Auto-upload when workflow is enabled and file is selected
+  useEffect(() => {
+    if (selectedFile && workflowEnabled && state === 'idle') {
+      // Small delay to show the selected file UI before upload starts
+      const timer = setTimeout(() => {
+        handleUpload();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFile, workflowEnabled, state]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -227,9 +242,13 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
       setState('queued');
 
       let jobId: string;
+      let workflowId: string | undefined;
 
       if (uploadResult.uploadMethod === 'direct' && uploadResult.jobId) {
         jobId = uploadResult.jobId;
+        // Extract workflowId from upload response
+        workflowId = uploadResult.workflowId;
+        console.log('[DocumentUploader] Upload response:', { jobId, workflowId });
       } else {
         if (!endpoint.auditFile) {
           throw new Error(`Missing auditFile endpoint for ${fileType}`);
@@ -239,7 +258,12 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
         });
         const responseData = response.data.data || response.data;
         jobId = responseData.jobId || responseData.id;
+        workflowId = responseData.workflowId;
+        console.log('[DocumentUploader] Audit response:', { jobId, workflowId });
       }
+
+      // Store workflowId in ref so it's available in handleJobComplete
+      workflowIdRef.current = workflowId;
 
       if (jobId) {
         startPolling(jobId);
@@ -357,11 +381,14 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
             )}
             {workflowEnabled && (
               <div className="text-center space-y-2">
-                <p className="text-sm text-gray-600 font-medium">
-                  Agentic workflow enabled
-                </p>
+                <div className="flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary-600" />
+                  <p className="text-sm text-gray-600 font-medium">
+                    Starting agentic workflow...
+                  </p>
+                </div>
                 <p className="text-xs text-gray-500">
-                  File will be automatically processed through the accessibility workflow upon upload
+                  File will be automatically processed through the accessibility workflow
                 </p>
               </div>
             )}

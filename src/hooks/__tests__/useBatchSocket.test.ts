@@ -7,17 +7,22 @@ import { io } from 'socket.io-client';
 vi.mock('socket.io-client');
 
 describe('useBatchSocket', () => {
-  let mockSocket: any;
+  let mockSocket: {
+    on: ReturnType<typeof vi.fn>;
+    emit: ReturnType<typeof vi.fn>;
+    disconnect: ReturnType<typeof vi.fn>;
+    connected: boolean;
+  };
 
   beforeEach(() => {
     // Create mock socket with event emitter functionality
     const eventHandlers = new Map();
 
     mockSocket = {
-      on: vi.fn((event: string, handler: Function) => {
+      on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
         eventHandlers.set(event, handler);
       }),
-      emit: vi.fn((event: string, ...args: any[]) => {
+      emit: vi.fn((event: string, ...args: unknown[]) => {
         const handler = eventHandlers.get(event);
         if (handler) handler(...args);
       }),
@@ -26,7 +31,7 @@ describe('useBatchSocket', () => {
     };
 
     // Mock io() to return our mock socket
-    (io as any).mockReturnValue(mockSocket);
+    vi.mocked(io).mockReturnValue(mockSocket as unknown as ReturnType<typeof io>);
   });
 
   afterEach(() => {
@@ -65,7 +70,7 @@ describe('useBatchSocket', () => {
     expect(result.current.connected).toBe(false);
 
     // Trigger connect event
-    const connectHandler = mockSocket.on.mock.calls.find((call: any) => call[0] === 'connect')?.[1];
+    const connectHandler = mockSocket.on.mock.calls.find((call) => (call[0] as string) === 'connect')?.[1];
     if (connectHandler) {
       connectHandler();
     }
@@ -80,7 +85,7 @@ describe('useBatchSocket', () => {
     const { result } = renderHook(() => useBatchSocket(batchId));
 
     // Connect first
-    const connectHandler = mockSocket.on.mock.calls.find((call: any) => call[0] === 'connect')?.[1];
+    const connectHandler = mockSocket.on.mock.calls.find((call) => (call[0] as string) === 'connect')?.[1];
     if (connectHandler) {
       connectHandler();
     }
@@ -90,7 +95,7 @@ describe('useBatchSocket', () => {
     });
 
     // Trigger disconnect event
-    const disconnectHandler = mockSocket.on.mock.calls.find((call: any) => call[0] === 'disconnect')?.[1];
+    const disconnectHandler = mockSocket.on.mock.calls.find((call) => (call[0] as string) === 'disconnect')?.[1];
     if (disconnectHandler) {
       disconnectHandler();
     }
@@ -106,7 +111,7 @@ describe('useBatchSocket', () => {
     renderHook(() => useBatchSocket(batchId));
 
     // Trigger connect to cause subscription
-    const connectHandler = mockSocket.on.mock.calls.find((call: any) => call[0] === 'connect')?.[1];
+    const connectHandler = mockSocket.on.mock.calls.find((call) => (call[0] as string) === 'connect')?.[1];
     if (connectHandler) {
       connectHandler();
     }
@@ -127,7 +132,7 @@ describe('useBatchSocket', () => {
     };
 
     // Trigger batch:progress event
-    const progressHandler = mockSocket.on.mock.calls.find((call: any) => call[0] === 'batch:progress')?.[1];
+    const progressHandler = mockSocket.on.mock.calls.find((call) => (call[0] as string) === 'batch:progress')?.[1];
     if (progressHandler) {
       progressHandler(progressEvent);
     }

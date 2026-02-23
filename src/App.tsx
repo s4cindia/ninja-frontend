@@ -70,6 +70,11 @@ import CitationAnalysisPage from '@/pages/CitationAnalysisPage';
 import CitationManuscriptPage from '@/pages/CitationManuscriptPage';
 import CitationEditorPage from '@/pages/CitationEditorPage';
 import { WorkflowPage } from '@/pages/workflow/WorkflowPage';
+import { AIReviewPage } from '@/pages/workflow/AIReviewPage';
+import { RemediationReviewPage } from '@/pages/workflow/RemediationReviewPage';
+import { ConformanceReviewPage } from '@/pages/workflow/ConformanceReviewPage';
+import { AcrSignoffPage } from '@/pages/workflow/AcrSignoffPage';
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -218,6 +223,12 @@ function AppRoutes() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/settings/workflow" element={<TenantWorkflowSettings />} />
           <Route path="/workflow/:workflowId" element={<WorkflowPage />} />
+          <Route path="/workflow/:workflowId/hitl/ai-review" element={<AIReviewPage />} />
+          <Route path="/workflow/:workflowId/hitl/remediation" element={<RemediationReviewPage />} />
+          <Route path="/workflow/:workflowId/hitl/remediation-review" element={<RemediationReviewPage />} />
+          <Route path="/workflow/:workflowId/hitl/conformance" element={<ConformanceReviewPage />} />
+          <Route path="/workflow/:workflowId/hitl/conformance-review" element={<ConformanceReviewPage />} />
+          <Route path="/workflow/:workflowId/hitl/acr-signoff" element={<AcrSignoffPage />} />
 
           {/* Editorial Services Routes */}
           <Route path="/editorial" element={<EditorialLayout />}>
