@@ -1,0 +1,158 @@
+{
+  "version": "1.0",
+  "description": "Sample House Style Rules Template - Customize for your organization",
+  "instructions": {
+    "import": "Go to Style Rules > My Rules tab > Click 'Choose File' and select this JSON file > Click 'Import JSON'",
+    "categories": ["PUNCTUATION", "CAPITALIZATION", "NUMBERS", "ABBREVIATIONS", "HYPHENATION", "SPELLING", "GRAMMAR", "TERMINOLOGY", "FORMATTING", "CITATIONS", "OTHER"],
+    "ruleTypes": ["TERMINOLOGY", "PATTERN", "CAPITALIZATION", "PUNCTUATION"],
+    "severities": ["ERROR", "WARNING", "SUGGESTION"],
+    "styleGuides": ["CHICAGO", "APA", "MLA", "AP", "VANCOUVER", "IEEE", "NATURE", "ELSEVIER", "CUSTOM"]
+  },
+  "rules": [
+    {
+      "name": "Company Name Capitalization",
+      "description": "Always capitalize our company name correctly",
+      "category": "CAPITALIZATION",
+      "ruleType": "TERMINOLOGY",
+      "preferredTerm": "Acme Corporation",
+      "avoidTerms": ["acme corporation", "ACME CORPORATION", "Acme Corp", "acme corp"],
+      "severity": "ERROR",
+      "isActive": true,
+      "baseStyleGuide": null
+    },
+    {
+      "name": "Product Name: Widget Pro",
+      "description": "Use correct product name formatting",
+      "category": "TERMINOLOGY",
+      "ruleType": "TERMINOLOGY",
+      "preferredTerm": "Widget Pro",
+      "avoidTerms": ["widget pro", "WidgetPro", "Widget-Pro", "widget-pro"],
+      "severity": "WARNING",
+      "isActive": true
+    },
+    {
+      "name": "Use American Spelling",
+      "description": "Use American English spelling for consistency",
+      "category": "SPELLING",
+      "ruleType": "TERMINOLOGY",
+      "preferredTerm": "color",
+      "avoidTerms": ["colour"],
+      "severity": "WARNING",
+      "isActive": true
+    },
+    {
+      "name": "Date Format (US)",
+      "description": "Use Month Day, Year format",
+      "category": "FORMATTING",
+      "ruleType": "PATTERN",
+      "pattern": "\\b(\\d{1,2})/(\\d{1,2})/(\\d{4})\\b",
+      "severity": "SUGGESTION",
+      "isActive": true
+    },
+    {
+      "name": "Avoid Double Negatives",
+      "description": "Don't use double negatives in formal writing",
+      "category": "GRAMMAR",
+      "ruleType": "PATTERN",
+      "pattern": "\\b(not|never|no)\\s+(un\\w+|in\\w+|im\\w+)\\b",
+      "severity": "WARNING",
+      "isActive": true
+    },
+    {
+      "name": "Trademark Symbol",
+      "description": "Include trademark symbol for our product names on first mention",
+      "category": "FORMATTING",
+      "ruleType": "TERMINOLOGY",
+      "preferredTerm": "Widget Pro\u2122",
+      "avoidTerms": ["Widget Pro"],
+      "severity": "SUGGESTION",
+      "isActive": false
+    },
+    {
+      "name": "Industry Term: Machine Learning",
+      "description": "Spell out machine learning, don't abbreviate on first use",
+      "category": "ABBREVIATIONS",
+      "ruleType": "TERMINOLOGY",
+      "preferredTerm": "machine learning (ML)",
+      "avoidTerms": ["ML"],
+      "severity": "SUGGESTION",
+      "isActive": true
+    },
+    {
+      "name": "Avoid Passive Voice in Headings",
+      "description": "Use active voice in section headings for clarity",
+      "category": "GRAMMAR",
+      "ruleType": "PATTERN",
+      "pattern": "^#{1,6}\\s.*\\b(is|are|was|were|been|being)\\s+\\w+ed\\b",
+      "severity": "SUGGESTION",
+      "isActive": true
+    },
+    {
+      "name": "Consistent Hyphenation: E-mail vs Email",
+      "description": "Use 'email' without hyphen",
+      "category": "HYPHENATION",
+      "ruleType": "TERMINOLOGY",
+      "preferredTerm": "email",
+      "avoidTerms": ["e-mail", "E-mail", "E-Mail"],
+      "severity": "WARNING",
+      "isActive": true
+    },
+    {
+      "name": "Oxford Comma Required",
+      "description": "Always use the Oxford comma in lists",
+      "category": "PUNCTUATION",
+      "ruleType": "PUNCTUATION",
+      "severity": "WARNING",
+      "isActive": true,
+      "baseStyleGuide": "CHICAGO"
+    },
+    {
+      "name": "Citation Format Check",
+      "description": "Citations should follow APA 7th edition format",
+      "category": "CITATIONS",
+      "ruleType": "PATTERN",
+      "pattern": "\\([A-Z][a-z]+,\\s*\\d{4}\\)",
+      "severity": "SUGGESTION",
+      "isActive": true,
+      "baseStyleGuide": "APA"
+    },
+    {
+      "name": "Avoid Jargon: Leverage",
+      "description": "Use clear language instead of business jargon",
+      "category": "TERMINOLOGY",
+      "ruleType": "TERMINOLOGY",
+      "preferredTerm": "use",
+      "avoidTerms": ["leverage", "leveraging", "leveraged"],
+      "severity": "SUGGESTION",
+      "isActive": true
+    },
+    {
+      "name": "Number Formatting: Thousands",
+      "description": "Use commas in numbers over 999",
+      "category": "NUMBERS",
+      "ruleType": "PATTERN",
+      "pattern": "\\b(\\d{4,})\\b(?![-/])",
+      "severity": "SUGGESTION",
+      "isActive": true
+    },
+    {
+      "name": "Consistent Units: Metric",
+      "description": "Use metric units with Imperial in parentheses",
+      "category": "FORMATTING",
+      "ruleType": "TERMINOLOGY",
+      "preferredTerm": "kilometers",
+      "avoidTerms": ["miles"],
+      "severity": "SUGGESTION",
+      "isActive": false
+    },
+    {
+      "name": "Acronym Definition",
+      "description": "Define acronyms on first use",
+      "category": "ABBREVIATIONS",
+      "ruleType": "PATTERN",
+      "pattern": "\\b([A-Z]{2,})\\b(?!\\s*\\()",
+      "severity": "SUGGESTION",
+      "isActive": true
+    }
+  ]
+}

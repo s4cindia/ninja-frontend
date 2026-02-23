@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -54,27 +54,23 @@ import BatchResultsPage from '@/pages/BatchResultsPage';
 import BatchFileDetailsPage from '@/pages/BatchFileDetailsPage';
 import BatchListPage from '@/pages/BatchListPage';
 import Settings from '@/pages/Settings';
+import HouseRulesSettingsPage from '@/pages/HouseRulesSettingsPage';
 import { TenantWorkflowSettings } from '@/pages/TenantWorkflowSettings';
+import { WorkflowPage } from '@/pages/workflow/WorkflowPage';
 import { EditorialLayout } from '@/components/editorial';
-import {
-  EditorialDashboardPage,
-  EditorialUploadPage,
-  PlagiarismPage,
-  StylePage,
-  ReportsPage,
-  EditorialDocumentsPage,
-  EditorialDocumentOverviewPage,
-} from '@/pages/editorial';
+import { EditorialDashboardPage } from '@/pages/editorial';
+import { ValidatorUploadPage } from '@/pages/validator';
 import CitationUploadPage from '@/pages/CitationUploadPage';
 import CitationAnalysisPage from '@/pages/CitationAnalysisPage';
 import CitationManuscriptPage from '@/pages/CitationManuscriptPage';
 import CitationEditorPage from '@/pages/CitationEditorPage';
-import { WorkflowPage } from '@/pages/workflow/WorkflowPage';
 import { AIReviewPage } from '@/pages/workflow/AIReviewPage';
 import { RemediationReviewPage } from '@/pages/workflow/RemediationReviewPage';
 import { ConformanceReviewPage } from '@/pages/workflow/ConformanceReviewPage';
 import { AcrSignoffPage } from '@/pages/workflow/AcrSignoffPage';
-
+import TestEditorPage from '@/pages/TestEditorPage';
+import DocumentEditorPage from '@/pages/DocumentEditorPage';
+import PdfViewerPage from '@/pages/PdfViewerPage';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -151,13 +147,6 @@ function SessionExpiryHandler() {
   return null;
 }
 
-// Redirect component that preserves jobId parameter for citation routes
-function RedirectCitationWithJobId() {
-  const { jobId } = useParams<{ jobId: string }>();
-  // Redirect to the citation editor with the jobId as documentId
-  return <Navigate to={jobId ? `/citation/editor/${jobId}` : '/citation/upload'} replace />;
-}
-
 function AppRoutes() {
   return (
     <>
@@ -221,6 +210,7 @@ function AppRoutes() {
           <Route path="/batches" element={<BatchListPage />} />
           <Route path="/batches/new" element={<BatchCreationPage />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/settings/house-rules" element={<HouseRulesSettingsPage />} />
           <Route path="/settings/workflow" element={<TenantWorkflowSettings />} />
           <Route path="/workflow/:workflowId" element={<WorkflowPage />} />
           <Route path="/workflow/:workflowId/hitl/ai-review" element={<AIReviewPage />} />
@@ -231,26 +221,32 @@ function AppRoutes() {
           {/* Editorial Services Routes */}
           <Route path="/editorial" element={<EditorialLayout />}>
             <Route index element={<EditorialDashboardPage />} />
-            <Route path="upload" element={<EditorialUploadPage />} />
-            <Route path="documents" element={<EditorialDocumentsPage />} />
-            <Route path="documents/:documentId" element={<EditorialDocumentOverviewPage />} />
-            {/* Redirect old citations to new Citation Intelligence Tool */}
-            <Route path="citations" element={<Navigate to="/citation/upload" replace />} />
-            <Route path="citations/:jobId" element={<RedirectCitationWithJobId />} />
-            <Route path="plagiarism" element={<PlagiarismPage />} />
-            <Route path="plagiarism/:jobId" element={<PlagiarismPage />} />
-            <Route path="style" element={<StylePage />} />
-            <Route path="style/:jobId" element={<StylePage />} />
-            <Route path="reports" element={<ReportsPage />} />
-            <Route path="reports/:jobId" element={<ReportsPage />} />
           </Route>
+
+          {/* Validator Routes */}
+          <Route path="/validator/upload" element={<ValidatorUploadPage />} />
+          <Route path="/validator/editor/:documentId" element={<DocumentEditorPage />} />
+          <Route path="/validator/pdf/:documentId" element={<PdfViewerPage />} />
 
           {/* Citation Intelligence Tool Routes */}
           <Route path="/citation/upload" element={<CitationUploadPage />} />
           <Route path="/citation/analysis/:documentId" element={<CitationAnalysisPage />} />
           <Route path="/citation/manuscript/:documentId" element={<CitationManuscriptPage />} />
           <Route path="/citation/editor/:documentId" element={<CitationEditorPage />} />
+
+          {/* Test Editor Page (protected) */}
+          <Route path="/test/editor" element={<TestEditorPage />} />
         </Route>
+
+        {/* Full-screen editor (no layout wrapper, opens in new tab) */}
+        <Route
+          path="/editor/:documentId"
+          element={
+            <ProtectedRoute>
+              <DocumentEditorPage />
+            </ProtectedRoute>
+          }
+        />
 
         <Route path="/unauthorized" element={<Unauthorized />} />
 

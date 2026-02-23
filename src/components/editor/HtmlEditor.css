@@ -1,0 +1,256 @@
+/* HTML Editor Styles */
+
+.html-editor-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Toolbar */
+.html-editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  flex-wrap: wrap;
+}
+
+.html-editor-toolbar .toolbar-group {
+  display: flex;
+  gap: 2px;
+}
+
+.html-editor-toolbar .toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: #d1d5db;
+  margin: 0 8px;
+}
+
+.html-editor-toolbar button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #374151;
+  transition: all 0.15s ease;
+}
+
+.html-editor-toolbar button:hover {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+}
+
+.html-editor-toolbar button:active {
+  background: #d1d5db;
+}
+
+.html-editor-toolbar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Editor Content */
+.html-editor-content {
+  flex: 1;
+  padding: 24px 32px;
+  overflow-y: auto;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 12pt;
+  line-height: 1.6;
+  color: #1f2937;
+  outline: none;
+  min-height: 300px;
+}
+
+.html-editor-content:focus {
+  outline: none;
+}
+
+/* Typography */
+.html-editor-content p {
+  margin: 0 0 1em 0;
+}
+
+.html-editor-content h1,
+.html-editor-content h2,
+.html-editor-content h3,
+.html-editor-content h4,
+.html-editor-content h5,
+.html-editor-content h6 {
+  margin: 1.5em 0 0.5em 0;
+  font-weight: bold;
+  line-height: 1.3;
+}
+
+.html-editor-content h1 { font-size: 2em; }
+.html-editor-content h2 { font-size: 1.5em; }
+.html-editor-content h3 { font-size: 1.25em; }
+.html-editor-content h4 { font-size: 1.1em; }
+.html-editor-content h5 { font-size: 1em; }
+.html-editor-content h6 { font-size: 0.9em; }
+
+/* Lists */
+.html-editor-content ul,
+.html-editor-content ol {
+  margin: 0 0 1em 0;
+  padding-left: 2em;
+}
+
+.html-editor-content li {
+  margin: 0.25em 0;
+}
+
+/* Tables - Full formatting preservation */
+.html-editor-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+  font-size: 11pt;
+}
+
+.html-editor-content table,
+.html-editor-content th,
+.html-editor-content td {
+  border: 1px solid #374151;
+}
+
+.html-editor-content th,
+.html-editor-content td {
+  padding: 8px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.html-editor-content th {
+  background: #f3f4f6;
+  font-weight: bold;
+}
+
+.html-editor-content thead {
+  background: #e5e7eb;
+}
+
+.html-editor-content tbody tr:nth-child(even) {
+  background: #f9fafb;
+}
+
+/* Superscript and Subscript */
+.html-editor-content sup {
+  font-size: 0.75em;
+  vertical-align: super;
+  line-height: 0;
+}
+
+.html-editor-content sub {
+  font-size: 0.75em;
+  vertical-align: sub;
+  line-height: 0;
+}
+
+/* Images */
+.html-editor-content img {
+  max-width: 100%;
+  height: auto;
+  margin: 1em 0;
+}
+
+.html-editor-content figure {
+  margin: 1em 0;
+  text-align: center;
+}
+
+.html-editor-content figcaption {
+  font-size: 0.9em;
+  color: #6b7280;
+  margin-top: 0.5em;
+}
+
+/* Links */
+.html-editor-content a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.html-editor-content a:hover {
+  color: #1d4ed8;
+}
+
+/* Blockquotes */
+.html-editor-content blockquote {
+  margin: 1em 0;
+  padding: 0.5em 1em;
+  border-left: 4px solid #d1d5db;
+  background: #f9fafb;
+  font-style: italic;
+}
+
+/* Code */
+.html-editor-content pre {
+  margin: 1em 0;
+  padding: 1em;
+  background: #1f2937;
+  color: #f9fafb;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.9em;
+}
+
+.html-editor-content code {
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.9em;
+  background: #f3f4f6;
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+
+.html-editor-content pre code {
+  background: transparent;
+  padding: 0;
+}
+
+/* Horizontal Rule */
+.html-editor-content hr {
+  border: none;
+  border-top: 1px solid #d1d5db;
+  margin: 2em 0;
+}
+
+/* Status Bar */
+.html-editor-statusbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 12px;
+  background: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* Print styles */
+@media print {
+  .html-editor-toolbar,
+  .html-editor-statusbar {
+    display: none;
+  }
+
+  .html-editor-content {
+    padding: 0;
+    border: none;
+  }
+}

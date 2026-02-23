@@ -28,7 +28,7 @@ const STATUS_OPTIONS = [
   { value: 'CANCELLED', label: 'Cancelled' },
 ];
 
-const CITATION_JOB_TYPES = ['CITATION_DETECTION', 'CITATION_VALIDATION', 'EDITORIAL'];
+const CITATION_JOB_TYPES = ['CITATION_DETECTION', 'CITATION_VALIDATION', 'EDITORIAL_FULL'];
 
 function getJobDetailPath(job: Job): string {
   if (CITATION_JOB_TYPES.includes(job.type)) {
@@ -82,6 +82,7 @@ export function Jobs() {
     EPUB_ACCESSIBILITY: stats?.byType?.EPUB_ACCESSIBILITY ?? 0,
     CITATION_DETECTION: stats?.byType?.CITATION_DETECTION ?? 0,
     PDF_ACCESSIBILITY: stats?.byType?.PDF_ACCESSIBILITY ?? 0,
+    EDITORIAL_FULL: stats?.byType?.EDITORIAL_FULL ?? 0,
   }), [stats]);
 
   return (
@@ -176,6 +177,19 @@ export function Jobs() {
           )}
         >
           PDF Audit {jobCounts.PDF_ACCESSIBILITY > 0 && `(${jobCounts.PDF_ACCESSIBILITY})`}
+        </button>
+        <button
+          role="tab"
+          aria-selected={typeFilter === 'EDITORIAL_FULL'}
+          onClick={() => { setTypeFilter('EDITORIAL_FULL'); setPage(1); }}
+          className={cn(
+            'px-3 py-1.5 text-sm rounded-md transition-colors',
+            typeFilter === 'EDITORIAL_FULL'
+              ? 'bg-emerald-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          )}
+        >
+          Editorial {jobCounts.EDITORIAL_FULL > 0 && `(${jobCounts.EDITORIAL_FULL})`}
         </button>
       </div>
 

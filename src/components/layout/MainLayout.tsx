@@ -15,7 +15,8 @@ import {
   Layers,
   MessageSquare,
   PenTool,
-  Settings
+  Settings,
+  BookCheck,
 } from 'lucide-react';
 
 type NavItem = {
@@ -61,6 +62,7 @@ export function MainLayout() {
       title: 'Editorial',
       items: [
         { to: '/editorial', icon: PenTool, label: 'Editorial Services' },
+        { to: '/settings/house-rules', icon: BookCheck, label: 'Style Rules' },
       ],
     },
     {

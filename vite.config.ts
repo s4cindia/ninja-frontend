@@ -14,7 +14,7 @@ export default defineConfig({
         server.middlewares.use((_req, res, next) => {
           res.setHeader(
             'Content-Security-Policy',
-            "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' ws: wss: http: https:; object-src 'none';"
+            "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:8080 https://localhost:8080; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com http://localhost:8080 https://localhost:8080; img-src 'self' data: blob: https: http://localhost:8080 https://localhost:8080; font-src 'self' data: https://fonts.gstatic.com http://localhost:8080 https://localhost:8080; connect-src 'self' ws: wss: http: https:; frame-src 'self' http://localhost:8080 https://localhost:8080; object-src 'none';"
           );
           next();
         });
@@ -39,7 +39,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173, // Ninja frontend (Blueprint uses 3000/3001, backend uses 5000)
+    port: 5000, // Frontend on port 5000 (backend uses 3001)
     host: '0.0.0.0',
     allowedHosts: true,
     hmr: isReplit ? {
@@ -47,7 +47,7 @@ export default defineConfig({
     } : undefined,
     proxy: {
       '/api/v1': {
-        target: process.env.VITE_BACKEND_URL || 'http://localhost:5000',
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:3001',
         changeOrigin: true,
         secure: false,
       },
@@ -55,7 +55,7 @@ export default defineConfig({
   },
   preview: {
     host: '0.0.0.0',
-    port: 5173,
+    port: 5000,
   },
   build: {
     outDir: 'dist',
