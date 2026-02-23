@@ -13,8 +13,9 @@ export function ValidatorUploadPage() {
   const [isUploading, setIsUploading] = useState(false);
 
   const validateFile = (file: File): string | null => {
-    if (!file.name.endsWith('.docx')) {
-      return 'Only DOCX files are supported for the Validator';
+    const fileName = file.name.toLowerCase();
+    if (!fileName.endsWith('.docx') && !fileName.endsWith('.pdf')) {
+      return 'Only DOCX and PDF files are supported';
     }
     if (file.size > MAX_FILE_SIZE) {
       return `File size exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB limit`;
@@ -80,9 +81,18 @@ export function ValidatorUploadPage() {
       // Upload using the api client (handles auth automatically)
       const response = await api.post('/validator/upload', formData);
 
-      // Navigate to the document editor
+      // Navigate to the appropriate viewer based on file type
       if (response.data?.data?.documentId) {
-        navigate(`/validator/editor/${response.data.data.documentId}`);
+        const documentId = response.data.data.documentId;
+        const isPdf = file.name.toLowerCase().endsWith('.pdf');
+
+        if (isPdf) {
+          // PDF files: Navigate to PDF viewer (no editing, just viewing)
+          navigate(`/validator/pdf/${documentId}?name=${encodeURIComponent(file.name)}`);
+        } else {
+          // DOCX files: Navigate to document editor
+          navigate(`/validator/editor/${documentId}`);
+        }
       } else {
         navigate('/editorial');
       }
@@ -109,7 +119,7 @@ export function ValidatorUploadPage() {
             Validator - Upload Document
           </h1>
           <p className="text-gray-500 mt-1">
-            Upload a DOCX file to edit with version control and track changes
+            Upload a DOCX or PDF file to edit with version control and track changes
           </p>
         </div>
 
@@ -130,7 +140,7 @@ export function ValidatorUploadPage() {
                 isDragging ? 'text-emerald-500' : 'text-gray-400'
               }`} />
               <p className="text-lg font-medium text-gray-700 mb-1">
-                Drop your DOCX file here
+                Drop your DOCX or PDF file here
               </p>
               <p className="text-sm text-gray-500 mb-4">
                 or click to browse
@@ -140,13 +150,13 @@ export function ValidatorUploadPage() {
                 Select File
                 <input
                   type="file"
-                  accept=".docx"
+                  accept=".docx,.pdf"
                   onChange={handleFileSelect}
                   className="hidden"
                 />
               </label>
               <p className="text-xs text-gray-400 mt-4">
-                Supported format: DOCX (up to 50MB)
+                Supported formats: DOCX, PDF (up to 50MB)
               </p>
             </div>
           ) : (
