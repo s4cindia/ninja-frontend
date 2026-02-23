@@ -1,9 +1,10 @@
-/* eslint-disable @typescript-eslint/no-var-requires */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { WorkflowDashboard } from '../WorkflowDashboard';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { workflowService } from '@/services/workflowService';
+import { useWorkflowSocket } from '@/hooks/useWorkflowSocket';
 
 // Mock hooks and services
 vi.mock('@/hooks/useWorkflowSocket', () => ({
@@ -25,6 +26,9 @@ vi.mock('@/services/workflowService', () => ({
   },
   WorkflowStatus: {},
 }));
+
+const mockGetWorkflowStatus = vi.mocked(workflowService.getWorkflowStatus);
+const mockUseWorkflowSocket = vi.mocked(useWorkflowSocket);
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -48,10 +52,7 @@ describe('WorkflowDashboard WebSocket Integration', () => {
 
   describe('computeProgressFromState', () => {
     it('should compute correct progress for each state', () => {
-      const { workflowService } = require('@/services/workflowService');
-      const { useWorkflowSocket } = require('@/hooks/useWorkflowSocket');
-
-      workflowService.getWorkflowStatus.mockResolvedValue({
+      mockGetWorkflowStatus.mockResolvedValue({
         id: '123',
         fileId: '456',
         currentState: 'UPLOAD_RECEIVED',
@@ -63,7 +64,7 @@ describe('WorkflowDashboard WebSocket Integration', () => {
         loopCount: 0,
       });
 
-      useWorkflowSocket.mockReturnValue({
+      mockUseWorkflowSocket.mockReturnValue({
         stateChange: {
           workflowId: '123',
           from: 'UPLOAD_RECEIVED',
@@ -85,9 +86,6 @@ describe('WorkflowDashboard WebSocket Integration', () => {
 
   describe('State Change Deduplication', () => {
     it('should not update when receiving duplicate state', async () => {
-      const { workflowService } = require('@/services/workflowService');
-      const { useWorkflowSocket } = require('@/hooks/useWorkflowSocket');
-
       const initialStatus = {
         id: '123',
         fileId: '456',
@@ -100,10 +98,10 @@ describe('WorkflowDashboard WebSocket Integration', () => {
         loopCount: 0,
       };
 
-      workflowService.getWorkflowStatus.mockResolvedValue(initialStatus);
+      mockGetWorkflowStatus.mockResolvedValue(initialStatus);
 
       // First render with same state
-      useWorkflowSocket.mockReturnValue({
+      mockUseWorkflowSocket.mockReturnValue({
         stateChange: {
           workflowId: '123',
           from: 'RUNNING_EPUBCHECK',
@@ -121,11 +119,11 @@ describe('WorkflowDashboard WebSocket Integration', () => {
       });
 
       await waitFor(() => {
-        expect(workflowService.getWorkflowStatus).toHaveBeenCalledTimes(1);
+        expect(mockGetWorkflowStatus).toHaveBeenCalledTimes(1);
       });
 
       // Simulate receiving same state again (duplicate event)
-      useWorkflowSocket.mockReturnValue({
+      mockUseWorkflowSocket.mockReturnValue({
         stateChange: {
           workflowId: '123',
           from: 'RUNNING_ACE',
@@ -145,10 +143,7 @@ describe('WorkflowDashboard WebSocket Integration', () => {
     });
 
     it('should update when receiving new state', async () => {
-      const { workflowService } = require('@/services/workflowService');
-      const { useWorkflowSocket } = require('@/hooks/useWorkflowSocket');
-
-      workflowService.getWorkflowStatus.mockResolvedValue({
+      mockGetWorkflowStatus.mockResolvedValue({
         id: '123',
         fileId: '456',
         currentState: 'RUNNING_ACE',
@@ -160,7 +155,7 @@ describe('WorkflowDashboard WebSocket Integration', () => {
         loopCount: 0,
       });
 
-      useWorkflowSocket.mockReturnValue({
+      mockUseWorkflowSocket.mockReturnValue({
         stateChange: {
           workflowId: '123',
           from: 'RUNNING_ACE',
@@ -176,7 +171,7 @@ describe('WorkflowDashboard WebSocket Integration', () => {
       render(<WorkflowDashboard workflowId="123" />, { wrapper: createWrapper() });
 
       await waitFor(() => {
-        expect(workflowService.getWorkflowStatus).toHaveBeenCalled();
+        expect(mockGetWorkflowStatus).toHaveBeenCalled();
       });
 
       // Component should update with new state and progress
@@ -204,10 +199,7 @@ describe('WorkflowDashboard WebSocket Integration', () => {
 
     progressTests.forEach(({ state, expected }) => {
       it(`should calculate ${expected}% progress for ${state}`, async () => {
-        const { workflowService } = require('@/services/workflowService');
-        const { useWorkflowSocket } = require('@/hooks/useWorkflowSocket');
-
-        workflowService.getWorkflowStatus.mockResolvedValue({
+        mockGetWorkflowStatus.mockResolvedValue({
           id: '123',
           fileId: '456',
           currentState: state,
@@ -219,7 +211,7 @@ describe('WorkflowDashboard WebSocket Integration', () => {
           loopCount: 0,
         });
 
-        useWorkflowSocket.mockReturnValue({
+        mockUseWorkflowSocket.mockReturnValue({
           stateChange: null,
           hitlRequired: null,
           workflowError: null,
@@ -229,7 +221,7 @@ describe('WorkflowDashboard WebSocket Integration', () => {
         render(<WorkflowDashboard workflowId="123" />, { wrapper: createWrapper() });
 
         await waitFor(() => {
-          expect(workflowService.getWorkflowStatus).toHaveBeenCalled();
+          expect(mockGetWorkflowStatus).toHaveBeenCalled();
         });
       });
     });
@@ -237,10 +229,7 @@ describe('WorkflowDashboard WebSocket Integration', () => {
 
   describe('HITL Notifications', () => {
     it('should show HITL banner when receiving hitl-required event', async () => {
-      const { workflowService } = require('@/services/workflowService');
-      const { useWorkflowSocket } = require('@/hooks/useWorkflowSocket');
-
-      workflowService.getWorkflowStatus.mockResolvedValue({
+      mockGetWorkflowStatus.mockResolvedValue({
         id: '123',
         fileId: '456',
         currentState: 'AWAITING_AI_REVIEW',
@@ -252,7 +241,7 @@ describe('WorkflowDashboard WebSocket Integration', () => {
         loopCount: 0,
       });
 
-      useWorkflowSocket.mockReturnValue({
+      mockUseWorkflowSocket.mockReturnValue({
         stateChange: null,
         hitlRequired: {
           workflowId: '123',
@@ -274,10 +263,7 @@ describe('WorkflowDashboard WebSocket Integration', () => {
 
   describe('Error Handling', () => {
     it('should show error toast when receiving error event', async () => {
-      const { workflowService } = require('@/services/workflowService');
-      const { useWorkflowSocket } = require('@/hooks/useWorkflowSocket');
-
-      workflowService.getWorkflowStatus.mockResolvedValue({
+      mockGetWorkflowStatus.mockResolvedValue({
         id: '123',
         fileId: '456',
         currentState: 'FAILED',
@@ -290,7 +276,7 @@ describe('WorkflowDashboard WebSocket Integration', () => {
         loopCount: 0,
       });
 
-      useWorkflowSocket.mockReturnValue({
+      mockUseWorkflowSocket.mockReturnValue({
         stateChange: null,
         hitlRequired: null,
         workflowError: {
@@ -307,7 +293,7 @@ describe('WorkflowDashboard WebSocket Integration', () => {
 
       // Error toast should be triggered
       await waitFor(() => {
-        expect(workflowService.getWorkflowStatus).toHaveBeenCalled();
+        expect(mockGetWorkflowStatus).toHaveBeenCalled();
       });
     });
   });
