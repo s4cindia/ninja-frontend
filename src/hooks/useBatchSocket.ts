@@ -24,6 +24,7 @@ export function useBatchSocket(batchId: string | null) {
   useEffect(() => {
     if (!batchId) {
       setProgress(null);
+      setConnected(false);
       return;
     }
 
