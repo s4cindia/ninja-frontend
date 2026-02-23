@@ -21,21 +21,25 @@ export function AcrSignoffPage() {
 
   useEffect(() => {
     if (!workflowId) return;
-    loadWorkflowData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workflowId]);
+    let cancelled = false;
 
-  async function loadWorkflowData() {
-    try {
-      setLoading(true);
-      const workflowData = await workflowService.getWorkflowStatus(workflowId!);
-      setWorkflow(workflowData);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load workflow data');
-    } finally {
-      setLoading(false);
+    async function loadWorkflowData() {
+      try {
+        setLoading(true);
+        const workflowData = await workflowService.getWorkflowStatus(workflowId!);
+        if (cancelled) return;
+        setWorkflow(workflowData);
+      } catch (err: unknown) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'Failed to load workflow data');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
-  }
+
+    loadWorkflowData();
+    return () => { cancelled = true; };
+  }, [workflowId]);
 
   async function handleSubmitSignoff() {
     if (!attestationConfirmed) {

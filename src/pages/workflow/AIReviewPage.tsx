@@ -69,6 +69,7 @@ export function AIReviewPage() {
 
   useEffect(() => {
     if (!workflowId) return;
+    let cancelled = false;
 
     async function loadData() {
       try {
@@ -76,6 +77,7 @@ export function AIReviewPage() {
 
         // Fetch workflow
         const workflowData = await workflowService.getWorkflowStatus(workflowId!);
+        if (cancelled) return;
         setWorkflow(workflowData);
 
         // Get jobId from workflow state
@@ -86,6 +88,7 @@ export function AIReviewPage() {
 
         // Fetch job to get audit results
         const job = await jobsService.getJob(stateData.jobId);
+        if (cancelled) return;
 
         // Extract issues from job output
         const output = job.output as { combinedIssues?: unknown[]; issues?: unknown[] } | undefined;
@@ -119,14 +122,16 @@ export function AIReviewPage() {
 
         setError(null);
       } catch (err) {
+        if (cancelled) return;
         console.error('[AIReviewPage] Failed to load data:', err);
         setError(getErrorMessage(err));
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     loadData();
+    return () => { cancelled = true; };
   }, [workflowId]);
 
   const handleDecisionChange = (issueId: string, decision: 'ACCEPT' | 'REJECT' | 'MODIFY') => {

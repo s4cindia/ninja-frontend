@@ -224,9 +224,7 @@ function AppRoutes() {
           <Route path="/settings/workflow" element={<TenantWorkflowSettings />} />
           <Route path="/workflow/:workflowId" element={<WorkflowPage />} />
           <Route path="/workflow/:workflowId/hitl/ai-review" element={<AIReviewPage />} />
-          <Route path="/workflow/:workflowId/hitl/remediation" element={<RemediationReviewPage />} />
           <Route path="/workflow/:workflowId/hitl/remediation-review" element={<RemediationReviewPage />} />
-          <Route path="/workflow/:workflowId/hitl/conformance" element={<ConformanceReviewPage />} />
           <Route path="/workflow/:workflowId/hitl/conformance-review" element={<ConformanceReviewPage />} />
           <Route path="/workflow/:workflowId/hitl/acr-signoff" element={<AcrSignoffPage />} />
 

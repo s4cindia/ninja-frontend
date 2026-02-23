@@ -52,9 +52,11 @@ export function ConformanceReviewPage() {
         jobId?: string;
       };
 
-      // If conformance mappings exist in state, use them
-      // Otherwise, generate mock data for testing
-      const conformanceCriteria = stateData.conformanceMappings || generateMockConformanceCriteria();
+      if (!stateData.conformanceMappings) {
+        throw new Error('Conformance mappings not yet available. The workflow may still be processing.');
+      }
+
+      const conformanceCriteria = stateData.conformanceMappings;
       setCriteria(conformanceCriteria);
 
       // Auto-confirm all "supports" and "not_applicable" criteria
@@ -75,128 +77,6 @@ export function ConformanceReviewPage() {
     }
   }
 
-  function generateMockConformanceCriteria(): ConformanceCriterion[] {
-    // Generate realistic conformance criteria based on common EPUB issues
-    return [
-      {
-        criterionId: '1.1.1',
-        title: 'Non-text Content',
-        level: 'A',
-        aiConformance: 'supports',
-        confidence: 0.92,
-        reasoning: 'All images have alt text after remediation. 2 images had missing alt text, now fixed.',
-        issueCount: 0
-      },
-      {
-        criterionId: '1.3.1',
-        title: 'Info and Relationships',
-        level: 'A',
-        aiConformance: 'supports',
-        confidence: 0.88,
-        reasoning: 'Heading hierarchy corrected. Semantic structure properly marked up.',
-        issueCount: 0
-      },
-      {
-        criterionId: '1.3.2',
-        title: 'Meaningful Sequence',
-        level: 'A',
-        aiConformance: 'supports',
-        confidence: 0.95,
-        reasoning: 'Reading order is logical and sequential.',
-        issueCount: 0
-      },
-      {
-        criterionId: '1.4.3',
-        title: 'Contrast (Minimum)',
-        level: 'AA',
-        aiConformance: 'not_applicable',
-        confidence: 0.90,
-        reasoning: 'EPUB is text-only, no custom colors detected.',
-        issueCount: 0
-      },
-      {
-        criterionId: '2.1.1',
-        title: 'Keyboard',
-        level: 'A',
-        aiConformance: 'not_applicable',
-        confidence: 0.85,
-        reasoning: 'No interactive elements requiring keyboard functionality.',
-        issueCount: 0
-      },
-      {
-        criterionId: '2.4.1',
-        title: 'Bypass Blocks',
-        level: 'A',
-        aiConformance: 'supports',
-        confidence: 0.87,
-        reasoning: 'EPUB has proper navigation landmarks and TOC.',
-        issueCount: 0
-      },
-      {
-        criterionId: '2.4.2',
-        title: 'Page Titled',
-        level: 'A',
-        aiConformance: 'supports',
-        confidence: 0.93,
-        reasoning: 'All HTML documents have descriptive titles.',
-        issueCount: 0
-      },
-      {
-        criterionId: '2.4.4',
-        title: 'Link Purpose (In Context)',
-        level: 'A',
-        aiConformance: 'supports',
-        confidence: 0.91,
-        reasoning: 'All links have descriptive text.',
-        issueCount: 0
-      },
-      {
-        criterionId: '2.4.6',
-        title: 'Headings and Labels',
-        level: 'AA',
-        aiConformance: 'supports',
-        confidence: 0.89,
-        reasoning: 'Headings are descriptive and follow logical hierarchy.',
-        issueCount: 0
-      },
-      {
-        criterionId: '3.1.1',
-        title: 'Language of Page',
-        level: 'A',
-        aiConformance: 'supports',
-        confidence: 0.96,
-        reasoning: 'Language attribute properly set (en).',
-        issueCount: 0
-      },
-      {
-        criterionId: '3.1.2',
-        title: 'Language of Parts',
-        level: 'AA',
-        aiConformance: 'supports',
-        confidence: 0.94,
-        reasoning: 'No language changes detected in content.',
-        issueCount: 0
-      },
-      {
-        criterionId: '4.1.1',
-        title: 'Parsing',
-        level: 'A',
-        aiConformance: 'supports',
-        confidence: 0.97,
-        reasoning: 'EPUB passes EPUBCheck validation.',
-        issueCount: 0
-      },
-      {
-        criterionId: '4.1.2',
-        title: 'Name, Role, Value',
-        level: 'A',
-        aiConformance: 'supports',
-        confidence: 0.90,
-        reasoning: 'Semantic HTML elements used appropriately.',
-        issueCount: 0
-      }
-    ];
-  }
 
   function handleConfirm(criterionId: string) {
     const newDecisions = new Map(decisions);

@@ -735,7 +735,7 @@ export const PdfRemediationPlanPage: React.FC = () => {
               onClick={() => {
                 if (workflowId) {
                   // In workflow context: go to HITL remediation review
-                  navigate(`/workflow/${workflowId}/hitl/remediation`);
+                  navigate(`/workflow/${workflowId}/hitl/remediation-review`);
                 } else if (autoFixableCount > 0) {
                   // Auto-fixable items still pending: trigger auto-fix
                   handleAutoFix();
@@ -749,7 +749,11 @@ export const PdfRemediationPlanPage: React.FC = () => {
                 }
               }}
             >
-              {autoFixableCount > 0 ? 'Run Auto-Fix' : 'Proceed to Re-Audit'}
+              {workflowId
+                ? 'Review Remediation'
+                : autoFixableCount > 0
+                  ? 'Run Auto-Fix'
+                  : 'Proceed to Re-Audit'}
             </Button>
           </div>
         </div>
