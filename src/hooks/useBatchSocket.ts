@@ -22,12 +22,15 @@ export function useBatchSocket(batchId: string | null) {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    if (!batchId) return;
+    if (!batchId) {
+      setProgress(null);
+      return;
+    }
 
     // Strip /api/v1 suffix to get the WebSocket server root (same as useWorkflowSocket)
     const rawUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-    const BACKEND_URL = rawUrl.replace(/\/api\/v\d+$/, '');
-    socketRef.current = io(BACKEND_URL, {
+    const backendUrl = rawUrl.replace(/\/api\/v\d+$/, '');
+    socketRef.current = io(backendUrl, {
       transports: ['websocket', 'polling'],
     });
 
@@ -50,13 +53,14 @@ export function useBatchSocket(batchId: string | null) {
       setProgress(event);
     });
 
-    // Cleanup on unmount
+    // Cleanup on unmount or batchId change
     return () => {
       if (socketRef.current) {
         console.log('[useBatchSocket] Disconnecting socket');
         socketRef.current.disconnect();
         socketRef.current = null;
       }
+      setProgress(null);
     };
   }, [batchId]);
 

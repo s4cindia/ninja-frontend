@@ -37,45 +37,49 @@ export function ConformanceReviewPage() {
 
   useEffect(() => {
     if (!workflowId) return;
-    loadWorkflowData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workflowId]);
+    let cancelled = false;
 
-  async function loadWorkflowData() {
-    try {
-      setLoading(true);
-      const workflowData = await workflowService.getWorkflowStatus(workflowId!);
+    async function loadWorkflowData() {
+      try {
+        setLoading(true);
+        const workflowData = await workflowService.getWorkflowStatus(workflowId!);
+        if (cancelled) return;
 
-      // Extract conformance mappings from workflow state
-      const stateData = workflowData.stateData as {
-        conformanceMappings?: ConformanceCriterion[];
-        jobId?: string;
-      };
+        // Extract conformance mappings from workflow state
+        const stateData = (workflowData.stateData ?? {}) as {
+          conformanceMappings?: ConformanceCriterion[];
+          jobId?: string;
+        };
 
-      if (!stateData.conformanceMappings) {
-        throw new Error('Conformance mappings not yet available. The workflow may still be processing.');
-      }
-
-      const conformanceCriteria = stateData.conformanceMappings;
-      setCriteria(conformanceCriteria);
-
-      // Auto-confirm all "supports" and "not_applicable" criteria
-      const autoDecisions = new Map<string, ConformanceDecision>();
-      conformanceCriteria.forEach(criterion => {
-        if (criterion.aiConformance === 'supports' || criterion.aiConformance === 'not_applicable') {
-          autoDecisions.set(criterion.criterionId, {
-            criterionId: criterion.criterionId,
-            decision: 'CONFIRM'
-          });
+        if (!stateData.conformanceMappings) {
+          throw new Error('Conformance mappings not yet available. The workflow may still be processing.');
         }
-      });
-      setDecisions(autoDecisions);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load workflow data');
-    } finally {
-      setLoading(false);
+
+        const conformanceCriteria = stateData.conformanceMappings;
+        setCriteria(conformanceCriteria);
+
+        // Auto-confirm all "supports" and "not_applicable" criteria
+        const autoDecisions = new Map<string, ConformanceDecision>();
+        conformanceCriteria.forEach(criterion => {
+          if (criterion.aiConformance === 'supports' || criterion.aiConformance === 'not_applicable') {
+            autoDecisions.set(criterion.criterionId, {
+              criterionId: criterion.criterionId,
+              decision: 'CONFIRM'
+            });
+          }
+        });
+        setDecisions(autoDecisions);
+      } catch (err: unknown) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'Failed to load workflow data');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
-  }
+
+    loadWorkflowData();
+    return () => { cancelled = true; };
+  }, [workflowId]);
 
 
   function handleConfirm(criterionId: string) {

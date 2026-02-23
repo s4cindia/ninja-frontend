@@ -184,7 +184,16 @@ export function AIReviewPage() {
     try {
       setSubmitting(true);
 
-      // Filter out issues with empty justifications for REJECT/MODIFY
+      // Validate MODIFY decisions require justification
+      const modifyWithoutJustification = Array.from(decisions.values()).filter(
+        d => d.decision === 'MODIFY' && !d.justification?.trim()
+      );
+      if (modifyWithoutJustification.length > 0) {
+        toast.error(`${modifyWithoutJustification.length} "Modify" decision${modifyWithoutJustification.length !== 1 ? 's' : ''} require a justification.`);
+        setSubmitting(false);
+        return;
+      }
+
       const decisionsArray = Array.from(decisions.values()).map(d => ({
         itemId: d.itemId,
         decision: d.decision,
