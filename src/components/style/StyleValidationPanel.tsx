@@ -4,7 +4,7 @@
  * Side panel for style validation that integrates with OnlyOffice editor
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Play,
   RefreshCw,
@@ -84,6 +84,7 @@ export function StyleValidationPanel({
   const [selectedRuleSets, setSelectedRuleSets] = useState<string[]>(['general']);
   const [showRuleSetPicker, setShowRuleSetPicker] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [pendingViolationId, setPendingViolationId] = useState<string | null>(null);
 
   // Queries
   const { data: violationsData, isLoading: isLoadingViolations, refetch: refetchViolations } = useViolations(
@@ -115,7 +116,7 @@ export function StyleValidationPanel({
   const ignoreViolation = useIgnoreViolation(documentId);
 
   // Clear active job when completed and refetch data
-  useMemo(() => {
+  useEffect(() => {
     if (jobProgress?.status === 'COMPLETED' || jobProgress?.status === 'FAILED') {
       setActiveJobId(null);
       refetchViolations();
@@ -167,12 +168,21 @@ export function StyleValidationPanel({
     if (onApplyFixToDocument) {
       onApplyFixToDocument(violation, fixOption);
     }
+    // Track which violation is being processed
+    setPendingViolationId(violation.id);
     // Then update the database status
-    applyFix.mutate({ violationId: violation.id, fixOption });
+    applyFix.mutate(
+      { violationId: violation.id, fixOption },
+      { onSettled: () => setPendingViolationId(null) }
+    );
   };
 
   const handleIgnore = (violationId: string, reason?: string) => {
-    ignoreViolation.mutate({ violationId, reason });
+    setPendingViolationId(violationId);
+    ignoreViolation.mutate(
+      { violationId, reason },
+      { onSettled: () => setPendingViolationId(null) }
+    );
   };
 
   const handleFilterChange = (key: keyof FilterState, value: string | undefined) => {
@@ -286,9 +296,6 @@ export function StyleValidationPanel({
                 </div>
               )}
 
-              {allRuleSets.length === 0 && (
-                <p className="text-xs text-gray-500 italic">No rule sets available.</p>
-              )}
             </div>
           )}
         </div>
@@ -536,8 +543,8 @@ export function StyleValidationPanel({
                 onApplyFix={handleApplyFix}
                 onIgnore={handleIgnore}
                 onNavigate={onNavigateToViolation}
-                isApplying={applyFix.isPending}
-                isIgnoring={ignoreViolation.isPending}
+                isApplying={pendingViolationId === violation.id && applyFix.isPending}
+                isIgnoring={pendingViolationId === violation.id && ignoreViolation.isPending}
               />
             ))}
           </>

@@ -1036,7 +1036,14 @@ export function HouseRulesManager({ className }: HouseRulesManagerProps) {
 
                 {/* Save Dialog Overlay */}
                 {showSaveDialog && (
-                  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                  <div
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+                    onClick={(e) => e.target === e.currentTarget && setShowSaveDialog(false)}
+                    onKeyDown={(e) => e.key === 'Escape' && setShowSaveDialog(false)}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="save-dialog-title"
+                  >
                     <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
                       <h3 className="text-lg font-medium text-gray-900 mb-4">
                         Save as Rule Set

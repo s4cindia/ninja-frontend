@@ -244,14 +244,15 @@ export default function DocumentEditorPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // For now, only support .txt files
-    // TODO: Add DOCX support with mammoth.js or similar
-    if (file.name.endsWith('.txt')) {
-      const text = await file.text();
-      setContent(`<p>${text.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')}</p>`);
+    const fileName = file.name.toLowerCase();
+    if (fileName.endsWith('.docx') || fileName.endsWith('.pdf')) {
+      // For DOCX and PDF, navigate to upload page to process through backend
+      toast.error('Please upload DOCX/PDF files through the upload page for proper processing.');
     } else {
-      alert('Currently only .txt files are supported. DOCX support coming soon.');
+      toast.error('Only DOCX and PDF files are supported.');
     }
+    // Reset input
+    e.target.value = '';
   }, []);
 
   // Handle file download as DOCX
@@ -516,7 +517,7 @@ export default function DocumentEditorPage() {
             Upload
             <input
               type="file"
-              accept=".txt,.html,.docx,.pdf"
+              accept=".docx,.pdf"
               onChange={handleFileUpload}
               className="hidden"
             />

@@ -397,11 +397,7 @@ export const styleService = {
         processingTimeMs: number;
         warnings: string[];
       };
-    }>('/style/upload-guide', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    }>('/style/upload-guide', formData);
     return response.data.data;
   },
 
