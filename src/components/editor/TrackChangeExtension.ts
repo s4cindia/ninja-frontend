@@ -9,10 +9,10 @@
  * Based on: https://github.com/chenyuncai/tiptap-track-change-extension
  */
 
-import { Extension } from '@tiptap/core';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Extension, type Editor, type ChainedCommands, type SingleCommands } from '@tiptap/core';
+import { Plugin, PluginKey, type Transaction, type EditorState } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
-// import { Mark, MarkType } from '@tiptap/pm/model';
+import type { Node } from '@tiptap/pm/model';
 
 export interface TrackChangeOptions {
   enabled: boolean;
@@ -92,7 +92,7 @@ export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
     return {
       enableTrackChanges:
         () =>
-        ({ editor }) => {
+        ({ editor }: { editor: Editor }) => {
           this.storage.enabled = true;
           this.options.onStatusChange?.(true);
           editor.view.dispatch(editor.state.tr);
@@ -101,7 +101,7 @@ export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
 
       disableTrackChanges:
         () =>
-        ({ editor }) => {
+        ({ editor }: { editor: Editor }) => {
           this.storage.enabled = false;
           this.options.onStatusChange?.(false);
           editor.view.dispatch(editor.state.tr);
@@ -110,7 +110,7 @@ export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
 
       toggleTrackChanges:
         () =>
-        ({ commands }) => {
+        ({ commands }: { commands: SingleCommands }) => {
           if (this.storage.enabled) {
             return commands.disableTrackChanges();
           }
@@ -119,7 +119,7 @@ export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
 
       insertWithTracking:
         (text: string) =>
-        ({ editor, chain }) => {
+        ({ editor, chain }: { editor: Editor; chain: () => ChainedCommands }) => {
           const { from } = editor.state.selection;
           const changeId = generateChangeId();
 
@@ -142,7 +142,7 @@ export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
 
       deleteWithTracking:
         () =>
-        ({ editor, chain }) => {
+        ({ editor, chain }: { editor: Editor; chain: () => ChainedCommands }) => {
           const { from, to } = editor.state.selection;
           const selectedText = editor.state.doc.textBetween(from, to);
 
@@ -170,7 +170,7 @@ export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
 
       replaceWithTracking:
         (searchText: string, replaceText: string) =>
-        ({ editor, chain }) => {
+        ({ editor, chain }: { editor: Editor; chain: () => ChainedCommands }) => {
           // Find the text in the document
           const doc = editor.state.doc;
           let found = false;
@@ -182,7 +182,7 @@ export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
           console.log('[TrackChange] Searching for:', normalizedSearch.substring(0, 50));
 
           // Strategy 1: Exact match
-          doc.descendants((node, nodePos) => {
+          doc.descendants((node: Node, nodePos: number) => {
             if (found) return false;
             if (node.isText) {
               const text = node.text || '';
@@ -201,7 +201,7 @@ export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
 
           // Strategy 2: Normalized match
           if (!found) {
-            doc.descendants((node, nodePos) => {
+            doc.descendants((node: Node, nodePos: number) => {
               if (found) return false;
               if (node.isText) {
                 const text = node.text || '';
@@ -241,7 +241,7 @@ export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
           // Strategy 3: Partial match (first 30 chars) for long text
           if (!found && searchText.length > 30) {
             const shortSearch = normalizeText(searchText.substring(0, 30));
-            doc.descendants((node, nodePos) => {
+            doc.descendants((node: Node, nodePos: number) => {
               if (found) return false;
               if (node.isText) {
                 const text = node.text || '';
@@ -304,7 +304,7 @@ export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
 
       acceptChange:
         () =>
-        ({ editor }) => {
+        ({ editor }: { editor: Editor }) => {
           // Accept the change at current selection
           const { from } = editor.state.selection;
 
@@ -321,7 +321,7 @@ export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
 
       rejectChange:
         () =>
-        ({ editor, chain }) => {
+        ({ editor, chain }: { editor: Editor; chain: () => ChainedCommands }) => {
           const { from } = editor.state.selection;
 
           // Find change at this position
@@ -348,7 +348,7 @@ export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
 
       acceptAllChanges:
         () =>
-        ({ editor }) => {
+        ({ editor }: { editor: Editor }) => {
           trackedChanges.clear();
           editor.view.dispatch(editor.state.tr);
           return true;
@@ -356,7 +356,7 @@ export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
 
       rejectAllChanges:
         () =>
-        ({ chain }) => {
+        ({ chain }: { chain: () => ChainedCommands }) => {
           // Process in reverse order to maintain positions
           const changes = Array.from(trackedChanges.values()).sort((a, b) => b.from - a.from);
 
@@ -383,7 +383,7 @@ export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
           init() {
             return DecorationSet.empty;
           },
-          apply(tr, _oldDecorations) {
+          apply(tr: Transaction, _oldDecorations: DecorationSet) {
             // Rebuild decorations based on tracked changes
             const decorations: Decoration[] = [];
 
@@ -400,7 +400,7 @@ export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
                   title: `${change.type === 'insertion' ? 'Added' : 'Deleted'} by ${change.userName}`,
                 });
                 decorations.push(deco);
-              } catch (e) {
+              } catch {
                 // Position may be invalid after document changes
               }
             }
@@ -409,8 +409,8 @@ export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
           },
         },
         props: {
-          decorations(state) {
-            return this.getState(state);
+          decorations(state: EditorState) {
+            return trackChangePluginKey.getState(state);
           },
         },
       }),

@@ -7,7 +7,7 @@
  * - Accept/Reject UI for each change
  */
 
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
@@ -19,6 +19,7 @@ import { TableCell } from '@tiptap/extension-table-cell';
 import { Superscript } from '@tiptap/extension-superscript';
 import { Subscript } from '@tiptap/extension-subscript';
 import { Image } from '@tiptap/extension-image';
+import type { Node } from '@tiptap/pm/model';
 import { useCallback, useImperativeHandle, forwardRef, useState } from 'react';
 import { TrackChangeExtension, getTrackedChanges, type TrackedChange } from './TrackChangeExtension';
 
@@ -103,17 +104,17 @@ export const TipTapEditor = forwardRef<TipTapEditorRef, TipTapEditorProps>(
           enabled: trackChangesEnabled,
           userId,
           userName,
-          onStatusChange: (enabled) => {
+          onStatusChange: (enabled: boolean) => {
             console.log('[TipTapEditor] Track changes:', enabled ? 'enabled' : 'disabled');
           },
         }),
       ],
       content: initialContent,
       editable: !readOnly,
-      onUpdate: ({ editor }) => {
+      onUpdate: ({ editor }: { editor: Editor }) => {
         onChange?.(editor.getHTML());
       },
-      onSelectionUpdate: ({ editor }) => {
+      onSelectionUpdate: ({ editor }: { editor: Editor }) => {
         const { from, to } = editor.state.selection;
         const text = editor.state.doc.textBetween(from, to);
         onSelectionChange?.({ from, to, text });
@@ -144,7 +145,7 @@ export const TipTapEditor = forwardRef<TipTapEditorRef, TipTapEditorProps>(
         console.log('[TipTapEditor] Searching for:', normalizedSearch.substring(0, 50));
 
         // First try exact match
-        doc.descendants((node, pos) => {
+        doc.descendants((node: Node, pos: number) => {
           if (found) return false;
           if (node.isText) {
             const text = node.text || '';
@@ -162,7 +163,7 @@ export const TipTapEditor = forwardRef<TipTapEditorRef, TipTapEditorProps>(
 
         // If not found, try normalized match
         if (!found) {
-          doc.descendants((node, pos) => {
+          doc.descendants((node: Node, pos: number) => {
             if (found) return false;
             if (node.isText) {
               const text = node.text || '';
@@ -192,7 +193,7 @@ export const TipTapEditor = forwardRef<TipTapEditorRef, TipTapEditorProps>(
         // If still not found, try searching for a shorter substring (first 30 chars)
         if (!found && searchText.length > 30) {
           const shortSearch = normalizeText(searchText.substring(0, 30));
-          doc.descendants((node, pos) => {
+          doc.descendants((node: Node, pos: number) => {
             if (found) return false;
             if (node.isText) {
               const text = node.text || '';
