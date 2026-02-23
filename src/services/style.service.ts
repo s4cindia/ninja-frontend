@@ -180,11 +180,21 @@ export const styleService = {
   },
 
   /**
-   * Get a single rule set with its rules
+   * Get a single rule set with its rules (custom rule sets)
    */
   async getRuleSetWithRules(ruleSetId: string): Promise<HouseRuleSet> {
     const response = await api.get<{ success: boolean; data: HouseRuleSet }>(
       `/style/rule-sets/${ruleSetId}`
+    );
+    return response.data.data;
+  },
+
+  /**
+   * Get a built-in rule set with its rules
+   */
+  async getBuiltInRuleSetWithRules(ruleSetId: string): Promise<HouseRuleSet> {
+    const response = await api.get<{ success: boolean; data: HouseRuleSet }>(
+      `/style/rule-sets/${ruleSetId}/built-in`
     );
     return response.data.data;
   },

@@ -217,6 +217,17 @@ export function useCustomRuleSet(ruleSetId: string) {
 }
 
 /**
+ * Fetch a single built-in rule set with its rules
+ */
+export function useBuiltInRuleSet(ruleSetId: string) {
+  return useQuery({
+    queryKey: ['style', 'builtInRuleSet', ruleSetId],
+    queryFn: () => styleService.getBuiltInRuleSetWithRules(ruleSetId),
+    enabled: !!ruleSetId,
+  });
+}
+
+/**
  * Create a new custom rule set
  */
 export function useCreateRuleSet() {
