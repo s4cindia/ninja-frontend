@@ -246,7 +246,7 @@ describe('WorkflowDashboard E2E Integration Tests', () => {
       expect(screen.getByText(/AI_REVIEW/i)).toBeInTheDocument();
 
       // Should have button to go to review
-      const reviewButton = screen.getByRole('button', { name: /Go to review/i });
+      const reviewButton = screen.getByRole('button', { name: /Review Now/i });
       expect(reviewButton).toBeInTheDocument();
     });
 
