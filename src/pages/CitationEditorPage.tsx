@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Alert } from '@/components/ui/Alert';
+import { Checkbox } from '@/components/ui/Checkbox';
 import ReferenceEditor from '@/components/citation/ReferenceEditor';
 import DragDropGuide from '@/components/citation/DragDropGuide';
 import DocumentViewer from '@/components/citation/DocumentViewer';
@@ -148,6 +149,9 @@ export default function CitationEditorPage() {
     }>;
   } | null>(null);
   const [showDoiValidationResults, setShowDoiValidationResults] = useState(false);
+  const [showSequenceWarning, setShowSequenceWarning] = useState(false);
+  const [showDismissDropdown, setShowDismissDropdown] = useState(false);
+  const [selectedChangesToDismiss, setSelectedChangesToDismiss] = useState<Set<string>>(new Set());
 
   // Detect out-of-sequence citations for Vancouver style
   const sequenceAnalysis = useMemo(() => {
@@ -626,6 +630,59 @@ export default function CitationEditorPage() {
     }
   };
 
+  // Handle dismissing selected changes only
+  const handleDismissSelected = async () => {
+    if (!documentId || selectedChangesToDismiss.size === 0) return;
+
+    setIsResetting(true);
+    try {
+      const changeIds = Array.from(selectedChangesToDismiss);
+      const response = await api.post(`/citation-management/document/${documentId}/dismiss-changes`, {
+        changeIds
+      });
+
+      if (response.data.success) {
+        toast.success(`Dismissed ${response.data.data?.dismissedCount || changeIds.length} change(s)`);
+        // Remove dismissed changes from local state
+        setRecentChanges(prev => prev.filter(c => !selectedChangesToDismiss.has(c.citationId)));
+        setSelectedChangesToDismiss(new Set());
+        setShowDismissDropdown(false);
+        // Reload to get fresh state
+        await loadAnalysis();
+      } else {
+        toast.error(response.data.error?.message || 'Failed to dismiss changes');
+      }
+    } catch (err: unknown) {
+      console.error('[CitationEditorPage] Dismiss changes failed:', err);
+      const apiErr = err as ApiError;
+      toast.error(apiErr.response?.data?.error?.message || 'Failed to dismiss changes');
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  // Toggle change selection
+  const toggleChangeSelection = (citationId: string) => {
+    setSelectedChangesToDismiss(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(citationId)) {
+        newSet.delete(citationId);
+      } else {
+        newSet.add(citationId);
+      }
+      return newSet;
+    });
+  };
+
+  // Select/deselect all changes
+  const toggleSelectAll = () => {
+    if (selectedChangesToDismiss.size === recentChanges.length) {
+      setSelectedChangesToDismiss(new Set());
+    } else {
+      setSelectedChangesToDismiss(new Set(recentChanges.map(c => c.citationId)));
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -779,8 +836,8 @@ export default function CitationEditorPage() {
           </Card>
         </div>
 
-        {/* Sequence Warning Banner */}
-        {!sequenceAnalysis.isSequential && (
+        {/* Sequence Warning Banner - Only show when user clicks Check Sequence */}
+        {showSequenceWarning && !sequenceAnalysis.isSequential && (
           <Alert variant="warning" className="mb-6">
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-3">
@@ -793,23 +850,32 @@ export default function CitationEditorPage() {
                   </p>
                 </div>
               </div>
-              <Button
-                onClick={handleResequence}
-                disabled={isResequencing}
-                className="ml-4 bg-amber-600 hover:bg-amber-700 text-white"
-              >
-                {isResequencing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Fixing...
-                  </>
-                ) : (
-                  <>
-                    <ArrowUpDown className="h-4 w-4 mr-2" />
-                    Fix Sequence
-                  </>
-                )}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowSequenceWarning(false)}
+                >
+                  Dismiss
+                </Button>
+                <Button
+                  onClick={handleResequence}
+                  disabled={isResequencing}
+                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                >
+                  {isResequencing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Fixing...
+                    </>
+                  ) : (
+                    <>
+                      <ArrowUpDown className="h-4 w-4 mr-2" />
+                      Fix Sequence
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </Alert>
         )}
@@ -1023,23 +1089,126 @@ export default function CitationEditorPage() {
                   View your document with citations highlighted in context
                 </p>
               </div>
-              {recentChanges.length > 0 && showChangeHighlights && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDismissChanges}
-                  disabled={isResetting}
-                >
-                  {isResetting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Reverting...
-                    </>
-                  ) : (
-                    `✓ Dismiss Changes (${recentChanges.length})`
-                  )}
-                </Button>
-              )}
+              <div className="flex gap-2">
+                {/* Check Sequence Button - For numeric styles */}
+                {(data.detectedStyle?.toLowerCase() === 'vancouver' ||
+                  data.detectedStyle?.toLowerCase() === 'ieee') && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowSequenceWarning(true)}
+                  >
+                    <ArrowUpDown className="h-4 w-4 mr-2" />
+                    Check Sequence
+                  </Button>
+                )}
+                {/* Dismiss Changes Dropdown */}
+                {recentChanges.length > 0 && (
+                  <div className="relative">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowDismissDropdown(!showDismissDropdown)}
+                      disabled={isResetting}
+                    >
+                      {isResetting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Dismissing...
+                        </>
+                      ) : (
+                        `✗ Dismiss Changes (${recentChanges.length})`
+                      )}
+                    </Button>
+                    {showDismissDropdown && (
+                      <div className="absolute right-0 mt-2 w-80 bg-white border rounded-lg shadow-lg z-50 max-h-96 overflow-hidden">
+                        <div className="p-3 border-b bg-gray-50">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium text-sm">Select changes to dismiss</span>
+                            <button
+                              onClick={() => setShowDismissDropdown(false)}
+                              className="text-gray-400 hover:text-gray-600"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                        <div className="p-2 border-b">
+                          <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                            <Checkbox
+                              checked={selectedChangesToDismiss.size === recentChanges.length}
+                              onChange={toggleSelectAll}
+                            />
+                            <span className="text-sm font-medium">
+                              {selectedChangesToDismiss.size === recentChanges.length ? 'Deselect All' : 'Select All'}
+                            </span>
+                          </label>
+                        </div>
+                        <div className="max-h-60 overflow-y-auto p-2">
+                          {recentChanges.map((change) => (
+                            <label
+                              key={change.citationId}
+                              className="flex items-start gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                            >
+                              <Checkbox
+                                checked={selectedChangesToDismiss.has(change.citationId)}
+                                onChange={() => toggleChangeSelection(change.citationId)}
+                                className="mt-0.5"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm">
+                                  <span className="text-green-600 font-medium">{change.oldText || `(${change.newNumber})`}</span>
+                                  <span className="text-gray-400 mx-1">←</span>
+                                  <span className="text-red-500 line-through">{change.newText || `(${change.oldNumber})`}</span>
+                                </div>
+                                <div className="text-xs text-gray-500 capitalize">
+                                  {change.changeType?.replace('_', ' ') || 'changed'}
+                                </div>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                        <div className="p-3 border-t bg-gray-50 space-y-2">
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setShowDismissDropdown(false);
+                                setSelectedChangesToDismiss(new Set());
+                              }}
+                              className="flex-1"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              onClick={handleDismissSelected}
+                              disabled={selectedChangesToDismiss.size === 0 || isResetting}
+                              className="flex-1"
+                            >
+                              Dismiss ({selectedChangesToDismiss.size})
+                            </Button>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setShowDismissDropdown(false);
+                              handleDismissChanges();
+                            }}
+                            disabled={isResetting}
+                            className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            Dismiss All & Reset
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
             <DocumentViewer
               fullText={data.document.fullText}

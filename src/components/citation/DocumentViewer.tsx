@@ -432,12 +432,15 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
           const trackClass = getTrackChangeClass(changeInfo.changeType);
           bgColor = `${trackClass || 'track-change-addition'} animate-pulse`;
           hoverColor = 'hover:bg-green-300';
-          refInfo = `Updated: ${escapeHtml(changeInfo.oldText)} → ${escapeHtml(changeInfo.newText)}`;
+          refInfo = `Updated: ${escapeHtml(changeInfo.oldText)} (was ${escapeHtml(changeInfo.newText)})`;
           searchText = changeInfo.oldText;
 
-          const oldDisplay = `<span class="track-change-deletion-sm">${escapeHtml(changeInfo.oldText)}</span>`;
-          const newDisplay = renderClickableNumbers(changeInfo.newText, 'track-change-addition');
-          displayContent = `${oldDisplay}<span class="track-change-arrow"> → </span>${newDisplay}`;
+          // Note: changeInfo.oldText contains the NEW number, changeInfo.newText contains the OLD number
+          // (backend stores citation's current text as beforeText, which becomes originalText/oldText)
+          const newDisplay = renderClickableNumbers(changeInfo.oldText, 'track-change-addition');
+          const oldDisplay = `<span class="track-change-deletion-sm">${escapeHtml(changeInfo.newText)}</span>`;
+          // Show new number first, then old number struck through (e.g., "(1) ← (4)")
+          displayContent = `${newDisplay}<span class="track-change-arrow"> ← </span>${oldDisplay}`;
 
           markTag = `<mark class="px-1 rounded transition-colors" title="${escapeHtml(refInfo)}">${displayContent}</mark>`;
           isTrackChangeMarkTag = true;
