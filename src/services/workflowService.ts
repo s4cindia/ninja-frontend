@@ -200,22 +200,22 @@ export const workflowService = {
   },
 
   async getAgenticBatchDashboard(batchId: string): Promise<AgenticBatchDashboard> {
-    const response = await api.get<ApiResponse<AgenticBatchDashboard>>(`/workflows/batch/${batchId}`);
-    return response.data.data;
+    const response = await api.get<AgenticBatchDashboard>(`/workflows/batch/${batchId}`);
+    return response.data;
   },
 
   async pauseBatch(batchId: string): Promise<{ pausedCount: number }> {
-    const response = await api.post<ApiResponse<{ pausedCount: number }>>(`/workflows/batch/${batchId}/pause`);
-    return response.data.data;
+    const response = await api.post<{ success: boolean; pausedCount: number }>(`/workflows/batch/${batchId}/pause`);
+    return response.data;
   },
 
   async resumeBatch(batchId: string): Promise<{ resumedCount: number }> {
-    const response = await api.post<ApiResponse<{ resumedCount: number }>>(`/workflows/batch/${batchId}/resume`);
-    return response.data.data;
+    const response = await api.post<{ success: boolean; resumedCount: number }>(`/workflows/batch/${batchId}/resume`);
+    return response.data;
   },
 
   async retryFailedBatch(batchId: string): Promise<{ retriedCount: number }> {
-    const response = await api.post<ApiResponse<{ retriedCount: number }>>(`/workflows/batch/${batchId}/retry-failed`);
-    return response.data.data;
+    const response = await api.post<{ success: boolean; retriedCount: number }>(`/workflows/batch/${batchId}/retry-failed`);
+    return response.data;
   },
 };
