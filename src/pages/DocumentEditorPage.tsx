@@ -18,7 +18,7 @@ export default function DocumentEditorPage() {
   const { documentId } = useParams<{ documentId: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const documentName = searchParams.get('name') || 'Document';
+  const [documentName, setDocumentName] = useState(searchParams.get('name') || 'Document');
 
   const editorRef = useRef<TipTapEditorRef>(null);
   const [showStylePanel, setShowStylePanel] = useState(false);
@@ -50,6 +50,11 @@ export default function DocumentEditorPage() {
 
         const result = await validatorService.getDocumentContent(documentId);
         setContent(result.content);
+
+        // Set document name from API response
+        if (result.fileName) {
+          setDocumentName(result.fileName);
+        }
 
         if (result.conversionWarnings && result.conversionWarnings.length > 0) {
           console.warn('[DocumentEditorPage] Conversion warnings:', result.conversionWarnings);
