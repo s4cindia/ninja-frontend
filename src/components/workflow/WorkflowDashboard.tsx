@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Pause, Play, XCircle, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Pause, Play, XCircle, RefreshCw, AlertTriangle, ChevronRight, FileText } from 'lucide-react';
 import { workflowService, WorkflowStatus } from '@/services/workflowService';
 import { useWorkflowSocket } from '@/hooks/useWorkflowSocket';
 import { WorkflowProgressBar } from './WorkflowProgressBar';
@@ -33,15 +33,31 @@ function formatTimestamp(ts: string | undefined): string {
   return new Date(ts).toLocaleString();
 }
 
-// Gate → HITL page path mapping
-const GATE_ROUTES: Record<string, string> = {
-  'ai-review': '/workflow/hitl/ai-review',
-  'remediation-review': '/workflow/hitl/remediation',
-  'conformance-review': '/workflow/hitl/conformance',
-  'acr-signoff': '/workflow/hitl/acr-signoff',
-};
+function computeProgressFromState(state: string): number {
+  const progressMap: Record<string, number> = {
+    UPLOAD_RECEIVED: 5,
+    PREPROCESSING: 10,
+    RUNNING_EPUBCHECK: 20,
+    RUNNING_ACE: 30,
+    RUNNING_AI_ANALYSIS: 40,
+    AWAITING_AI_REVIEW: 45,
+    AUTO_REMEDIATION: 55,
+    AWAITING_REMEDIATION_REVIEW: 60,
+    VERIFICATION_AUDIT: 65,
+    CONFORMANCE_MAPPING: 70,
+    AWAITING_CONFORMANCE_REVIEW: 75,
+    ACR_GENERATION: 85,
+    AWAITING_ACR_SIGNOFF: 90,
+    COMPLETED: 100,
+    FAILED: 0,
+  };
+  return progressMap[state] ?? 50;
+}
+
 
 export function WorkflowDashboard({ workflowId }: WorkflowDashboardProps) {
+  console.log('[WorkflowDashboard] Mounting for workflow:', workflowId);
+
   const navigate = useNavigate();
   const [status, setStatus] = useState<WorkflowStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,20 +66,24 @@ export function WorkflowDashboard({ workflowId }: WorkflowDashboardProps) {
   const [hitlBanner, setHitlBanner] = useState<{ gate: string; deepLink: string } | null>(null);
 
   const { stateChange, hitlRequired, workflowError } = useWorkflowSocket(workflowId);
+  console.log('[WorkflowDashboard] WebSocket state:', { stateChange, hitlRequired, workflowError });
 
   // Initial fetch
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    console.log('[WorkflowDashboard] Fetching workflow status for:', workflowId);
     workflowService
       .getWorkflowStatus(workflowId)
       .then(data => {
+        console.log('[WorkflowDashboard] Received workflow status:', data);
         if (!cancelled) {
           setStatus(data);
           setFetchError(null);
         }
       })
       .catch(err => {
+        console.error('[WorkflowDashboard] Failed to fetch workflow status:', err);
         if (!cancelled) setFetchError(getErrorMessage(err));
       })
       .finally(() => {
@@ -74,18 +94,25 @@ export function WorkflowDashboard({ workflowId }: WorkflowDashboardProps) {
     };
   }, [workflowId]);
 
-  // Socket: state change
+  // Socket: state change (with deduplication)
   useEffect(() => {
     if (!stateChange) return;
-    setStatus(prev =>
-      prev
+
+    setStatus(prev => {
+      // Deduplicate: ignore if state hasn't actually changed
+      if (prev && prev.currentState === stateChange.to) {
+        return prev;
+      }
+
+      return prev
         ? {
             ...prev,
             currentState: stateChange.to,
             phase: stateChange.phase,
+            progress: computeProgressFromState(stateChange.to),
           }
-        : prev
-    );
+        : prev;
+    });
   }, [stateChange]);
 
   // Socket: HITL required
@@ -141,6 +168,13 @@ export function WorkflowDashboard({ workflowId }: WorkflowDashboardProps) {
   const isAuto = AUTO_STATES.has(state);
   const isPaused = state === 'PAUSED';
   const isFailed = state === 'FAILED';
+  const isCompleted = state === 'COMPLETED';
+
+  // Extract ACR data from workflow state data
+  // Note: acrJobId is the ACR Job's primary key, but the review page expects the original jobId
+  const stateData = status.stateData as { jobId?: string; acrJobId?: string; acrGeneratedAt?: string } | undefined;
+  const jobId = stateData?.jobId;
+  const acrGenerated = !!stateData?.acrGeneratedAt;
 
   return (
     <div className="space-y-4">
@@ -151,21 +185,24 @@ export function WorkflowDashboard({ workflowId }: WorkflowDashboardProps) {
           title={`Human Review Required at ${hitlBanner.gate}`}
           onClose={() => setHitlBanner(null)}
         >
-          <div className="flex items-center gap-3 mt-1">
-            <AlertTriangle className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
-            <span>This workflow is waiting for your review.</span>
-            <button
-              type="button"
+          <div className="flex items-center justify-between mt-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-orange-600" aria-hidden="true" />
+              <span className="text-sm">This workflow is waiting for your review.</span>
+            </div>
+            <Button
+              variant="primary"
+              size="md"
+              rightIcon={<ChevronRight className="w-4 h-4" />}
               onClick={() =>
                 navigate(
-                  GATE_ROUTES[hitlBanner.gate] ??
+                  hitlBanner.deepLink ||
                     `/workflow/${workflowId}/hitl`
                 )
               }
-              className="underline font-medium hover:no-underline"
             >
-              Go to review
-            </button>
+              Review Now
+            </Button>
           </div>
         </Alert>
       )}
@@ -210,6 +247,25 @@ export function WorkflowDashboard({ workflowId }: WorkflowDashboardProps) {
           {isFailed && status.errorMessage && (
             <Alert variant="error" title="Workflow failed">
               {status.errorMessage}
+            </Alert>
+          )}
+
+          {/* ACR Report Link */}
+          {isCompleted && jobId && acrGenerated && (
+            <Alert variant="success" title="Workflow Complete">
+              <div className="flex items-center justify-between mt-3">
+                <span className="text-sm">
+                  The Accessibility Conformance Report has been generated and is ready for review.
+                </span>
+                <Button
+                  variant="primary"
+                  size="md"
+                  rightIcon={<FileText className="w-4 h-4" />}
+                  onClick={() => navigate(`/acr/report/review/${jobId}`)}
+                >
+                  View ACR Report
+                </Button>
+              </div>
             </Alert>
           )}
 

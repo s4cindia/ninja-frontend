@@ -25,6 +25,7 @@ interface UploadSummary {
     moderate: number;
     minor: number;
   };
+  workflowId?: string;
 }
 
 const generateDemoIssues = (summary: UploadSummary['issuesSummary']): AuditIssue[] => {
@@ -161,6 +162,13 @@ export const EPUBAccessibility: React.FC = () => {
   }, [jobIdParam, auditResult, isLoadingJob, loadJobAuditResult]);
 
   const handleUploadComplete = async (summary: UploadSummary) => {
+    // If workflowId is present, redirect to workflow monitoring page
+    if (summary.workflowId) {
+      console.log('[EPUBAccessibility] Workflow created, redirecting to workflow page:', summary.workflowId);
+      navigate(`/workflow/${summary.workflowId}`);
+      return;
+    }
+
     const issuesSummary = summary.issuesSummary || {
       total: 12,
       critical: 2,

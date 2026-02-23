@@ -20,4 +20,5 @@ export interface AuditSummary {
     moderate: number;
     minor: number;
   };
+  workflowId?: string;
 }

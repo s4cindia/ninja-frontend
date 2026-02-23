@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Clock } from 'lucide-react';
 import { workflowService } from '@/services/workflowService';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
@@ -28,7 +28,8 @@ const ACTIVE_STATES = new Set([
   'PAUSED',
 ]);
 
-function toTitleCase(snake: string): string {
+function toTitleCase(snake?: string | null): string {
+  if (!snake) return 'Unknown';
   return snake
     .toLowerCase()
     .split('_')
@@ -36,26 +37,28 @@ function toTitleCase(snake: string): string {
     .join(' ');
 }
 
-function formatTimestamp(ts: string): string {
+function formatTimestamp(ts?: string | null): string {
+  if (!ts) return 'Unknown time';
   return new Date(ts).toLocaleString(undefined, {
-    year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
   });
 }
 
 export function WorkflowTimeline({ workflowId }: WorkflowTimelineProps) {
   const currentStateRef = useRef<string>('');
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const latestEventRef = useRef<HTMLDivElement>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['workflow-timeline', workflowId],
     queryFn: () => workflowService.getTimeline(workflowId),
     refetchInterval: () => {
-      // Keep polling while the workflow is still active
-      return ACTIVE_STATES.has(currentStateRef.current) ? 10_000 : false;
+      // With WebSocket, only poll every 30s as backup
+      // WebSocket provides instant updates via workflow:state-change events
+      return ACTIVE_STATES.has(currentStateRef.current) ? 30_000 : false;
     },
   });
 
@@ -68,23 +71,61 @@ export function WorkflowTimeline({ workflowId }: WorkflowTimelineProps) {
     }
   }, [data]);
 
+  // Auto-scroll to show latest event (rightmost)
+  useEffect(() => {
+    if (latestEventRef.current && scrollContainerRef.current) {
+      latestEventRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'end' // Scroll to the right end
+      });
+    }
+  }, [data?.events.length]);
+
   if (isLoading) {
     return (
-      <div className="flex justify-center py-8">
-        <Spinner size="md" />
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Event Timeline</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex justify-center py-8">
+            <Spinner size="md" />
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
   if (error) {
     return (
-      <Alert variant="error" title="Failed to load timeline">
-        {getErrorMessage(error)}
-      </Alert>
+      <Card>
+        <CardHeader>
+          <CardTitle>Event Timeline</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Alert variant="error" title="Failed to load timeline">
+            {getErrorMessage(error)}
+          </Alert>
+        </CardContent>
+      </Card>
     );
   }
 
   const events = data?.events ?? [];
+
+  if (events.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Event Timeline</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-gray-500 text-center py-4">No events recorded yet.</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -92,43 +133,73 @@ export function WorkflowTimeline({ workflowId }: WorkflowTimelineProps) {
         <CardTitle>Event Timeline</CardTitle>
       </CardHeader>
       <CardContent>
-        {events.length === 0 ? (
-          <p className="text-sm text-gray-500 text-center py-4">No events recorded yet.</p>
-        ) : (
-          <ol className="relative border-l border-gray-200 space-y-6 pl-6">
-            {/* Newest first */}
-            {[...events].reverse().map((event, idx) => (
-              <li key={event.id ?? idx} className="relative">
-                {/* Timeline dot */}
-                <span
-                  className="absolute -left-[25px] top-1 w-3 h-3 rounded-full border-2 border-white bg-primary-500 shadow"
-                  aria-hidden="true"
-                />
+        {/* Horizontal timeline */}
+        <div className="relative">
+          <div ref={scrollContainerRef} className="overflow-x-auto pb-4">
+            <div className="flex items-start min-w-max">
+              {/* Oldest first for horizontal layout */}
+              {[...events].reverse().map((event, idx) => {
+                const isLast = idx === events.length - 1;
 
-                <div className="space-y-0.5">
-                  <p className="text-sm font-medium text-gray-900">
-                    {toTitleCase(event.type)}
-                  </p>
-
-                  {event.from && event.to && (
-                    <p className="flex items-center gap-1 text-xs text-gray-500">
-                      <span>{toTitleCase(event.from)}</span>
-                      <ArrowRight className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
-                      <span className="font-medium text-gray-700">{toTitleCase(event.to)}</span>
-                    </p>
-                  )}
-
-                  <time
-                    dateTime={event.timestamp}
-                    className="text-xs text-gray-400"
+                return (
+                  <div
+                    key={event.id ?? idx}
+                    ref={isLast ? latestEventRef : null}
+                    className="flex items-center"
                   >
-                    {formatTimestamp(event.timestamp)}
-                  </time>
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
+                    {/* Event card */}
+                    <div className="flex flex-col items-center" style={{ minWidth: '180px' }}>
+                      {/* Event dot */}
+                      <div className="relative">
+                        <span
+                          className="flex h-3 w-3 rounded-full border-2 border-white bg-primary-500 shadow"
+                          aria-hidden="true"
+                        />
+                      </div>
+
+                      {/* Event content */}
+                      <div className="mt-3 text-center px-2" style={{ maxWidth: '160px' }}>
+                        <p className="text-xs font-medium text-gray-900 truncate">
+                          {toTitleCase(event.type)}
+                        </p>
+
+                        {event.from && event.to && (
+                          <div className="flex items-center justify-center gap-1 mt-1">
+                            <span className="text-[10px] text-gray-500 truncate max-w-[60px]">
+                              {toTitleCase(event.from)}
+                            </span>
+                            <ArrowRight className="w-2.5 h-2.5 flex-shrink-0 text-gray-400" aria-hidden="true" />
+                            <span className="text-[10px] font-medium text-gray-700 truncate max-w-[60px]">
+                              {toTitleCase(event.to)}
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-center gap-1 mt-1">
+                          <Clock className="w-2.5 h-2.5 text-gray-400" aria-hidden="true" />
+                          <time
+                            dateTime={event.timestamp}
+                            className="text-[10px] text-gray-400"
+                          >
+                            {formatTimestamp(event.timestamp)}
+                          </time>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Connecting line */}
+                    {!isLast && (
+                      <div className="flex items-center" style={{ width: '60px', marginBottom: '80px' }}>
+                        <div className="h-0.5 w-full bg-primary-200" aria-hidden="true" />
+                        <ArrowRight className="w-3 h-3 text-primary-300 -ml-1.5" aria-hidden="true" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   Loader2,
@@ -39,6 +39,8 @@ import type { RemediationTask, ReauditComparisonResult } from '@/types/pdf-remed
 export const PdfRemediationPlanPage: React.FC = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const workflowId = searchParams.get('workflowId');
   const { data: plan, isLoading, error, refetch } = useRemediationPlan(jobId);
 
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
@@ -730,13 +732,28 @@ export const PdfRemediationPlanPage: React.FC = () => {
             </Button>
             <Button
               variant="primary"
-              disabled={autoFixableCount === 0 && quickFixCount === 0}
               onClick={() => {
-                // TODO: Start remediation workflow
-                alert('Remediation workflow will be implemented in next phase');
+                if (workflowId) {
+                  // In workflow context: go to HITL remediation review
+                  navigate(`/workflow/${workflowId}/hitl/remediation-review`);
+                } else if (autoFixableCount > 0) {
+                  // Auto-fixable items still pending: trigger auto-fix
+                  handleAutoFix();
+                } else {
+                  // Only manual tasks remain: go back to audit so user can re-audit after fixing externally
+                  toast('Please fix the listed issues using Adobe Acrobat Pro or similar tool, then re-audit your document.', {
+                    icon: 'ℹ️',
+                    duration: 6000,
+                  });
+                  navigate(`/pdf/audit/${jobId}`);
+                }
               }}
             >
-              Start Remediation
+              {workflowId
+                ? 'Review Remediation'
+                : autoFixableCount > 0
+                  ? 'Run Auto-Fix'
+                  : 'Proceed to Re-Audit'}
             </Button>
           </div>
         </div>

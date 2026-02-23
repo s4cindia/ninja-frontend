@@ -17,12 +17,14 @@ interface UploadProgress {
 interface DirectUploadResponse {
   jobId: string;
   fileId?: string;
+  workflowId?: string;
 }
 
 interface UploadResult {
   fileId: string;
   fileKey: string;
   jobId?: string;
+  workflowId?: string;
   uploadMethod: 's3' | 'direct';
 }
 
@@ -108,6 +110,7 @@ class UploadService {
     return {
       jobId: response.data.data?.jobId || response.data.jobId,
       fileId: response.data.data?.fileId,
+      workflowId: response.data.data?.workflowId || response.data.workflowId,
     };
   }
 
@@ -140,6 +143,7 @@ class UploadService {
           fileId: result.fileId || result.jobId,
           fileKey: result.jobId,
           jobId: result.jobId,
+          workflowId: result.workflowId,
           uploadMethod: 'direct' as const,
         };
       }

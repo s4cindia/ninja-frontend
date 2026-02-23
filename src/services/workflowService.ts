@@ -13,6 +13,7 @@ export interface WorkflowStatus {
   loopCount: number;
   createdBy: string;
   batchId?: string;
+  stateData?: Record<string, unknown>;
 }
 
 export interface WorkflowEvent {
@@ -39,8 +40,9 @@ export interface BatchDashboard {
 
 export interface AIReviewDecision {
   itemId: string;
-  decision: 'approve' | 'reject' | 'modify';
-  notes?: string;
+  decision: 'ACCEPT' | 'REJECT' | 'MODIFY' | 'OVERRIDE' | 'MANUAL_FIX';
+  modifiedValue?: unknown;
+  justification?: string;
 }
 
 export interface ConformanceDecision {
@@ -108,6 +110,17 @@ export const workflowService = {
     fixDetail: unknown
   ): Promise<void> {
     await api.post(`/workflows/${workflowId}/hitl/remediation-fix`, { itemId, fixDetail });
+  },
+
+  async submitRemediationReview(
+    workflowId: string,
+    notes?: string
+  ): Promise<{ gateComplete: boolean }> {
+    const response = await api.post<ApiResponse<{ gateComplete: boolean; message: string }>>(
+      `/workflows/${workflowId}/hitl/remediation-review`,
+      { notes }
+    );
+    return response.data.data;
   },
 
   async submitConformanceReview(

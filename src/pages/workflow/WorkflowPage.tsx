@@ -3,6 +3,7 @@ import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { WorkflowDashboard } from '@/components/workflow/WorkflowDashboard';
+import { WorkflowStepper } from '@/components/workflow/WorkflowStepper';
 import { WorkflowTimeline } from '@/components/workflow/WorkflowTimeline';
 import { ArrowLeft } from 'lucide-react';
 
@@ -43,6 +44,7 @@ export function WorkflowPage() {
 
       <div className="space-y-6">
         <WorkflowDashboard workflowId={workflowId} />
+        <WorkflowStepper workflowId={workflowId} />
         <WorkflowTimeline workflowId={workflowId} />
       </div>
     </div>
