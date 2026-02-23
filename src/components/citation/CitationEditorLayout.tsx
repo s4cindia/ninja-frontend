@@ -128,10 +128,10 @@ export function CitationEditorLayout({ data, textLookupId }: CitationEditorLayou
       <input
         ref={fileInputRef}
         type="file"
-        accept=".docx"
+        accept=".docx,.pdf"
         className="hidden"
         onChange={handleFileSelected}
-        aria-label="Select DOCX file for HTML regeneration"
+        aria-label="Select DOCX or PDF file for HTML regeneration"
       />
 
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-gray-800 text-white rounded-t-lg">
