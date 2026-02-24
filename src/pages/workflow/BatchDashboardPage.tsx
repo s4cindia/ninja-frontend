@@ -139,13 +139,18 @@ export function BatchDashboardPage() {
     <div className="max-w-5xl mx-auto p-6 space-y-6">
       {/* Header */}
       <div>
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-3"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          Back
-        </button>
+        <div className="flex items-center justify-between mb-3">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Back
+          </button>
+          <Button variant="outline" onClick={() => navigate('/workflow/batch/new')}>
+            + New Agentic Batch
+          </Button>
+        </div>
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{batch.name}</h1>

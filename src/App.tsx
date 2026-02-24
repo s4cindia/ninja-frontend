@@ -69,6 +69,7 @@ import { RemediationReviewPage } from '@/pages/workflow/RemediationReviewPage';
 import { ConformanceReviewPage } from '@/pages/workflow/ConformanceReviewPage';
 import { AcrSignoffPage } from '@/pages/workflow/AcrSignoffPage';
 import { BatchDashboardPage } from '@/pages/workflow/BatchDashboardPage';
+import { AgenticBatchCreatePage } from '@/pages/workflow/AgenticBatchCreatePage';
 import TestEditorPage from '@/pages/TestEditorPage';
 import DocumentEditorPage from '@/pages/DocumentEditorPage';
 import PdfViewerPage from '@/pages/PdfViewerPage';
@@ -213,6 +214,7 @@ function AppRoutes() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/settings/house-rules" element={<HouseRulesSettingsPage />} />
           <Route path="/settings/workflow" element={<TenantWorkflowSettings />} />
+          <Route path="/workflow/batch/new" element={<AgenticBatchCreatePage />} />
           <Route path="/workflow/batch/:batchId" element={<BatchDashboardPage />} />
           <Route path="/workflow/:workflowId" element={<WorkflowPage />} />
           <Route path="/workflow/:workflowId/hitl/ai-review" element={<AIReviewPage />} />
