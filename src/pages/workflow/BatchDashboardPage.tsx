@@ -114,7 +114,7 @@ export function BatchDashboardPage() {
 
   const canPause = !['COMPLETED', 'CANCELLED', 'PAUSED'].includes(batch.status);
   const canResume = batch.status === 'PAUSED';
-  const canRetry = batch.metrics.failedCount > 0;
+  const canRetry = failedCount > 0;
 
   const handleAction = (action: string) => {
     if (confirmAction === action) {
@@ -253,7 +253,7 @@ export function BatchDashboardPage() {
               <div className="text-center p-3 bg-blue-50 rounded-lg">
                 <Loader2 className="h-5 w-5 text-blue-500 mx-auto mb-1" />
                 <div className="text-xl font-bold text-blue-700">
-                  {totalFiles - completedCount - failedCount}
+                  {Math.max(0, totalFiles - completedCount - failedCount)}
                 </div>
                 <div className="text-xs text-blue-600">In Progress</div>
               </div>

@@ -2,7 +2,6 @@ import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import toast from 'react-hot-toast';
-import axios from 'axios';
 import { Upload, X, FileText, Bot, AlertTriangle, Loader2, Play } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { filesService } from '@/services/files.service';
@@ -74,7 +73,7 @@ export function AgenticBatchCreatePage() {
     const { refreshToken, setTokens, logout } = useAuthStore.getState();
     if (!refreshToken) { logout(); return false; }
     try {
-      const res = await axios.post('/api/v1/auth/refresh', { refreshToken });
+      const res = await api.post('/api/v1/auth/refresh', { refreshToken });
       const { accessToken: newAccess, refreshToken: newRefresh } = res.data.data;
       setTokens(newAccess, newRefresh);
       api.defaults.headers.common['Authorization'] = `Bearer ${newAccess}`;
