@@ -187,11 +187,11 @@ export const workflowService = {
     concurrency?: number,
     autoApprovalPolicy?: BatchAutoApprovalPolicy
   ): Promise<{ batchId: string; workflowCount: number; autoApprovalPolicy?: BatchAutoApprovalPolicy | null }> {
-    const response = await api.post<ApiResponse<{ batchId: string; workflowCount: number; autoApprovalPolicy?: BatchAutoApprovalPolicy | null }>>(
+    const response = await api.post<{ batchId: string; workflowCount: number; autoApprovalPolicy?: BatchAutoApprovalPolicy | null }>(
       '/workflows/batch',
       { name, fileIds, concurrency, autoApprovalPolicy }
     );
-    return response.data.data;
+    return response.data;
   },
 
   async getBatchDashboard(batchId: string): Promise<BatchDashboard> {
