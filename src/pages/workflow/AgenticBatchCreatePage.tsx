@@ -2,10 +2,13 @@ import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import toast from 'react-hot-toast';
+import axios from 'axios';
 import { Upload, X, FileText, Bot, AlertTriangle, Loader2, Play } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { filesService } from '@/services/files.service';
 import { workflowService, BatchAutoApprovalPolicy, BatchGatePolicy } from '@/services/workflowService';
+import { useAuthStore } from '@/stores/auth.store';
+import { api } from '@/services/api';
 
 type ErrorStrategy = 'pause-batch' | 'continue-others' | 'fail-batch';
 
@@ -65,9 +68,30 @@ export function AgenticBatchCreatePage() {
 
   const allAutoAccept = Object.values(gatePolicies).every(v => v === 'auto-accept');
 
+  // Proactively refresh the access token before uploading files.
+  // Avoids relying on the Axios retry interceptor for FormData requests.
+  const ensureFreshToken = async (): Promise<boolean> => {
+    const { refreshToken, setTokens, logout } = useAuthStore.getState();
+    if (!refreshToken) { logout(); return false; }
+    try {
+      const res = await axios.post('/api/v1/auth/refresh', { refreshToken });
+      const { accessToken: newAccess, refreshToken: newRefresh } = res.data.data;
+      setTokens(newAccess, newRefresh);
+      api.defaults.headers.common['Authorization'] = `Bearer ${newAccess}`;
+      return true;
+    } catch {
+      logout();
+      return false;
+    }
+  };
+
   const handleSubmit = async () => {
     if (files.length === 0) { toast.error('Add at least one EPUB file'); return; }
     if (!batchName.trim()) { toast.error('Batch name is required'); return; }
+
+    // Proactively refresh token before starting uploads to avoid mid-upload 401s
+    const ok = await ensureFreshToken();
+    if (!ok) { toast.error('Session expired — please log in again'); return; }
 
     setSubmitting(true);
     const fileIds: string[] = [];
