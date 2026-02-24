@@ -59,6 +59,7 @@ interface AnalysisReference {
   url?: string;
   publisher?: string;
   citationCount?: number;
+  formattedText?: string;
 }
 
 interface AnalysisValidation {
@@ -1157,9 +1158,9 @@ export default function CitationEditorPage() {
                               />
                               <div className="flex-1 min-w-0">
                                 <div className="text-sm">
-                                  <span className="text-green-600 font-medium">{change.oldText || `(${change.newNumber})`}</span>
+                                  <span className="text-green-600 font-medium">{change.newText || `(${change.newNumber})`}</span>
                                   <span className="text-gray-400 mx-1">←</span>
-                                  <span className="text-red-500 line-through">{change.newText || `(${change.oldNumber})`}</span>
+                                  <span className="text-red-500 line-through">{change.oldText || `(${change.oldNumber})`}</span>
                                 </div>
                                 <div className="text-xs text-gray-500 capitalize">
                                   {change.changeType?.replace('_', ' ') || 'changed'}
