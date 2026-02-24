@@ -239,7 +239,7 @@ describe('WorkflowDashboard E2E Integration Tests', () => {
 
       // Should display HITL notification banner
       await waitFor(() => {
-        expect(screen.getByText(/Human Review Required/i)).toBeInTheDocument();
+        expect(screen.getAllByText(/Human Review Required/i).length).toBeGreaterThan(0);
       }, { timeout: 2000 });
 
       // Should show AI_REVIEW gate

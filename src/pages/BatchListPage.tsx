@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
 import { useBatches } from '@/hooks/useBatch';
-import { Plus, Layers, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Layers, ChevronLeft, ChevronRight, Bot } from 'lucide-react';
 import type { BatchStatus } from '@/types/batch.types';
 
 function getStatusVariant(status: BatchStatus): 'info' | 'success' | 'warning' | 'error' {
@@ -47,12 +47,21 @@ export default function BatchListPage() {
             Manage and monitor your EPUB batch processing jobs
           </p>
         </div>
-        <Button
-          onClick={() => navigate('/batch/new')}
-          leftIcon={<Plus className="h-4 w-4" />}
-        >
-          Create New Batch
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate('/workflow/batch/new')}
+            leftIcon={<Bot className="h-4 w-4" />}
+          >
+            New Agentic Batch
+          </Button>
+          <Button
+            onClick={() => navigate('/batch/new')}
+            leftIcon={<Plus className="h-4 w-4" />}
+          >
+            Create New Batch
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (

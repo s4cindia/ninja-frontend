@@ -16,6 +16,7 @@ export const TenantWorkflowSettings: React.FC = () => {
   const [remediationTimeout, setRemediationTimeout] = useState<string>('3600000');
   const [conformanceTimeout, setConformanceTimeout] = useState<string>('3600000');
   const [acrSignoffTimeout, setAcrSignoffTimeout] = useState<string>('null');
+  const [allowFullyHeadless, setAllowFullyHeadless] = useState<boolean>(false);
 
   // Load current configuration
   useEffect(() => {
@@ -36,6 +37,7 @@ export const TenantWorkflowSettings: React.FC = () => {
       setAcrSignoffTimeout(
         currentConfig.hitlGates?.AWAITING_ACR_SIGNOFF === null ? 'null' : String(currentConfig.hitlGates?.AWAITING_ACR_SIGNOFF)
       );
+      setAllowFullyHeadless(currentConfig.batchPolicy?.allowFullyHeadless ?? false);
 
       setIsDirty(false);
     } catch (err) {
@@ -85,6 +87,9 @@ export const TenantWorkflowSettings: React.FC = () => {
           AWAITING_CONFORMANCE_REVIEW: confTimeout,
           AWAITING_ACR_SIGNOFF: acrTimeout,
         },
+        batchPolicy: {
+          allowFullyHeadless,
+        },
       };
 
       const updatedConfig = await tenantConfigService.updateWorkflowConfig(updates);
@@ -116,6 +121,7 @@ export const TenantWorkflowSettings: React.FC = () => {
       setAcrSignoffTimeout(
         config.hitlGates?.AWAITING_ACR_SIGNOFF === null ? 'null' : String(config.hitlGates?.AWAITING_ACR_SIGNOFF)
       );
+      setAllowFullyHeadless(config.batchPolicy?.allowFullyHeadless ?? false);
       setIsDirty(false);
     }
   };
@@ -174,6 +180,34 @@ export const TenantWorkflowSettings: React.FC = () => {
                 }}
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+            </label>
+          </div>
+        </div>
+
+        {/* Batch Policy */}
+        <div className="border-b border-gray-200 pb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-900">Allow Fully Headless Batches</h3>
+              <p className="mt-1 text-sm text-gray-600">
+                When enabled, batch jobs may set all HITL gates to auto-accept, bypassing all human review.
+                By default, at least one gate must remain as manual review.
+              </p>
+              <p className="mt-1 text-xs text-amber-700 font-medium">
+                ⚠️ Only enable this if your organization's quality assurance processes do not require human review.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer ml-4">
+              <input
+                type="checkbox"
+                className="sr-only peer"
+                checked={allowFullyHeadless}
+                onChange={(e) => {
+                  setAllowFullyHeadless(e.target.checked);
+                  markDirty();
+                }}
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
             </label>
           </div>
         </div>
