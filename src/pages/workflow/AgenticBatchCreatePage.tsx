@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import toast from 'react-hot-toast';
-import { Upload, X, FileText, Bot, User, AlertTriangle, Loader2, Play } from 'lucide-react';
+import { Upload, X, FileText, Bot, AlertTriangle, Loader2, Play } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { filesService } from '@/services/files.service';
 import { workflowService, BatchAutoApprovalPolicy, BatchGatePolicy } from '@/services/workflowService';
@@ -184,30 +184,45 @@ export function AgenticBatchCreatePage() {
         </div>
 
         <p className="text-xs text-gray-500">
-          Toggle each gate between <strong>Auto-accept</strong> (machine skips) and{' '}
-          <strong>Require manual</strong> (workflow pauses for human review).
+          Toggle each gate on (green = Auto) to let the machine approve automatically,
+          or off (gray = Manual) to pause and wait for human review.
         </p>
 
-        <div className="space-y-2">
+        <div className="space-y-3">
           {GATES.map(({ key, label }) => {
             const isAuto = gatePolicies[key] === 'auto-accept';
             return (
               <div key={key} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                <span className="text-sm text-gray-700">{label}</span>
-                <button
-                  type="button"
-                  onClick={() => toggleGate(key)}
-                  disabled={submitting}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors
-                    ${isAuto
-                      ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}
-                    disabled:opacity-50`}
-                >
-                  {isAuto
-                    ? <><Bot className="h-3 w-3" /> Auto-accept</>
-                    : <><User className="h-3 w-3" /> Require manual</>}
-                </button>
+                <div>
+                  <span className="text-sm font-medium text-gray-700">{label}</span>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {isAuto ? 'Machine approves automatically — no human review' : 'Workflow pauses and waits for human decision'}
+                  </p>
+                </div>
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <span className={`text-xs font-medium ${isAuto ? 'text-gray-400' : 'text-gray-700'}`}>
+                    Manual
+                  </span>
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      className="sr-only"
+                      checked={isAuto}
+                      onChange={() => toggleGate(key)}
+                      disabled={submitting}
+                    />
+                    <div className={`w-11 h-6 rounded-full transition-colors duration-200
+                      ${isAuto ? 'bg-green-500' : 'bg-gray-300'}
+                      ${submitting ? 'opacity-50' : ''}`}
+                    />
+                    <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200
+                      ${isAuto ? 'translate-x-5' : 'translate-x-0'}`}
+                    />
+                  </div>
+                  <span className={`text-xs font-medium ${isAuto ? 'text-green-600' : 'text-gray-400'}`}>
+                    Auto
+                  </span>
+                </label>
               </div>
             );
           })}
