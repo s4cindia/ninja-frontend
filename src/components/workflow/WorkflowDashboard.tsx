@@ -16,6 +16,22 @@ interface WorkflowDashboardProps {
 }
 
 const TERMINAL_STATES = new Set(['COMPLETED', 'FAILED', 'CANCELLED']);
+
+/** States that require human action — mapped to their HITL URL slug */
+const HITL_STATE_SLUGS: Record<string, string> = {
+  AWAITING_AI_REVIEW: 'ai-review',
+  AWAITING_REMEDIATION_REVIEW: 'remediation-review',
+  AWAITING_CONFORMANCE_REVIEW: 'conformance-review',
+  AWAITING_ACR_SIGNOFF: 'acr-signoff',
+};
+
+const HITL_STATE_LABELS: Record<string, string> = {
+  AWAITING_AI_REVIEW: 'AI Review',
+  AWAITING_REMEDIATION_REVIEW: 'Remediation Review',
+  AWAITING_CONFORMANCE_REVIEW: 'Conformance Review',
+  AWAITING_ACR_SIGNOFF: 'ACR Sign-off',
+};
+
 const AUTO_STATES = new Set([
   'UPLOAD_RECEIVED',
   'PREPROCESSING',
@@ -80,6 +96,14 @@ export function WorkflowDashboard({ workflowId }: WorkflowDashboardProps) {
         if (!cancelled) {
           setStatus(data);
           setFetchError(null);
+          // If already waiting at a HITL gate, show the banner immediately
+          const slug = HITL_STATE_SLUGS[data.currentState];
+          if (slug) {
+            setHitlBanner({
+              gate: HITL_STATE_LABELS[data.currentState] ?? data.currentState,
+              deepLink: `/workflow/${workflowId}/hitl/${slug}`,
+            });
+          }
         }
       })
       .catch(err => {
@@ -113,7 +137,18 @@ export function WorkflowDashboard({ workflowId }: WorkflowDashboardProps) {
           }
         : prev;
     });
-  }, [stateChange]);
+
+    // Show banner if entering a HITL gate, clear it if advancing past one
+    const slug = HITL_STATE_SLUGS[stateChange.to];
+    if (slug) {
+      setHitlBanner({
+        gate: HITL_STATE_LABELS[stateChange.to] ?? stateChange.to,
+        deepLink: `/workflow/${workflowId}/hitl/${slug}`,
+      });
+    } else if (HITL_STATE_SLUGS[stateChange.from ?? '']) {
+      setHitlBanner(null);
+    }
+  }, [stateChange, workflowId]);
 
   // Socket: HITL required
   useEffect(() => {
@@ -267,6 +302,26 @@ export function WorkflowDashboard({ workflowId }: WorkflowDashboardProps) {
                 </Button>
               </div>
             </Alert>
+          )}
+
+          {/* HITL inline CTA — always visible when waiting at a gate */}
+          {HITL_STATE_SLUGS[state] && (
+            <div className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-center gap-2 text-sm text-amber-800">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>
+                  <strong>{HITL_STATE_LABELS[state]}</strong> — human review required
+                </span>
+              </div>
+              <Button
+                variant="primary"
+                size="sm"
+                rightIcon={<ChevronRight className="w-4 h-4" />}
+                onClick={() => navigate(`/workflow/${workflowId}/hitl/${HITL_STATE_SLUGS[state]}`)}
+              >
+                Start Review
+              </Button>
+            </div>
           )}
 
           {/* Action buttons */}

@@ -75,6 +75,8 @@ export interface AgenticBatchDashboard {
   startedAt: string;
   completedAt?: string;
   autoApprovalPolicy?: BatchAutoApprovalPolicy | null;
+  failedWorkflows?: Array<{ id: string; filename: string; errorMessage: string | null }>;
+  hitlWaiting?: Array<{ workflowId: string; filename: string; gate: string; reviewUrl: string }>;
 }
 
 export interface AIReviewDecision {

@@ -34,6 +34,7 @@ export function ConformanceReviewPage() {
   const [decisions, setDecisions] = useState<Map<string, ConformanceDecision>>(new Map());
   const [filter, setFilter] = useState<'all' | 'needs-review' | 'not-applicable'>('all');
   const [error, setError] = useState<string | null>(null);
+  const [batchId, setBatchId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!workflowId) return;
@@ -44,6 +45,8 @@ export function ConformanceReviewPage() {
         setLoading(true);
         const workflowData = await workflowService.getWorkflowStatus(workflowId!);
         if (cancelled) return;
+
+        if (workflowData.batchId) setBatchId(workflowData.batchId);
 
         // Extract conformance mappings from workflow state
         const stateData = (workflowData.stateData ?? {}) as {
@@ -124,7 +127,11 @@ export function ConformanceReviewPage() {
       await workflowService.submitConformanceReview(workflowId!, reviewDecisions);
 
       toast.success('Conformance review submitted! Workflow continuing...');
-      navigate(`/workflow/${workflowId}`);
+      if (batchId) {
+        navigate(`/workflow/batch/${batchId}`);
+      } else {
+        navigate(`/workflow/${workflowId}`);
+      }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to submit conformance review');
     } finally {
@@ -161,9 +168,13 @@ export function ConformanceReviewPage() {
           variant="outline"
           size="sm"
           leftIcon={<ArrowLeft className="w-4 h-4" />}
-          onClick={() => navigate(`/workflow/${workflowId}`)}
+          onClick={() =>
+            batchId
+              ? navigate(`/workflow/batch/${batchId}`)
+              : navigate(`/workflow/${workflowId}`)
+          }
         >
-          Back to Workflow
+          {batchId ? 'Back to Batch' : 'Back to Workflow'}
         </Button>
         <Alert variant="error" title="Failed to load conformance review">
           {error}
@@ -198,9 +209,13 @@ export function ConformanceReviewPage() {
             variant="outline"
             size="sm"
             leftIcon={<ArrowLeft className="w-4 h-4" />}
-            onClick={() => navigate(`/workflow/${workflowId}`)}
+            onClick={() =>
+              batchId
+                ? navigate(`/workflow/batch/${batchId}`)
+                : navigate(`/workflow/${workflowId}`)
+            }
           >
-            Back
+            {batchId ? 'Back to Batch' : 'Back'}
           </Button>
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">Conformance Review</h1>

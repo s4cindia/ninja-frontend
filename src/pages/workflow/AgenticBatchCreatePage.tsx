@@ -100,12 +100,15 @@ export function AgenticBatchCreatePage() {
       // Step 1: upload each file individually
       for (let i = 0; i < files.length; i++) {
         setUploadProgress(`Uploading file ${i + 1} of ${files.length}: ${files[i].name}`);
+        console.log(`[AgenticBatch] Uploading file ${i + 1}/${files.length}: ${files[i].name}`);
         const uploaded = await filesService.upload(files[i]);
+        console.log(`[AgenticBatch] File uploaded, id=${uploaded.id}`);
         fileIds.push(uploaded.id);
       }
 
       // Step 2: create the agentic batch
       setUploadProgress('Creating batch workflow…');
+      console.log('[AgenticBatch] Creating batch with fileIds:', fileIds);
       const policy: BatchAutoApprovalPolicy = {
         gates: gatePolicies as BatchAutoApprovalPolicy['gates'],
         onError: errorStrategy,
@@ -121,9 +124,14 @@ export function AgenticBatchCreatePage() {
       toast.success(`Batch started — ${result.workflowCount} workflow(s) queued`);
       navigate(`/workflow/batch/${result.batchId}`);
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+      console.error('[AgenticBatch] Submit failed:', err);
+      const axiosErr = err as { response?: { status?: number; data?: { error?: string; message?: string } }; message?: string };
+      const msg = axiosErr?.response?.data?.error
+        || axiosErr?.response?.data?.message
+        || axiosErr?.message
         || 'Failed to create batch';
-      toast.error(msg);
+      const status = axiosErr?.response?.status ? ` (${axiosErr.response.status})` : '';
+      toast.error(`${msg}${status}`, { duration: 8000 });
     } finally {
       setSubmitting(false);
       setUploadProgress('');

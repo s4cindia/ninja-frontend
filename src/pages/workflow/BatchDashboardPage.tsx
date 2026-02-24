@@ -281,24 +281,52 @@ export function BatchDashboardPage() {
             </div>
           )}
 
-          {/* HITL gate queue if any */}
-          {Object.entries(batch.metrics.perGate).some(([, count]) => count > 0) && (
+          {/* Failed workflow error details */}
+          {batch.failedWorkflows && batch.failedWorkflows.length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <XCircle className="h-4 w-4 text-red-600" />
+                <h3 className="text-base font-semibold text-red-900">Failed Workflows</h3>
+              </div>
+              <div className="space-y-2">
+                {batch.failedWorkflows.map(wf => (
+                  <div key={wf.id} className="text-sm">
+                    <div className="font-medium text-red-800 truncate">{wf.filename}</div>
+                    <div className="text-red-700 text-xs mt-0.5">
+                      {wf.errorMessage ?? 'Unknown error'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* HITL gate queue — per-file review links */}
+          {batch.hitlWaiting && batch.hitlWaiting.length > 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-5">
               <div className="flex items-center gap-2 mb-3">
                 <AlertTriangle className="h-4 w-4 text-amber-600" />
                 <h3 className="text-base font-semibold text-amber-900">HITL Gates Waiting</h3>
               </div>
-              <div className="space-y-1.5">
-                {Object.entries(batch.metrics.perGate)
-                  .filter(([, count]) => count > 0)
-                  .map(([gate, count]) => (
-                    <div key={gate} className="flex items-center justify-between text-sm">
-                      <span className="text-amber-800">{gate.replace(/_/g, ' ')}</span>
-                      <span className="font-medium text-amber-900">
-                        {count} {count === 1 ? 'file' : 'files'} waiting
-                      </span>
+              <div className="space-y-2">
+                {batch.hitlWaiting.map(item => (
+                  <div key={item.workflowId} className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium text-amber-700 uppercase tracking-wide">
+                        {item.gate}
+                      </div>
+                      <div className="text-sm text-amber-900 truncate">{item.filename}</div>
                     </div>
-                  ))}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => navigate(item.reviewUrl)}
+                      className="shrink-0 border-amber-400 text-amber-800 hover:bg-amber-100"
+                    >
+                      Review
+                    </Button>
+                  </div>
+                ))}
               </div>
             </div>
           )}
