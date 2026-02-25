@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import toast from 'react-hot-toast';
-import { Upload, X, FileText, Bot, AlertTriangle, Loader2, Play, ChevronDown, ChevronUp } from 'lucide-react';
+import { Upload, X, FileText, Bot, AlertTriangle, Loader2, Play, ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { filesService } from '@/services/files.service';
 import {
@@ -14,6 +14,7 @@ import {
 } from '@/services/workflowService';
 import { useAuthStore } from '@/stores/auth.store';
 import { api } from '@/services/api';
+import { tenantConfigService } from '@/services/tenant-config.service';
 
 type ErrorStrategy = 'pause-batch' | 'continue-others' | 'fail-batch';
 
@@ -94,6 +95,20 @@ export function AgenticBatchCreatePage() {
   const [submitting, setSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
 
+  // Tenant setting: whether fully headless batches are permitted
+  const [allowFullyHeadless, setAllowFullyHeadless] = useState<boolean>(false);
+  const [showHeadlessModal, setShowHeadlessModal] = useState(false);
+  const [modalToggleValue, setModalToggleValue] = useState(false);
+  const [savingHeadless, setSavingHeadless] = useState(false);
+
+  useEffect(() => {
+    tenantConfigService.getWorkflowConfig().then(cfg => {
+      setAllowFullyHeadless(cfg.batchPolicy?.allowFullyHeadless ?? false);
+    }).catch(() => {
+      // silently fall back to false (restrictive)
+    });
+  }, []);
+
   const onDrop = useCallback((accepted: File[]) => {
     const epubs = accepted.filter(f => f.name.toLowerCase().endsWith('.epub'));
     if (epubs.length !== accepted.length) toast.error('Only EPUB files are supported');
@@ -142,6 +157,27 @@ export function AgenticBatchCreatePage() {
       ...prev,
       [key]: { ...prev[key], showAdvanced: !prev[key].showAdvanced },
     }));
+  };
+
+  const openHeadlessModal = () => {
+    setModalToggleValue(false);
+    setShowHeadlessModal(true);
+  };
+
+  const saveHeadlessSetting = async () => {
+    setSavingHeadless(true);
+    try {
+      await tenantConfigService.updateWorkflowConfig({ batchPolicy: { allowFullyHeadless: modalToggleValue } });
+      setAllowFullyHeadless(modalToggleValue);
+      setShowHeadlessModal(false);
+      if (modalToggleValue) {
+        toast.success('Fully headless batches enabled for this tenant');
+      }
+    } catch {
+      toast.error('Failed to update tenant setting');
+    } finally {
+      setSavingHeadless(false);
+    }
   };
 
   const allAutoAccept = Object.values(gateConfigs).every(c => c.mode === 'auto-accept');
@@ -408,13 +444,31 @@ export function AgenticBatchCreatePage() {
         </div>
 
         {allAutoAccept && (
-          <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
-            <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
-            <p className="text-xs text-amber-700">
-              All gates are set to Auto. The batch will run fully headless with no human review.
-              Ensure your tenant settings allow fully headless batches.
-            </p>
-          </div>
+          allowFullyHeadless ? (
+            <div className="flex items-start gap-2 p-3 bg-purple-50 border border-purple-200 rounded-md">
+              <CheckCircle2 className="h-4 w-4 text-purple-500 mt-0.5 shrink-0" />
+              <p className="text-xs text-purple-700">
+                All gates are set to Auto. Fully headless mode is enabled for this tenant — no human review will occur.
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-start justify-between gap-3 p-3 bg-amber-50 border border-amber-200 rounded-md">
+              <div className="flex items-start gap-2 min-w-0">
+                <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                <p className="text-xs text-amber-700">
+                  All gates are set to Auto, but your tenant does not permit fully headless batches.
+                  At least one gate must remain on Manual or Conditional, or enable the setting below.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={openHeadlessModal}
+                className="shrink-0 text-xs font-semibold text-amber-800 underline hover:text-amber-900 whitespace-nowrap"
+              >
+                Enable →
+              </button>
+            </div>
+          )
         )}
 
         {/* Error strategy */}
@@ -459,6 +513,75 @@ export function AgenticBatchCreatePage() {
           </Button>
         </div>
       </div>
+
+      {/* Fully Headless Modal */}
+      {showHeadlessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6 space-y-5">
+            {/* Header */}
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                <AlertTriangle className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Enable Fully Headless Batches</h2>
+                <p className="mt-1 text-sm text-gray-600">
+                  This is a <strong>tenant-wide</strong> setting. Once enabled, any batch may run with all HITL
+                  gates set to auto-accept, bypassing all human review.
+                </p>
+              </div>
+            </div>
+
+            {/* Risk list */}
+            <div className="bg-amber-50 border border-amber-200 rounded-md p-3 space-y-1">
+              <p className="text-xs font-medium text-amber-800">Confirm before enabling:</p>
+              <ul className="text-xs text-amber-700 list-disc list-inside space-y-0.5">
+                <li>Your QA process does not require human sign-off on AI decisions</li>
+                <li>AI remediation quality meets your acceptance threshold</li>
+                <li>ACRs will be generated without a human attestation step</li>
+              </ul>
+            </div>
+
+            {/* Toggle */}
+            <div className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-md">
+              <div>
+                <p className="text-sm font-medium text-gray-900">Allow fully headless batches</p>
+                <p className="text-xs text-gray-500 mt-0.5">Tenant-wide · affects all future batches</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={modalToggleValue}
+                  onChange={e => setModalToggleValue(e.target.checked)}
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-amber-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+              </label>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-3 pt-1">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowHeadlessModal(false)}
+                disabled={savingHeadless}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={saveHeadlessSetting}
+                disabled={savingHeadless || !modalToggleValue}
+              >
+                {savingHeadless
+                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving…</>
+                  : 'Save & Continue'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
