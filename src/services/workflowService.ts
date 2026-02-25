@@ -75,6 +75,14 @@ export interface BatchDashboard {
   autoApprovalPolicy?: BatchAutoApprovalPolicy | null;
 }
 
+export interface AcrBatchConfig {
+  vendor: string;
+  contactEmail: string;
+  edition: 'VPAT2.5-WCAG' | 'VPAT2.5-508' | 'VPAT2.5-EU' | 'VPAT2.5-INT';
+  mode: 'individual' | 'aggregate';
+  aggregationStrategy: 'conservative' | 'optimistic';
+}
+
 /** Response from GET /workflows/batch/:batchId (agentic workflow batch) */
 export interface AgenticBatchDashboard {
   id: string;
@@ -91,7 +99,9 @@ export interface AgenticBatchDashboard {
   startedAt: string;
   completedAt?: string;
   autoApprovalPolicy?: BatchAutoApprovalPolicy | null;
+  acrConfig?: AcrBatchConfig | null;
   failedWorkflows?: Array<{ id: string; filename: string; errorMessage: string | null }>;
+  completedWorkflows?: Array<{ workflowId: string; filename: string; acrJobId: string | null; jobId: string | null }>;
   hitlWaiting?: Array<{ workflowId: string; filename: string; gate: string; reviewUrl: string }>;
 }
 
@@ -203,11 +213,12 @@ export const workflowService = {
     name: string,
     fileIds: string[],
     concurrency?: number,
-    autoApprovalPolicy?: BatchAutoApprovalPolicy
+    autoApprovalPolicy?: BatchAutoApprovalPolicy,
+    acrConfig?: AcrBatchConfig
   ): Promise<{ batchId: string; workflowCount: number; autoApprovalPolicy?: BatchAutoApprovalPolicy | null }> {
     const response = await api.post<{ batchId: string; workflowCount: number; autoApprovalPolicy?: BatchAutoApprovalPolicy | null }>(
       '/workflows/batch',
-      { name, fileIds, concurrency, autoApprovalPolicy }
+      { name, fileIds, concurrency, autoApprovalPolicy, acrConfig }
     );
     return response.data;
   },

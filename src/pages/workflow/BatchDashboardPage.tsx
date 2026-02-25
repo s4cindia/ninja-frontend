@@ -12,6 +12,8 @@ import {
   AlertTriangle,
   ChevronLeft,
   Clock,
+  FileText,
+  ExternalLink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { PolicySummaryCard } from '@/components/workflow/PolicySummaryCard';
@@ -295,6 +297,42 @@ export function BatchDashboardPage() {
                     <div className="text-red-700 text-xs mt-0.5">
                       {wf.errorMessage ?? 'Unknown error'}
                     </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ACR Reports — shown for completed workflows */}
+          {batch.completedWorkflows && batch.completedWorkflows.length > 0 && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <FileText className="h-4 w-4 text-green-600" />
+                <h3 className="text-base font-semibold text-green-900">ACR Reports</h3>
+                <span className="ml-auto text-xs text-green-700">
+                  {batch.completedWorkflows.filter(w => w.acrJobId).length} / {batch.completedWorkflows.length} ready
+                </span>
+              </div>
+              <div className="space-y-2">
+                {batch.completedWorkflows.map(wf => (
+                  <div key={wf.workflowId} className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex items-center gap-2">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                      <span className="text-sm text-green-900 truncate">{wf.filename}</span>
+                    </div>
+                    {wf.acrJobId ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => navigate(`/acr/report/review/${wf.acrJobId}`)}
+                        className="shrink-0 border-green-400 text-green-800 hover:bg-green-100 gap-1"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        View ACR
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-green-600 shrink-0">Generating…</span>
+                    )}
                   </div>
                 ))}
               </div>

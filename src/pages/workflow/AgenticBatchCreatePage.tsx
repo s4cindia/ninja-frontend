@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import toast from 'react-hot-toast';
-import { Upload, X, FileText, Bot, AlertTriangle, Loader2, Play, ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react';
+import { Upload, X, FileText, Bot, AlertTriangle, Loader2, Play, ChevronDown, ChevronUp, CheckCircle2, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { filesService } from '@/services/files.service';
 import {
@@ -11,6 +11,7 @@ import {
   BatchGatePolicy,
   ConditionalGatePolicy,
   GatePolicyMode,
+  AcrBatchConfig,
 } from '@/services/workflowService';
 import { useAuthStore } from '@/stores/auth.store';
 import { api } from '@/services/api';
@@ -94,6 +95,13 @@ export function AgenticBatchCreatePage() {
   const [errorStrategy, setErrorStrategy] = useState<ErrorStrategy>('continue-others');
   const [submitting, setSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
+
+  // ACR report settings
+  const [acrVendor, setAcrVendor] = useState('');
+  const [acrEmail, setAcrEmail] = useState('');
+  const [acrEdition, setAcrEdition] = useState<AcrBatchConfig['edition']>('VPAT2.5-WCAG');
+  const [acrMode, setAcrMode] = useState<AcrBatchConfig['mode']>('individual');
+  const [acrAggStrategy, setAcrAggStrategy] = useState<AcrBatchConfig['aggregationStrategy']>('conservative');
 
   // Tenant setting: whether fully headless batches are permitted
   const [allowFullyHeadless, setAllowFullyHeadless] = useState<boolean>(false);
@@ -216,8 +224,11 @@ export function AgenticBatchCreatePage() {
 
       setUploadProgress('Creating batch workflow…');
       const policy = buildPolicy(gateConfigs, errorStrategy);
+      const acrConfig: AcrBatchConfig | undefined = (acrVendor.trim() && acrEmail.trim())
+        ? { vendor: acrVendor.trim(), contactEmail: acrEmail.trim(), edition: acrEdition, mode: acrMode, aggregationStrategy: acrAggStrategy }
+        : undefined;
 
-      const result = await workflowService.startBatch(batchName.trim(), fileIds, 2, policy);
+      const result = await workflowService.startBatch(batchName.trim(), fileIds, 2, policy, acrConfig);
       toast.success(`Batch started — ${result.workflowCount} workflow(s) queued`);
       navigate(`/workflow/batch/${result.batchId}`);
     } catch (err: unknown) {
@@ -302,6 +313,87 @@ export function AgenticBatchCreatePage() {
             ))}
           </ul>
         )}
+      </div>
+
+      {/* ACR Report Settings */}
+      <div className="bg-white border border-gray-200 rounded-lg p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <ClipboardList className="h-5 w-5 text-primary-600" />
+          <h2 className="text-sm font-semibold text-gray-900">ACR Report Settings</h2>
+          <span className="text-xs text-gray-400">(used when generating Accessibility Conformance Reports)</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Vendor / Company Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={acrVendor}
+              onChange={e => setAcrVendor(e.target.value)}
+              disabled={submitting}
+              placeholder="e.g., Acme Publishing"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Contact Email <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="email"
+              value={acrEmail}
+              onChange={e => setAcrEmail(e.target.value)}
+              disabled={submitting}
+              placeholder="e.g., accessibility@acme.com"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">VPAT Edition</label>
+            <select
+              value={acrEdition}
+              onChange={e => setAcrEdition(e.target.value as AcrBatchConfig['edition'])}
+              disabled={submitting}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+            >
+              <option value="VPAT2.5-WCAG">VPAT 2.5 WCAG</option>
+              <option value="VPAT2.5-508">VPAT 2.5 Section 508</option>
+              <option value="VPAT2.5-EU">VPAT 2.5 EU</option>
+              <option value="VPAT2.5-INT">VPAT 2.5 INT</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Report Mode</label>
+            <select
+              value={acrMode}
+              onChange={e => setAcrMode(e.target.value as AcrBatchConfig['mode'])}
+              disabled={submitting}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+            >
+              <option value="individual">Individual (one per file)</option>
+              <option value="aggregate">Aggregate (one for batch)</option>
+            </select>
+          </div>
+          {acrMode === 'aggregate' && (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Aggregation Strategy</label>
+              <select
+                value={acrAggStrategy}
+                onChange={e => setAcrAggStrategy(e.target.value as AcrBatchConfig['aggregationStrategy'])}
+                disabled={submitting}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+              >
+                <option value="conservative">Conservative (any failure = Does Not Support)</option>
+                <option value="optimistic">Optimistic (majority pass = Partially Supports)</option>
+              </select>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Auto-approval policy */}
