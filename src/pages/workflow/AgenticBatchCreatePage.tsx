@@ -186,7 +186,7 @@ export function AgenticBatchCreatePage() {
     const { refreshToken, setTokens, logout } = useAuthStore.getState();
     if (!refreshToken) { logout(); return false; }
     try {
-      const res = await api.post('/api/v1/auth/refresh', { refreshToken });
+      const res = await api.post('/auth/refresh', { refreshToken });
       const { accessToken: newAccess, refreshToken: newRefresh } = res.data.data;
       setTokens(newAccess, newRefresh);
       api.defaults.headers.common['Authorization'] = `Bearer ${newAccess}`;
