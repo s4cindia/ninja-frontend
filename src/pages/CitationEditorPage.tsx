@@ -10,6 +10,7 @@ import {
   Download,
   RefreshCw,
   ArrowLeft,
+  CheckCircle,
   CheckCircle2,
   AlertTriangle,
   Link as LinkIcon,
@@ -92,6 +93,7 @@ interface AnalysisData {
 
 interface RecentChange {
   citationId: string;
+  changeId?: string; // CitationChange ID for dismiss operations
   oldNumber: number;
   newNumber: number | null; // null means orphaned (reference deleted)
   oldText?: string; // Original citation text (e.g., "[3–5]")
@@ -101,6 +103,7 @@ interface RecentChange {
 
 interface PreviewCitation {
   id: string;
+  changeId?: string;
   changeType: string;
   isOrphaned?: boolean;
   referenceNumber?: number;
@@ -157,7 +160,7 @@ export default function CitationEditorPage() {
   // Detect out-of-sequence citations for Vancouver style
   const sequenceAnalysis = useMemo(() => {
     if (!data?.citations || data.citations.length === 0) {
-      return { isSequential: true, outOfOrder: [], expectedOrder: [] };
+      return { isSequential: true, outOfOrder: [], gaps: [], expectedOrder: [] };
     }
 
     // Only check for numeric citation styles (Vancouver, IEEE)
@@ -166,7 +169,7 @@ export default function CitationEditorPage() {
                           data.citations.some((c: AnalysisCitation) => /^\s*[([]?\d+[)\]]?\s*$/.test(c.rawText?.replace(/[,\-–]/g, '')));
 
     if (!isNumericStyle) {
-      return { isSequential: true, outOfOrder: [], expectedOrder: [] };
+      return { isSequential: true, outOfOrder: [], gaps: [], expectedOrder: [] };
     }
 
     // Extract citation numbers in order of appearance
@@ -186,7 +189,7 @@ export default function CitationEditorPage() {
     }
 
     if (citationNumbers.length === 0) {
-      return { isSequential: true, outOfOrder: [], expectedOrder: [] };
+      return { isSequential: true, outOfOrder: [], gaps: [], expectedOrder: [] };
     }
 
     // Track first occurrence of each number
@@ -210,12 +213,27 @@ export default function CitationEditorPage() {
       }
     }
 
+    // Also detect gaps (e.g., 1, 3, 4 — missing 2 after a deletion)
+    const gaps: number[] = [];
+    if (firstOccurrence.length > 0) {
+      const sorted = [...firstOccurrence].sort((a, b) => a - b);
+      // Should start from 1 and be contiguous
+      for (let i = 0; i < sorted.length; i++) {
+        if (sorted[i] !== i + 1) {
+          gaps.push(i + 1); // Expected number that's missing
+        }
+      }
+    }
+
     // Calculate expected order (sorted by first appearance)
     const expectedOrder = [...firstOccurrence].sort((a, b) => a - b);
 
+    const hasIssues = outOfOrder.length > 0 || gaps.length > 0;
+
     return {
-      isSequential: outOfOrder.length === 0,
+      isSequential: !hasIssues,
       outOfOrder,
+      gaps,
       expectedOrder,
       actualOrder: firstOccurrence
     };
@@ -229,6 +247,15 @@ export default function CitationEditorPage() {
     setError(null);
     try {
       console.log('[CitationEditorPage] Loading analysis for document:', documentId);
+
+      // Re-create citation-reference links before fetching analysis
+      // This ensures any unlinked citations (e.g., after reorder/delete) get linked
+      try {
+        await api.post(`/citation-management/document/${documentId}/create-links`);
+        console.log('[CitationEditorPage] Citation-reference links refreshed');
+      } catch (linkErr) {
+        console.log('[CitationEditorPage] Could not refresh links (non-critical):', linkErr);
+      }
 
       const response = await api.get(
         `/citation-management/document/${documentId}/analysis`
@@ -270,6 +297,7 @@ export default function CitationEditorPage() {
             // Convert preview data to RecentChange format
             interface PreviewCitation {
               id: string;
+              changeId?: string;
               changeType: string;
               isOrphaned?: boolean;
               referenceNumber?: number;
@@ -280,6 +308,7 @@ export default function CitationEditorPage() {
               .filter((p) => p.changeType !== 'unchanged')
               .map((p) => ({
                 citationId: p.id,
+                changeId: p.changeId,
                 oldNumber: 0,
                 newNumber: p.isOrphaned || p.changeType === 'deleted' ? null : (p.referenceNumber ?? null),
                 oldText: p.originalText,
@@ -367,6 +396,7 @@ export default function CitationEditorPage() {
               .filter((p: PreviewCitation) => p.changeType !== 'unchanged')
               .map((p: PreviewCitation) => ({
                 citationId: p.id,
+                changeId: p.changeId,
                 oldNumber: 0,
                 newNumber: p.isOrphaned || p.changeType === 'deleted' ? null : p.referenceNumber,
                 oldText: p.originalText,
@@ -448,8 +478,6 @@ export default function CitationEditorPage() {
       if (options.acceptChanges) {
         params.append('acceptChanges', 'true');
       }
-      // Note: includeOriginal and highlightChanges are handled by the backend
-      // if acceptChanges is false (Track Changes mode)
 
       const queryString = params.toString();
       const url = `/citation-management/document/${documentId}/export${queryString ? `?${queryString}` : ''}`;
@@ -465,9 +493,8 @@ export default function CitationEditorPage() {
       const link = document.createElement('a');
       link.href = downloadUrl;
 
-      // Use different filename based on export type
-      const suffix = options.acceptChanges ? '_corrected' : '_tracked_changes';
-      link.download = `${data?.document.filename.replace('.docx', '')}${suffix}.docx`;
+      // Use original filename
+      link.download = data?.document.filename || 'export.docx';
 
       document.body.appendChild(link);
       link.click();
@@ -516,6 +543,7 @@ export default function CitationEditorPage() {
           .filter((p: PreviewCitation) => p.changeType !== 'unchanged')
           .map((p: PreviewCitation) => ({
             citationId: p.id,
+            changeId: p.changeId,
             oldNumber: 0, // Not used for display, we use oldText/newText
             newNumber: p.isOrphaned || p.changeType === 'deleted' ? null : p.referenceNumber,
             oldText: p.originalText,
@@ -569,6 +597,7 @@ export default function CitationEditorPage() {
               .filter((p: PreviewCitation) => p.changeType !== 'unchanged')
               .map((p: PreviewCitation) => ({
                 citationId: p.id,
+                changeId: p.changeId,
                 oldNumber: 0,
                 newNumber: p.isOrphaned || p.changeType === 'deleted' ? null : p.referenceNumber,
                 oldText: p.originalText,
@@ -637,18 +666,34 @@ export default function CitationEditorPage() {
 
     setIsResetting(true);
     try {
-      const changeIds = Array.from(selectedChangesToDismiss);
+      // Map selected citationIds to their CitationChange IDs for the backend
+      const changeIds = recentChanges
+        .filter(c => selectedChangesToDismiss.has(c.citationId) && c.changeId)
+        .map(c => c.changeId!);
+
+      if (changeIds.length === 0) {
+        toast.error('No valid change IDs found for selected changes');
+        setIsResetting(false);
+        return;
+      }
+
       const response = await api.post(`/citation-management/document/${documentId}/dismiss-changes`, {
         changeIds
       });
 
       if (response.data.success) {
-        toast.success(`Dismissed ${response.data.data?.dismissedCount || changeIds.length} change(s)`);
+        const restored = response.data.data?.referencesRestored || 0;
+        const dismissed = response.data.data?.dismissedCount || changeIds.length;
+        toast.success(
+          restored > 0
+            ? `Restored ${restored} deleted reference(s) and dismissed ${dismissed} change(s)`
+            : `Dismissed ${dismissed} change(s)`
+        );
         // Remove dismissed changes from local state
         setRecentChanges(prev => prev.filter(c => !selectedChangesToDismiss.has(c.citationId)));
         setSelectedChangesToDismiss(new Set());
         setShowDismissDropdown(false);
-        // Reload to get fresh state
+        // Reload to get fresh state (critical for DELETE undos that restore references, citations, and HTML)
         await loadAnalysis();
       } else {
         toast.error(response.data.error?.message || 'Failed to dismiss changes');
@@ -837,7 +882,7 @@ export default function CitationEditorPage() {
           </Card>
         </div>
 
-        {/* Sequence Warning Banner - Only show when user clicks Check Sequence */}
+        {/* Sequence Warning/Success Banner - Show when user clicks Check Sequence */}
         {showSequenceWarning && !sequenceAnalysis.isSequential && (
           <Alert variant="warning" className="mb-6">
             <div className="flex items-center justify-between w-full">
@@ -846,7 +891,12 @@ export default function CitationEditorPage() {
                 <div>
                   <p className="font-semibold text-amber-800">Citations Out of Sequence</p>
                   <p className="text-sm text-amber-700 mt-1">
-                    The following citations appear out of order: [{sequenceAnalysis.outOfOrder.join(', ')}].
+                    {sequenceAnalysis.outOfOrder.length > 0 && (
+                      <>Out of order: [{sequenceAnalysis.outOfOrder.join(', ')}]. </>
+                    )}
+                    {sequenceAnalysis.gaps.length > 0 && (
+                      <>Missing numbers: [{sequenceAnalysis.gaps.join(', ')}]. </>
+                    )}
                     For Vancouver style, citations should appear in numerical order (1, 2, 3...).
                   </p>
                 </div>
@@ -877,6 +927,27 @@ export default function CitationEditorPage() {
                   )}
                 </Button>
               </div>
+            </div>
+          </Alert>
+        )}
+
+        {/* Success Banner - Citations are in sequence */}
+        {showSequenceWarning && sequenceAnalysis.isSequential && (
+          <Alert variant="info" className="mb-6">
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-3">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <p className="text-sm text-green-800">
+                  All citations are in correct sequence.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSequenceWarning(false)}
+              >
+                Dismiss
+              </Button>
             </div>
           </Alert>
         )}
@@ -1157,14 +1228,25 @@ export default function CitationEditorPage() {
                                 className="mt-0.5"
                               />
                               <div className="flex-1 min-w-0">
-                                <div className="text-sm">
-                                  <span className="text-green-600 font-medium">{change.newText || `(${change.newNumber})`}</span>
-                                  <span className="text-gray-400 mx-1">←</span>
-                                  <span className="text-red-500 line-through">{change.oldText || `(${change.oldNumber})`}</span>
-                                </div>
-                                <div className="text-xs text-gray-500 capitalize">
-                                  {change.changeType?.replace('_', ' ') || 'changed'}
-                                </div>
+                                {change.changeType === 'deleted' && change.citationId.startsWith('ref-delete-') ? (
+                                  <>
+                                    <div className="text-sm">
+                                      <span className="text-red-500 line-through truncate">{change.oldText || 'Reference deleted'}</span>
+                                    </div>
+                                    <div className="text-xs text-gray-500">Reference Deleted</div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="text-sm">
+                                      <span className="text-green-600 font-medium">{change.newText || `(${change.newNumber})`}</span>
+                                      <span className="text-gray-400 mx-1">&larr;</span>
+                                      <span className="text-red-500 line-through">{change.oldText || `(${change.oldNumber})`}</span>
+                                    </div>
+                                    <div className="text-xs text-gray-500 capitalize">
+                                      {change.changeType?.replace('_', ' ') || 'changed'}
+                                    </div>
+                                  </>
+                                )}
                               </div>
                             </label>
                           ))}

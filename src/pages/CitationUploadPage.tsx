@@ -3,7 +3,7 @@
  * "One-click manuscript analysis"
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import { Upload, FileText, Clock, CheckCircle, Trash2 } from 'lucide-react';
@@ -38,6 +38,8 @@ export default function CitationUploadPage() {
       return response.data.data;
     },
     staleTime: 30000, // 30 seconds
+    retry: false, // Don't retry on 401/auth errors
+    meta: { suppressError: true }, // Suppress error toasts for this query
   });
 
   // Delete job mutation
@@ -74,7 +76,7 @@ export default function CitationUploadPage() {
     }
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
     accept: {
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
@@ -82,7 +84,21 @@ export default function CitationUploadPage() {
     },
     multiple: false,
     maxSize: 50 * 1024 * 1024, // 50MB
+    noClick: true, // Disable built-in click — Chrome's isFileDialogActive gets stuck
+    useFsAccessApi: false,
   });
+
+  // Guard to prevent open() from being called recursively via input.click() bubbling
+  const isOpeningRef = useRef(false);
+  const handleBrowse = useCallback((e: React.MouseEvent) => {
+    // Ignore clicks on the hidden file input (bubbled from open() → input.click())
+    if ((e.target as HTMLElement).tagName === 'INPUT') return;
+    if (isOpeningRef.current) return;
+    isOpeningRef.current = true;
+    open();
+    // Reset guard after a tick to allow future clicks
+    setTimeout(() => { isOpeningRef.current = false; }, 100);
+  }, [open]);
 
   const handleUpload = async (e?: React.MouseEvent) => {
     // Prevent dropzone from opening file picker
@@ -147,6 +163,7 @@ export default function CitationUploadPage() {
         <Card className="p-8 mb-8">
           <div
             {...getRootProps()}
+            onClick={handleBrowse}
             className={`border-3 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${
               isDragActive
                 ? 'border-blue-500 bg-blue-50'
