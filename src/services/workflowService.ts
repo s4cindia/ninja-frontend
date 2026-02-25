@@ -1,7 +1,23 @@
 import { api, ApiResponse } from './api';
 
-/** Per-gate approval policy for batch agentic workflows. */
-export type BatchGatePolicy = 'auto-accept' | 'require-manual';
+/** Phase 1: simple per-gate mode string. Phase 2: extended object. */
+export type GatePolicyMode = 'auto-accept' | 'conditional' | 'require-manual';
+
+export interface PolicyConditions {
+  minConfidence?: number;  // 0.0–1.0
+  issueTypeRules?: Record<string, 'auto-accept' | 'auto-reject' | 'manual'>;
+}
+
+export interface ConditionalGatePolicy {
+  mode: GatePolicyMode;
+  conditions?: PolicyConditions;
+}
+
+/**
+ * Phase 1 (string): 'auto-accept' | 'require-manual'
+ * Phase 2 (object): { mode: 'conditional', conditions: { minConfidence?, issueTypeRules? } }
+ */
+export type BatchGatePolicy = 'auto-accept' | 'require-manual' | ConditionalGatePolicy;
 
 /** Error handling strategy when a workflow within a batch fails. */
 export type BatchErrorStrategy = 'pause-batch' | 'continue-others' | 'fail-batch';
