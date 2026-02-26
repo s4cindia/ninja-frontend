@@ -54,6 +54,7 @@ interface Reference {
   url?: string;
   publisher?: string;
   citationCount?: number;
+  formattedText?: string;
 }
 
 interface Citation {
@@ -577,18 +578,22 @@ export default function ReferenceEditor({
 
                   {/* Reference content */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-900">
-                      <span className="font-medium">{ref.authors?.join(', ') || 'Unknown'}</span>
-                      {ref.year && <span className="text-gray-600"> ({ref.year})</span>}
-                      {'. '}
-                      <span className="italic">{ref.title || 'Untitled'}</span>
-                      {ref.journalName && <span className="text-gray-700">. {ref.journalName}</span>}
-                      {ref.publisher && <span className="text-gray-700">. {ref.publisher}</span>}
-                      {ref.volume && <span>, {ref.volume}</span>}
-                      {ref.issue && <span>({ref.issue})</span>}
-                      {ref.pages && <span>, {ref.pages}</span>}
-                      {'.'}
-                    </p>
+                    {ref.formattedText ? (
+                      <p className="text-sm text-gray-900">{ref.formattedText}</p>
+                    ) : (
+                      <p className="text-sm text-gray-900">
+                        <span className="font-medium">{ref.authors?.join(', ') || 'Unknown'}</span>
+                        {ref.year && <span className="text-gray-600"> ({ref.year})</span>}
+                        {'. '}
+                        <span className="italic">{ref.title || 'Untitled'}</span>
+                        {ref.journalName && <span className="text-gray-700">. {ref.journalName}</span>}
+                        {ref.publisher && <span className="text-gray-700">. {ref.publisher}</span>}
+                        {ref.volume && <span>, {ref.volume}</span>}
+                        {ref.issue && <span>({ref.issue})</span>}
+                        {ref.pages && <span>, {ref.pages}</span>}
+                        {'.'}
+                      </p>
+                    )}
                     {ref.doi && (
                       <a
                         href={`https://doi.org/${ref.doi}`}

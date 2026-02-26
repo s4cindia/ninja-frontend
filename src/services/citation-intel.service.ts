@@ -64,10 +64,14 @@ export const citationIntelService = {
       const isLocalhost = window.location.hostname === 'localhost' ||
                           window.location.hostname === '127.0.0.1';
 
-      // In localhost, fallback to direct upload for S3 config issues (503) or server errors (500)
-      // This allows local development without S3 configured
-      if (isLocalhost && (statusCode === 503 || statusCode === 500)) {
-        console.log('S3 presign failed in dev, falling back to direct upload');
+      // Detect network/CORS errors (TypeError: Failed to fetch) from S3 upload
+      const isNetworkError = presignError instanceof TypeError;
+
+      // In localhost, fallback to direct upload for:
+      // - S3 config issues (503) or server errors (500)
+      // - Network/CORS errors when S3 bucket doesn't allow localhost origin
+      if (isLocalhost && (statusCode === 503 || statusCode === 500 || isNetworkError)) {
+        console.log('S3 upload failed in dev, falling back to direct upload');
         const formData = new FormData();
         formData.append('file', file);
 
