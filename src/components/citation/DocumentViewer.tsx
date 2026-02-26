@@ -970,8 +970,12 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
       {(() => {
         const citedNumbers = new Set<number>();
         for (const c of citations) {
-          if (!c.rawText) continue;
-          for (const n of expandCitationRange(c.rawText)) citedNumbers.add(n);
+          // Use DB-linked reference number (works for all formats including APA author-year)
+          if (c.referenceNumber) citedNumbers.add(c.referenceNumber);
+          // Also extract numbers from rawText for numeric formats (Vancouver, IEEE)
+          if (c.rawText) {
+            for (const n of expandCitationRange(c.rawText)) citedNumbers.add(n);
+          }
         }
         const uncited = (references || []).filter(r => !citedNumbers.has(r.number));
         if (uncited.length === 0) return null;
