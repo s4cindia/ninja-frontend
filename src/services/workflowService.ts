@@ -112,6 +112,31 @@ export interface AgenticBatchDashboard {
   hitlWaiting?: Array<{ workflowId: string; filename: string; gate: string; reviewUrl: string }>;
 }
 
+export interface BatchHITLCluster {
+  id: string;
+  batchId: string;
+  gate: string;
+  issueCode: string;
+  issueTitle: string;
+  severity: string;
+  fileCount: number;
+  totalInstances: number;
+  representativeIssues: unknown[];
+  decision: 'ACCEPT' | 'REJECT' | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+}
+
+export interface BatchHITLClustersResponse {
+  batchId: string;
+  gate: string;
+  clusters: BatchHITLCluster[];
+  reviewedCount: number;
+  totalCount: number;
+  allReviewed: boolean;
+}
+
 export interface AIReviewDecision {
   itemId: string;
   decision: 'ACCEPT' | 'REJECT' | 'MODIFY' | 'OVERRIDE' | 'MANUAL_FIX';
@@ -252,6 +277,32 @@ export const workflowService = {
 
   async retryFailedBatch(batchId: string): Promise<{ retriedCount: number }> {
     const response = await api.post<{ success: boolean; retriedCount: number }>(`/workflows/batch/${batchId}/retry-failed`);
+    return response.data;
+  },
+
+  async getBatchHITLClusters(batchId: string, gate: string): Promise<BatchHITLClustersResponse> {
+    const response = await api.get<BatchHITLClustersResponse>(
+      `/workflows/batch/${batchId}/hitl/${gate}/clusters`
+    );
+    return response.data;
+  },
+
+  async updateClusterDecision(
+    batchId: string,
+    clusterId: string,
+    decision: 'ACCEPT' | 'REJECT'
+  ): Promise<{ success: boolean; cluster: BatchHITLCluster }> {
+    const response = await api.put<{ success: boolean; cluster: BatchHITLCluster }>(
+      `/workflows/batch/${batchId}/hitl/cluster/${clusterId}/decision`,
+      { decision }
+    );
+    return response.data;
+  },
+
+  async applyBatchDecisions(batchId: string, gate: string): Promise<{ success: boolean; appliedCount: number }> {
+    const response = await api.post<{ success: boolean; appliedCount: number }>(
+      `/workflows/batch/${batchId}/hitl/${gate}/apply-decisions`
+    );
     return response.data;
   },
 };

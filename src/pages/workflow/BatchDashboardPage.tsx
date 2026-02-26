@@ -391,35 +391,77 @@ export function BatchDashboardPage() {
             </div>
           )}
 
-          {/* HITL gate queue — per-file review links */}
-          {batch.hitlWaiting && batch.hitlWaiting.length > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                <h3 className="text-base font-semibold text-amber-900">HITL Gates Waiting</h3>
-              </div>
-              <div className="space-y-2">
-                {batch.hitlWaiting.map(item => (
-                  <div key={item.workflowId} className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-xs font-medium text-amber-700 uppercase tracking-wide">
-                        {item.gate}
+          {/* HITL gate queue — grouped by gate with batch review option */}
+          {batch.hitlWaiting && batch.hitlWaiting.length > 0 && (() => {
+            // Group waiting items by gate slug (extracted from reviewUrl)
+            const byGate = new Map<string, typeof batch.hitlWaiting>();
+            for (const item of batch.hitlWaiting) {
+              const slug = item.reviewUrl.split('/hitl/')[1] ?? 'ai-review';
+              if (!byGate.has(slug)) byGate.set(slug, []);
+              byGate.get(slug)!.push(item);
+            }
+
+            return (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-5 space-y-4">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <h3 className="text-base font-semibold text-amber-900">HITL Gates Waiting</h3>
+                  <span className="ml-auto text-xs text-amber-700">
+                    {batch.hitlWaiting.length} file{batch.hitlWaiting.length !== 1 ? 's' : ''} pending
+                  </span>
+                </div>
+
+                {Array.from(byGate.entries()).map(([slug, items]) => (
+                  <div key={slug} className="bg-white border border-amber-200 rounded-md p-3 space-y-2">
+                    {/* Gate header with batch review button */}
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-xs font-semibold text-amber-700 uppercase tracking-wide">
+                          {items[0].gate}
+                        </div>
+                        <div className="text-xs text-amber-600 mt-0.5">
+                          {items.length} file{items.length !== 1 ? 's' : ''} waiting
+                        </div>
                       </div>
-                      <div className="text-sm text-amber-900 truncate">{item.filename}</div>
+                      {items.length > 1 ? (
+                        <Button
+                          size="sm"
+                          onClick={() => navigate(`/workflow/batch/${batchId}/hitl/${slug}`)}
+                          className="shrink-0 bg-amber-600 hover:bg-amber-700 text-white border-0"
+                        >
+                          Review as Batch
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => navigate(items[0].reviewUrl)}
+                          className="shrink-0 border-amber-400 text-amber-800 hover:bg-amber-100"
+                        >
+                          Review
+                        </Button>
+                      )}
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => navigate(item.reviewUrl)}
-                      className="shrink-0 border-amber-400 text-amber-800 hover:bg-amber-100"
-                    >
-                      Review
-                    </Button>
+
+                    {/* File list */}
+                    <div className="space-y-1 border-t border-amber-100 pt-2">
+                      {items.map(item => (
+                        <div key={item.workflowId} className="flex items-center justify-between gap-2 text-sm">
+                          <span className="text-amber-900 truncate">{item.filename}</span>
+                          <button
+                            onClick={() => navigate(item.reviewUrl)}
+                            className="shrink-0 text-xs text-amber-600 hover:text-amber-800 underline"
+                          >
+                            Review individually
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* Right column: policy card */}
