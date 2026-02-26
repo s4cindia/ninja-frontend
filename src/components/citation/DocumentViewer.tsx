@@ -103,6 +103,32 @@ function expandCitationRange(text: string): number[] {
   return numbers.sort((a, b) => a - b);
 }
 
+// Generate format variants of a citation text for cross-format matching
+// E.g., "(1)" → ["(1)", "[1]"], "(2-4)" → ["(2-4)", "[2-4]", "(2, 3, 4)", "[2,3,4]", ...]
+function generateCitationVariants(text: string): string[] {
+  const variants = [text];
+  const nums = expandCitationRange(text);
+  if (nums.length === 0) return variants;
+
+  const isConsecutiveRange = nums.length >= 2 &&
+    nums.every((n, i) => i === 0 || n === nums[i - 1] + 1);
+
+  const formats: string[] = [];
+  formats.push(nums.join(', '), nums.join(','));
+  if (isConsecutiveRange) {
+    formats.push(`${nums[0]}-${nums[nums.length - 1]}`);
+    formats.push(`${nums[0]}\u2013${nums[nums.length - 1]}`);
+  }
+
+  for (const inner of formats) {
+    const bracket = `[${inner}]`;
+    const paren = `(${inner})`;
+    if (!variants.includes(bracket)) variants.push(bracket);
+    if (!variants.includes(paren)) variants.push(paren);
+  }
+  return variants;
+}
+
 // Get track changes CSS class based on change type
 function getTrackChangeClass(changeType?: string): string {
   switch (changeType) {
@@ -405,17 +431,23 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
 
       // Helper to render citation numbers as clickable links
       const renderClickableNumbers = (text: string, changeClass?: string): string => {
-        // Check if this looks like a numeric citation [1], [1-3], [1, 2, 3]
+        // Check if this looks like a numeric citation: [1], [1-3], [1, 2, 3] or (1), (1-3), (1, 2, 3)
         const bracketMatch = text.match(/^\[([^\]]+)\]$/);
-        if (bracketMatch) {
-          const inner = bracketMatch[1];
-          const numbers = expandCitationRange(inner);
-          if (numbers.length > 0) {
-            // Render each number as a clickable link
-            const clickableNumbers = numbers.map(n =>
-              `<span class="citation-link${changeClass ? ' ' + changeClass : ''}" data-ref="${n}" style="cursor: pointer;">${n}</span>`
-            ).join(', ');
-            return `[${clickableNumbers}]`;
+        const parenMatch = !bracketMatch ? text.match(/^\(([^)]+)\)$/) : null;
+        const match = bracketMatch || parenMatch;
+        if (match) {
+          const inner = match[1];
+          // Only treat as numeric if the inner content is numbers, commas, dashes, spaces
+          if (/^[\d\s,\-–—]+$/.test(inner)) {
+            const numbers = expandCitationRange(inner);
+            if (numbers.length > 0) {
+              const open = bracketMatch ? '[' : '(';
+              const close = bracketMatch ? ']' : ')';
+              const clickableNumbers = numbers.map(n =>
+                `<span class="citation-link${changeClass ? ' ' + changeClass : ''}" data-ref="${n}" style="cursor: pointer;">${n}</span>`
+              ).join(', ');
+              return `${open}${clickableNumbers}${close}`;
+            }
           }
         }
         // For non-numeric citations (e.g., parenthetical like "(Author, Year)"),
@@ -444,8 +476,12 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
         // Old numbers will falsely match OTHER citations' current numbers (e.g., old "(1)" matches
         // a different citation now showing "(1)"), causing wrong track changes at wrong positions.
         // So for renumber, skip oldTextInHtml and always search by newText.
-        const oldTextInHtml = !isRenumber && fullHtml?.includes(changeInfo.oldText);
-        const newTextInHtml = fullHtml?.includes(changeInfo.newText);
+        // Check oldText in HTML with format variants (e.g., oldText "(1)" but HTML has "[1]")
+        const oldTextVariants = !isRenumber ? generateCitationVariants(changeInfo.oldText) : [];
+        const oldTextInHtml = oldTextVariants.some(v => fullHtml?.includes(v));
+        // Check newText in HTML with format variants (brackets/parens, spacing, ranges)
+        const newTextVariants = generateCitationVariants(changeInfo.newText);
+        const newTextInHtml = newTextVariants.some(v => fullHtml?.includes(v));
 
         if (oldTextInHtml) {
           // Style conversion: old text still in HTML - show track change format
@@ -454,6 +490,11 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
           hoverColor = 'hover:bg-green-300';
           refInfo = `Updated: ${escapeHtml(changeInfo.newText)} (was ${escapeHtml(changeInfo.oldText)})`;
           searchText = changeInfo.oldText;
+          // Find the exact variant that matched in HTML for accurate replacement
+          const matchedOldVariant = oldTextVariants.find(v => fullHtml?.includes(v));
+          if (matchedOldVariant && matchedOldVariant !== searchText) {
+            searchText = matchedOldVariant;
+          }
 
           // oldText = original citation text (before conversion)
           // newText = converted citation text (after conversion)
@@ -470,6 +511,11 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
         } else if (newTextInHtml) {
           // HTML already updated with new text — search by newText
           searchText = changeInfo.newText;
+          // Find the exact variant that matched in HTML for accurate replacement
+          const matchedVariant = newTextVariants.find(v => fullHtml?.includes(v));
+          if (matchedVariant && matchedVariant !== searchText) {
+            searchText = matchedVariant;
+          }
 
           if (isRenumber) {
             // Renumber: show track change format (old → new) at the correct position
@@ -624,9 +670,9 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
       }
 
       // Additional fallback: for numeric citations, try common patterns if exact match fails
-      // e.g., if rawText is [2] but HTML might have [3], try nearby numbers
-      const bracketMatch = searchText.match(/^\[(\d+(?:[,\s\-–]+\d+)*)\]$/);
-      if (bracketMatch && !changeInfo) {
+      // e.g., if rawText is [2] or (2) but HTML might have [3] or (3), try nearby numbers
+      const numericMatch = searchText.match(/^[[(](\d+(?:[,\s\-–]+\d+)*)[)\]]$/);
+      if (numericMatch && !changeInfo) {
         // Try searching for the citation by looking for bracket patterns near the position
         // This is a last resort when we don't have changeInfo
         const nums = expandCitationRange(searchText);
@@ -643,6 +689,31 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
               textsToTry.push(matchingChange.oldText);
             }
           }
+        }
+      }
+
+      // Format-variant fallback: when rawText format (parens/brackets) doesn't match
+      // the actual document text. E.g., rawText "(1, 2)" but HTML has "[1,2]"
+      // Also handles spacing differences: "(1, 2)" vs "(1,2)" and range compression: "(3, 4, 5)" vs "[3–5]"
+      const citationNums = expandCitationRange(searchText);
+      if (citationNums.length > 0) {
+        const isConsecutiveRange = citationNums.length >= 2 &&
+          citationNums.every((n, i) => i === 0 || n === citationNums[i - 1] + 1);
+        // Build all common representations
+        const spaced = citationNums.join(', ');       // "1, 2" or "3, 4, 5"
+        const compact = citationNums.join(',');        // "1,2" or "3,4,5"
+        const rangeEnDash = isConsecutiveRange
+          ? `${citationNums[0]}\u2013${citationNums[citationNums.length - 1]}` // "3–5"
+          : null;
+        const rangeHyphen = isConsecutiveRange
+          ? `${citationNums[0]}-${citationNums[citationNums.length - 1]}` // "3-5"
+          : null;
+        const variants: string[] = [];
+        for (const inner of [spaced, compact, ...(rangeEnDash ? [rangeEnDash] : []), ...(rangeHyphen ? [rangeHyphen] : [])]) {
+          variants.push(`[${inner}]`, `(${inner})`);
+        }
+        for (const v of variants) {
+          if (!textsToTry.includes(v)) textsToTry.push(v);
         }
       }
 
@@ -894,6 +965,33 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
           </ul>
         </div>
       )}
+
+      {/* Warning for uncited references */}
+      {(() => {
+        const citedNumbers = new Set<number>();
+        for (const c of citations) {
+          if (!c.rawText) continue;
+          for (const n of expandCitationRange(c.rawText)) citedNumbers.add(n);
+        }
+        const uncited = (references || []).filter(r => !citedNumbers.has(r.number));
+        if (uncited.length === 0) return null;
+        return (
+          <div className="bg-yellow-50 border border-yellow-200 rounded p-4 mb-4">
+            <p className="text-sm text-yellow-800">
+              <strong>⚠️ {uncited.length} reference(s) not cited in text:</strong>{' '}
+              These references have no in-text citation. Consider removing them or adding citations.
+            </p>
+            <ul className="mt-2 text-xs text-yellow-700 list-disc list-inside">
+              {uncited.slice(0, 5).map((r) => (
+                <li key={r.id}>#{r.number} — {r.authors?.[0] || 'Unknown'}{r.year ? ` (${r.year})` : ''}</li>
+              ))}
+              {uncited.length > 5 && (
+                <li>...and {uncited.length - 5} more</li>
+              )}
+            </ul>
+          </div>
+        );
+      })()}
       <div className="prose max-w-none">
         <div
           className="document-content font-serif text-base leading-relaxed text-gray-800"
