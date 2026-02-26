@@ -14,6 +14,9 @@ import {
   Clock,
   FileText,
   ExternalLink,
+  Search,
+  Wrench,
+  Download,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { PolicySummaryCard } from '@/components/workflow/PolicySummaryCard';
@@ -303,36 +306,85 @@ export function BatchDashboardPage() {
             </div>
           )}
 
-          {/* ACR Reports — shown for completed workflows */}
+          {/* Completed files — all artifacts per workflow */}
           {batch.completedWorkflows && batch.completedWorkflows.length > 0 && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <FileText className="h-4 w-4 text-green-600" />
-                <h3 className="text-base font-semibold text-green-900">ACR Reports</h3>
+              <div className="flex items-center gap-2 mb-4">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <h3 className="text-base font-semibold text-green-900">Completed Files</h3>
                 <span className="ml-auto text-xs text-green-700">
-                  {batch.completedWorkflows.filter(w => w.acrJobId).length} / {batch.completedWorkflows.length} ready
+                  {batch.completedWorkflows.length} file{batch.completedWorkflows.length !== 1 ? 's' : ''}
                 </span>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-4">
                 {batch.completedWorkflows.map(wf => (
-                  <div key={wf.workflowId} className="flex items-center justify-between gap-3">
-                    <div className="min-w-0 flex items-center gap-2">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-green-500 shrink-0" />
-                      <span className="text-sm text-green-900 truncate">{wf.filename}</span>
+                  <div key={wf.workflowId} className="bg-white rounded-md border border-green-200 p-3">
+                    <div className="flex items-center gap-2 mb-3">
+                      <FileText className="h-4 w-4 text-green-600 shrink-0" />
+                      <span className="text-sm font-medium text-gray-900 truncate">{wf.filename}</span>
                     </div>
-                    {wf.acrJobId ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => navigate(`/acr/report/review/${wf.acrJobId}`)}
-                        className="shrink-0 border-green-400 text-green-800 hover:bg-green-100 gap-1"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        View ACR
-                      </Button>
-                    ) : (
-                      <span className="text-xs text-green-600 shrink-0">Generating…</span>
-                    )}
+                    <div className="flex flex-wrap gap-2">
+                      {/* Audit results */}
+                      {wf.jobId && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => navigate(
+                            `/jobs/${wf.jobId}?batchId=${batchId}&filename=${encodeURIComponent(wf.filename)}`
+                          )}
+                          className="gap-1 text-xs"
+                        >
+                          <Search className="h-3 w-3" />
+                          Audit Results
+                        </Button>
+                      )}
+                      {/* Remediation plan */}
+                      {wf.jobId && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => navigate(
+                            wf.fileType === 'pdf'
+                              ? `/pdf/${wf.jobId}/remediation?batchId=${batchId}&filename=${encodeURIComponent(wf.filename)}`
+                              : `/epub/remediate/${wf.jobId}?batchId=${batchId}&filename=${encodeURIComponent(wf.filename)}`
+                          )}
+                          className="gap-1 text-xs"
+                        >
+                          <Wrench className="h-3 w-3" />
+                          Remediation
+                        </Button>
+                      )}
+                      {/* Remediated file download */}
+                      {wf.remediatedFileName && wf.jobId && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => window.open(
+                            `/api/v1/workflows/${wf.workflowId}/download`,
+                            '_blank',
+                            'noopener,noreferrer'
+                          )}
+                          className="gap-1 text-xs"
+                        >
+                          <Download className="h-3 w-3" />
+                          Download Remediated
+                        </Button>
+                      )}
+                      {/* ACR report */}
+                      {wf.acrJobId ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => navigate(`/acr/report/review/${wf.acrJobId}?batchId=${batchId}`)}
+                          className="gap-1 text-xs border-green-400 text-green-800 hover:bg-green-100"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          View ACR
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-gray-400 self-center">ACR generating…</span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

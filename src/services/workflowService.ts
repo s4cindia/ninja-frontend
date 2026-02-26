@@ -101,7 +101,14 @@ export interface AgenticBatchDashboard {
   autoApprovalPolicy?: BatchAutoApprovalPolicy | null;
   acrConfig?: AcrBatchConfig | null;
   failedWorkflows?: Array<{ id: string; filename: string; errorMessage: string | null }>;
-  completedWorkflows?: Array<{ workflowId: string; filename: string; acrJobId: string | null; jobId: string | null }>;
+  completedWorkflows?: Array<{
+    workflowId: string;
+    filename: string;
+    acrJobId: string | null;
+    jobId: string | null;
+    remediatedFileName: string | null;
+    fileType: 'epub' | 'pdf';
+  }>;
   hitlWaiting?: Array<{ workflowId: string; filename: string; gate: string; reviewUrl: string }>;
 }
 

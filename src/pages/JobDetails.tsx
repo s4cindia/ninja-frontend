@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useParams, Link, Navigate } from 'react-router-dom';
+import { useParams, Link, Navigate, useSearchParams } from 'react-router-dom';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { Button } from '@/components/ui/Button';
 import { ErrorBoundary } from '@/components/ui';
@@ -32,6 +32,9 @@ const CITATION_JOB_TYPES = ['CITATION_DETECTION', 'CITATION_VALIDATION', 'EDITOR
 
 export function JobDetails() {
   const { jobId } = useParams<{ jobId: string }>();
+  const [searchParams] = useSearchParams();
+  const fromBatchId = searchParams.get('batchId');
+  const filenameParam = searchParams.get('filename');
   const { data: job, isLoading, isError, error, refetch } = useJob(jobId || null);
   const cancelJob = useCancelJob();
 
@@ -111,21 +114,28 @@ export function JobDetails() {
     );
   }
 
-  const fileName = extractFileNameFromJob(job);
+  const fileName = filenameParam || extractFileNameFromJob(job);
   const canCancel = job.status === 'QUEUED' || job.status === 'PROCESSING';
   const outputUrl = extractDownloadUrl(job.output);
+  const backPath = fromBatchId ? `/workflow/batch/${fromBatchId}` : '/jobs';
+  const backLabel = fromBatchId ? 'Back to Batch' : 'Back';
 
   return (
     <div>
-      <Breadcrumbs items={[{ label: 'Jobs', path: '/jobs' }, { label: fileName }]} />
+      <Breadcrumbs items={[
+        fromBatchId
+          ? { label: 'Agentic Batch', path: `/workflow/batch/${fromBatchId}` }
+          : { label: 'Jobs', path: '/jobs' },
+        { label: fileName },
+      ]} />
 
       <div className="flex items-center justify-between mb-6" data-testid="job-detail-header">
         <h1 className="text-2xl font-bold text-gray-900">{fileName}</h1>
         <div className="flex gap-2">
-          <Link to="/jobs">
+          <Link to={backPath}>
             <Button variant="outline" data-testid="back-button">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
+              {backLabel}
             </Button>
           </Link>
           {canCancel && (
