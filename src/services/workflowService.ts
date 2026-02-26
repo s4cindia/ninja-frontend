@@ -1,7 +1,23 @@
 import { api, ApiResponse } from './api';
 
-/** Per-gate approval policy for batch agentic workflows. */
-export type BatchGatePolicy = 'auto-accept' | 'require-manual';
+/** Phase 1: simple per-gate mode string. Phase 2: extended object. */
+export type GatePolicyMode = 'auto-accept' | 'conditional' | 'require-manual';
+
+export interface PolicyConditions {
+  minConfidence?: number;  // 0.0–1.0
+  issueTypeRules?: Record<string, 'auto-accept' | 'auto-reject' | 'manual'>;
+}
+
+export interface ConditionalGatePolicy {
+  mode: GatePolicyMode;
+  conditions?: PolicyConditions;
+}
+
+/**
+ * Phase 1 (string): 'auto-accept' | 'require-manual'
+ * Phase 2 (object): { mode: 'conditional', conditions: { minConfidence?, issueTypeRules? } }
+ */
+export type BatchGatePolicy = 'auto-accept' | 'require-manual' | ConditionalGatePolicy;
 
 /** Error handling strategy when a workflow within a batch fails. */
 export type BatchErrorStrategy = 'pause-batch' | 'continue-others' | 'fail-batch';
@@ -59,6 +75,14 @@ export interface BatchDashboard {
   autoApprovalPolicy?: BatchAutoApprovalPolicy | null;
 }
 
+export interface AcrBatchConfig {
+  vendor: string;
+  contactEmail: string;
+  edition: 'VPAT2.5-WCAG' | 'VPAT2.5-508' | 'VPAT2.5-EU' | 'VPAT2.5-INT';
+  mode: 'individual' | 'aggregate';
+  aggregationStrategy: 'conservative' | 'optimistic';
+}
+
 /** Response from GET /workflows/batch/:batchId (agentic workflow batch) */
 export interface AgenticBatchDashboard {
   id: string;
@@ -75,7 +99,16 @@ export interface AgenticBatchDashboard {
   startedAt: string;
   completedAt?: string;
   autoApprovalPolicy?: BatchAutoApprovalPolicy | null;
+  acrConfig?: AcrBatchConfig | null;
   failedWorkflows?: Array<{ id: string; filename: string; errorMessage: string | null }>;
+  completedWorkflows?: Array<{
+    workflowId: string;
+    filename: string;
+    acrJobId: string | null;
+    jobId: string | null;
+    remediatedFileName: string | null;
+    fileType: 'epub' | 'pdf';
+  }>;
   hitlWaiting?: Array<{ workflowId: string; filename: string; gate: string; reviewUrl: string }>;
 }
 
@@ -187,11 +220,12 @@ export const workflowService = {
     name: string,
     fileIds: string[],
     concurrency?: number,
-    autoApprovalPolicy?: BatchAutoApprovalPolicy
+    autoApprovalPolicy?: BatchAutoApprovalPolicy,
+    acrConfig?: AcrBatchConfig
   ): Promise<{ batchId: string; workflowCount: number; autoApprovalPolicy?: BatchAutoApprovalPolicy | null }> {
     const response = await api.post<{ batchId: string; workflowCount: number; autoApprovalPolicy?: BatchAutoApprovalPolicy | null }>(
       '/workflows/batch',
-      { name, fileIds, concurrency, autoApprovalPolicy }
+      { name, fileIds, concurrency, autoApprovalPolicy, acrConfig }
     );
     return response.data;
   },

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle, ChevronDown, ChevronRight, Edit2, Save, X, PanelLeftClose, PanelLeft } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
@@ -278,6 +278,8 @@ function CriterionCard({ criterion, acrJobId, isExpanded, onToggleExpand }: Crit
 export function AcrReportReviewPage() {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const fromBatchId = searchParams.get('batchId');
   const [expandedCriteria, setExpandedCriteria] = useState<Set<string>>(new Set());
   const [showNACriteria, setShowNACriteria] = useState(false); // Collapsed by default
   const [isEditingExecutiveSummary, setIsEditingExecutiveSummary] = useState(false);
@@ -458,16 +460,28 @@ export function AcrReportReviewPage() {
 
           <div className="mt-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
+              {fromBatchId ? (
+                <Button variant="ghost" size="sm" onClick={() => navigate(`/workflow/batch/${fromBatchId}`)}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back to Batch
+                </Button>
+              ) : (
+                <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back
+                </Button>
+              )}
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">
                   Review & Edit ACR Report
                 </h1>
                 <p className="text-sm text-gray-600 mt-1">
-                  {acrJob.documentTitle || `Job ${jobId}`} • {acrJob.edition}
+                  {/* Strip UUID prefix if documentTitle is a storage filename (legacy records) */}
+                  {(acrJob.documentTitle ?? '')
+                    .replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[._-]/i, '')
+                    || acrJob.documentTitle
+                    || `Job ${jobId}`}
+                  {' '}• {acrJob.edition}
                 </p>
               </div>
             </div>
