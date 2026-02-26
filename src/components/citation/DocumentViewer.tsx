@@ -478,10 +478,10 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
         // So for renumber, skip oldTextInHtml and always search by newText.
         // Check oldText in HTML with format variants (e.g., oldText "(1)" but HTML has "[1]")
         const oldTextVariants = !isRenumber ? generateCitationVariants(changeInfo.oldText) : [];
-        const oldTextInHtml = oldTextVariants.some(v => fullHtml?.includes(v));
+        const oldTextInHtml = oldTextVariants.some(v => html.includes(v));
         // Check newText in HTML with format variants (brackets/parens, spacing, ranges)
         const newTextVariants = generateCitationVariants(changeInfo.newText);
-        const newTextInHtml = newTextVariants.some(v => fullHtml?.includes(v));
+        const newTextInHtml = newTextVariants.some(v => html.includes(v));
 
         if (oldTextInHtml) {
           // Style conversion: old text still in HTML - show track change format
@@ -491,7 +491,7 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
           refInfo = `Updated: ${escapeHtml(changeInfo.newText)} (was ${escapeHtml(changeInfo.oldText)})`;
           searchText = changeInfo.oldText;
           // Find the exact variant that matched in HTML for accurate replacement
-          const matchedOldVariant = oldTextVariants.find(v => fullHtml?.includes(v));
+          const matchedOldVariant = oldTextVariants.find(v => html.includes(v));
           if (matchedOldVariant && matchedOldVariant !== searchText) {
             searchText = matchedOldVariant;
           }
@@ -512,7 +512,7 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
           // HTML already updated with new text — search by newText
           searchText = changeInfo.newText;
           // Find the exact variant that matched in HTML for accurate replacement
-          const matchedVariant = newTextVariants.find(v => fullHtml?.includes(v));
+          const matchedVariant = newTextVariants.find(v => html.includes(v));
           if (matchedVariant && matchedVariant !== searchText) {
             searchText = matchedVariant;
           }
@@ -971,7 +971,7 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
         const citedNumbers = new Set<number>();
         for (const c of citations) {
           // Use DB-linked reference number (works for all formats including APA author-year)
-          if (c.referenceNumber) citedNumbers.add(c.referenceNumber);
+          if (c.referenceNumber !== null && c.referenceNumber !== undefined) citedNumbers.add(c.referenceNumber);
           // Also extract numbers from rawText for numeric formats (Vancouver, IEEE)
           if (c.rawText) {
             for (const n of expandCitationRange(c.rawText)) citedNumbers.add(n);

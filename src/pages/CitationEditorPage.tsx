@@ -933,7 +933,7 @@ export default function CitationEditorPage() {
 
         {/* Success Banner - Citations are in sequence */}
         {showSequenceWarning && sequenceAnalysis.isSequential && (
-          <Alert variant="info" className="mb-6">
+          <Alert variant="success" className="mb-6">
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-3">
                 <CheckCircle className="h-5 w-5 text-green-600" />
