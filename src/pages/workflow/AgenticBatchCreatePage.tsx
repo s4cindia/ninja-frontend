@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import toast from 'react-hot-toast';
@@ -108,6 +108,17 @@ export function AgenticBatchCreatePage() {
   const [showHeadlessModal, setShowHeadlessModal] = useState(false);
   const [modalToggleValue, setModalToggleValue] = useState(false);
   const [savingHeadless, setSavingHeadless] = useState(false);
+  const headlessDialogRef = useRef<HTMLDivElement>(null);
+  const headlessTriggerRef = useRef<HTMLButtonElement>(null);
+
+  // Focus the dialog when it opens; restore focus to trigger on close
+  useEffect(() => {
+    if (showHeadlessModal) {
+      headlessDialogRef.current?.focus();
+    } else {
+      headlessTriggerRef.current?.focus();
+    }
+  }, [showHeadlessModal]);
 
   useEffect(() => {
     tenantConfigService.getWorkflowConfig().then(cfg => {
@@ -208,6 +219,8 @@ export function AgenticBatchCreatePage() {
   const handleSubmit = async () => {
     if (files.length === 0) { toast.error('Add at least one EPUB file'); return; }
     if (!batchName.trim()) { toast.error('Batch name is required'); return; }
+    if (!acrVendor.trim()) { toast.error('Vendor / Organization name is required for ACR reports'); return; }
+    if (!acrEmail.trim()) { toast.error('Contact email is required for ACR reports'); return; }
 
     const ok = await ensureFreshToken();
     if (!ok) { toast.error('Session expired — please log in again'); return; }
@@ -224,9 +237,13 @@ export function AgenticBatchCreatePage() {
 
       setUploadProgress('Creating batch workflow…');
       const policy = buildPolicy(gateConfigs, errorStrategy);
-      const acrConfig: AcrBatchConfig | undefined = (acrVendor.trim() && acrEmail.trim())
-        ? { vendor: acrVendor.trim(), contactEmail: acrEmail.trim(), edition: acrEdition, mode: acrMode, aggregationStrategy: acrAggStrategy }
-        : undefined;
+      const acrConfig: AcrBatchConfig = {
+        vendor: acrVendor.trim(),
+        contactEmail: acrEmail.trim(),
+        edition: acrEdition,
+        mode: acrMode,
+        aggregationStrategy: acrAggStrategy,
+      };
 
       const result = await workflowService.startBatch(batchName.trim(), fileIds, 2, policy, acrConfig);
       toast.success(`Batch started — ${result.workflowCount} workflow(s) queued`);
@@ -553,6 +570,7 @@ export function AgenticBatchCreatePage() {
                 </p>
               </div>
               <button
+                ref={headlessTriggerRef}
                 type="button"
                 onClick={openHeadlessModal}
                 className="shrink-0 text-xs font-semibold text-amber-800 underline hover:text-amber-900 whitespace-nowrap"
@@ -609,14 +627,22 @@ export function AgenticBatchCreatePage() {
       {/* Fully Headless Modal */}
       {showHeadlessModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6 space-y-5">
+          <div
+            ref={headlessDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="headless-modal-title"
+            tabIndex={-1}
+            onKeyDown={(e) => e.key === 'Escape' && setShowHeadlessModal(false)}
+            className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6 space-y-5 outline-none"
+          >
             {/* Header */}
             <div className="flex items-start gap-3">
               <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
                 <AlertTriangle className="h-5 w-5 text-amber-600" />
               </div>
               <div>
-                <h2 className="text-base font-semibold text-gray-900">Enable Fully Headless Batches</h2>
+                <h2 id="headless-modal-title" className="text-base font-semibold text-gray-900">Enable Fully Headless Batches</h2>
                 <p className="mt-1 text-sm text-gray-600">
                   This is a <strong>tenant-wide</strong> setting. Once enabled, any batch may run with all HITL
                   gates set to auto-accept, bypassing all human review.
