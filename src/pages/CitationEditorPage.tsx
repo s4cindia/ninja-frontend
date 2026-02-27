@@ -16,7 +16,8 @@ import {
   Eye,
   ArrowUpDown,
   Loader2,
-  Trash2
+  Trash2,
+  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -954,18 +955,18 @@ export default function CitationEditorPage() {
 
         {/* Processing indicator when document is being analyzed */}
         {['ANALYZING', 'QUEUED', 'PROCESSING'].includes(data.document.status) && pollCount < MAX_POLLS && (
-          <Alert variant="info" className="mb-6">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Document is being analyzed. This page will update automatically when complete...</span>
-          </Alert>
+          <div className="flex items-center gap-2 text-sm text-blue-600 mb-3">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <span>Analyzing... auto-refreshing</span>
+          </div>
         )}
 
         {/* Timeout message when polling stopped */}
         {['ANALYZING', 'QUEUED', 'PROCESSING'].includes(data.document.status) && pollCount >= MAX_POLLS && (
-          <Alert variant="warning" className="mb-6">
-            <AlertTriangle className="h-4 w-4" />
-            <span>Analysis is taking longer than expected. Click Refresh to check status.</span>
-          </Alert>
+          <div className="flex items-center gap-2 text-sm text-amber-600 mb-3">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            <span>Analysis taking longer than expected — click Refresh</span>
+          </div>
         )}
 
         {/* Sequence Warning/Success Banner - Show when user clicks Check Sequence */}
@@ -1120,53 +1121,48 @@ export default function CitationEditorPage() {
         {activeTab === 'document' && (
           <div>
             {recentChanges.length > 0 && (
-            <div className="mb-3 flex justify-end">
+            <div className="mb-2 flex justify-end">
                 {/* Dismiss Changes Dropdown */}
                   <div className="relative">
-                    <Button
-                      variant="outline"
-                      size="sm"
+                    <button
                       onClick={() => setShowDismissDropdown(!showDismissDropdown)}
                       disabled={isResetting}
+                      className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-red-600 transition-colors disabled:opacity-50"
                     >
                       {isResetting ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Dismissing...
-                        </>
+                        <Loader2 className="h-3 w-3 animate-spin" />
                       ) : (
-                        `✗ Dismiss Changes (${recentChanges.length})`
+                        <X className="h-3 w-3" />
                       )}
-                    </Button>
+                      {isResetting ? 'Dismissing...' : `Dismiss changes (${recentChanges.length})`}
+                    </button>
                     {showDismissDropdown && (
-                      <div className="absolute right-0 mt-2 w-80 bg-white border rounded-lg shadow-lg z-50 max-h-96 overflow-hidden">
-                        <div className="p-3 border-b bg-gray-50">
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium text-sm">Select changes to dismiss</span>
-                            <button
-                              onClick={() => setShowDismissDropdown(false)}
-                              className="text-gray-400 hover:text-gray-600"
-                            >
-                              ✕
-                            </button>
-                          </div>
+                      <div className="absolute right-0 mt-1 w-72 bg-white border rounded-lg shadow-lg z-50 max-h-80 overflow-hidden">
+                        <div className="px-3 py-2 border-b bg-gray-50 flex items-center justify-between">
+                          <span className="font-medium text-xs text-gray-700">Select changes to dismiss</span>
+                          <button
+                            onClick={() => setShowDismissDropdown(false)}
+                            className="text-gray-400 hover:text-gray-600 text-xs"
+                          >
+                            ✕
+                          </button>
                         </div>
-                        <div className="p-2 border-b">
-                          <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                        <div className="px-2 py-1.5 border-b">
+                          <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-1 py-0.5 rounded text-xs">
                             <Checkbox
                               checked={selectedChangesToDismiss.size === recentChanges.length}
                               onChange={toggleSelectAll}
                             />
-                            <span className="text-sm font-medium">
+                            <span className="font-medium">
                               {selectedChangesToDismiss.size === recentChanges.length ? 'Deselect All' : 'Select All'}
                             </span>
                           </label>
                         </div>
-                        <div className="max-h-60 overflow-y-auto p-2">
+                        <div className="max-h-48 overflow-y-auto px-2 py-1">
                           {recentChanges.map((change) => (
                             <label
                               key={change.citationId}
-                              className="flex items-start gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                              className="flex items-start gap-2 cursor-pointer hover:bg-gray-50 px-1 py-1 rounded"
                             >
                               <Checkbox
                                 checked={selectedChangesToDismiss.has(change.citationId)}
@@ -1175,63 +1171,49 @@ export default function CitationEditorPage() {
                               />
                               <div className="flex-1 min-w-0">
                                 {change.changeType === 'deleted' && change.citationId.startsWith('ref-delete-') ? (
-                                  <>
-                                    <div className="text-sm">
-                                      <span className="text-red-500 line-through truncate">{change.oldText || 'Reference deleted'}</span>
-                                    </div>
-                                    <div className="text-xs text-gray-500">Reference Deleted</div>
-                                  </>
+                                  <div className="text-xs">
+                                    <span className="text-red-500 line-through truncate">{change.oldText || 'Ref deleted'}</span>
+                                  </div>
                                 ) : (
-                                  <>
-                                    <div className="text-sm">
-                                      <span className="text-green-600 font-medium">{change.newText || `(${change.newNumber})`}</span>
-                                      <span className="text-gray-400 mx-1">&larr;</span>
-                                      <span className="text-red-500 line-through">{change.oldText || `(${change.oldNumber})`}</span>
-                                    </div>
-                                    <div className="text-xs text-gray-500 capitalize">
-                                      {change.changeType?.replace('_', ' ') || 'changed'}
-                                    </div>
-                                  </>
+                                  <div className="text-xs">
+                                    <span className="text-green-600 font-medium">{change.newText || `(${change.newNumber})`}</span>
+                                    <span className="text-gray-400 mx-0.5">&larr;</span>
+                                    <span className="text-red-500 line-through">{change.oldText || `(${change.oldNumber})`}</span>
+                                  </div>
                                 )}
                               </div>
                             </label>
                           ))}
                         </div>
-                        <div className="p-3 border-t bg-gray-50 space-y-2">
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setShowDismissDropdown(false);
-                                setSelectedChangesToDismiss(new Set());
-                              }}
-                              className="flex-1"
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              onClick={handleDismissSelected}
-                              disabled={selectedChangesToDismiss.size === 0 || isResetting}
-                              className="flex-1"
-                            >
-                              Dismiss ({selectedChangesToDismiss.size})
-                            </Button>
-                          </div>
+                        <div className="px-2 py-2 border-t bg-gray-50 flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setShowDismissDropdown(false);
+                              setSelectedChangesToDismiss(new Set());
+                            }}
+                            className="flex-1 text-xs text-gray-600 hover:text-gray-800 py-1 rounded border hover:bg-gray-100"
+                          >
+                            Cancel
+                          </button>
                           <Button
-                            variant="outline"
+                            variant="danger"
                             size="sm"
+                            onClick={handleDismissSelected}
+                            disabled={selectedChangesToDismiss.size === 0 || isResetting}
+                            className="flex-1 !text-xs !py-1"
+                          >
+                            Dismiss ({selectedChangesToDismiss.size})
+                          </Button>
+                          <button
                             onClick={() => {
                               setShowDismissDropdown(false);
                               handleDismissChanges();
                             }}
                             disabled={isResetting}
-                            className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
+                            className="text-xs text-red-500 hover:text-red-700 hover:underline whitespace-nowrap disabled:opacity-50"
                           >
-                            Dismiss All & Reset
-                          </Button>
+                            Reset all
+                          </button>
                         </div>
                       </div>
                     )}
