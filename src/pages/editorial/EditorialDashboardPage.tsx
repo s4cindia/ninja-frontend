@@ -69,8 +69,8 @@ function computePerfStats(docs: DocumentWithTiming[]) {
     })
     .filter(t => t > 0 && t < 3600000); // Filter out negative or >1hr outliers
 
-  const fileSizes = docs.filter(d => d.fileSize && d.fileSize > 0).map(d => d.fileSize!);
-  const wordCounts = docs.filter(d => d.wordCount && d.wordCount > 0).map(d => d.wordCount!);
+  const fileSizes = docs.filter(d => d.fileSize != null && d.fileSize > 0).map(d => d.fileSize!);
+  const wordCounts = docs.filter(d => d.wordCount != null && d.wordCount > 0).map(d => d.wordCount!);
 
   return {
     avgProcessingTime: processingTimes.length > 0
@@ -529,19 +529,19 @@ export function EditorialDashboardPage() {
                       </div>
                       <div className="flex items-center gap-2 text-xs text-gray-500">
                         <span>{activity.action}</span>
-                        {activity.fileSize && activity.fileSize > 0 && (
+                        {activity.fileSize != null && activity.fileSize > 0 && (
                           <>
                             <span className="text-gray-300">|</span>
                             <span>{formatFileSize(activity.fileSize)}</span>
                           </>
                         )}
-                        {activity.wordCount && activity.wordCount > 0 && (
+                        {activity.wordCount != null && activity.wordCount > 0 && (
                           <>
                             <span className="text-gray-300">|</span>
                             <span>{activity.wordCount.toLocaleString()} words</span>
                           </>
                         )}
-                        {activity.processingTime && (
+                        {activity.processingTime != null && (
                           <>
                             <span className="text-gray-300">|</span>
                             <span className="text-green-600 font-medium">
@@ -563,14 +563,16 @@ export function EditorialDashboardPage() {
                       )}
                       <span className="text-xs text-gray-400 w-16 text-right">{activity.timestamp}</span>
                       <button
-                        className={`p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity ${typeColors.button}`}
+                        className={`p-1.5 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-400 transition-opacity ${typeColors.button}`}
                         title={activity.type === 'citation' ? 'Open Citation Analysis' : 'Open in Editor'}
+                        aria-label={activity.type === 'citation' ? 'Open Citation Analysis' : 'Open in Editor'}
                       >
                         <Edit3 className="w-4 h-4" />
                       </button>
                       <button
-                        className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity bg-red-100 text-red-600 hover:bg-red-200"
+                        className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-400 transition-opacity bg-red-100 text-red-600 hover:bg-red-200"
                         title="Delete document"
+                        aria-label={`Delete document ${activity.document}`}
                         disabled={deletingId === activity.documentId}
                         onClick={(e) => handleDeleteDocument(e, activity)}
                       >

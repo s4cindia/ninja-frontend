@@ -3,7 +3,7 @@
  * Full-featured citation management with drag-drop reference editor
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   FileText,
@@ -160,6 +160,19 @@ export default function CitationEditorPage() {
   const [showSequenceWarning, setShowSequenceWarning] = useState(false);
   const [showDismissDropdown, setShowDismissDropdown] = useState(false);
   const [selectedChangesToDismiss, setSelectedChangesToDismiss] = useState<Set<string>>(new Set());
+  const dismissDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dismiss dropdown on click outside
+  useEffect(() => {
+    if (!showDismissDropdown) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dismissDropdownRef.current && !dismissDropdownRef.current.contains(e.target as Node)) {
+        setShowDismissDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showDismissDropdown]);
 
   // Detect out-of-sequence citations for Vancouver style
   const sequenceAnalysis = useMemo(() => {
@@ -1044,8 +1057,8 @@ export default function CitationEditorPage() {
             <div className="flex flex-wrap gap-1.5">
               {data.citations.map((citation: AnalysisCitation) => {
                 const hasNoReference = !citation.referenceNumber && (!citation.linkedReferenceNumbers || citation.linkedReferenceNumbers.length === 0) && !citation.isOrphaned;
-                const refNums = (citation.linkedReferenceNumbers?.length ?? 0) > 0
-                  ? citation.linkedReferenceNumbers!
+                const refNums = Array.isArray(citation.linkedReferenceNumbers) && citation.linkedReferenceNumbers.length > 0
+                  ? citation.linkedReferenceNumbers
                   : citation.referenceNumber ? [citation.referenceNumber] : [];
 
                 return (
@@ -1122,7 +1135,7 @@ export default function CitationEditorPage() {
             {recentChanges.length > 0 && (
             <div className="mb-2 flex justify-end">
                 {/* Dismiss Changes Dropdown */}
-                  <div className="relative">
+                  <div className="relative" ref={dismissDropdownRef}>
                     <button
                       onClick={() => setShowDismissDropdown(!showDismissDropdown)}
                       disabled={isResetting}

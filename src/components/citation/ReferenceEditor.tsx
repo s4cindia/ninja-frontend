@@ -37,7 +37,7 @@ interface ValidationDiscrepancy {
   correctValue: string;
 }
 
-interface ValidationResult {
+interface ReferenceValidationResult {
   status: 'verified' | 'discrepancies_found' | 'not_found';
   message?: string;
   referenceId: string;
@@ -141,7 +141,7 @@ export default function ReferenceEditor({
   const [saveError, setSaveError] = useState<string | null>(null);
 
   // Validation state
-  const [validationResults, setValidationResults] = useState<Record<string, ValidationResult>>({});
+  const [validationResults, setValidationResults] = useState<Record<string, ReferenceValidationResult>>({});
   const [validatingIds, setValidatingIds] = useState<Set<string>>(new Set());
 
   // Debounce timer ref
@@ -417,7 +417,7 @@ export default function ReferenceEditor({
       if (response.data.success) {
         setValidationResults(prev => ({
           ...prev,
-          [refId]: response.data.data as ValidationResult
+          [refId]: response.data.data as ReferenceValidationResult
         }));
       }
     } catch (err: unknown) {
@@ -981,6 +981,7 @@ export default function ReferenceEditor({
                                   <button
                                     onClick={() => handleAcceptField(ref.id, d.field, d.correctValue)}
                                     className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                                    aria-label={`Accept ${FIELD_LABELS[d.field] || d.field} correction`}
                                   >
                                     Accept
                                   </button>
