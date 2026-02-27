@@ -376,11 +376,13 @@ export default function ReferenceEditor({
   const handleSaveEdit = () => {
     if (!editingId) return;
 
-    // Optimistic update
+    // Optimistic update — clear formattedText so the individual fields fallback
+    // renders immediately with edited values. Server regenerates formatted text
+    // when the PATCH saves, and onReload() will restore it.
     setLocalReferences(prev =>
       prev.map(ref =>
         ref.id === editingId
-          ? { ...ref, ...editForm }
+          ? { ...ref, ...editForm, formattedText: undefined }
           : ref
       )
     );
@@ -447,9 +449,11 @@ export default function ReferenceEditor({
       corrections.doi = result.suggestedDoi;
     }
 
-    // Optimistic update
+    // Optimistic update — clear formattedText so the individual fields fallback
+    // renders immediately with corrected values. Server regenerates formatted text
+    // when the PATCH saves, and onReload() will restore it.
     setLocalReferences(prev =>
-      prev.map(ref => ref.id === refId ? { ...ref, ...corrections } : ref)
+      prev.map(ref => ref.id === refId ? { ...ref, ...corrections, formattedText: undefined } : ref)
     );
 
     // Queue the edit
@@ -474,9 +478,9 @@ export default function ReferenceEditor({
       (corrections as Record<string, string>)[field] = correctValue;
     }
 
-    // Optimistic update
+    // Optimistic update — clear formattedText so corrected field values show immediately
     setLocalReferences(prev =>
-      prev.map(ref => ref.id === refId ? { ...ref, ...corrections } : ref)
+      prev.map(ref => ref.id === refId ? { ...ref, ...corrections, formattedText: undefined } : ref)
     );
 
     // Queue the edit
@@ -757,17 +761,48 @@ export default function ReferenceEditor({
                         {'.'}
                       </p>
                     )}
-                    {ref.doi && (
-                      <a
-                        href={`https://doi.org/${ref.doi}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-600 hover:underline inline-flex items-center mt-1"
-                      >
-                        DOI: {ref.doi}
-                        <ExternalLink className="h-3 w-3 ml-1" />
-                      </a>
-                    )}
+                    {/* Show metadata fields that exist in data but aren't in the formatted text */}
+                    {(() => {
+                      const ft = ref.formattedText || '';
+                      const missing: Array<{ label: string; value: string; isDoi?: boolean }> = [];
+                      if (ref.doi) {
+                        missing.push({ label: 'DOI', value: ref.doi, isDoi: true });
+                      }
+                      if (ref.publisher && ft && !ft.includes(ref.publisher)) {
+                        missing.push({ label: 'Publisher', value: ref.publisher });
+                      }
+                      if (ref.volume && ft && !ft.includes(ref.volume)) {
+                        missing.push({ label: 'Volume', value: ref.volume });
+                      }
+                      if (ref.issue && ft && !ft.includes(ref.issue)) {
+                        missing.push({ label: 'Issue', value: ref.issue });
+                      }
+                      if (ref.pages && ft && !ft.includes(ref.pages)) {
+                        missing.push({ label: 'Pages', value: ref.pages });
+                      }
+                      if (ref.url && ft && !ft.includes(ref.url)) {
+                        missing.push({ label: 'URL', value: ref.url });
+                      }
+                      if (missing.length === 0) return null;
+                      return (
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
+                          {missing.map(m => m.isDoi ? (
+                            <a
+                              key={m.label}
+                              href={`https://doi.org/${m.value}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-600 hover:underline inline-flex items-center"
+                            >
+                              DOI: {m.value}
+                              <ExternalLink className="h-3 w-3 ml-1" />
+                            </a>
+                          ) : (
+                            <span key={m.label} className="text-xs text-gray-500">{m.label}: {m.value}</span>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Source type badge */}

@@ -793,12 +793,11 @@ export default function CitationEditorPage() {
                 size="sm"
                 disabled={deleteDocumentMutation.isPending}
                 onClick={() => {
+                  if (!documentId) return;
                   if (confirm('Delete this document? This cannot be undone.')) {
-                    if (documentId) {
-                      deleteDocumentMutation.mutate(documentId, {
-                        onSuccess: () => navigate('/citation/upload'),
-                      });
-                    }
+                    deleteDocumentMutation.mutate(documentId, {
+                      onSuccess: () => navigate('/citation/upload'),
+                    });
                   }
                 }}
               >
