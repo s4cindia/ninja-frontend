@@ -108,8 +108,10 @@ export interface AnalysisResult {
     id: string;
     filename: string;
     status: string;
+    fileSize?: number;
     wordCount: number;
     pageCount?: number;
+    processingTime?: number | null;
     fullText?: string;
     fullHtml?: string;
     statistics: {

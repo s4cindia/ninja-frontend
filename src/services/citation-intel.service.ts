@@ -260,6 +260,14 @@ export const citationIntelService = {
   /**
    * Export manuscript with corrected references
    */
+  /**
+   * Delete a document and all associated data
+   */
+  async deleteDocument(documentId: string): Promise<{ documentId: string }> {
+    const response = await api.delete(`/citation-management/document/${documentId}`);
+    return response.data.data;
+  },
+
   async exportWithCorrections(
     jobId: string,
     options: {

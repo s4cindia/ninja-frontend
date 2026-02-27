@@ -6,11 +6,11 @@ export const JOB_TYPE_LABELS: Record<string, string> = {
   'ALT_TEXT_GENERATION': 'Alt Text Generation',
   'METADATA_EXTRACTION': 'Metadata Extraction',
   'BATCH_VALIDATION': 'Batch Validation',
-  'CITATION_DETECTION': 'Citation Detection',
+  'CITATION_DETECTION': 'Citation Management',
   'CITATION_VALIDATION': 'Citation Validation',
   'PLAGIARISM_CHECK': 'Plagiarism Check',
   'STYLE_VALIDATION': 'Style Validation',
-  'EDITORIAL_FULL': 'Editorial Full Check'
+  'EDITORIAL_FULL': 'Validator'
 };
 
 export const JOB_STATUS_COLORS: Record<string, string> = {
@@ -28,10 +28,7 @@ export function getJobTypeLabel(type: string): string {
 export function extractFileNameFromJob(job: { input?: Record<string, unknown>; output?: Record<string, unknown> }): string {
   if (job.output?.originalName) return String(job.output.originalName);
   if (job.input?.originalName) return String(job.input.originalName);
-  // Strip UUID storage prefix if present (e.g. "abc123-....epub" → shown as-is in fallback)
-  const raw = job.output?.fileName || job.output?.filename || job.input?.fileName || job.input?.filename;
-  if (raw) {
-    return String(raw).replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[._-]/i, '');
-  }
-  return 'Unknown file';
+  if (job.input?.fileName) return String(job.input.fileName);
+  if (job.input?.filename) return String(job.input.filename);
+  return '(deleted)';
 }

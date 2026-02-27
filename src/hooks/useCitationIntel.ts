@@ -204,6 +204,25 @@ export function useFlagReferenceForReview() {
   });
 }
 
+export function useDeleteDocument() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (documentId: string) => citationIntelService.deleteDocument(documentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['citation-analysis'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-citation-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['jobStats'] });
+      toast.success('Document deleted');
+    },
+    onError: (error: unknown) => {
+      const message = (error as ApiErrorResponse)?.response?.data?.error?.message || 'Failed to delete document';
+      toast.error(message);
+    },
+  });
+}
+
 export function useRevertReference() {
   const queryClient = useQueryClient();
 

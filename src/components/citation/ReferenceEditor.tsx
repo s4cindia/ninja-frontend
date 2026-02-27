@@ -12,11 +12,53 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { api } from '@/services/api';
-import { Trash2, GripVertical, Edit2, Check, X, ChevronUp, ChevronDown, ExternalLink, Loader2, Cloud, CloudOff } from 'lucide-react';
+import { Trash2, GripVertical, Edit2, Check, X, ChevronUp, ChevronDown, ExternalLink, Loader2, Cloud, CloudOff, ShieldCheck, AlertTriangle, CheckCircle, Info } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 // Debounce delay for auto-save (ms)
 const DEBOUNCE_DELAY = 1500;
+
+// Field display labels
+const FIELD_LABELS: Record<string, string> = {
+  authors: 'Authors',
+  year: 'Year',
+  title: 'Title',
+  journalName: 'Journal',
+  volume: 'Volume',
+  issue: 'Issue',
+  pages: 'Pages',
+  publisher: 'Publisher',
+  doi: 'DOI',
+};
+
+interface ValidationDiscrepancy {
+  field: string;
+  currentValue: string;
+  correctValue: string;
+}
+
+interface ReferenceValidationResult {
+  status: 'verified' | 'discrepancies_found' | 'not_found';
+  message?: string;
+  referenceId: string;
+  lookupMethod?: 'doi' | 'search';
+  confidence?: number;
+  discrepancies?: ValidationDiscrepancy[];
+  suggestedDoi?: string;
+  crossrefMetadata?: {
+    authors: string[];
+    title: string;
+    year?: string;
+    journalName?: string;
+    volume?: string;
+    issue?: string;
+    pages?: string;
+    doi?: string;
+    url?: string;
+    publisher?: string;
+    sourceType?: string;
+  };
+}
 
 // Pending change types
 type PendingChange =
@@ -98,8 +140,21 @@ export default function ReferenceEditor({
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // Validation state
+  const [validationResults, setValidationResults] = useState<Record<string, ReferenceValidationResult>>({});
+  const [validatingIds, setValidatingIds] = useState<Set<string>>(new Set());
+
   // Debounce timer ref
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Ref to track pending changes for the debounce timer (avoids side effects in state updaters)
+  const pendingChangesRef = useRef<PendingChange[]>([]);
+
+  // Use refs for callbacks to avoid stale closures in debounce timer
+  const onReloadRef = useRef(onReload);
+  const onReorderCompleteRef = useRef(onReorderComplete);
+  useEffect(() => { onReloadRef.current = onReload; }, [onReload]);
+  useEffect(() => { onReorderCompleteRef.current = onReorderComplete; }, [onReorderComplete]);
 
   // Sync local references when props change (after server reload)
   useEffect(() => {
@@ -145,8 +200,14 @@ export default function ReferenceEditor({
 
       // Clear pending changes and reload from server
       setPendingChanges([]);
-      onReorderComplete?.();
-      onReload?.();
+      pendingChangesRef.current = [];
+
+      // Use refs to get latest callback references (avoids stale closures)
+      if (onReorderCompleteRef.current) {
+        await onReorderCompleteRef.current();
+      } else if (onReloadRef.current) {
+        await onReloadRef.current();
+      }
     } catch (err: unknown) {
       console.error('Batch save error:', err);
       setSaveError('Failed to save changes');
@@ -154,7 +215,7 @@ export default function ReferenceEditor({
     } finally {
       setIsSaving(false);
     }
-  }, [documentId, onReload, onReorderComplete]);
+  }, [documentId]);
 
   // Debounced save - queues a change and schedules batch save
   const queueChange = useCallback((change: PendingChange) => {
@@ -164,7 +225,9 @@ export default function ReferenceEditor({
       const filtered = prev.filter(c =>
         !(c.referenceId === change.referenceId && c.type === change.type)
       );
-      return [...filtered, change];
+      const updated = [...filtered, change];
+      pendingChangesRef.current = updated;
+      return updated;
     });
 
     // Clear existing timeout
@@ -173,13 +236,12 @@ export default function ReferenceEditor({
     }
 
     // Schedule batch save after debounce delay
+    // Use ref to read current pending changes (no side effects in state updaters)
     saveTimeoutRef.current = setTimeout(() => {
-      setPendingChanges(currentChanges => {
-        if (currentChanges.length > 0) {
-          executeBatchSave(currentChanges);
-        }
-        return currentChanges;
-      });
+      const current = pendingChangesRef.current;
+      if (current.length > 0) {
+        executeBatchSave(current);
+      }
     }, DEBOUNCE_DELAY);
   }, [executeBatchSave]);
 
@@ -314,11 +376,13 @@ export default function ReferenceEditor({
   const handleSaveEdit = () => {
     if (!editingId) return;
 
-    // Optimistic update
+    // Optimistic update — clear formattedText so the individual fields fallback
+    // renders immediately with edited values. Server regenerates formatted text
+    // when the PATCH saves, and onReload() will restore it.
     setLocalReferences(prev =>
       prev.map(ref =>
         ref.id === editingId
-          ? { ...ref, ...editForm }
+          ? { ...ref, ...editForm, formattedText: undefined }
           : ref
       )
     );
@@ -334,6 +398,109 @@ export default function ReferenceEditor({
   const cancelEdit = () => {
     setEditingId(null);
     setEditForm({});
+  };
+
+  // Validate a reference against CrossRef
+  const handleValidate = async (refId: string) => {
+    setValidatingIds(prev => new Set(prev).add(refId));
+    // Clear previous result for this reference
+    setValidationResults(prev => {
+      const updated = { ...prev };
+      delete updated[refId];
+      return updated;
+    });
+
+    try {
+      const response = await api.get(
+        `/citation-management/document/${documentId}/reference/${refId}/validate`
+      );
+      if (response.data.success) {
+        setValidationResults(prev => ({
+          ...prev,
+          [refId]: response.data.data as ReferenceValidationResult
+        }));
+      }
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Validation failed';
+      toast.error(errorMessage);
+    } finally {
+      setValidatingIds(prev => { const next = new Set(prev); next.delete(refId); return next; });
+    }
+  };
+
+  // Accept all corrections from CrossRef validation
+  const handleAcceptAllCorrections = (refId: string) => {
+    const result = validationResults[refId];
+    if (!result?.discrepancies?.length && !result?.suggestedDoi) return;
+
+    const corrections: Partial<Reference> = {};
+
+    // Apply discrepancies
+    for (const d of result.discrepancies || []) {
+      if (d.field === 'authors') {
+        corrections.authors = d.correctValue.split(', ');
+      } else {
+        (corrections as Record<string, string>)[d.field] = d.correctValue;
+      }
+    }
+
+    // Add suggested DOI
+    if (result.suggestedDoi) {
+      corrections.doi = result.suggestedDoi;
+    }
+
+    // Optimistic update — clear formattedText so the individual fields fallback
+    // renders immediately with corrected values. Server regenerates formatted text
+    // when the PATCH saves, and onReload() will restore it.
+    setLocalReferences(prev =>
+      prev.map(ref => ref.id === refId ? { ...ref, ...corrections, formattedText: undefined } : ref)
+    );
+
+    // Queue the edit
+    queueChange({ type: 'edit', referenceId: refId, data: corrections });
+
+    // Clear validation result
+    setValidationResults(prev => {
+      const updated = { ...prev };
+      delete updated[refId];
+      return updated;
+    });
+
+    toast.success('Corrections applied');
+  };
+
+  // Accept a single field correction
+  const handleAcceptField = (refId: string, field: string, correctValue: string) => {
+    const corrections: Partial<Reference> = {};
+    if (field === 'authors') {
+      corrections.authors = correctValue.split(', ');
+    } else {
+      (corrections as Record<string, string>)[field] = correctValue;
+    }
+
+    // Optimistic update — clear formattedText so corrected field values show immediately
+    setLocalReferences(prev =>
+      prev.map(ref => ref.id === refId ? { ...ref, ...corrections, formattedText: undefined } : ref)
+    );
+
+    // Queue the edit
+    queueChange({ type: 'edit', referenceId: refId, data: corrections });
+
+    // Remove this discrepancy from validation results
+    setValidationResults(prev => {
+      const result = prev[refId];
+      if (!result) return prev;
+      const remaining = (result.discrepancies || []).filter(d => d.field !== field);
+      const suggestedDoi = field === 'doi' ? undefined : result.suggestedDoi;
+      if (remaining.length === 0 && !suggestedDoi) {
+        const updated = { ...prev };
+        delete updated[refId];
+        return updated;
+      }
+      return { ...prev, [refId]: { ...result, discrepancies: remaining, suggestedDoi } };
+    });
+
+    toast.success(`${FIELD_LABELS[field] || field} updated`);
   };
 
   // Determine save status
@@ -594,17 +761,48 @@ export default function ReferenceEditor({
                         {'.'}
                       </p>
                     )}
-                    {ref.doi && (
-                      <a
-                        href={`https://doi.org/${ref.doi}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-600 hover:underline inline-flex items-center mt-1"
-                      >
-                        DOI: {ref.doi}
-                        <ExternalLink className="h-3 w-3 ml-1" />
-                      </a>
-                    )}
+                    {/* Show metadata fields that exist in data but aren't in the formatted text */}
+                    {(() => {
+                      const ft = ref.formattedText || '';
+                      const missing: Array<{ label: string; value: string; isDoi?: boolean }> = [];
+                      if (ref.doi && (!ft || !ft.includes(ref.doi))) {
+                        missing.push({ label: 'DOI', value: ref.doi, isDoi: true });
+                      }
+                      if (ref.publisher && ft && !ft.includes(ref.publisher)) {
+                        missing.push({ label: 'Publisher', value: ref.publisher });
+                      }
+                      if (ref.volume && ft && !ft.includes(ref.volume)) {
+                        missing.push({ label: 'Volume', value: ref.volume });
+                      }
+                      if (ref.issue && ft && !ft.includes(ref.issue)) {
+                        missing.push({ label: 'Issue', value: ref.issue });
+                      }
+                      if (ref.pages && ft && !ft.includes(ref.pages)) {
+                        missing.push({ label: 'Pages', value: ref.pages });
+                      }
+                      if (ref.url && ft && !ft.includes(ref.url)) {
+                        missing.push({ label: 'URL', value: ref.url });
+                      }
+                      if (missing.length === 0) return null;
+                      return (
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
+                          {missing.map(m => m.isDoi ? (
+                            <a
+                              key={m.label}
+                              href={`https://doi.org/${m.value}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-600 hover:underline inline-flex items-center"
+                            >
+                              DOI: {m.value}
+                              <ExternalLink className="h-3 w-3 ml-1" />
+                            </a>
+                          ) : (
+                            <span key={m.label} className="text-xs text-gray-500">{m.label}: {m.value}</span>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Source type badge */}
@@ -650,6 +848,26 @@ export default function ReferenceEditor({
                       <ChevronDown className="h-4 w-4" />
                     </button>
 
+                    {/* Validate against CrossRef */}
+                    <button
+                      onClick={() => handleValidate(ref.id)}
+                      disabled={validatingIds.has(ref.id)}
+                      className={`p-1 ${
+                        validationResults[ref.id]?.status === 'verified'
+                          ? 'text-green-500'
+                          : validationResults[ref.id]?.status === 'discrepancies_found'
+                          ? 'text-orange-500'
+                          : 'text-gray-400 hover:text-indigo-600'
+                      }`}
+                      title="Validate against CrossRef"
+                    >
+                      {validatingIds.has(ref.id) ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <ShieldCheck className="h-4 w-4" />
+                      )}
+                    </button>
+
                     {/* Edit */}
                     <button
                       onClick={() => startEdit(ref)}
@@ -669,6 +887,147 @@ export default function ReferenceEditor({
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
+                </div>
+              )}
+
+              {/* Validation result panel */}
+              {validationResults[ref.id] && (
+                <div className="mt-2 ml-8">
+                  {validationResults[ref.id].status === 'verified' && (
+                    <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded-md">
+                      <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                      <span className="text-sm text-green-800">
+                        Verified — All fields match CrossRef
+                        {validationResults[ref.id].confidence && (
+                          <span className="text-green-600 ml-1">
+                            ({Math.round((validationResults[ref.id].confidence || 0) * 100)}% confidence)
+                          </span>
+                        )}
+                      </span>
+                      <button
+                        onClick={() => setValidationResults(prev => {
+                          const updated = { ...prev };
+                          delete updated[ref.id];
+                          return updated;
+                        })}
+                        className="ml-auto p-0.5 text-green-400 hover:text-green-600"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
+
+                  {validationResults[ref.id].status === 'discrepancies_found' && (
+                    <div className="p-3 bg-orange-50 border border-orange-200 rounded-md">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-orange-600 flex-shrink-0" />
+                          <span className="text-sm font-medium text-orange-800">
+                            Discrepancies found
+                            {validationResults[ref.id].lookupMethod === 'search' && (
+                              <span className="font-normal text-orange-600 ml-1">
+                                (via search, {Math.round((validationResults[ref.id].confidence || 0) * 100)}% match)
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {((validationResults[ref.id].discrepancies?.length || 0) > 0 || validationResults[ref.id].suggestedDoi) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleAcceptAllCorrections(ref.id)}
+                              className="text-xs h-7"
+                            >
+                              <Check className="h-3 w-3 mr-1" />
+                              Accept All
+                            </Button>
+                          )}
+                          <button
+                            onClick={() => setValidationResults(prev => {
+                              const updated = { ...prev };
+                              delete updated[ref.id];
+                              return updated;
+                            })}
+                            className="p-0.5 text-orange-400 hover:text-orange-600"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Discrepancies table */}
+                      {(validationResults[ref.id].discrepancies?.length || 0) > 0 && (
+                        <table className="w-full text-xs border-collapse">
+                          <thead>
+                            <tr className="border-b border-orange-200">
+                              <th className="text-left py-1 pr-2 text-orange-700 font-medium w-20">Field</th>
+                              <th className="text-left py-1 pr-2 text-orange-700 font-medium">Current</th>
+                              <th className="text-left py-1 pr-2 text-orange-700 font-medium">CrossRef</th>
+                              <th className="w-16"></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {validationResults[ref.id].discrepancies?.map((d) => (
+                              <tr key={d.field} className="border-b border-orange-100">
+                                <td className="py-1 pr-2 text-orange-800 font-medium">{FIELD_LABELS[d.field] || d.field}</td>
+                                <td className="py-1 pr-2 text-gray-600 max-w-[200px] truncate" title={d.currentValue}>
+                                  {d.currentValue || <span className="italic text-gray-400">empty</span>}
+                                </td>
+                                <td className="py-1 pr-2 text-gray-900 font-medium max-w-[200px] truncate" title={d.correctValue}>
+                                  {d.correctValue}
+                                </td>
+                                <td className="py-1 text-right">
+                                  <button
+                                    onClick={() => handleAcceptField(ref.id, d.field, d.correctValue)}
+                                    className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                                    aria-label={`Accept ${FIELD_LABELS[d.field] || d.field} correction`}
+                                  >
+                                    Accept
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+
+                      {/* Suggested DOI */}
+                      {validationResults[ref.id].suggestedDoi && (
+                        <div className="mt-2 flex items-center gap-2 p-1.5 bg-blue-50 border border-blue-200 rounded">
+                          <ExternalLink className="h-3 w-3 text-blue-600 flex-shrink-0" />
+                          <span className="text-xs text-blue-800">
+                            DOI found: <span className="font-mono">{validationResults[ref.id].suggestedDoi}</span>
+                          </span>
+                          <button
+                            onClick={() => handleAcceptField(ref.id, 'doi', validationResults[ref.id].suggestedDoi!)}
+                            className="text-xs text-indigo-600 hover:text-indigo-800 font-medium ml-auto"
+                          >
+                            Add DOI
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {validationResults[ref.id].status === 'not_found' && (
+                    <div className="flex items-center gap-2 p-2 bg-gray-50 border border-gray-200 rounded-md">
+                      <Info className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                      <span className="text-sm text-gray-600">
+                        {validationResults[ref.id].message || 'Reference not found in CrossRef database'}
+                      </span>
+                      <button
+                        onClick={() => setValidationResults(prev => {
+                          const updated = { ...prev };
+                          delete updated[ref.id];
+                          return updated;
+                        })}
+                        className="ml-auto p-0.5 text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -291,15 +291,22 @@ export default function CitationUploadPage() {
           </Card>
         )}
 
-        {/* Features Preview */}
-        <div className="mt-12 grid grid-cols-2 gap-6 text-center max-w-md mx-auto">
-          <div>
-            <div className="text-3xl font-bold text-green-600 mb-2">95%</div>
-            <p className="text-sm text-gray-600">DOI Recovery Rate</p>
+        {/* What You Get */}
+        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto">
+          <div className="bg-white rounded-lg border border-gray-200 p-5 text-center">
+            <div className="text-2xl font-bold text-green-600 mb-1">95%</div>
+            <p className="text-sm font-medium text-gray-800 mb-1">DOI Recovery Rate</p>
+            <p className="text-xs text-gray-500">Auto-resolve DOIs and links for your references</p>
           </div>
-          <div>
-            <div className="text-3xl font-bold text-purple-600 mb-2">6</div>
-            <p className="text-sm text-gray-600">Issue Types Detected</p>
+          <div className="bg-white rounded-lg border border-gray-200 p-5 text-center">
+            <div className="text-2xl font-bold text-blue-600 mb-1">5+</div>
+            <p className="text-sm font-medium text-gray-800 mb-1">Citation Styles</p>
+            <p className="text-xs text-gray-500">APA, Chicago, Vancouver, IEEE, and more</p>
+          </div>
+          <div className="bg-white rounded-lg border border-gray-200 p-5 text-center">
+            <div className="text-2xl font-bold text-purple-600 mb-1">1-Click</div>
+            <p className="text-sm font-medium text-gray-800 mb-1">Fix & Export</p>
+            <p className="text-xs text-gray-500">Review changes in-editor and export corrected DOCX</p>
           </div>
         </div>
       </div>

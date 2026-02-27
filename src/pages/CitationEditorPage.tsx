@@ -3,7 +3,7 @@
  * Full-featured citation management with drag-drop reference editor
  */
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   FileText,
@@ -13,13 +13,13 @@ import {
   CheckCircle,
   CheckCircle2,
   AlertTriangle,
-  Link as LinkIcon,
   Eye,
   ArrowUpDown,
-  Loader2
+  Loader2,
+  Trash2,
+  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Alert } from '@/components/ui/Alert';
 import { Checkbox } from '@/components/ui/Checkbox';
@@ -28,6 +28,7 @@ import DragDropGuide from '@/components/citation/DragDropGuide';
 import DocumentViewer from '@/components/citation/DocumentViewer';
 import { ExportOptionsModal } from '@/components/citation/ExportOptionsModal';
 import { api } from '@/services/api';
+import { useDeleteDocument } from '@/hooks/useCitationIntel';
 import toast from 'react-hot-toast';
 
 interface AnalysisCitation {
@@ -78,6 +79,8 @@ interface AnalysisData {
     status: string;
     wordCount: number;
     pageCount?: number;
+    fileSize?: number;
+    processingTime?: number | null;
     fullText?: string;
     fullHtml?: string;
     statistics: {
@@ -125,6 +128,7 @@ interface ApiError {
 export default function CitationEditorPage() {
   const { documentId } = useParams();
   const navigate = useNavigate();
+  const deleteDocumentMutation = useDeleteDocument();
   const [data, setData] = useState<AnalysisData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -156,6 +160,19 @@ export default function CitationEditorPage() {
   const [showSequenceWarning, setShowSequenceWarning] = useState(false);
   const [showDismissDropdown, setShowDismissDropdown] = useState(false);
   const [selectedChangesToDismiss, setSelectedChangesToDismiss] = useState<Set<string>>(new Set());
+  const dismissDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dismiss dropdown on click outside
+  useEffect(() => {
+    if (!showDismissDropdown) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dismissDropdownRef.current && !dismissDropdownRef.current.contains(e.target as Node)) {
+        setShowDismissDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showDismissDropdown]);
 
   // Detect out-of-sequence citations for Vancouver style
   const sequenceAnalysis = useMemo(() => {
@@ -520,11 +537,11 @@ export default function CitationEditorPage() {
     }, 100);
   };
 
-  const handleReorderComplete = async () => {
+  const handleReorderComplete = useCallback(async () => {
     console.log('[CitationEditorPage] handleReorderComplete called');
 
-    // Reload data first
-    await loadAnalysis();
+    // Reload data without showing full-page loading spinner (smooth update)
+    await loadAnalysis(false);
 
     // Fetch preview data from backend to get correctly computed changes
     // This uses the backend's chaining logic: ORIGINAL DOCX → CURRENT → FINAL
@@ -562,7 +579,7 @@ export default function CitationEditorPage() {
       console.error('[CitationEditorPage] Failed to fetch preview:', err);
       // Preview failed - changes won't be highlighted but data is still reloaded
     }
-  };
+  }, [loadAnalysis, documentId]);
 
   // Handle resequencing citations by appearance order
   const handleResequence = async () => {
@@ -747,7 +764,7 @@ export default function CitationEditorPage() {
           <AlertTriangle className="h-4 w-4" />
           <span>{error}</span>
         </Alert>
-        <Button onClick={() => navigate('/citation-management')}>
+        <Button onClick={() => navigate('/citation/upload')}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Upload
         </Button>
@@ -764,42 +781,183 @@ export default function CitationEditorPage() {
       <DragDropGuide />
       <div className="min-h-screen bg-gray-50">
       <div className="border-b bg-white sticky top-0 z-10 shadow-sm">
-        <div className="container mx-auto px-4 py-4 max-w-7xl">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+        <div className="container mx-auto px-4 max-w-7xl">
+          {/* Row 1: Navigation + Title + Actions */}
+          <div className="flex items-center justify-between py-2">
+            <div className="flex items-center space-x-3">
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => navigate('/citation-management')}
+                onClick={() => navigate('/citation/upload')}
               >
-                <ArrowLeft className="h-4 w-4 mr-2" />
+                <ArrowLeft className="h-4 w-4 mr-1" />
                 Back
               </Button>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">
-                  Citation Management
-                </h1>
-                <p className="text-sm text-gray-600 flex items-center mt-1">
-                  <FileText className="h-3 w-3 mr-1" />
-                  {data.document.filename}
-                </p>
-              </div>
+              <h1 className="text-lg font-bold text-gray-900">Citation Management</h1>
+              <span className="text-gray-300">·</span>
+              <span className="text-sm text-gray-600 flex items-center">
+                <FileText className="h-3 w-3 mr-1" />
+                {data.document.filename}
+              </span>
             </div>
             <div className="flex items-center space-x-2">
+              <Button
+                variant="danger"
+                size="sm"
+                disabled={deleteDocumentMutation.isPending}
+                onClick={() => {
+                  if (!documentId) return;
+                  if (confirm('Delete this document? This cannot be undone.')) {
+                    deleteDocumentMutation.mutate(documentId, {
+                      onSuccess: () => navigate('/citation/upload'),
+                    });
+                  }
+                }}
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                {deleteDocumentMutation.isPending ? 'Deleting...' : 'Delete'}
+              </Button>
               <Button variant="outline" size="sm" onClick={() => loadAnalysis()}>
-                <RefreshCw className="h-4 w-4 mr-2" />
+                <RefreshCw className="h-4 w-4 mr-1" />
                 Refresh
               </Button>
               <Button size="sm" onClick={() => setShowExportModal(true)}>
-                <Download className="h-4 w-4 mr-2" />
-                Export DOCX
+                <Download className="h-4 w-4 mr-1" />
+                Export
               </Button>
             </div>
+          </div>
+
+          {/* Row 2: Inline stats with colored labels */}
+          <div className="flex items-center gap-3 pb-2 text-xs flex-wrap">
+            <Badge variant="success">{data.detectedStyle}</Badge>
+            <span className="inline-flex items-center gap-1">
+              <span className="text-blue-500 font-medium">Citations</span>
+              <span className="font-semibold text-blue-700">{data.document.statistics.totalCitations}</span>
+            </span>
+            <span className="text-gray-300">·</span>
+            <span className="inline-flex items-center gap-1">
+              <span className="text-green-500 font-medium">Refs</span>
+              <span className="font-semibold text-green-700">{data.document.statistics.totalReferences}</span>
+            </span>
+            <span className="text-gray-300">·</span>
+            <span className="inline-flex items-center gap-1">
+              <span className="text-purple-500 font-medium">Words</span>
+              <span className="font-semibold text-purple-700">{data.document.wordCount.toLocaleString()}</span>
+            </span>
+            <span className="text-gray-300">·</span>
+            <span className="inline-flex items-center gap-1">
+              <span className="text-indigo-500 font-medium">Size</span>
+              <span className="font-semibold text-indigo-700">
+                {data.document.fileSize != null
+                  ? data.document.fileSize >= 1048576
+                    ? `${(data.document.fileSize / 1048576).toFixed(1)} MB`
+                    : `${(data.document.fileSize / 1024).toFixed(1)} KB`
+                  : '—'}
+              </span>
+            </span>
+            <span className="text-gray-300">·</span>
+            <span className="inline-flex items-center gap-1">
+              <span className="text-amber-500 font-medium">Time</span>
+              <span className="font-semibold text-amber-700">
+                {data.document.processingTime != null
+                  ? data.document.processingTime >= 60000
+                    ? `${Math.floor(data.document.processingTime / 60000)}m ${Math.round((data.document.processingTime % 60000) / 1000)}s`
+                    : `${(data.document.processingTime / 1000).toFixed(1)}s`
+                  : '—'}
+              </span>
+            </span>
+          </div>
+
+          {/* Row 3: Compact tools toolbar */}
+          <div className="flex items-center gap-3 pb-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 font-medium">Convert:</span>
+              <select
+                value={selectedStyle}
+                onChange={(e) => setSelectedStyle(e.target.value)}
+                className="text-sm px-2 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                disabled={converting}
+              >
+                <option value="APA">APA</option>
+                <option value="MLA">MLA</option>
+                <option value="Chicago">Chicago</option>
+                <option value="Vancouver">Vancouver</option>
+                <option value="IEEE">IEEE</option>
+                <option value="Harvard">Harvard</option>
+                <option value="AMA">AMA</option>
+              </select>
+              <Button
+                size="sm"
+                onClick={handleConvertStyle}
+                disabled={converting || selectedStyle === data.detectedStyle}
+              >
+                {converting ? (
+                  <>
+                    <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                    Converting...
+                  </>
+                ) : (
+                  'Convert'
+                )}
+              </Button>
+            </div>
+            <div className="h-4 w-px bg-gray-300" />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleValidateDOIs}
+              disabled={validating}
+            >
+              {validating ? (
+                <>
+                  <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                  Validating...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  Validate DOIs
+                </>
+              )}
+            </Button>
+            {doiValidationResults && doiValidationResults.validated > 0 && (
+              <button
+                className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                onClick={() => setShowDoiValidationResults(true)}
+              >
+                Results: {doiValidationResults.valid}/{doiValidationResults.validated} valid
+                {doiValidationResults.withDiscrepancies > 0 && `, ${doiValidationResults.withDiscrepancies} mismatches`}
+              </button>
+            )}
+            <div className="h-4 w-px bg-gray-300" />
+            <Button
+              variant={showCitations ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => setShowCitations(!showCitations)}
+            >
+              <Eye className="h-3 w-3 mr-1" />
+              Citations ({data.citations.length})
+            </Button>
+            {(data.detectedStyle?.toLowerCase() === 'vancouver' ||
+              data.detectedStyle?.toLowerCase() === 'ieee') && (
+              <>
+                <div className="h-4 w-px bg-gray-300" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowSequenceWarning(true)}
+                >
+                  <ArrowUpDown className="h-3 w-3 mr-1" />
+                  Check Seq
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="container mx-auto px-4 py-4 max-w-7xl">
         {error && (
           <Alert variant="error" className="mb-6">
             <AlertTriangle className="h-4 w-4" />
@@ -809,78 +967,19 @@ export default function CitationEditorPage() {
 
         {/* Processing indicator when document is being analyzed */}
         {['ANALYZING', 'QUEUED', 'PROCESSING'].includes(data.document.status) && pollCount < MAX_POLLS && (
-          <Alert variant="info" className="mb-6">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Document is being analyzed. This page will update automatically when complete...</span>
-          </Alert>
+          <div className="flex items-center gap-2 text-sm text-blue-600 mb-3">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <span>Analyzing... auto-refreshing</span>
+          </div>
         )}
 
         {/* Timeout message when polling stopped */}
         {['ANALYZING', 'QUEUED', 'PROCESSING'].includes(data.document.status) && pollCount >= MAX_POLLS && (
-          <Alert variant="warning" className="mb-6">
-            <AlertTriangle className="h-4 w-4" />
-            <span>Analysis is taking longer than expected. Click Refresh to check status.</span>
-          </Alert>
+          <div className="flex items-center gap-2 text-sm text-amber-600 mb-3">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            <span>Analysis taking longer than expected — click Refresh</span>
+          </div>
         )}
-
-        {/* Statistics Dashboard */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Citations</p>
-                <p className="text-3xl font-bold text-blue-600 mt-1">
-                  {data.document.statistics.totalCitations}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                <span className="text-2xl">📝</span>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">References</p>
-                <p className="text-3xl font-bold text-green-600 mt-1">
-                  {data.document.statistics.totalReferences}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                <span className="text-2xl">📚</span>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Word Count</p>
-                <p className="text-3xl font-bold text-purple-600 mt-1">
-                  {data.document.wordCount.toLocaleString()}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                <span className="text-2xl">📄</span>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Citation Style</p>
-                <Badge variant="success" className="mt-2 text-lg">
-                  {data.detectedStyle}
-                </Badge>
-              </div>
-              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                <span className="text-2xl">✨</span>
-              </div>
-            </div>
-          </Card>
-        </div>
 
         {/* Sequence Warning/Success Banner - Show when user clicks Check Sequence */}
         {showSequenceWarning && !sequenceAnalysis.isSequential && (
@@ -952,175 +1051,54 @@ export default function CitationEditorPage() {
           </Alert>
         )}
 
-        {/* Action Panel */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card className="p-4">
-            <h3 className="font-semibold mb-3 text-gray-900">
-              Convert Citation Style
-            </h3>
-            <select
-              value={selectedStyle}
-              onChange={(e) => setSelectedStyle(e.target.value)}
-              className="w-full mb-3 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-              disabled={converting}
-            >
-              <option value="APA">APA 7th Edition</option>
-              <option value="MLA">MLA 9th Edition</option>
-              <option value="Chicago">Chicago Manual</option>
-              <option value="Vancouver">Vancouver</option>
-              <option value="IEEE">IEEE</option>
-              <option value="Harvard">Harvard</option>
-              <option value="AMA">AMA</option>
-            </select>
-            <Button
-              className="w-full"
-              onClick={handleConvertStyle}
-              disabled={converting || selectedStyle === data.detectedStyle}
-            >
-              {converting ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Converting...
-                </>
-              ) : (
-                <>Convert to {selectedStyle}</>
-              )}
-            </Button>
-          </Card>
-
-          <Card className="p-4">
-            <h3 className="font-semibold mb-3 text-gray-900 flex items-center">
-              <LinkIcon className="h-4 w-4 mr-2" />
-              DOI Validation
-            </h3>
-            <p className="text-sm text-gray-600 mb-3">
-              Validate all DOIs and check metadata accuracy
-            </p>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={handleValidateDOIs}
-              disabled={validating}
-            >
-              {validating ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Validating...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Validate DOIs
-                </>
-              )}
-            </Button>
-            {doiValidationResults && doiValidationResults.validated > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full mt-2 text-blue-600 hover:text-blue-800"
-                onClick={() => setShowDoiValidationResults(true)}
-              >
-                View Results ({doiValidationResults.valid}/{doiValidationResults.validated} valid
-                {doiValidationResults.withDiscrepancies > 0 && `, ${doiValidationResults.withDiscrepancies} mismatches`})
-              </Button>
-            )}
-          </Card>
-
-          <Card className="p-4">
-            <h3 className="font-semibold mb-3 text-gray-900 flex items-center">
-              <Eye className="h-4 w-4 mr-2" />
-              In-Text Citations
-            </h3>
-            <p className="text-sm text-gray-600 mb-3">
-              View {data.citations.length} citation{data.citations.length !== 1 ? 's' : ''} in document
-            </p>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => setShowCitations(!showCitations)}
-            >
-              {showCitations ? 'Hide' : 'Show'} Citations
-            </Button>
-          </Card>
-        </div>
-
-        {/* In-Text Citations Preview */}
+        {/* In-Text Citations — Compact pill/chip view */}
         {showCitations && data.citations.length > 0 && (
-          <Card className="p-6 mb-6">
-            <h3 className="text-lg font-semibold mb-4">In-Text Citations</h3>
-            {/* Warning for citations without references */}
-            {data.citations.filter((c: AnalysisCitation) => !c.referenceNumber && (!c.linkedReferenceNumbers || c.linkedReferenceNumbers.length === 0) && !c.isOrphaned).length > 0 && (
-              <div className="bg-orange-50 border border-orange-200 rounded p-3 mb-4">
-                <p className="text-sm text-orange-800">
-                  <AlertTriangle className="inline h-4 w-4 mr-1" />
-                  <strong>{data.citations.filter((c: AnalysisCitation) => !c.referenceNumber && (!c.linkedReferenceNumbers || c.linkedReferenceNumbers.length === 0) && !c.isOrphaned).length} citation(s)</strong> don't have matching references in the reference list.
-                </p>
-              </div>
-            )}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
+          <div className="mb-4 border border-gray-200 rounded-lg bg-white p-3">
+            <div className="flex flex-wrap gap-1.5">
               {data.citations.map((citation: AnalysisCitation) => {
                 const hasNoReference = !citation.referenceNumber && (!citation.linkedReferenceNumbers || citation.linkedReferenceNumbers.length === 0) && !citation.isOrphaned;
+                const refNums = Array.isArray(citation.linkedReferenceNumbers) && citation.linkedReferenceNumbers.length > 0
+                  ? citation.linkedReferenceNumbers
+                  : citation.referenceNumber ? [citation.referenceNumber] : [];
+
                 return (
-                  <div
+                  <button
                     key={citation.id}
-                    className={`p-3 border rounded-md transition-colors ${
+                    onClick={() => {
+                      if (refNums.length > 0) {
+                        setActiveTab('references');
+                        setTimeout(() => {
+                          const refElement = document.getElementById(`ref-${refNums[0]}`);
+                          refElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          refElement?.classList.add('ring-2', 'ring-blue-500');
+                          setTimeout(() => refElement?.classList.remove('ring-2', 'ring-blue-500'), 2000);
+                        }, 100);
+                      }
+                    }}
+                    title={`¶${citation.paragraphIndex || citation.paragraphNumber || 0} · ${citation.citationType || 'citation'}${refNums.length > 0 ? ` · Ref ${refNums.join(', ')}` : ''}${citation.isOrphaned ? ' · Orphaned' : ''}${hasNoReference ? ' · No matching ref' : ''}`}
+                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-mono font-medium transition-colors cursor-pointer ${
                       citation.isOrphaned
-                        ? 'border-red-300 bg-red-50 hover:bg-red-100'
+                        ? 'bg-red-100 text-red-700 border border-red-300 hover:bg-red-200'
                         : hasNoReference
-                        ? 'border-orange-300 bg-orange-50 hover:bg-orange-100'
-                        : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                        ? 'bg-orange-100 text-orange-700 border border-orange-300 hover:bg-orange-200'
+                        : 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'
                     }`}
                   >
-                    <div className="flex items-start justify-between mb-2">
-                      <Badge variant="default" className="text-xs">
-                        ¶{citation.paragraphIndex || citation.paragraphNumber || 0}
-                      </Badge>
-                      <span className="text-sm font-mono text-gray-700">
-                        {citation.rawText}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between mt-2">
-                      <p className="text-xs text-gray-500 italic">
-                        {citation.citationType || 'Citation'}
-                      </p>
-                      {citation.isOrphaned ? (
-                        <span className="text-xs text-red-600 font-medium">
-                          ⚠️ Reference deleted
-                        </span>
-                      ) : hasNoReference ? (
-                        <span className="text-xs text-orange-600 font-medium">
-                          ⚠️ No matching reference
-                        </span>
-                      ) : ((citation.linkedReferenceNumbers?.length ?? 0) > 0 || citation.referenceNumber) ? (
-                        <div className="flex flex-wrap gap-1">
-                          {/* Show all linked reference numbers as clickable buttons */}
-                          {((citation.linkedReferenceNumbers?.length ?? 0) > 0 ? citation.linkedReferenceNumbers! : [citation.referenceNumber]).map((refNum: number | undefined, idx: number) => refNum !== undefined && (
-                            <button
-                              key={refNum}
-                              onClick={() => {
-                                setActiveTab('references');
-                                setTimeout(() => {
-                                  const refElement = document.getElementById(`ref-${refNum}`);
-                                  refElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                  // Highlight the reference briefly
-                                  refElement?.classList.add('ring-2', 'ring-blue-500');
-                                  setTimeout(() => refElement?.classList.remove('ring-2', 'ring-blue-500'), 2000);
-                                }, 100);
-                              }}
-                              className="text-xs text-blue-600 hover:text-blue-800 hover:underline font-medium"
-                            >
-                              {idx === 0 ? '→ ' : ''}#{refNum}
-                            </button>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
+                    {citation.rawText}
+                    {citation.isOrphaned && <span className="text-red-500 text-[10px]">✗</span>}
+                    {hasNoReference && <span className="text-orange-500 text-[10px]">?</span>}
+                  </button>
                 );
               })}
             </div>
-          </Card>
+            {/* Legend */}
+            <div className="flex items-center gap-4 mt-2 pt-2 border-t border-gray-100 text-[10px] text-gray-500">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400" /> Linked</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-400" /> No match</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400" /> Orphaned</span>
+              <span className="text-gray-400 ml-auto">Click to jump to reference</span>
+            </div>
+          </div>
         )}
 
         {/* Tab Navigation */}
@@ -1154,73 +1132,49 @@ export default function CitationEditorPage() {
         {/* Document Preview Tab */}
         {activeTab === 'document' && (
           <div>
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Document Preview</h2>
-                <p className="text-gray-600 mt-1">
-                  View your document with citations highlighted in context
-                </p>
-              </div>
-              <div className="flex gap-2">
-                {/* Check Sequence Button - For numeric styles */}
-                {(data.detectedStyle?.toLowerCase() === 'vancouver' ||
-                  data.detectedStyle?.toLowerCase() === 'ieee') && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowSequenceWarning(true)}
-                  >
-                    <ArrowUpDown className="h-4 w-4 mr-2" />
-                    Check Sequence
-                  </Button>
-                )}
+            {recentChanges.length > 0 && (
+            <div className="mb-2 flex justify-end">
                 {/* Dismiss Changes Dropdown */}
-                {recentChanges.length > 0 && (
-                  <div className="relative">
-                    <Button
-                      variant="outline"
-                      size="sm"
+                  <div className="relative" ref={dismissDropdownRef}>
+                    <button
                       onClick={() => setShowDismissDropdown(!showDismissDropdown)}
                       disabled={isResetting}
+                      className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-red-600 transition-colors disabled:opacity-50"
                     >
                       {isResetting ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Dismissing...
-                        </>
+                        <Loader2 className="h-3 w-3 animate-spin" />
                       ) : (
-                        `✗ Dismiss Changes (${recentChanges.length})`
+                        <X className="h-3 w-3" />
                       )}
-                    </Button>
+                      {isResetting ? 'Dismissing...' : `Dismiss changes (${recentChanges.length})`}
+                    </button>
                     {showDismissDropdown && (
-                      <div className="absolute right-0 mt-2 w-80 bg-white border rounded-lg shadow-lg z-50 max-h-96 overflow-hidden">
-                        <div className="p-3 border-b bg-gray-50">
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium text-sm">Select changes to dismiss</span>
-                            <button
-                              onClick={() => setShowDismissDropdown(false)}
-                              className="text-gray-400 hover:text-gray-600"
-                            >
-                              ✕
-                            </button>
-                          </div>
+                      <div className="absolute right-0 mt-1 w-72 bg-white border rounded-lg shadow-lg z-50 max-h-80 overflow-hidden">
+                        <div className="px-3 py-2 border-b bg-gray-50 flex items-center justify-between">
+                          <span className="font-medium text-xs text-gray-700">Select changes to dismiss</span>
+                          <button
+                            onClick={() => setShowDismissDropdown(false)}
+                            className="text-gray-400 hover:text-gray-600 text-xs"
+                          >
+                            ✕
+                          </button>
                         </div>
-                        <div className="p-2 border-b">
-                          <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                        <div className="px-2 py-1.5 border-b">
+                          <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-1 py-0.5 rounded text-xs">
                             <Checkbox
                               checked={selectedChangesToDismiss.size === recentChanges.length}
                               onChange={toggleSelectAll}
                             />
-                            <span className="text-sm font-medium">
+                            <span className="font-medium">
                               {selectedChangesToDismiss.size === recentChanges.length ? 'Deselect All' : 'Select All'}
                             </span>
                           </label>
                         </div>
-                        <div className="max-h-60 overflow-y-auto p-2">
+                        <div className="max-h-48 overflow-y-auto px-2 py-1">
                           {recentChanges.map((change) => (
                             <label
                               key={change.citationId}
-                              className="flex items-start gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                              className="flex items-start gap-2 cursor-pointer hover:bg-gray-50 px-1 py-1 rounded"
                             >
                               <Checkbox
                                 checked={selectedChangesToDismiss.has(change.citationId)}
@@ -1229,70 +1183,55 @@ export default function CitationEditorPage() {
                               />
                               <div className="flex-1 min-w-0">
                                 {change.changeType === 'deleted' && change.citationId.startsWith('ref-delete-') ? (
-                                  <>
-                                    <div className="text-sm">
-                                      <span className="text-red-500 line-through truncate">{change.oldText || 'Reference deleted'}</span>
-                                    </div>
-                                    <div className="text-xs text-gray-500">Reference Deleted</div>
-                                  </>
+                                  <div className="text-xs">
+                                    <span className="text-red-500 line-through truncate">{change.oldText || 'Ref deleted'}</span>
+                                  </div>
                                 ) : (
-                                  <>
-                                    <div className="text-sm">
-                                      <span className="text-green-600 font-medium">{change.newText || `(${change.newNumber})`}</span>
-                                      <span className="text-gray-400 mx-1">&larr;</span>
-                                      <span className="text-red-500 line-through">{change.oldText || `(${change.oldNumber})`}</span>
-                                    </div>
-                                    <div className="text-xs text-gray-500 capitalize">
-                                      {change.changeType?.replace('_', ' ') || 'changed'}
-                                    </div>
-                                  </>
+                                  <div className="text-xs">
+                                    <span className="text-green-600 font-medium">{change.newText || `(${change.newNumber})`}</span>
+                                    <span className="text-gray-400 mx-0.5">&larr;</span>
+                                    <span className="text-red-500 line-through">{change.oldText || `(${change.oldNumber})`}</span>
+                                  </div>
                                 )}
                               </div>
                             </label>
                           ))}
                         </div>
-                        <div className="p-3 border-t bg-gray-50 space-y-2">
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setShowDismissDropdown(false);
-                                setSelectedChangesToDismiss(new Set());
-                              }}
-                              className="flex-1"
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              onClick={handleDismissSelected}
-                              disabled={selectedChangesToDismiss.size === 0 || isResetting}
-                              className="flex-1"
-                            >
-                              Dismiss ({selectedChangesToDismiss.size})
-                            </Button>
-                          </div>
+                        <div className="px-2 py-2 border-t bg-gray-50 flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setShowDismissDropdown(false);
+                              setSelectedChangesToDismiss(new Set());
+                            }}
+                            className="flex-1 text-xs text-gray-600 hover:text-gray-800 py-1 rounded border hover:bg-gray-100"
+                          >
+                            Cancel
+                          </button>
                           <Button
-                            variant="outline"
+                            variant="danger"
                             size="sm"
+                            onClick={handleDismissSelected}
+                            disabled={selectedChangesToDismiss.size === 0 || isResetting}
+                            className="flex-1 !text-xs !py-1"
+                          >
+                            Dismiss ({selectedChangesToDismiss.size})
+                          </Button>
+                          <button
                             onClick={() => {
                               setShowDismissDropdown(false);
                               handleDismissChanges();
                             }}
                             disabled={isResetting}
-                            className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
+                            className="text-xs text-red-500 hover:text-red-700 hover:underline whitespace-nowrap disabled:opacity-50"
                           >
-                            Dismiss All & Reset
-                          </Button>
+                            Reset all
+                          </button>
                         </div>
                       </div>
                     )}
                   </div>
-                )}
-              </div>
             </div>
+            )}
             <DocumentViewer
               fullText={data.document.fullText}
               fullHtml={data.document.fullHtml}
@@ -1312,12 +1251,7 @@ export default function CitationEditorPage() {
         {/* Reference List Tab */}
         {activeTab === 'references' && (
           <div>
-            <div className="mb-4">
-              <h2 className="text-2xl font-bold text-gray-900">Reference List</h2>
-              <p className="text-gray-600 mt-1">
-                Drag and drop to reorder • All in-text citations update automatically
-              </p>
-            </div>
+            <p className="text-sm text-gray-500 mb-3">Drag and drop to reorder. All in-text citations update automatically.</p>
             <ReferenceEditor
               documentId={documentId!}
               references={data.references}
