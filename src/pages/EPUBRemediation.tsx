@@ -1036,6 +1036,9 @@ export const EPUBRemediation: React.FC = () => {
   const locationState = location.state as LocationState | null;
   const cancelledRef = useRef(false);
 
+  const fromBatchId = searchParams.get("batchId");
+  const filenameParam = searchParams.get("filename");
+
   // Check URL for completion status
   const urlStatus = searchParams.get("status");
   const initialPageState: PageState =
@@ -1943,21 +1946,22 @@ export const EPUBRemediation: React.FC = () => {
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <Breadcrumbs
-        items={[
-          { label: "EPUB Accessibility", path: "/epub" },
-          { label: "Remediation" },
-        ]}
+        items={
+          fromBatchId
+            ? [{ label: "Agentic Batch", path: `/workflow/batch/${fromBatchId}` }, { label: filenameParam || "Remediation" }]
+            : [{ label: "EPUB Accessibility", path: "/epub" }, { label: "Remediation" }]
+        }
       />
       <div className="flex items-center justify-between">
         <div>
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate("/epub")}
+            onClick={() => navigate(fromBatchId ? `/workflow/batch/${fromBatchId}` : "/epub")}
             className="mb-2"
           >
             <ArrowLeft className="h-4 w-4 mr-1" />
-            Back
+            {fromBatchId ? "Back to Batch" : "Back"}
           </Button>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <BookOpen className="h-7 w-7 text-primary-600" />

@@ -29,11 +29,8 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
 
-// Use local worker for better compatibility and to avoid CDN/CSP issues
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.js',
-  import.meta.url
-).toString();
+// Use local worker served from public/ to avoid CDN/CSP issues
+pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
 
 export interface PdfPreviewPanelProps {
   pdfUrl: string;

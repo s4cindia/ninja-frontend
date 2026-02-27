@@ -1,5 +1,41 @@
 import { api, ApiResponse } from './api';
 
+/** Phase 1: simple per-gate mode string. Phase 2: extended object. */
+export type GatePolicyMode = 'auto-accept' | 'conditional' | 'require-manual';
+
+export interface PolicyConditions {
+  minConfidence?: number;  // 0.0–1.0
+  issueTypeRules?: Record<string, 'auto-accept' | 'auto-reject' | 'manual'>;
+}
+
+export interface ConditionalGatePolicy {
+  mode: GatePolicyMode;
+  conditions?: PolicyConditions;
+}
+
+/**
+ * Phase 1 (string): 'auto-accept' | 'require-manual'
+ * Phase 2 (object): { mode: 'conditional', conditions: { minConfidence?, issueTypeRules? } }
+ */
+export type BatchGatePolicy = 'auto-accept' | 'require-manual' | ConditionalGatePolicy;
+
+/** Error handling strategy when a workflow within a batch fails. */
+export type BatchErrorStrategy = 'pause-batch' | 'continue-others' | 'fail-batch';
+
+/**
+ * Auto-approval policy stored on a batch run.
+ * Determines which HITL gates are skipped and how errors are handled.
+ */
+export interface BatchAutoApprovalPolicy {
+  gates: {
+    AI_REVIEW?: BatchGatePolicy;
+    REMEDIATION_REVIEW?: BatchGatePolicy;
+    CONFORMANCE_REVIEW?: BatchGatePolicy;
+    ACR_SIGNOFF?: BatchGatePolicy;
+  };
+  onError: BatchErrorStrategy;
+}
+
 export interface WorkflowStatus {
   id: string;
   fileId: string;
@@ -36,6 +72,44 @@ export interface BatchDashboard {
   inProgressCount: number;
   createdAt: string;
   workflows: WorkflowStatus[];
+  autoApprovalPolicy?: BatchAutoApprovalPolicy | null;
+}
+
+export interface AcrBatchConfig {
+  vendor: string;
+  contactEmail: string;
+  edition: 'VPAT2.5-WCAG' | 'VPAT2.5-508' | 'VPAT2.5-EU' | 'VPAT2.5-INT';
+  mode: 'individual' | 'aggregate';
+  aggregationStrategy: 'conservative' | 'optimistic';
+}
+
+/** Response from GET /workflows/batch/:batchId (agentic workflow batch) */
+export interface AgenticBatchDashboard {
+  id: string;
+  name: string;
+  totalFiles: number;
+  status: string;
+  metrics: {
+    perStage: Record<string, number>;
+    perGate: Record<string, number>;
+    completedCount: number;
+    failedCount: number;
+    errorCount: number;
+  };
+  startedAt: string;
+  completedAt?: string;
+  autoApprovalPolicy?: BatchAutoApprovalPolicy | null;
+  acrConfig?: AcrBatchConfig | null;
+  failedWorkflows?: Array<{ id: string; filename: string; errorMessage: string | null }>;
+  completedWorkflows?: Array<{
+    workflowId: string;
+    filename: string;
+    acrJobId: string | null;
+    jobId: string | null;
+    remediatedFileName: string | null;
+    fileType: 'epub' | 'pdf';
+  }>;
+  hitlWaiting?: Array<{ workflowId: string; filename: string; gate: string; reviewUrl: string }>;
 }
 
 export interface AIReviewDecision {
@@ -145,17 +219,39 @@ export const workflowService = {
   async startBatch(
     name: string,
     fileIds: string[],
-    concurrency?: number
-  ): Promise<{ batchId: string; workflowCount: number }> {
-    const response = await api.post<ApiResponse<{ batchId: string; workflowCount: number }>>(
+    concurrency?: number,
+    autoApprovalPolicy?: BatchAutoApprovalPolicy,
+    acrConfig?: AcrBatchConfig
+  ): Promise<{ batchId: string; workflowCount: number; autoApprovalPolicy?: BatchAutoApprovalPolicy | null }> {
+    const response = await api.post<{ batchId: string; workflowCount: number; autoApprovalPolicy?: BatchAutoApprovalPolicy | null }>(
       '/workflows/batch',
-      { name, fileIds, concurrency }
+      { name, fileIds, concurrency, autoApprovalPolicy, acrConfig }
     );
-    return response.data.data;
+    return response.data;
   },
 
   async getBatchDashboard(batchId: string): Promise<BatchDashboard> {
     const response = await api.get<ApiResponse<BatchDashboard>>(`/workflows/batch/${batchId}`);
     return response.data.data;
+  },
+
+  async getAgenticBatchDashboard(batchId: string): Promise<AgenticBatchDashboard> {
+    const response = await api.get<AgenticBatchDashboard>(`/workflows/batch/${batchId}`);
+    return response.data;
+  },
+
+  async pauseBatch(batchId: string): Promise<{ pausedCount: number }> {
+    const response = await api.post<{ success: boolean; pausedCount: number }>(`/workflows/batch/${batchId}/pause`);
+    return response.data;
+  },
+
+  async resumeBatch(batchId: string): Promise<{ resumedCount: number }> {
+    const response = await api.post<{ success: boolean; resumedCount: number }>(`/workflows/batch/${batchId}/resume`);
+    return response.data;
+  },
+
+  async retryFailedBatch(batchId: string): Promise<{ retriedCount: number }> {
+    const response = await api.post<{ success: boolean; retriedCount: number }>(`/workflows/batch/${batchId}/retry-failed`);
+    return response.data;
   },
 };

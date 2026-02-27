@@ -26,8 +26,6 @@ export function getJobTypeLabel(type: string): string {
 }
 
 export function extractFileNameFromJob(job: { input?: Record<string, unknown>; output?: Record<string, unknown> }): string {
-  if (job.output?.fileName) return String(job.output.fileName);
-  if (job.output?.filename) return String(job.output.filename);
   if (job.output?.originalName) return String(job.output.originalName);
   if (job.input?.originalName) return String(job.input.originalName);
   if (job.input?.fileName) return String(job.input.fileName);

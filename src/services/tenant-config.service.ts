@@ -22,12 +22,22 @@ export interface AutoRetryConfig {
 }
 
 /**
+ * Tenant-level batch policy configuration.
+ * Controls whether fully headless (no human review) batches are permitted.
+ */
+export interface BatchPolicyTenantConfig {
+  /** When true, batches may set all gates to 'auto-accept' with no human review. */
+  allowFullyHeadless: boolean;
+}
+
+/**
  * Complete workflow configuration.
  */
 export interface WorkflowConfig {
   enabled: boolean;
   hitlGates?: HitlGateConfig;
   autoRetry?: AutoRetryConfig;
+  batchPolicy?: BatchPolicyTenantConfig;
 }
 
 /**
@@ -37,6 +47,7 @@ export interface WorkflowConfigUpdate {
   enabled?: boolean;
   hitlGates?: Partial<HitlGateConfig>;
   autoRetry?: Partial<AutoRetryConfig>;
+  batchPolicy?: Partial<BatchPolicyTenantConfig>;
 }
 
 /**
@@ -73,6 +84,9 @@ class TenantConfigService {
           maxRetries: 3,
           backoffMs: 5000,
           retryableStates: ['FAILED'],
+        },
+        batchPolicy: {
+          allowFullyHeadless: false,
         },
       };
     }

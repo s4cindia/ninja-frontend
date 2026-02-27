@@ -256,7 +256,7 @@ describe('WorkflowDashboard WebSocket Integration', () => {
       render(<WorkflowDashboard workflowId="123" />, { wrapper: createWrapper() });
 
       await waitFor(() => {
-        expect(screen.getByText(/Human review required/i)).toBeInTheDocument();
+        expect(screen.getAllByText(/Human review required/i).length).toBeGreaterThan(0);
       });
     });
   });

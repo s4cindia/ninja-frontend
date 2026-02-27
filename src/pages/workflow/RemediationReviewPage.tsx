@@ -124,7 +124,12 @@ export function RemediationReviewPage() {
       await workflowService.submitRemediationReview(workflowId!);
 
       toast.success('Remediation review accepted! Workflow continuing...');
-      navigate(`/workflow/${workflowId}`);
+      // Return to batch dashboard so the reviewer can process the next file
+      if (workflow?.batchId) {
+        navigate(`/workflow/batch/${workflow.batchId}`);
+      } else {
+        navigate(`/workflow/${workflowId}`);
+      }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to submit review');
     } finally {
@@ -177,9 +182,13 @@ export function RemediationReviewPage() {
             variant="outline"
             size="sm"
             leftIcon={<ArrowLeft className="w-4 h-4" />}
-            onClick={() => navigate(`/workflow/${workflowId}`)}
+            onClick={() =>
+              workflow?.batchId
+                ? navigate(`/workflow/batch/${workflow.batchId}`)
+                : navigate(`/workflow/${workflowId}`)
+            }
           >
-            Back
+            {workflow?.batchId ? 'Back to Batch' : 'Back'}
           </Button>
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">Remediation Review</h1>

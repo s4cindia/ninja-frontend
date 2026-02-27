@@ -17,12 +17,15 @@ import {
   PenTool,
   Settings,
   BookCheck,
+  Bot,
 } from 'lucide-react';
 
 type NavItem = {
   to: string;
   icon: React.ComponentType<{ className?: string }>;
   label: string;
+  /** If set, the nav item is highlighted when the pathname starts with this prefix instead of `to`. */
+  activePrefix?: string;
 };
 
 type NavSection = {
@@ -70,17 +73,24 @@ export function MainLayout() {
       items: [
         { to: '/remediation', icon: Wrench, label: 'Remediation' },
         { to: '/batches', icon: Layers, label: 'Batch Processing' },
+        {
+          to: '/workflow/batch/new',
+          icon: Bot,
+          label: 'Agentic Batch',
+          activePrefix: '/workflow/batch',
+        },
         { to: '/feedback', icon: MessageSquare, label: 'Feedback' },
         { to: '/settings/workflow', icon: Settings, label: 'Workflow Settings' },
       ],
     },
   ];
 
-  const isActive = (path: string) => {
-    if (path === '/dashboard') {
+  const isActive = (item: NavItem) => {
+    const checkPath = item.activePrefix ?? item.to;
+    if (checkPath === '/dashboard') {
       return location.pathname === '/dashboard' || location.pathname === '/';
     }
-    return location.pathname.startsWith(path);
+    return location.pathname.startsWith(checkPath);
   };
 
   return (
@@ -124,7 +134,7 @@ export function MainLayout() {
                       key={item.to}
                       to={item.to}
                       className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
-                        isActive(item.to)
+                        isActive(item)
                           ? 'bg-primary-50 text-primary-700 font-medium'
                           : 'text-gray-700 hover:bg-gray-100'
                       }`}

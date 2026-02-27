@@ -457,6 +457,7 @@ describe('PdfAuditApiService', () => {
       });
 
       const promise = pdfAuditApi.pollForCompletion('job-123', 1000, 10000);
+      promise.catch(() => {}); // suppress unhandled rejection during timer advancement
 
       await vi.advanceTimersByTimeAsync(1000);
 
@@ -473,6 +474,7 @@ describe('PdfAuditApiService', () => {
       });
 
       const promise = pdfAuditApi.pollForCompletion('job-123', 1000, 5000);
+      promise.catch(() => {}); // suppress unhandled rejection during timer advancement
 
       // Advance past timeout
       await vi.advanceTimersByTimeAsync(6000);
@@ -499,6 +501,7 @@ describe('PdfAuditApiService', () => {
       });
 
       const { promise, abort } = pdfAuditApi.createCancellablePolling('job-123', 1000, 10000);
+      promise.catch(() => {}); // suppress unhandled rejection during abort
 
       // Start polling
       await vi.advanceTimersByTimeAsync(1000);
