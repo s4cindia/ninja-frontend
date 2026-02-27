@@ -142,7 +142,7 @@ export default function ReferenceEditor({
 
   // Validation state
   const [validationResults, setValidationResults] = useState<Record<string, ValidationResult>>({});
-  const [validatingId, setValidatingId] = useState<string | null>(null);
+  const [validatingIds, setValidatingIds] = useState<Set<string>>(new Set());
 
   // Debounce timer ref
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -402,7 +402,7 @@ export default function ReferenceEditor({
 
   // Validate a reference against CrossRef
   const handleValidate = async (refId: string) => {
-    setValidatingId(refId);
+    setValidatingIds(prev => new Set(prev).add(refId));
     // Clear previous result for this reference
     setValidationResults(prev => {
       const updated = { ...prev };
@@ -411,7 +411,7 @@ export default function ReferenceEditor({
     });
 
     try {
-      const response = await api.post(
+      const response = await api.get(
         `/citation-management/document/${documentId}/reference/${refId}/validate`
       );
       if (response.data.success) {
@@ -424,7 +424,7 @@ export default function ReferenceEditor({
       const errorMessage = err instanceof Error ? err.message : 'Validation failed';
       toast.error(errorMessage);
     } finally {
-      setValidatingId(null);
+      setValidatingIds(prev => { const next = new Set(prev); next.delete(refId); return next; });
     }
   };
 
@@ -765,7 +765,7 @@ export default function ReferenceEditor({
                     {(() => {
                       const ft = ref.formattedText || '';
                       const missing: Array<{ label: string; value: string; isDoi?: boolean }> = [];
-                      if (ref.doi) {
+                      if (ref.doi && (!ft || !ft.includes(ref.doi))) {
                         missing.push({ label: 'DOI', value: ref.doi, isDoi: true });
                       }
                       if (ref.publisher && ft && !ft.includes(ref.publisher)) {
@@ -851,7 +851,7 @@ export default function ReferenceEditor({
                     {/* Validate against CrossRef */}
                     <button
                       onClick={() => handleValidate(ref.id)}
-                      disabled={validatingId === ref.id}
+                      disabled={validatingIds.has(ref.id)}
                       className={`p-1 ${
                         validationResults[ref.id]?.status === 'verified'
                           ? 'text-green-500'
@@ -861,7 +861,7 @@ export default function ReferenceEditor({
                       }`}
                       title="Validate against CrossRef"
                     >
-                      {validatingId === ref.id ? (
+                      {validatingIds.has(ref.id) ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <ShieldCheck className="h-4 w-4" />

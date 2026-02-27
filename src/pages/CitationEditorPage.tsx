@@ -836,7 +836,7 @@ export default function CitationEditorPage() {
             <span className="inline-flex items-center gap-1">
               <span className="text-indigo-500 font-medium">Size</span>
               <span className="font-semibold text-indigo-700">
-                {data.document.fileSize
+                {data.document.fileSize != null
                   ? data.document.fileSize >= 1048576
                     ? `${(data.document.fileSize / 1048576).toFixed(1)} MB`
                     : `${(data.document.fileSize / 1024).toFixed(1)} KB`
@@ -847,7 +847,7 @@ export default function CitationEditorPage() {
             <span className="inline-flex items-center gap-1">
               <span className="text-amber-500 font-medium">Time</span>
               <span className="font-semibold text-amber-700">
-                {data.document.processingTime
+                {data.document.processingTime != null
                   ? data.document.processingTime >= 60000
                     ? `${Math.floor(data.document.processingTime / 60000)}m ${Math.round((data.document.processingTime % 60000) / 1000)}s`
                     : `${(data.document.processingTime / 1000).toFixed(1)}s`

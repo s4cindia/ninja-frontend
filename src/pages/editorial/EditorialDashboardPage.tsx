@@ -284,8 +284,9 @@ export function EditorialDashboardPage() {
       }
       toast.success('Document deleted');
       fetchRecentDocuments();
-    } catch {
-      toast.error('Failed to delete document');
+    } catch (err) {
+      console.error('[EditorialDashboard] Delete failed:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to delete document');
     } finally {
       setDeletingId(null);
     }
