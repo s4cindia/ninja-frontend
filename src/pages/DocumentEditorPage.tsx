@@ -2,7 +2,6 @@
  * Document Editor Page
  *
  * TipTap-based document editor with style validation panel integration.
- * Replaces the OnlyOffice-based FullEditorPage.
  */
 
 import { useRef, useState, useCallback, useEffect } from 'react';
@@ -34,6 +33,7 @@ export default function DocumentEditorPage() {
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [currentVersion, setCurrentVersion] = useState<number | null>(null);
   const [restoring, setRestoring] = useState(false);
+  const [docStats, setDocStats] = useState<{ fileSize?: number; wordCount?: number; processingTime?: number | null }>({});
 
   // Load document content from API
   useEffect(() => {
@@ -50,6 +50,13 @@ export default function DocumentEditorPage() {
 
         const result = await validatorService.getDocumentContent(documentId);
         setContent(result.content);
+
+        // Store document statistics
+        setDocStats({
+          fileSize: result.fileSize,
+          wordCount: result.wordCount,
+          processingTime: result.processingTime,
+        });
 
         // Set document name from API response
         if (result.fileName) {
@@ -577,6 +584,41 @@ export default function DocumentEditorPage() {
           </button>
         </div>
       </div>
+
+      {/* Document Statistics Bar */}
+      {(docStats.fileSize || docStats.wordCount || docStats.processingTime) && (
+        <div className="flex items-center gap-4 bg-gray-50 border-b px-4 py-2">
+          {docStats.wordCount != null && docStats.wordCount > 0 && (
+            <div className="flex items-center gap-1.5 text-sm">
+              <span className="text-gray-400">📄</span>
+              <span className="text-gray-500">Words:</span>
+              <span className="font-medium text-gray-700">{docStats.wordCount.toLocaleString()}</span>
+            </div>
+          )}
+          {docStats.fileSize != null && docStats.fileSize > 0 && (
+            <div className="flex items-center gap-1.5 text-sm">
+              <span className="text-gray-400">💾</span>
+              <span className="text-gray-500">Size:</span>
+              <span className="font-medium text-gray-700">
+                {docStats.fileSize >= 1048576
+                  ? `${(docStats.fileSize / 1048576).toFixed(1)} MB`
+                  : `${(docStats.fileSize / 1024).toFixed(1)} KB`}
+              </span>
+            </div>
+          )}
+          {docStats.processingTime != null && docStats.processingTime > 0 && docStats.processingTime < 600000 && (
+            <div className="flex items-center gap-1.5 text-sm">
+              <span className="text-gray-400">⚡</span>
+              <span className="text-gray-500">Analyzed in:</span>
+              <span className="font-medium text-green-600">
+                {docStats.processingTime >= 60000
+                  ? `${Math.floor(docStats.processingTime / 60000)}m ${Math.round((docStats.processingTime % 60000) / 1000)}s`
+                  : `${(docStats.processingTime / 1000).toFixed(1)}s`}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {editorContent}
     </div>

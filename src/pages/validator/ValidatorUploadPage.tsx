@@ -206,7 +206,7 @@ export function ValidatorUploadPage() {
           <ul className="space-y-3 text-sm text-gray-600">
             <li className="flex items-start gap-2">
               <span className="text-emerald-500 mt-0.5">✓</span>
-              Edit documents with full OnlyOffice integration
+              Edit documents with built-in rich text editor
             </li>
             <li className="flex items-start gap-2">
               <span className="text-emerald-500 mt-0.5">✓</span>

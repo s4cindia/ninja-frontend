@@ -1,7 +1,7 @@
 /**
  * StyleValidationPanel Component
  *
- * Side panel for style validation that integrates with OnlyOffice editor
+ * Side panel for style validation that integrates with the document editor
  */
 
 import { useState, useEffect } from 'react';

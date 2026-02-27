@@ -19,6 +19,9 @@ export interface DocumentContent {
   documentId: string;
   content: string;
   fileName: string;
+  fileSize?: number;
+  wordCount?: number;
+  processingTime?: number | null;
   conversionWarnings?: string[];
 }
 

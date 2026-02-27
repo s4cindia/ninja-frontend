@@ -12,6 +12,7 @@ export interface Job {
   updatedAt: string;
   startedAt?: string;
   completedAt?: string;
+  documentId?: string;
 }
 
 export interface JobFilters {
@@ -91,5 +92,9 @@ export const jobsService = {
 
   async cancelJob(jobId: string): Promise<void> {
     await api.delete(`/jobs/${jobId}`);
+  },
+
+  async deleteJob(jobId: string): Promise<void> {
+    await api.delete(`/jobs/${jobId}/permanent`);
   },
 };

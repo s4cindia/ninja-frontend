@@ -2,18 +2,19 @@ import { useState, useMemo } from 'react';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
-import { useJobs, useJobStats, useCancelJob } from '@/hooks/useJobs';
+import { useJobs, useJobStats, useCancelJob, useDeleteJob } from '@/hooks/useJobs';
 import { Job } from '@/services/jobs.service';
 import { getJobTypeLabel, extractFileNameFromJob } from '@/utils/jobTypes';
 import { getStatusIcon, getStatusBadgeClass, formatRelativeTime } from '@/utils/jobHelpers';
-import { 
+import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
   X,
   RefreshCw,
   Eye,
-  Clock
+  Clock,
+  Trash2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -28,12 +29,15 @@ const STATUS_OPTIONS = [
   { value: 'CANCELLED', label: 'Cancelled' },
 ];
 
-const CITATION_JOB_TYPES = ['CITATION_DETECTION', 'CITATION_VALIDATION', 'EDITORIAL_FULL'];
+const CITATION_JOB_TYPES = ['CITATION_DETECTION', 'CITATION_VALIDATION'];
 
 function getJobDetailPath(job: Job): string {
   if (CITATION_JOB_TYPES.includes(job.type)) {
     // Navigate to citation analysis page - backend resolves job ID to document
     return `/citation/analysis/${job.id}`;
+  }
+  if (job.type === 'EDITORIAL_FULL' && job.documentId) {
+    return `/validator/editor/${job.documentId}`;
   }
   return `/jobs/${job.id}`;
 }
@@ -54,6 +58,7 @@ export function Jobs() {
   const { data, isLoading, isError, error, refetch } = useJobs(filters);
   const { data: stats } = useJobStats();
   const cancelJob = useCancelJob();
+  const deleteJob = useDeleteJob();
 
   const hasFilters = statusFilter || typeFilter;
 
@@ -70,6 +75,17 @@ export function Jobs() {
     } catch (error) {
       console.error('Failed to cancel job:', error);
       const message = error instanceof Error ? error.message : 'Failed to cancel job';
+      toast.error(message);
+    }
+  };
+
+  const handleDelete = async (jobId: string) => {
+    if (!confirm('Permanently delete this job and all its data? This cannot be undone.')) return;
+    try {
+      await deleteJob.mutateAsync(jobId);
+      toast.success('Job deleted');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to delete job';
       toast.error(message);
     }
   };
@@ -163,7 +179,7 @@ export function Jobs() {
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           )}
         >
-          Citation Detection {jobCounts.CITATION_DETECTION > 0 && `(${jobCounts.CITATION_DETECTION})`}
+          Citation Management {jobCounts.CITATION_DETECTION > 0 && `(${jobCounts.CITATION_DETECTION})`}
         </button>
         <button
           role="tab"
@@ -189,7 +205,7 @@ export function Jobs() {
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           )}
         >
-          Editorial {jobCounts.EDITORIAL_FULL > 0 && `(${jobCounts.EDITORIAL_FULL})`}
+          Validator {jobCounts.EDITORIAL_FULL > 0 && `(${jobCounts.EDITORIAL_FULL})`}
         </button>
       </div>
 
@@ -345,6 +361,14 @@ export function Jobs() {
                               Cancel
                             </Button>
                           )}
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => handleDelete(job.id)}
+                            disabled={deleteJob.isPending}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
                       </td>
                     </tr>

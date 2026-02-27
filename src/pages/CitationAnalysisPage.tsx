@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, CheckCircle, Clock, FileText, Target, Download, BookOpen } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, FileText, Target, Download, BookOpen, Zap, HardDrive } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
@@ -14,6 +14,21 @@ import { useAnalysisResults } from '@/hooks/useCitationIntel';
 import { ExportOptionsModal } from '@/components/citation/ExportOptionsModal';
 import { citationIntelService } from '@/services/citation-intel.service';
 import toast from 'react-hot-toast';
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  const seconds = ms / 1000;
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSecs = Math.round(seconds % 60);
+  return `${minutes}m ${remainingSecs}s`;
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 // Type guard to check if error has a response with status
 interface HttpError {
@@ -175,6 +190,35 @@ export default function CitationAnalysisPage() {
     );
   }
 
+  // Show incomplete/pending analysis (document exists but not fully processed)
+  if (isComplete && analysis && analysis.document.status !== 'COMPLETED') {
+    const filename = analysis.document.filename;
+    const status = analysis.document.status;
+
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="p-12 max-w-2xl w-full text-center">
+          <Clock className="h-16 w-16 text-amber-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Analysis Not Complete</h2>
+          <p className="text-gray-600 mb-2">
+            <span className="font-semibold">{filename}</span> was uploaded but analysis {status === 'UPLOADED' ? 'has not started' : 'is still in progress'}.
+          </p>
+          <p className="text-sm text-gray-500 mb-6">
+            Status: <span className="font-mono">{status}</span>
+          </p>
+          <div className="flex gap-3 justify-center">
+            <Button onClick={() => navigate('/citation/upload')} variant="primary">
+              Upload New Document
+            </Button>
+            <Button onClick={() => navigate('/editorial')} variant="outline">
+              Go Back
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   // Show results (THE HOOK!)
   if (isComplete && analysis) {
     const { document, references, detectedStyle } = analysis;
@@ -193,9 +237,33 @@ export default function CitationAnalysisPage() {
                   <h1 className="text-3xl font-bold text-gray-900">Analysis Complete</h1>
                 </div>
                 <p className="text-xl text-gray-700 ml-11">
-                  📄 <span className="font-semibold">{filename}</span> - Detected style:{' '}
+                  <span className="font-semibold">{filename}</span> - Detected style:{' '}
                   <span className="font-bold text-blue-600">{detectedStyle || 'Unknown'}</span>
                 </p>
+                {/* Performance summary line */}
+                <div className="flex items-center gap-4 ml-11 mt-2 text-sm text-gray-600">
+                  {document.processingTime && document.processingTime > 0 && (
+                    <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                      <Zap className="h-3.5 w-3.5" />
+                      Analyzed in {formatDuration(document.processingTime)}
+                    </span>
+                  )}
+                  {document.fileSize && document.fileSize > 0 && (
+                    <span className="inline-flex items-center gap-1">
+                      <HardDrive className="h-3.5 w-3.5 text-gray-400" />
+                      {formatFileSize(document.fileSize)}
+                    </span>
+                  )}
+                  {document.wordCount > 0 && (
+                    <span className="inline-flex items-center gap-1">
+                      <FileText className="h-3.5 w-3.5 text-gray-400" />
+                      {document.wordCount.toLocaleString()} words
+                    </span>
+                  )}
+                  {document.pageCount && document.pageCount > 0 && (
+                    <span>{document.pageCount} page{document.pageCount !== 1 ? 's' : ''}</span>
+                  )}
+                </div>
               </div>
               <div className="flex space-x-3">
                 <Button variant="outline" onClick={() => navigate(`/citation/manuscript/${documentId}`)}>
@@ -216,27 +284,41 @@ export default function CitationAnalysisPage() {
           {/* Document Stats */}
           <Card className="p-8 mb-8">
             <h2 className="text-2xl font-semibold text-gray-900 mb-6">Document Statistics</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <FileText className="h-8 w-8 text-blue-500 mx-auto mb-2" />
-                <p className="text-3xl font-bold text-gray-900">{statistics?.totalReferences || 0}</p>
-                <p className="text-sm text-gray-600">References</p>
+                <FileText className="h-7 w-7 text-blue-500 mx-auto mb-2" />
+                <p className="text-2xl font-bold text-gray-900">{statistics?.totalReferences || 0}</p>
+                <p className="text-xs text-gray-600">References</p>
               </div>
               <div className="text-center p-4 bg-green-50 rounded-lg">
-                <Target className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                <p className="text-3xl font-bold text-gray-900">{statistics?.totalCitations || 0}</p>
-                <p className="text-sm text-gray-600">In-Text Citations</p>
+                <Target className="h-7 w-7 text-green-500 mx-auto mb-2" />
+                <p className="text-2xl font-bold text-gray-900">{statistics?.totalCitations || 0}</p>
+                <p className="text-xs text-gray-600">In-Text Citations</p>
               </div>
               <div className="text-center p-4 bg-purple-50 rounded-lg">
-                <CheckCircle className="h-8 w-8 text-purple-500 mx-auto mb-2" />
-                <p className="text-3xl font-bold text-gray-900">{document.wordCount || 0}</p>
-                <p className="text-sm text-gray-600">Words</p>
+                <FileText className="h-7 w-7 text-purple-500 mx-auto mb-2" />
+                <p className="text-2xl font-bold text-gray-900">{document.wordCount?.toLocaleString() || 0}</p>
+                <p className="text-xs text-gray-600">Words</p>
               </div>
               <div className="text-center p-4 bg-orange-50 rounded-lg">
-                <Clock className="h-8 w-8 text-orange-500 mx-auto mb-2" />
-                <p className="text-3xl font-bold text-gray-900">{document.pageCount || 0}</p>
-                <p className="text-sm text-gray-600">Pages</p>
+                <BookOpen className="h-7 w-7 text-orange-500 mx-auto mb-2" />
+                <p className="text-2xl font-bold text-gray-900">{document.pageCount || 0}</p>
+                <p className="text-xs text-gray-600">Pages</p>
               </div>
+              {document.fileSize && document.fileSize > 0 && (
+                <div className="text-center p-4 bg-gray-50 rounded-lg">
+                  <HardDrive className="h-7 w-7 text-gray-500 mx-auto mb-2" />
+                  <p className="text-2xl font-bold text-gray-900">{formatFileSize(document.fileSize)}</p>
+                  <p className="text-xs text-gray-600">File Size</p>
+                </div>
+              )}
+              {document.processingTime && document.processingTime > 0 && (
+                <div className="text-center p-4 bg-emerald-50 rounded-lg">
+                  <Zap className="h-7 w-7 text-emerald-500 mx-auto mb-2" />
+                  <p className="text-2xl font-bold text-emerald-700">{formatDuration(document.processingTime)}</p>
+                  <p className="text-xs text-gray-600">Analysis Time</p>
+                </div>
+              )}
             </div>
           </Card>
 

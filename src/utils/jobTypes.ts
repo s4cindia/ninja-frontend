@@ -6,11 +6,11 @@ export const JOB_TYPE_LABELS: Record<string, string> = {
   'ALT_TEXT_GENERATION': 'Alt Text Generation',
   'METADATA_EXTRACTION': 'Metadata Extraction',
   'BATCH_VALIDATION': 'Batch Validation',
-  'CITATION_DETECTION': 'Citation Detection',
+  'CITATION_DETECTION': 'Citation Management',
   'CITATION_VALIDATION': 'Citation Validation',
   'PLAGIARISM_CHECK': 'Plagiarism Check',
   'STYLE_VALIDATION': 'Style Validation',
-  'EDITORIAL_FULL': 'Editorial Full Check'
+  'EDITORIAL_FULL': 'Validator'
 };
 
 export const JOB_STATUS_COLORS: Record<string, string> = {
@@ -32,5 +32,5 @@ export function extractFileNameFromJob(job: { input?: Record<string, unknown>; o
   if (job.input?.originalName) return String(job.input.originalName);
   if (job.input?.fileName) return String(job.input.fileName);
   if (job.input?.filename) return String(job.input.filename);
-  return 'Unknown file';
+  return '(deleted)';
 }
