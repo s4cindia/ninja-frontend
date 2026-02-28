@@ -1,7 +1,11 @@
 import { chromium } from 'playwright';
 
-const E2E_EMAIL = process.env.E2E_EMAIL || 'sakthi@qbend.com';
-const E2E_PASSWORD = process.env.E2E_PASSWORD || 'Qbend#123';
+const E2E_EMAIL = process.env.E2E_EMAIL;
+const E2E_PASSWORD = process.env.E2E_PASSWORD;
+if (!E2E_EMAIL || !E2E_PASSWORD) {
+  console.error('Missing required env vars: E2E_EMAIL and E2E_PASSWORD');
+  process.exit(1);
+}
 
 (async () => {
   const browser = await chromium.launch({ headless: true });
@@ -78,9 +82,9 @@ const E2E_PASSWORD = process.env.E2E_PASSWORD || 'Qbend#123';
   // === Now look for the document content area and scroll it separately ===
   console.log('\n=== Checking document content area for internal scrolling ===');
 
-  // Look at all visible text to understand the document structure
-  const pageText = await page.evaluate(() => document.body.innerText.substring(0, 3000));
-  console.log('Page text length:', pageText.length);
+  // Check page text length (avoid logging raw content for security)
+  const pageTextLength = await page.evaluate(() => document.body.innerText.length);
+  console.log('Page text length:', pageTextLength);
 
   // Find the document preview content area
   const contentAreas = await page.evaluate(() => {
@@ -296,7 +300,7 @@ const E2E_PASSWORD = process.env.E2E_PASSWORD || 'Qbend#123';
     if (main) return main.innerHTML.substring(0, 5000);
     return '';
   });
-  console.log('\nDocument content HTML (first 5000 chars):\n', docContentHtml);
+  console.log('\nDocument content HTML length:', docContentHtml.length, 'chars');
 
   console.log(`\nTotal screenshots taken: ${screenshotIndex - 1}`);
 

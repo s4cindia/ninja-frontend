@@ -51,9 +51,8 @@ export function PlagiarismCheckContent({ documentId, onGoToLocation, onApplyFix 
       setDownloading(true);
       // Fetch all matches with pagination
       const PAGE_SIZE = 100;
-      let allMatchesList: typeof firstPage.matches = [];
       const firstPage = await plagiarismService.getMatches(documentId, { limit: PAGE_SIZE, page: 1 });
-      allMatchesList = firstPage.matches;
+      let allMatchesList = [...firstPage.matches];
       const totalPages = Math.ceil((firstPage.total || firstPage.matches.length) / PAGE_SIZE);
       for (let p = 2; p <= totalPages; p++) {
         const page = await plagiarismService.getMatches(documentId, { limit: PAGE_SIZE, page: p });

@@ -94,9 +94,10 @@ export function RuleSetCard({
             >
               <Trash2 className="h-4 w-4" />
             </Button>
-            <button
+            <Button
+              size="sm"
+              variant="ghost"
               onClick={(e) => { e.stopPropagation(); onToggleExpand(ruleSet.id); }}
-              className="p-1 hover:bg-gray-100 rounded"
               aria-label={isExpanded ? 'Collapse rules' : 'Expand rules'}
             >
               {isExpanded ? (
@@ -104,7 +105,7 @@ export function RuleSetCard({
               ) : (
                 <ChevronRight className="h-5 w-5 text-gray-400" />
               )}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

@@ -48,11 +48,11 @@ export function PlagiarismMatchCard({ match, onReview, onGoToLocation, onApplyFi
     }
   };
 
-  const handleFix = () => {
+  const handleFix = async () => {
     if (onApplyFix) {
       const searchText = match.sourceText.slice(0, 150);
       const fixText = buildCitationFix(match.sourceText);
-      const result = onApplyFix(searchText, fixText);
+      const result = await Promise.resolve(onApplyFix(searchText, fixText));
       // Only update review status if the fix was applied successfully
       if (result !== false) {
         onReview(match.id, 'PROPERLY_ATTRIBUTED');

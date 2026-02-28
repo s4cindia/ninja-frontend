@@ -87,9 +87,8 @@ export function IntegrityCheckContent({ documentId, onGoToLocation, onApplyFix: 
       setDownloading(true);
       // Fetch all issues with pagination
       const PAGE_SIZE = 500;
-      let allIssuesList: typeof firstPage.issues = [];
       const firstPage = await integrityService.getIssues(documentId, { limit: PAGE_SIZE, page: 1 });
-      allIssuesList = firstPage.issues;
+      let allIssuesList = [...firstPage.issues];
       const totalPages = Math.ceil((firstPage.total || firstPage.issues.length) / PAGE_SIZE);
       for (let p = 2; p <= totalPages; p++) {
         const page = await integrityService.getIssues(documentId, { limit: PAGE_SIZE, page: p });

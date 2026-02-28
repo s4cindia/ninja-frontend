@@ -1,7 +1,13 @@
 import { chromium } from 'playwright';
 
-const E2E_EMAIL = process.env.E2E_EMAIL || 'sakthi@qbend.com';
-const E2E_PASSWORD = process.env.E2E_PASSWORD || 'Qbend#123';
+const E2E_EMAIL = process.env.E2E_EMAIL;
+const E2E_PASSWORD = process.env.E2E_PASSWORD;
+if (!E2E_EMAIL || !E2E_PASSWORD) {
+  console.error('Missing required env vars: E2E_EMAIL and E2E_PASSWORD');
+  process.exit(1);
+}
+
+const MAX_SCREENSHOTS = 35;
 
 (async () => {
   const browser = await chromium.launch({ headless: true });
@@ -83,8 +89,8 @@ const E2E_PASSWORD = process.env.E2E_PASSWORD || 'Qbend#123';
     screenshotIndex++;
 
     // Safety limit
-    if (screenshotIndex > 20) {
-      console.log('Reached screenshot limit of 20.');
+    if (screenshotIndex > MAX_SCREENSHOTS) {
+      console.log(`Reached screenshot limit of ${MAX_SCREENSHOTS}.`);
       break;
     }
   }
@@ -221,12 +227,12 @@ const E2E_PASSWORD = process.env.E2E_PASSWORD || 'Qbend#123';
             await page.screenshot({ path: `/tmp/citation-editor-${screenshotIndex}.png`, fullPage: false });
             console.log(`Screenshot ${screenshotIndex} saved (tab "${tabText}" scroll: ${tabScroll}px).`);
             screenshotIndex++;
-            if (screenshotIndex > 35) break;
+            if (screenshotIndex > MAX_SCREENSHOTS) break;
           }
         }
       }
     } catch (e) {
-      // Tab not found, continue
+      console.warn(`Tab interaction skipped: ${e.message}`);
     }
   }
 

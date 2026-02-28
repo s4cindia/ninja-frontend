@@ -171,15 +171,18 @@ function findTextInDoc(
 
   // Strategy 1: exact match on full text
   let idx = fullText.indexOf(search);
+  let matchLen = search.length;
   if (idx === -1) {
-    // Strategy 2: normalized match
+    // Strategy 2: normalized match (use normalized length for correct offset mapping)
     const normFull = normalizeText(fullText);
     const normSearch = normalizeText(search);
     idx = normFull.indexOf(normSearch);
+    matchLen = normSearch.length;
     if (idx === -1 && search.length > 30) {
       // Strategy 3: partial (first 30 chars)
       const shortSearch = normalizeText(search.substring(0, 30));
       idx = normFull.indexOf(shortSearch);
+      matchLen = shortSearch.length;
     }
     if (idx === -1) return null;
   }
@@ -188,7 +191,6 @@ function findTextInDoc(
   let charOffset = 0;
   let fromPos = -1;
   let toPos = -1;
-  const matchLen = search.length;
 
   for (const chunk of chunks) {
     const chunkEnd = charOffset + chunk.text.length;

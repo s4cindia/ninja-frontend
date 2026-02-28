@@ -89,7 +89,7 @@ export function useDocumentEditor() {
       setLastSaved(new Date()); setHasUnsavedChanges(false);
       if (result.version) { setCurrentVersion(result.version); loadVersions(); }
       return true;
-    } catch { toast.error('Failed to save document'); return false; }
+    } catch (err) { console.error('Save failed:', err); toast.error('Failed to save document'); return false; }
     finally { setSaving(false); }
   }, [documentId, loadVersions]);
 
@@ -168,7 +168,7 @@ export function useDocumentEditor() {
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast.success('Document exported successfully');
-    } catch { toast.error('Failed to export document. Please try again.'); }
+    } catch (err) { console.error('Export failed:', err); toast.error('Failed to export document. Please try again.'); }
     finally { setExporting(false); }
   }, [documentId, documentName, handleSave]);
 
@@ -176,11 +176,11 @@ export function useDocumentEditor() {
     if (!documentId) return;
     try {
       setExporting(true);
-      // Fetch all three reports in parallel (API max per page; sufficient for reports)
+      // Fetch reports (use API max page size to capture most results)
       const [styleData, integrityData, plagiarismData] = await Promise.allSettled([
-        styleService.getViolations(documentId, { take: 500 }),
-        integrityService.getIssues(documentId, { limit: 100 }),
-        plagiarismService.getMatches(documentId, { limit: 100 }),
+        styleService.getViolations(documentId, { take: 1000 }),
+        integrityService.getIssues(documentId, { limit: 1000 }),
+        plagiarismService.getMatches(documentId, { limit: 1000 }),
       ]);
 
       const ExcelJSMod: { default: typeof ExcelJS } = await import('exceljs');
@@ -245,7 +245,8 @@ export function useDocumentEditor() {
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast.success('Consolidated report downloaded');
-    } catch {
+    } catch (err) {
+      console.error('Consolidated report failed:', err);
       toast.error('Failed to generate consolidated report');
     } finally {
       setExporting(false);
