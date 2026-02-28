@@ -76,15 +76,16 @@ export function useDocumentEditor() {
 
   useEffect(() => { if (documentId && !loading && showVersionPanel) loadVersions(); }, [documentId, loading, showVersionPanel, loadVersions]);
 
-  const handleSave = useCallback(async () => {
-    if (!documentId || !editorRef.current) return;
+  const handleSave = useCallback(async (): Promise<boolean> => {
+    if (!documentId || !editorRef.current) return false;
     try {
       setSaving(true);
       const htmlContent = editorRef.current.getHTML();
       const result = await validatorService.saveDocumentContent(documentId, htmlContent);
       setLastSaved(new Date()); setHasUnsavedChanges(false);
       if (result.version) { setCurrentVersion(result.version); loadVersions(); }
-    } catch { toast.error('Failed to save document'); }
+      return true;
+    } catch { toast.error('Failed to save document'); return false; }
     finally { setSaving(false); }
   }, [documentId, loadVersions]);
 
@@ -171,11 +172,11 @@ export function useDocumentEditor() {
     if (!documentId) return;
     try {
       setExporting(true);
-      // Fetch all three reports in parallel
+      // Fetch all three reports in parallel (API max per page; sufficient for reports)
       const [styleData, integrityData, plagiarismData] = await Promise.allSettled([
-        styleService.getViolations(documentId, { take: 1000 }),
-        integrityService.getIssues(documentId, { limit: 1000 }),
-        plagiarismService.getMatches(documentId, { limit: 1000 }),
+        styleService.getViolations(documentId, { take: 500 }),
+        integrityService.getIssues(documentId, { limit: 100 }),
+        plagiarismService.getMatches(documentId, { limit: 100 }),
       ]);
 
       const ExcelJSMod: { default: typeof ExcelJS } = await import('exceljs');

@@ -11,10 +11,10 @@ export function formatDuration(startedAt: string | null, completedAt: string | n
   const ms = new Date(completedAt).getTime() - new Date(startedAt).getTime();
   if (!Number.isFinite(ms) || ms < 0) return null;
   if (ms < 1000) return `${ms}ms`;
-  const seconds = ms / 1000;
-  if (seconds < 60) return `${seconds.toFixed(1)}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = Math.round(seconds % 60);
+  const totalSeconds = Math.round(ms / 1000);
+  if (totalSeconds < 60) return `${(ms / 1000).toFixed(1)}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainingSeconds = totalSeconds % 60;
   return `${minutes}m ${remainingSeconds}s`;
 }
 

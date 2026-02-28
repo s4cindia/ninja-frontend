@@ -11,16 +11,17 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ 
-    className, 
-    variant = 'primary', 
-    size = 'md', 
+  ({
+    className,
+    variant = 'primary',
+    size = 'md',
     isLoading = false,
     leftIcon,
     rightIcon,
     disabled,
-    children, 
-    ...props 
+    children,
+    type = 'button',
+    ...rest
   }, ref) => {
     const baseStyles = 'inline-flex items-center justify-center font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
     
@@ -41,10 +42,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         ref={ref}
-        type={props.type ?? 'button'}
+        type={type}
         className={clsx(baseStyles, variants[variant], sizes[size], className)}
         disabled={disabled || isLoading}
-        {...props}
+        {...rest}
       >
         {isLoading ? (
           <Loader2 className="w-4 h-4 animate-spin" />

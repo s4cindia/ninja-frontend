@@ -1,5 +1,8 @@
 import { chromium } from 'playwright';
 
+const E2E_EMAIL = process.env.E2E_EMAIL || 'sakthi@qbend.com';
+const E2E_PASSWORD = process.env.E2E_PASSWORD || 'Qbend#123';
+
 (async () => {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
@@ -19,10 +22,10 @@ import { chromium } from 'playwright';
 
   // Try to find email input
   const emailInput = await page.locator('input[type="email"], input[name="email"], input[placeholder*="email" i], input[placeholder*="Email" i]').first();
-  await emailInput.fill('sakthi@qbend.com');
+  await emailInput.fill(E2E_EMAIL);
 
   const passwordInput = await page.locator('input[type="password"], input[name="password"]').first();
-  await passwordInput.fill('Qbend#123');
+  await passwordInput.fill(E2E_PASSWORD);
 
   // Click login button
   const loginButton = await page.locator('button[type="submit"], button:has-text("Login"), button:has-text("Sign in"), button:has-text("Log in")').first();

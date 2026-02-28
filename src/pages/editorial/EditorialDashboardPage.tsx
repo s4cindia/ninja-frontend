@@ -7,7 +7,7 @@
  */
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, FileCheck, Search } from 'lucide-react';
+import { BookOpen, FileCheck } from 'lucide-react';
 import { api } from '@/services/api';
 import toast from 'react-hot-toast';
 import { ModuleStatsCard, type ModuleCardData } from './ModuleStatsCard';
@@ -165,12 +165,6 @@ export function EditorialDashboardPage() {
       description: 'Comprehensive document quality checker with version control and track changes. Identify formatting errors, structural issues, and inconsistencies before publication.',
       benefits: ['Spot heading hierarchy violations and broken cross-references', 'Track every edit with full version history and accept/reject workflow', 'Export clean, production-ready DOCX with all corrections applied'],
       uploadPath: '/validator/upload', icon: FileCheck, color: 'emerald', stats: validatorStats, perfStats: validatorPerfStats,
-    },
-    {
-      title: 'Plagiarism Detection',
-      description: 'AI-powered plagiarism detection with semantic fingerprinting. Identify verbatim copies, paraphrased content, and self-plagiarism across documents.',
-      benefits: ['Detect internal duplicates and cross-document self-plagiarism', 'AI-powered classification: verbatim, paraphrased, common phrase', 'Review and dismiss matches with confidence scores'],
-      uploadPath: '/editorial/upload', icon: Search, color: 'amber', stats: { total: 0, pending: 0, completed: 0 }, perfStats: { ...emptyPerf },
     },
   ], [citationStats, citationPerfStats, validatorStats, validatorPerfStats]);
 
