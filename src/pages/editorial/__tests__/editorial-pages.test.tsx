@@ -47,9 +47,9 @@ describe('Editorial Services Dashboard', () => {
     expect(screen.getByText('Recent Documents')).toBeInTheDocument();
   });
 
-  it('shows upload buttons for both modules', () => {
+  it('shows upload buttons for all modules', () => {
     renderWithRouter('/editorial');
     const uploadButtons = screen.getAllByText('Upload Document');
-    expect(uploadButtons).toHaveLength(2);
+    expect(uploadButtons).toHaveLength(3);
   });
 });
