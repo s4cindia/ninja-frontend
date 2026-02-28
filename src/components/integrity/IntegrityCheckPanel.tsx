@@ -85,11 +85,20 @@ export function IntegrityCheckContent({ documentId, onGoToLocation, onApplyFix: 
   const handleDownloadReport = async () => {
     try {
       setDownloading(true);
-      const allIssues = await integrityService.getIssues(documentId, { limit: 1000 });
+      // Fetch all issues with pagination
+      const PAGE_SIZE = 500;
+      let allIssuesList: typeof firstPage.issues = [];
+      const firstPage = await integrityService.getIssues(documentId, { limit: PAGE_SIZE, page: 1 });
+      allIssuesList = firstPage.issues;
+      const totalPages = Math.ceil((firstPage.total || firstPage.issues.length) / PAGE_SIZE);
+      for (let p = 2; p <= totalPages; p++) {
+        const page = await integrityService.getIssues(documentId, { limit: PAGE_SIZE, page: p });
+        allIssuesList = allIssuesList.concat(page.issues);
+      }
 
       // Build CSV with BOM for Excel compatibility
       const headers = ['#', 'Title', 'Type', 'Severity', 'Status', 'Description', 'Original Text', 'Suggested Fix'];
-      const rows = allIssues.issues.map((issue, i) => {
+      const rows = allIssuesList.map((issue, i) => {
         const typeLabel = getCheckTypeLabel(issue.checkType);
         return [
           String(i + 1),

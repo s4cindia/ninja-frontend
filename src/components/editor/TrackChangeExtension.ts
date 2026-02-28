@@ -50,7 +50,13 @@ export const TrackInsertionMark = Mark.create({
       tag: 'span.track-insertion',
       getAttrs: (el) => {
         const dom = el as HTMLElement;
-        return { source: dom.getAttribute('data-source') || 'manual' };
+        return {
+          changeId: dom.getAttribute('data-change-id') || null,
+          userId: dom.getAttribute('data-user-id') || null,
+          userName: dom.getAttribute('data-user') || null,
+          timestamp: dom.getAttribute('data-timestamp') || null,
+          source: dom.getAttribute('data-source') || 'manual',
+        };
       },
     }];
   },
@@ -61,7 +67,9 @@ export const TrackInsertionMark = Mark.create({
       mergeAttributes(HTMLAttributes, {
         class: 'track-insertion',
         'data-change-id': HTMLAttributes.changeId,
+        'data-user-id': HTMLAttributes.userId,
         'data-user': HTMLAttributes.userName,
+        'data-timestamp': HTMLAttributes.timestamp,
         'data-source': HTMLAttributes.source || 'manual',
       }),
       0,
@@ -92,7 +100,13 @@ export const TrackDeletionMark = Mark.create({
       tag: 'span.track-deletion',
       getAttrs: (el) => {
         const dom = el as HTMLElement;
-        return { source: dom.getAttribute('data-source') || 'manual' };
+        return {
+          changeId: dom.getAttribute('data-change-id') || null,
+          userId: dom.getAttribute('data-user-id') || null,
+          userName: dom.getAttribute('data-user') || null,
+          timestamp: dom.getAttribute('data-timestamp') || null,
+          source: dom.getAttribute('data-source') || 'manual',
+        };
       },
     }];
   },
@@ -103,7 +117,9 @@ export const TrackDeletionMark = Mark.create({
       mergeAttributes(HTMLAttributes, {
         class: 'track-deletion',
         'data-change-id': HTMLAttributes.changeId,
+        'data-user-id': HTMLAttributes.userId,
         'data-user': HTMLAttributes.userName,
+        'data-timestamp': HTMLAttributes.timestamp,
         'data-source': HTMLAttributes.source || 'manual',
       }),
       0,
@@ -197,7 +213,8 @@ function findTextInDoc(
 
 // ─── public API ────────────────────────────────────────────────────────
 
-// Track-changes enabled flag (module-level so commands can read it)
+// Deprecated module-level tracking state — kept as fallback.
+// Prefer using editor.storage.trackChange.{enabled,userId,userName} instead.
 let trackingEnabled = true;
 let trackingUserId = 'anonymous';
 let trackingUserName = 'Anonymous User';
@@ -287,10 +304,16 @@ export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
   addStorage() {
     return {
       enabled: this.options.enabled,
+      userId: this.options.userId,
+      userName: this.options.userName,
     };
   },
 
   onCreate() {
+    // Sync to both storage (per-instance) and module-level (legacy fallback)
+    this.storage.enabled = this.options.enabled;
+    this.storage.userId = this.options.userId;
+    this.storage.userName = this.options.userName;
     trackingEnabled = this.options.enabled;
     trackingUserId = this.options.userId;
     trackingUserName = this.options.userName;

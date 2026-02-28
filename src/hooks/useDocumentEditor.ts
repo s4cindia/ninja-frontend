@@ -7,7 +7,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import type * as XLSXTypes from 'xlsx';
+import type ExcelJS from 'exceljs';
 import type { TipTapEditorRef } from '@/components/editor';
 import { validatorService, type DocumentVersion } from '@/services/validator.service';
 import { styleService } from '@/services/style.service';
@@ -178,75 +178,61 @@ export function useDocumentEditor() {
         plagiarismService.getMatches(documentId, { limit: 1000 }),
       ]);
 
-      const XLSX: typeof XLSXTypes = await import('xlsx');
-      const wb = XLSX.utils.book_new();
+      const ExcelJSMod: { default: typeof ExcelJS } = await import('exceljs');
+      const wb = new ExcelJSMod.default.Workbook();
+
+      // Helper to add rows to a worksheet
+      const addSheet = (name: string, headers: string[], rows: string[][]) => {
+        const ws = wb.addWorksheet(name);
+        ws.addRow(headers);
+        // Bold header row
+        ws.getRow(1).font = { bold: true };
+        for (const row of rows) ws.addRow(row);
+        // Auto-width columns
+        ws.columns.forEach((col) => {
+          let max = 10;
+          col.eachCell?.({ includeEmpty: false }, (cell) => {
+            const len = String(cell.value || '').length;
+            if (len > max) max = Math.min(len + 2, 50);
+          });
+          col.width = max;
+        });
+      };
 
       // Sheet 1: Style Validation
+      const styleHeaders = ['#', 'Title', 'Category', 'Severity', 'Status', 'Original Text', 'Suggested Text', 'Description'];
       const styleRows = styleData.status === 'fulfilled'
-        ? styleData.value.violations.map((v, i) => ({
-            '#': i + 1,
-            'Title': v.title || '',
-            'Category': v.category || '',
-            'Severity': v.severity || '',
-            'Status': v.status || '',
-            'Original Text': v.originalText || '',
-            'Suggested Text': v.suggestedText || '',
-            'Description': v.description || '',
-          }))
-        : [{ '#': '', 'Title': 'No style validation data available', 'Category': '', 'Severity': '', 'Status': '', 'Original Text': '', 'Suggested Text': '', 'Description': '' }];
-      const styleWs = XLSX.utils.json_to_sheet(styleRows);
-      XLSX.utils.book_append_sheet(wb, styleWs, 'Style Validation');
+        ? styleData.value.violations.map((v, i) => [
+            String(i + 1), v.title || '', v.category || '', v.severity || '',
+            v.status || '', v.originalText || '', v.suggestedText || '', v.description || '',
+          ])
+        : [['', 'No style validation data available', '', '', '', '', '', '']];
+      addSheet('Style Validation', styleHeaders, styleRows);
 
       // Sheet 2: Integrity Check
+      const integrityHeaders = ['#', 'Title', 'Type', 'Severity', 'Status', 'Description', 'Original Text', 'Suggested Fix'];
       const integrityRows = integrityData.status === 'fulfilled'
-        ? integrityData.value.issues.map((v, i) => ({
-            '#': i + 1,
-            'Title': v.title || '',
-            'Type': v.checkType || '',
-            'Severity': v.severity || '',
-            'Status': v.status || '',
-            'Description': v.description || '',
-            'Original Text': v.originalText || '',
-            'Suggested Fix': v.suggestedFix || '',
-          }))
-        : [{ '#': '', 'Title': 'No integrity check data available', 'Type': '', 'Severity': '', 'Status': '', 'Description': '', 'Original Text': '', 'Suggested Fix': '' }];
-      const integrityWs = XLSX.utils.json_to_sheet(integrityRows);
-      XLSX.utils.book_append_sheet(wb, integrityWs, 'Integrity Check');
+        ? integrityData.value.issues.map((v, i) => [
+            String(i + 1), v.title || '', v.checkType || '', v.severity || '',
+            v.status || '', v.description || '', v.originalText || '', v.suggestedFix || '',
+          ])
+        : [['', 'No integrity check data available', '', '', '', '', '', '']];
+      addSheet('Integrity Check', integrityHeaders, integrityRows);
 
       // Sheet 3: Plagiarism Check
+      const plagiarismHeaders = ['#', 'Match Type', 'Classification', 'Similarity %', 'Confidence %', 'Status', 'Source Text', 'Matched Text', 'AI Reasoning'];
       const plagiarismRows = plagiarismData.status === 'fulfilled'
-        ? plagiarismData.value.matches.map((v, i) => ({
-            '#': i + 1,
-            'Match Type': v.matchType || '',
-            'Classification': v.classification || '',
-            'Similarity %': v.similarityScore != null ? Math.round(v.similarityScore * 100) : '',
-            'Confidence %': v.confidence != null ? Math.round(v.confidence * 100) : '',
-            'Status': v.status || '',
-            'Source Text': v.sourceText || '',
-            'Matched Text': v.matchedText || '',
-            'AI Reasoning': v.aiReasoning || '',
-          }))
-        : [{ '#': '', 'Match Type': 'No plagiarism check data available', 'Classification': '', 'Similarity %': '', 'Confidence %': '', 'Status': '', 'Source Text': '', 'Matched Text': '', 'AI Reasoning': '' }];
-      const plagiarismWs = XLSX.utils.json_to_sheet(plagiarismRows);
-      XLSX.utils.book_append_sheet(wb, plagiarismWs, 'Plagiarism Check');
+        ? plagiarismData.value.matches.map((v, i) => [
+            String(i + 1), v.matchType || '', v.classification || '',
+            v.similarityScore != null ? String(Math.round(v.similarityScore * 100)) : '',
+            v.confidence != null ? String(Math.round(v.confidence * 100)) : '',
+            v.status || '', v.sourceText || '', v.matchedText || '', v.aiReasoning || '',
+          ])
+        : [['', 'No plagiarism check data available', '', '', '', '', '', '', '']];
+      addSheet('Plagiarism Check', plagiarismHeaders, plagiarismRows);
 
-      // Auto-size columns for each sheet
-      [styleWs, integrityWs, plagiarismWs].forEach(ws => {
-        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-        const colWidths: number[] = [];
-        for (let c = range.s.c; c <= range.e.c; c++) {
-          let max = 10;
-          for (let r = range.s.r; r <= range.e.r; r++) {
-            const cell = ws[XLSX.utils.encode_cell({ r, c })];
-            if (cell?.v) max = Math.max(max, Math.min(String(cell.v).length + 2, 50));
-          }
-          colWidths.push(max);
-        }
-        ws['!cols'] = colWidths.map(w => ({ wch: w }));
-      });
-
-      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-      const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

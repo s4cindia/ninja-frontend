@@ -95,30 +95,45 @@ export const TipTapEditor = forwardRef<TipTapEditorRef, TipTapEditorProps>(
     });
 
     // Inject source label CSS for track changes (workaround for Vite CSS cache on WSL2)
+    // Uses ref-counting so the style element persists until the last editor unmounts
     useEffect(() => {
       const id = 'track-change-source-labels';
-      if (document.getElementById(id)) return;
-      const style = document.createElement('style');
-      style.id = id;
-      style.textContent = `
-        .tiptap-content .ProseMirror span.track-insertion[data-source],
-        .tiptap-content .ProseMirror span.track-deletion[data-source] { cursor: help; }
-        .tiptap-content .ProseMirror span.track-insertion[data-source]::after,
-        .tiptap-content .ProseMirror span.track-deletion[data-source]::after {
-          content: attr(data-source); font-size: 9px; font-weight: 600;
-          text-transform: uppercase; letter-spacing: 0.3px; padding: 0 3px;
-          border-radius: 2px; margin-left: 2px; vertical-align: super;
-          line-height: 1; text-decoration: none; display: none; pointer-events: none;
+      const countAttr = 'data-ref-count';
+      let existing = document.getElementById(id);
+      if (existing) {
+        const count = parseInt(existing.getAttribute(countAttr) || '1', 10);
+        existing.setAttribute(countAttr, String(count + 1));
+      } else {
+        existing = document.createElement('style');
+        existing.id = id;
+        existing.setAttribute(countAttr, '1');
+        existing.textContent = `
+          .tiptap-content .ProseMirror span.track-insertion[data-source],
+          .tiptap-content .ProseMirror span.track-deletion[data-source] { cursor: help; }
+          .tiptap-content .ProseMirror span.track-insertion[data-source]::after,
+          .tiptap-content .ProseMirror span.track-deletion[data-source]::after {
+            content: attr(data-source); font-size: 9px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.3px; padding: 0 3px;
+            border-radius: 2px; margin-left: 2px; vertical-align: super;
+            line-height: 1; text-decoration: none; display: none; pointer-events: none;
+          }
+          .tiptap-content .ProseMirror span.track-insertion[data-source]:hover::after,
+          .tiptap-content .ProseMirror span.track-deletion[data-source]:hover::after { display: inline; }
+          .tiptap-content .ProseMirror span[data-source="style"]::after { background: #ede9fe; color: #6d28d9; }
+          .tiptap-content .ProseMirror span[data-source="integrity"]::after { background: #ccfbf1; color: #0f766e; }
+          .tiptap-content .ProseMirror span[data-source="plagiarism"]::after { background: #fef3c7; color: #92400e; }
+          .tiptap-content .ProseMirror span[data-source="manual"]::after { background: #f1f5f9; color: #475569; }
+        `;
+        document.head.appendChild(existing);
+      }
+      return () => {
+        const el = document.getElementById(id);
+        if (el) {
+          const count = parseInt(el.getAttribute(countAttr) || '1', 10);
+          if (count <= 1) { el.remove(); }
+          else { el.setAttribute(countAttr, String(count - 1)); }
         }
-        .tiptap-content .ProseMirror span.track-insertion[data-source]:hover::after,
-        .tiptap-content .ProseMirror span.track-deletion[data-source]:hover::after { display: inline; }
-        .tiptap-content .ProseMirror span[data-source="style"]::after { background: #ede9fe; color: #6d28d9; }
-        .tiptap-content .ProseMirror span[data-source="integrity"]::after { background: #ccfbf1; color: #0f766e; }
-        .tiptap-content .ProseMirror span[data-source="plagiarism"]::after { background: #fef3c7; color: #92400e; }
-        .tiptap-content .ProseMirror span[data-source="manual"]::after { background: #f1f5f9; color: #475569; }
-      `;
-      document.head.appendChild(style);
-      return () => { const el = document.getElementById(id); if (el) el.remove(); };
+      };
     }, []);
 
     const trackedChanges = useMemo(

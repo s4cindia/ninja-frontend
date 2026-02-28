@@ -49,11 +49,20 @@ export function PlagiarismCheckContent({ documentId, onGoToLocation, onApplyFix 
   const handleDownloadReport = async () => {
     try {
       setDownloading(true);
-      const allMatches = await plagiarismService.getMatches(documentId, { limit: 1000 });
+      // Fetch all matches with pagination
+      const PAGE_SIZE = 100;
+      let allMatchesList: typeof firstPage.matches = [];
+      const firstPage = await plagiarismService.getMatches(documentId, { limit: PAGE_SIZE, page: 1 });
+      allMatchesList = firstPage.matches;
+      const totalPages = Math.ceil((firstPage.total || firstPage.matches.length) / PAGE_SIZE);
+      for (let p = 2; p <= totalPages; p++) {
+        const page = await plagiarismService.getMatches(documentId, { limit: PAGE_SIZE, page: p });
+        allMatchesList = allMatchesList.concat(page.matches);
+      }
 
       // Build CSV with BOM for Excel compatibility
       const headers = ['#', 'Match Type', 'Classification', 'Similarity %', 'Confidence %', 'Status', 'Source Text', 'Matched Text', 'AI Reasoning'];
-      const rows = allMatches.matches.map((match, i) => {
+      const rows = allMatchesList.map((match, i) => {
         const typeLabel = MATCH_TYPE_LABELS[match.matchType]?.label || match.matchType;
         const clsLabel = CLASSIFICATION_LABELS[match.classification]?.label || match.classification;
         return [

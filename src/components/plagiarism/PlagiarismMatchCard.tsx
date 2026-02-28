@@ -12,7 +12,7 @@ interface Props {
   match: PlagiarismMatch;
   onReview: (matchId: string, status: Exclude<MatchReviewStatus, 'PENDING'>) => void;
   onGoToLocation?: (text: string) => void;
-  onApplyFix?: (originalText: string, fixText: string) => void;
+  onApplyFix?: (originalText: string, fixText: string) => boolean | void;
   isReviewing: boolean;
 }
 
@@ -52,8 +52,11 @@ export function PlagiarismMatchCard({ match, onReview, onGoToLocation, onApplyFi
     if (onApplyFix) {
       const searchText = match.sourceText.slice(0, 150);
       const fixText = buildCitationFix(match.sourceText);
-      onApplyFix(searchText, fixText);
-      onReview(match.id, 'PROPERLY_ATTRIBUTED');
+      const result = onApplyFix(searchText, fixText);
+      // Only update review status if the fix was applied successfully
+      if (result !== false) {
+        onReview(match.id, 'PROPERLY_ATTRIBUTED');
+      }
     }
   };
 

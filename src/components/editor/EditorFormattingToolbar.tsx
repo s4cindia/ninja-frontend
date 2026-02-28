@@ -20,6 +20,8 @@ export function EditorFormattingToolbar({ editor }: EditorFormattingToolbarProps
           onClick={() => editor.chain().focus().toggleBold().run()}
           className={editor.isActive('bold') ? 'is-active' : ''}
           title="Bold (Ctrl+B)"
+          aria-label="Bold"
+          aria-pressed={editor.isActive('bold')}
         >
           <strong>B</strong>
         </button>
@@ -28,6 +30,8 @@ export function EditorFormattingToolbar({ editor }: EditorFormattingToolbarProps
           onClick={() => editor.chain().focus().toggleItalic().run()}
           className={editor.isActive('italic') ? 'is-active' : ''}
           title="Italic (Ctrl+I)"
+          aria-label="Italic"
+          aria-pressed={editor.isActive('italic')}
         >
           <em>I</em>
         </button>
@@ -36,6 +40,8 @@ export function EditorFormattingToolbar({ editor }: EditorFormattingToolbarProps
           onClick={() => editor.chain().focus().toggleUnderline().run()}
           className={editor.isActive('underline') ? 'is-active' : ''}
           title="Underline (Ctrl+U)"
+          aria-label="Underline"
+          aria-pressed={editor.isActive('underline')}
         >
           <u>U</u>
         </button>
@@ -44,6 +50,8 @@ export function EditorFormattingToolbar({ editor }: EditorFormattingToolbarProps
           onClick={() => editor.chain().focus().toggleStrike().run()}
           className={editor.isActive('strike') ? 'is-active' : ''}
           title="Strikethrough"
+          aria-label="Strikethrough"
+          aria-pressed={editor.isActive('strike')}
         >
           <s>S</s>
         </button>
@@ -52,6 +60,8 @@ export function EditorFormattingToolbar({ editor }: EditorFormattingToolbarProps
           onClick={() => editor.chain().focus().toggleSuperscript().run()}
           className={editor.isActive('superscript') ? 'is-active' : ''}
           title="Superscript"
+          aria-label="Superscript"
+          aria-pressed={editor.isActive('superscript')}
         >
           X<sup>2</sup>
         </button>
@@ -60,6 +70,8 @@ export function EditorFormattingToolbar({ editor }: EditorFormattingToolbarProps
           onClick={() => editor.chain().focus().toggleSubscript().run()}
           className={editor.isActive('subscript') ? 'is-active' : ''}
           title="Subscript"
+          aria-label="Subscript"
+          aria-pressed={editor.isActive('subscript')}
         >
           X<sub>2</sub>
         </button>
@@ -123,6 +135,7 @@ export function EditorFormattingToolbar({ editor }: EditorFormattingToolbarProps
           onClick={() => editor.chain().focus().undo().run()}
           disabled={!editor.can().undo()}
           title="Undo (Ctrl+Z)"
+          aria-label="Undo"
         >
           {'\u21B6'}
         </button>
@@ -131,6 +144,7 @@ export function EditorFormattingToolbar({ editor }: EditorFormattingToolbarProps
           onClick={() => editor.chain().focus().redo().run()}
           disabled={!editor.can().redo()}
           title="Redo (Ctrl+Y)"
+          aria-label="Redo"
         >
           {'\u21B7'}
         </button>
