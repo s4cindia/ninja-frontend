@@ -73,6 +73,7 @@ import { AgenticBatchCreatePage } from '@/pages/workflow/AgenticBatchCreatePage'
 import TestEditorPage from '@/pages/TestEditorPage';
 import DocumentEditorPage from '@/pages/DocumentEditorPage';
 import PdfViewerPage from '@/pages/PdfViewerPage';
+import { PlagiarismPage } from '@/pages/editorial/PlagiarismPage';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -231,6 +232,9 @@ function AppRoutes() {
           <Route path="/validator/upload" element={<ValidatorUploadPage />} />
           <Route path="/validator/editor/:documentId" element={<DocumentEditorPage />} />
           <Route path="/validator/pdf/:documentId" element={<PdfViewerPage />} />
+
+          {/* Plagiarism Detection Routes */}
+          <Route path="/plagiarism/analysis/:documentId" element={<PlagiarismPage />} />
 
           {/* Citation Intelligence Tool Routes */}
           <Route path="/citation/upload" element={<CitationUploadPage />} />

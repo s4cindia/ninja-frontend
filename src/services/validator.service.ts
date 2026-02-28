@@ -23,6 +23,7 @@ export interface DocumentContent {
   wordCount?: number;
   processingTime?: number | null;
   conversionWarnings?: string[];
+  contentType?: 'JOURNAL_ARTICLE' | 'BOOK' | 'UNKNOWN';
 }
 
 export interface UploadResponse {
@@ -172,8 +173,9 @@ export const validatorService = {
    * Export document as DOCX
    * Returns a Blob that can be downloaded
    */
-  async exportDocument(documentId: string): Promise<Blob> {
+  async exportDocument(documentId: string, mode: 'clean' | 'tracked' = 'clean'): Promise<Blob> {
     const response = await api.get(`/validator/documents/${documentId}/export`, {
+      params: { mode },
       responseType: 'blob',
     });
     return response.data;

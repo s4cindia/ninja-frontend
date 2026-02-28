@@ -1,12 +1,7 @@
 /**
- * TipTap Document Editor
- *
- * Rich text editor with:
- * - Full formatting support (tables, superscript, subscript, images)
- * - Track changes with inline highlighting
- * - Accept/Reject UI for each change
+ * TipTap Document Editor - rich text editor with track changes support.
+ * Includes inline source labels for track changes (style/integrity/plagiarism).
  */
-
 import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -19,18 +14,25 @@ import { TableCell } from '@tiptap/extension-table-cell';
 import { Superscript } from '@tiptap/extension-superscript';
 import { Subscript } from '@tiptap/extension-subscript';
 import { Image } from '@tiptap/extension-image';
-import type { Node } from '@tiptap/pm/model';
-import { useCallback, useImperativeHandle, forwardRef, useState } from 'react';
-import { TrackChangeExtension, getTrackedChanges, type TrackedChange } from './TrackChangeExtension';
-
+import { useCallback, useImperativeHandle, forwardRef, useState, useMemo, useEffect } from 'react';
+import {
+  TrackChangeExtension, TrackInsertionMark, TrackDeletionMark,
+  getTrackedChangesFromEditor, type TrackedChange, type TrackChangeSource,
+} from './TrackChangeExtension';
+import { findAndSelectText } from './utils/documentSearch';
+import { EditorFormattingToolbar } from './EditorFormattingToolbar';
+import { TrackChangesToolbar } from './TrackChangesToolbar';
+import { TrackedChangesPanel } from './TrackedChangesPanel';
 import './TipTapEditor.css';
+
+type TrackChangeStorage = { trackChange?: { enabled: boolean } };
 
 export interface TipTapEditorRef {
   getContent: () => string;
   getHTML: () => string;
   setContent: (content: string) => void;
   findAndSelect: (text: string) => boolean;
-  replaceWithTracking: (searchText: string, replaceText: string) => boolean;
+  replaceWithTracking: (searchText: string, replaceText: string, source?: TrackChangeSource) => boolean;
   acceptAllChanges: () => void;
   rejectAllChanges: () => void;
   getTrackedChanges: () => TrackedChange[];
@@ -51,61 +53,29 @@ export interface TipTapEditorProps {
 }
 
 export const TipTapEditor = forwardRef<TipTapEditorRef, TipTapEditorProps>(
-  (
-    {
-      initialContent = '<p>Start typing...</p>',
-      onChange,
-      onSelectionChange,
-      trackChangesEnabled = true,
-      userId = 'user',
-      userName = 'User',
-      className = '',
-      readOnly = false,
-    },
-    ref
-  ) => {
+  ({ initialContent = '<p>Start typing...</p>', onChange, onSelectionChange,
+    trackChangesEnabled = true, userId = 'user', userName = 'User',
+    className = '', readOnly = false }, ref) => {
     const [showChangesPanel, setShowChangesPanel] = useState(false);
+    const [, setRenderTick] = useState(0);
+    const [wordCount, setWordCount] = useState(0);
+    const [charCount, setCharCount] = useState(0);
 
     const editor = useEditor({
       extensions: [
-        StarterKit.configure({
-          // Disable default table since we use extension
-          heading: {
-            levels: [1, 2, 3, 4, 5, 6],
-          },
-        }),
+        StarterKit.configure({ heading: { levels: [1, 2, 3, 4, 5, 6] } }),
         Underline,
-        TextAlign.configure({
-          types: ['heading', 'paragraph'],
-        }),
-        Highlight.configure({
-          multicolor: true,
-        }),
-        // Table support
-        Table.configure({
-          resizable: true,
-          HTMLAttributes: {
-            class: 'editor-table',
-          },
-        }),
-        TableRow,
-        TableHeader,
-        TableCell,
-        // Superscript and subscript
-        Superscript,
-        Subscript,
-        // Image support
-        Image.configure({
-          inline: true,
-          allowBase64: true,
-        }),
-        // Track changes
+        TextAlign.configure({ types: ['heading', 'paragraph'] }),
+        Highlight.configure({ multicolor: true }),
+        Table.configure({ resizable: true, HTMLAttributes: { class: 'editor-table' } }),
+        TableRow, TableHeader, TableCell,
+        Superscript, Subscript,
+        Image.configure({ inline: true, allowBase64: true }),
+        TrackInsertionMark, TrackDeletionMark,
         TrackChangeExtension.configure({
-          enabled: trackChangesEnabled,
-          userId,
-          userName,
-          onStatusChange: (enabled: boolean) => {
-            console.log('[TipTapEditor] Track changes:', enabled ? 'enabled' : 'disabled');
+          enabled: trackChangesEnabled, userId, userName,
+          onStatusChange: (_enabled: boolean) => {
+            // Track changes status updated
           },
         }),
       ],
@@ -113,171 +83,80 @@ export const TipTapEditor = forwardRef<TipTapEditorRef, TipTapEditorProps>(
       editable: !readOnly,
       onUpdate: ({ editor }: { editor: Editor }) => {
         onChange?.(editor.getHTML());
+        const text = editor.getText();
+        setWordCount(text.split(/\s+/).filter(Boolean).length);
+        setCharCount(text.length);
+        setRenderTick((t) => t + 1);
       },
       onSelectionUpdate: ({ editor }: { editor: Editor }) => {
         const { from, to } = editor.state.selection;
-        const text = editor.state.doc.textBetween(from, to);
-        onSelectionChange?.({ from, to, text });
+        onSelectionChange?.({ from, to, text: editor.state.doc.textBetween(from, to) });
       },
     });
 
-    // Normalize text for comparison (handle whitespace and special chars)
-    const normalizeText = (text: string): string => {
-      return text
-        .replace(/\s+/g, ' ')  // Normalize whitespace
-        .replace(/[\u00A0]/g, ' ')  // Replace non-breaking spaces
-        .replace(/['']/g, "'")  // Normalize quotes
-        .replace(/[""]/g, '"')
-        .trim();
-    };
+    // Inject source label CSS for track changes (workaround for Vite CSS cache on WSL2)
+    useEffect(() => {
+      const id = 'track-change-source-labels';
+      if (document.getElementById(id)) return;
+      const style = document.createElement('style');
+      style.id = id;
+      style.textContent = `
+        .tiptap-content .ProseMirror span.track-insertion[data-source],
+        .tiptap-content .ProseMirror span.track-deletion[data-source] { cursor: help; }
+        .tiptap-content .ProseMirror span.track-insertion[data-source]::after,
+        .tiptap-content .ProseMirror span.track-deletion[data-source]::after {
+          content: attr(data-source); font-size: 9px; font-weight: 600;
+          text-transform: uppercase; letter-spacing: 0.3px; padding: 0 3px;
+          border-radius: 2px; margin-left: 2px; vertical-align: super;
+          line-height: 1; text-decoration: none; display: none; pointer-events: none;
+        }
+        .tiptap-content .ProseMirror span.track-insertion[data-source]:hover::after,
+        .tiptap-content .ProseMirror span.track-deletion[data-source]:hover::after { display: inline; }
+        .tiptap-content .ProseMirror span[data-source="style"]::after { background: #ede9fe; color: #6d28d9; }
+        .tiptap-content .ProseMirror span[data-source="integrity"]::after { background: #ccfbf1; color: #0f766e; }
+        .tiptap-content .ProseMirror span[data-source="plagiarism"]::after { background: #fef3c7; color: #92400e; }
+        .tiptap-content .ProseMirror span[data-source="manual"]::after { background: #f1f5f9; color: #475569; }
+      `;
+      document.head.appendChild(style);
+      return () => { const el = document.getElementById(id); if (el) el.remove(); };
+    }, []);
 
-    // Find and select text in the document
+    const trackedChanges = useMemo(
+      () => getTrackedChangesFromEditor(editor),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [editor, editor?.state.doc]
+    );
+
     const findAndSelect = useCallback(
       (searchText: string): boolean => {
         if (!editor) return false;
-
-        const doc = editor.state.doc;
-        let found = false;
-        let foundFrom = 0;
-        let foundTo = 0;
-
-        const normalizedSearch = normalizeText(searchText);
-        console.log('[TipTapEditor] Searching for:', normalizedSearch.substring(0, 50));
-
-        // First try exact match
-        doc.descendants((node: Node, pos: number) => {
-          if (found) return false;
-          if (node.isText) {
-            const text = node.text || '';
-            const index = text.indexOf(searchText);
-            if (index !== -1) {
-              foundFrom = pos + index;
-              foundTo = foundFrom + searchText.length;
-              found = true;
-              console.log('[TipTapEditor] Exact match found at position:', foundFrom);
-              return false;
-            }
-          }
-          return true;
-        });
-
-        // If not found, try normalized match
-        if (!found) {
-          doc.descendants((node: Node, pos: number) => {
-            if (found) return false;
-            if (node.isText) {
-              const text = node.text || '';
-              const normalizedText = normalizeText(text);
-              const index = normalizedText.indexOf(normalizedSearch);
-              if (index !== -1) {
-                // Find the actual position in the original text
-                let actualIndex = 0;
-                let normalizedIndex = 0;
-                while (normalizedIndex < index && actualIndex < text.length) {
-                  if (text[actualIndex] !== ' ' || normalizedText[normalizedIndex] === ' ') {
-                    normalizedIndex++;
-                  }
-                  actualIndex++;
-                }
-                foundFrom = pos + actualIndex;
-                foundTo = foundFrom + searchText.length;
-                found = true;
-                console.log('[TipTapEditor] Normalized match found at position:', foundFrom);
-                return false;
-              }
-            }
-            return true;
-          });
-        }
-
-        // If still not found, try searching for a shorter substring (first 30 chars)
-        if (!found && searchText.length > 30) {
-          const shortSearch = normalizeText(searchText.substring(0, 30));
-          doc.descendants((node: Node, pos: number) => {
-            if (found) return false;
-            if (node.isText) {
-              const text = node.text || '';
-              const normalizedText = normalizeText(text);
-              const index = normalizedText.indexOf(shortSearch);
-              if (index !== -1) {
-                foundFrom = pos + index;
-                foundTo = foundFrom + Math.min(searchText.length, text.length - index);
-                found = true;
-                console.log('[TipTapEditor] Partial match found at position:', foundFrom);
-                return false;
-              }
-            }
-            return true;
-          });
-        }
-
-        if (found) {
-          editor
-            .chain()
-            .focus()
-            .setTextSelection({ from: foundFrom, to: foundTo })
-            .scrollIntoView()
-            .run();
-
-          // Add temporary highlight
-          setTimeout(() => {
-            editor.chain().setHighlight({ color: '#fef08a' }).run();
-            setTimeout(() => {
-              editor.chain().unsetHighlight().run();
-            }, 2000);
-          }, 100);
-
-          return true;
-        }
-
-        console.log('[TipTapEditor] Text not found:', searchText.substring(0, 50));
-        return false;
+        return findAndSelectText(editor, searchText);
       },
       [editor]
     );
 
-    // Replace text with tracking
     const replaceWithTracking = useCallback(
-      (searchText: string, replaceText: string): boolean => {
+      (searchText: string, replaceText: string, source?: TrackChangeSource): boolean => {
         if (!editor) return false;
-        return editor.commands.replaceWithTracking(searchText, replaceText);
+        return editor.commands.replaceWithTracking(searchText, replaceText, source);
       },
       [editor]
     );
 
-    // Get tracked changes for panel display
-    const trackedChanges = getTrackedChanges();
-
-    // Expose methods via ref
-    useImperativeHandle(
-      ref,
-      () => ({
-        getContent: () => editor?.getText() || '',
-        getHTML: () => editor?.getHTML() || '',
-        setContent: (content: string) => {
-          editor?.commands.setContent(content);
-        },
-        findAndSelect,
-        replaceWithTracking,
-        acceptAllChanges: () => {
-          editor?.commands.acceptAllChanges();
-        },
-        rejectAllChanges: () => {
-          editor?.commands.rejectAllChanges();
-        },
-        getTrackedChanges,
-        enableTrackChanges: () => {
-          editor?.commands.enableTrackChanges();
-        },
-        disableTrackChanges: () => {
-          editor?.commands.disableTrackChanges();
-        },
-        isTrackChangesEnabled: () => {
-          return (editor?.storage as { trackChange?: { enabled: boolean } }).trackChange?.enabled ?? false;
-        },
-      }),
-      [editor, findAndSelect, replaceWithTracking]
-    );
+    useImperativeHandle(ref, () => ({
+      getContent: () => editor?.getText() || '',
+      getHTML: () => editor?.getHTML() || '',
+      setContent: (content: string) => { editor?.commands.setContent(content); },
+      findAndSelect,
+      replaceWithTracking,
+      acceptAllChanges: () => { editor?.commands.acceptAllChanges(); },
+      rejectAllChanges: () => { editor?.commands.rejectAllChanges(); },
+      getTrackedChanges: () => getTrackedChangesFromEditor(editor),
+      enableTrackChanges: () => { editor?.commands.enableTrackChanges(); },
+      disableTrackChanges: () => { editor?.commands.disableTrackChanges(); },
+      isTrackChangesEnabled: () =>
+        (editor?.storage as TrackChangeStorage).trackChange?.enabled ?? false,
+    }), [editor, findAndSelect, replaceWithTracking]);
 
     if (!editor) {
       return (
@@ -287,215 +166,33 @@ export const TipTapEditor = forwardRef<TipTapEditorRef, TipTapEditorProps>(
       );
     }
 
-    const isTrackingEnabled = (editor.storage as { trackChange?: { enabled: boolean } }).trackChange?.enabled;
+    const isTrackingEnabled = (editor.storage as TrackChangeStorage).trackChange?.enabled;
 
     return (
       <div className={`tiptap-editor-container ${className}`}>
-        {/* Toolbar */}
         <div className="tiptap-toolbar">
-          <div className="tiptap-toolbar-group">
-            <button
-              onClick={() => editor.chain().focus().toggleBold().run()}
-              className={editor.isActive('bold') ? 'is-active' : ''}
-              title="Bold (Ctrl+B)"
-            >
-              <strong>B</strong>
-            </button>
-            <button
-              onClick={() => editor.chain().focus().toggleItalic().run()}
-              className={editor.isActive('italic') ? 'is-active' : ''}
-              title="Italic (Ctrl+I)"
-            >
-              <em>I</em>
-            </button>
-            <button
-              onClick={() => editor.chain().focus().toggleUnderline().run()}
-              className={editor.isActive('underline') ? 'is-active' : ''}
-              title="Underline (Ctrl+U)"
-            >
-              <u>U</u>
-            </button>
-            <button
-              onClick={() => editor.chain().focus().toggleStrike().run()}
-              className={editor.isActive('strike') ? 'is-active' : ''}
-              title="Strikethrough"
-            >
-              <s>S</s>
-            </button>
-            <button
-              onClick={() => editor.chain().focus().toggleSuperscript().run()}
-              className={editor.isActive('superscript') ? 'is-active' : ''}
-              title="Superscript"
-            >
-              X<sup>2</sup>
-            </button>
-            <button
-              onClick={() => editor.chain().focus().toggleSubscript().run()}
-              className={editor.isActive('subscript') ? 'is-active' : ''}
-              title="Subscript"
-            >
-              X<sub>2</sub>
-            </button>
-          </div>
-
-          <div className="tiptap-toolbar-divider" />
-
-          <div className="tiptap-toolbar-group">
-            <button
-              onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-              className={editor.isActive('heading', { level: 1 }) ? 'is-active' : ''}
-              title="Heading 1"
-            >
-              H1
-            </button>
-            <button
-              onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-              className={editor.isActive('heading', { level: 2 }) ? 'is-active' : ''}
-              title="Heading 2"
-            >
-              H2
-            </button>
-            <button
-              onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-              className={editor.isActive('heading', { level: 3 }) ? 'is-active' : ''}
-              title="Heading 3"
-            >
-              H3
-            </button>
-          </div>
-
-          <div className="tiptap-toolbar-divider" />
-
-          <div className="tiptap-toolbar-group">
-            <button
-              onClick={() => editor.chain().focus().toggleBulletList().run()}
-              className={editor.isActive('bulletList') ? 'is-active' : ''}
-              title="Bullet List"
-            >
-              • List
-            </button>
-            <button
-              onClick={() => editor.chain().focus().toggleOrderedList().run()}
-              className={editor.isActive('orderedList') ? 'is-active' : ''}
-              title="Numbered List"
-            >
-              1. List
-            </button>
-          </div>
-
-          <div className="tiptap-toolbar-divider" />
-
-          <div className="tiptap-toolbar-group">
-            <button
-              onClick={() => editor.chain().focus().undo().run()}
-              disabled={!editor.can().undo()}
-              title="Undo (Ctrl+Z)"
-            >
-              ↶
-            </button>
-            <button
-              onClick={() => editor.chain().focus().redo().run()}
-              disabled={!editor.can().redo()}
-              title="Redo (Ctrl+Y)"
-            >
-              ↷
-            </button>
-          </div>
-
-          <div className="tiptap-toolbar-divider" />
-
-          {/* Track Changes Controls */}
-          <div className="tiptap-toolbar-group track-changes-controls">
-            <button
-              onClick={() => editor.commands.toggleTrackChanges()}
-              className={isTrackingEnabled ? 'is-active tracking-on' : ''}
-              title="Toggle Track Changes"
-            >
-              {isTrackingEnabled ? '📝 Tracking ON' : '📝 Track'}
-            </button>
-            <button
-              onClick={() => setShowChangesPanel(!showChangesPanel)}
-              className={showChangesPanel ? 'is-active' : ''}
-              title="Show Changes Panel"
-            >
-              📋 Changes ({trackedChanges.length})
-            </button>
-            <button
-              onClick={() => editor.commands.acceptAllChanges()}
-              title="Accept All Changes"
-              className="accept-btn"
-            >
-              ✓ Accept All
-            </button>
-            <button
-              onClick={() => editor.commands.rejectAllChanges()}
-              title="Reject All Changes"
-              className="reject-btn"
-            >
-              ✗ Reject All
-            </button>
-          </div>
+          <EditorFormattingToolbar editor={editor} />
+          <TrackChangesToolbar
+            editor={editor}
+            isTrackingEnabled={!!isTrackingEnabled}
+            trackedChangesCount={trackedChanges.length}
+            showChangesPanel={showChangesPanel}
+            onToggleChangesPanel={() => setShowChangesPanel(!showChangesPanel)}
+          />
         </div>
-
-        {/* Main content area */}
         <div className="tiptap-main">
-          {/* Editor Content */}
           <EditorContent editor={editor} className="tiptap-content" />
-
-          {/* Changes Panel */}
-          {showChangesPanel && trackedChanges.length > 0 && (
-            <div className="tiptap-changes-panel">
-              <div className="changes-panel-header">
-                <h3>Tracked Changes</h3>
-                <button onClick={() => setShowChangesPanel(false)}>×</button>
-              </div>
-              <div className="changes-list">
-                {trackedChanges.map((change) => (
-                  <div key={change.id} className={`change-item ${change.type}`}>
-                    <div className="change-header">
-                      <span className={`change-type ${change.type}`}>
-                        {change.type === 'insertion' ? '+ Added' : '− Deleted'}
-                      </span>
-                      <span className="change-user">{change.userName}</span>
-                    </div>
-                    <div className="change-text">
-                      "{change.text.substring(0, 50)}{change.text.length > 50 ? '...' : ''}"
-                    </div>
-                    <div className="change-actions">
-                      <button
-                        onClick={() => {
-                          editor.chain().focus().setTextSelection(change.from).run();
-                          editor.commands.acceptChange();
-                        }}
-                        className="accept-btn"
-                      >
-                        ✓ Accept
-                      </button>
-                      <button
-                        onClick={() => {
-                          editor.chain().focus().setTextSelection(change.from).run();
-                          editor.commands.rejectChange();
-                        }}
-                        className="reject-btn"
-                      >
-                        ✗ Reject
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+          {showChangesPanel && (
+            <TrackedChangesPanel
+              editor={editor}
+              trackedChanges={trackedChanges}
+              onClose={() => setShowChangesPanel(false)}
+            />
           )}
         </div>
-
-        {/* Status Bar */}
         <div className="tiptap-statusbar">
-          <span>
-            Words: {editor.getText().split(/\s+/).filter(Boolean).length}
-          </span>
-          <span>
-            Characters: {editor.getText().length}
-          </span>
+          <span>Words: {wordCount}</span>
+          <span>Characters: {charCount}</span>
           {isTrackingEnabled && (
             <span className="track-changes-badge">
               Track Changes: ON | {trackedChanges.length} changes

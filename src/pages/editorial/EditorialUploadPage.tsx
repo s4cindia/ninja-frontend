@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { FileUploader, UploadedFile } from '@/components/shared';
 import { citationService } from '@/services/citation.service';
+import { plagiarismService } from '@/services/plagiarism.service';
 
 type AnalysisType = 'citations' | 'plagiarism' | 'style';
 
@@ -24,7 +25,7 @@ const ANALYSIS_OPTIONS: AnalysisOption[] = [
     id: 'plagiarism',
     label: 'Plagiarism Check',
     description: 'Scan for potential plagiarism and paraphrased content',
-    available: false,
+    available: true,
   },
   {
     id: 'style',
@@ -69,7 +70,24 @@ export function EditorialUploadPage() {
       if (selectedAnalyses.has('citations')) {
         const file = uploadedFiles[0].file;
         const result = await citationService.detectFromFile(file);
+        // If plagiarism is also selected, start that check too
+        if (selectedAnalyses.has('plagiarism') && result.documentId) {
+          plagiarismService.startCheck(result.documentId).catch((err) => {
+            const msg = err instanceof Error ? err.message : 'Failed to start plagiarism check';
+            setSubmitError(msg);
+          });
+        }
         navigate(`/editorial/citations/${result.jobId}`);
+      } else if (selectedAnalyses.has('plagiarism')) {
+        // Plagiarism only - upload through citation service to get documentId, then run plagiarism
+        const file = uploadedFiles[0].file;
+        const result = await citationService.detectFromFile(file);
+        if (result.documentId) {
+          await plagiarismService.startCheck(result.documentId);
+          navigate(`/plagiarism/analysis/${result.documentId}`);
+        } else {
+          navigate('/editorial');
+        }
       } else {
         navigate('/editorial');
       }

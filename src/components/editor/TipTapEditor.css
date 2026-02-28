@@ -317,7 +317,7 @@
   margin: 2em 0;
 }
 
-/* Track Changes Styles */
+/* Track Changes Styles — base */
 .tiptap-content .ProseMirror .track-insertion,
 .tiptap-content .ProseMirror span[class*="track-insertion"] {
   background-color: #dcfce7;
@@ -332,6 +332,91 @@
   text-decoration: line-through;
   text-decoration-color: #ef4444;
   color: #991b1b;
+}
+
+/* Track Changes — source-specific insertion tints */
+.tiptap-content .ProseMirror span.track-insertion[data-source="style"] {
+  background-color: #ede9fe;
+  text-decoration-color: #7c3aed;
+}
+
+.tiptap-content .ProseMirror span.track-insertion[data-source="integrity"] {
+  background-color: #ccfbf1;
+  text-decoration-color: #14b8a6;
+}
+
+.tiptap-content .ProseMirror span.track-insertion[data-source="plagiarism"] {
+  background-color: #fef3c7;
+  text-decoration-color: #f59e0b;
+}
+
+/* Track Changes — inline source labels (shown on hover) */
+.tiptap-content .ProseMirror span.track-insertion[data-source="style"],
+.tiptap-content .ProseMirror span.track-deletion[data-source="style"] {
+  cursor: help;
+}
+.tiptap-content .ProseMirror span.track-insertion[data-source="integrity"],
+.tiptap-content .ProseMirror span.track-deletion[data-source="integrity"] {
+  cursor: help;
+}
+.tiptap-content .ProseMirror span.track-insertion[data-source="plagiarism"],
+.tiptap-content .ProseMirror span.track-deletion[data-source="plagiarism"] {
+  cursor: help;
+}
+
+.tiptap-content .ProseMirror span.track-insertion[data-source]::after,
+.tiptap-content .ProseMirror span.track-deletion[data-source]::after {
+  content: attr(data-source);
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 0px 3px;
+  border-radius: 2px;
+  margin-left: 2px;
+  vertical-align: super;
+  line-height: 1;
+  text-decoration: none;
+  display: none;
+  pointer-events: none;
+}
+
+.tiptap-content .ProseMirror span.track-insertion[data-source]:hover::after,
+.tiptap-content .ProseMirror span.track-deletion[data-source]:hover::after {
+  display: inline;
+}
+
+.tiptap-content .ProseMirror span[data-source="style"]::after {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+.tiptap-content .ProseMirror span[data-source="integrity"]::after {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+.tiptap-content .ProseMirror span[data-source="plagiarism"]::after {
+  background: #fef3c7;
+  color: #92400e;
+}
+.tiptap-content .ProseMirror span[data-source="manual"]::after {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+/* Track Changes — source-specific deletion tints */
+.tiptap-content .ProseMirror span.track-deletion[data-source="style"] {
+  background-color: #f5f3ff;
+  text-decoration-color: #7c3aed;
+}
+
+.tiptap-content .ProseMirror span.track-deletion[data-source="integrity"] {
+  background-color: #f0fdfa;
+  text-decoration-color: #14b8a6;
+}
+
+.tiptap-content .ProseMirror span.track-deletion[data-source="plagiarism"] {
+  background-color: #fffbeb;
+  text-decoration-color: #f59e0b;
 }
 
 /* Highlight for find */
@@ -417,8 +502,8 @@
 
 .change-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 6px;
   margin-bottom: 8px;
 }
 
@@ -438,6 +523,35 @@
 .change-type.deletion {
   background: #fee2e2;
   color: #991b1b;
+}
+
+/* Source badges in tracked changes panel */
+.change-source-badge {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: capitalize;
+}
+
+.source-badge-style {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.source-badge-integrity {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+.source-badge-plagiarism {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.source-badge-manual {
+  background: #f1f5f9;
+  color: #475569;
 }
 
 .change-user {
