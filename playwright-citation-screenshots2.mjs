@@ -5,6 +5,7 @@ const E2E_PASSWORD = process.env.E2E_PASSWORD || 'Qbend#123';
 
 (async () => {
   const browser = await chromium.launch({ headless: true });
+  try {
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
   const page = await context.newPage();
 
@@ -79,7 +80,7 @@ const E2E_PASSWORD = process.env.E2E_PASSWORD || 'Qbend#123';
 
   // Look at all visible text to understand the document structure
   const pageText = await page.evaluate(() => document.body.innerText.substring(0, 3000));
-  console.log('Page text (first 3000 chars):\n', pageText);
+  console.log('Page text length:', pageText.length);
 
   // Find the document preview content area
   const contentAreas = await page.evaluate(() => {
@@ -227,7 +228,7 @@ const E2E_PASSWORD = process.env.E2E_PASSWORD || 'Qbend#123';
       await docPreviewTab.click();
       await page.waitForTimeout(2000);
     }
-  } catch (e) {}
+  } catch (err) { console.error('Document Preview tab not found:', err.message); }
 
   // Analyze how citations appear in the document
   const citationAnalysis = await page.evaluate(() => {
@@ -298,6 +299,9 @@ const E2E_PASSWORD = process.env.E2E_PASSWORD || 'Qbend#123';
   console.log('\nDocument content HTML (first 5000 chars):\n', docContentHtml);
 
   console.log(`\nTotal screenshots taken: ${screenshotIndex - 1}`);
-  await browser.close();
+
   console.log('Done!');
+  } finally {
+    await browser.close();
+  }
 })();

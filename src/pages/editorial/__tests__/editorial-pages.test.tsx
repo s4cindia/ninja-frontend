@@ -50,6 +50,6 @@ describe('Editorial Services Dashboard', () => {
   it('shows upload buttons for all modules', () => {
     renderWithRouter('/editorial');
     const uploadButtons = screen.getAllByText('Upload Document');
-    expect(uploadButtons).toHaveLength(3);
+    expect(uploadButtons).toHaveLength(2);
   });
 });

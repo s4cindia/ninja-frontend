@@ -5,6 +5,7 @@ const E2E_PASSWORD = process.env.E2E_PASSWORD || 'Qbend#123';
 
 (async () => {
   const browser = await chromium.launch({ headless: true });
+  try {
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
   const page = await context.newPage();
 
@@ -253,6 +254,8 @@ const E2E_PASSWORD = process.env.E2E_PASSWORD || 'Qbend#123';
 
   console.log(`\nTotal screenshots taken: ${screenshotIndex - 1}`);
 
-  await browser.close();
   console.log('Done!');
+  } finally {
+    await browser.close();
+  }
 })();

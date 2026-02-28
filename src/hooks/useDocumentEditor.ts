@@ -45,10 +45,12 @@ export function useDocumentEditor() {
 
   useEffect(() => {
     if (!documentId) { setError('No document ID provided'); setLoading(false); return; }
+    let cancelled = false;
     const loadDocument = async () => {
       try {
         setLoading(true); setError(null);
         const result = await validatorService.getDocumentContent(documentId);
+        if (cancelled) return;
         setContent(result.content);
         setDocStats({ fileSize: result.fileSize, wordCount: result.wordCount, processingTime: result.processingTime });
         if (result.contentType) setContentType(result.contentType);
@@ -56,11 +58,13 @@ export function useDocumentEditor() {
         if (result.conversionWarnings?.length) toast.error(`Conversion warnings: ${result.conversionWarnings.join(', ')}`);
         setLoading(false);
       } catch {
+        if (cancelled) return;
         setError('Failed to load document. Please check if the document exists.');
         setLoading(false);
       }
     };
     loadDocument();
+    return () => { cancelled = true; };
   }, [documentId]);
 
   const loadVersions = useCallback(async () => {
@@ -142,8 +146,8 @@ export function useDocumentEditor() {
     const file = e.target.files?.[0];
     if (!file) return;
     const fn = file.name.toLowerCase();
-    if (fn.endsWith('.docx') || fn.endsWith('.pdf')) toast.error('Please upload DOCX/PDF files through the upload page for proper processing.');
-    else toast.error('Only DOCX and PDF files are supported.');
+    if (fn.endsWith('.docx') || fn.endsWith('.pdf')) toast.error('Please use the upload page to add new documents for proper processing.');
+    else toast.error('Unsupported file type. Only DOCX and PDF files are supported.');
     e.target.value = '';
   }, []);
 
