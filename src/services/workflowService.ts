@@ -110,6 +110,16 @@ export interface AgenticBatchDashboard {
     fileType: 'epub' | 'pdf';
   }>;
   hitlWaiting?: Array<{ workflowId: string; filename: string; gate: string; reviewUrl: string }>;
+  allWorkflows?: Array<{
+    workflowId: string;
+    filename: string;
+    currentState: string;
+    fileType: 'epub' | 'pdf';
+    jobId: string | null;
+    remediatedFileName: string | null;
+    acrJobId: string | null;
+    errorMessage: string | null;
+  }>;
 }
 
 export interface BatchHITLCluster {
@@ -122,10 +132,12 @@ export interface BatchHITLCluster {
   fileCount: number;
   totalInstances: number;
   representativeIssues: unknown[];
-  decision: 'ACCEPT' | 'REJECT' | null;
+  decision: 'ACCEPT' | 'REJECT' | 'AUTO_FIX' | null;
   reviewedBy: string | null;
   reviewedAt: string | null;
   createdAt: string;
+  /** Computed by backend from fix-classification constants */
+  fixType: 'auto' | 'quickfix' | 'manual';
 }
 
 export interface BatchHITLClustersResponse {
@@ -280,6 +292,11 @@ export const workflowService = {
     return response.data;
   },
 
+  async restartStuckBatch(batchId: string): Promise<{ restartedCount: number }> {
+    const response = await api.post<{ success: boolean; restartedCount: number }>(`/workflows/batch/${batchId}/restart-stuck`);
+    return response.data;
+  },
+
   async getBatchHITLClusters(batchId: string, gate: string): Promise<BatchHITLClustersResponse> {
     const response = await api.get<BatchHITLClustersResponse>(
       `/workflows/batch/${batchId}/hitl/${gate}/clusters`
@@ -290,7 +307,7 @@ export const workflowService = {
   async updateClusterDecision(
     batchId: string,
     clusterId: string,
-    decision: 'ACCEPT' | 'REJECT'
+    decision: 'ACCEPT' | 'REJECT' | 'AUTO_FIX'
   ): Promise<{ success: boolean; cluster: BatchHITLCluster }> {
     const response = await api.put<{ success: boolean; cluster: BatchHITLCluster }>(
       `/workflows/batch/${batchId}/hitl/cluster/${clusterId}/decision`,

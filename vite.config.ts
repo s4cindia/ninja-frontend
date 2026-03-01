@@ -39,7 +39,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5000, // Frontend on port 5000 (backend uses 3001)
+    port: 5000, // Frontend on port 5000 (backend uses 3002)
     host: '0.0.0.0',
     allowedHosts: true,
     hmr: isReplit ? {
@@ -47,7 +47,7 @@ export default defineConfig({
     } : undefined,
     proxy: {
       '/api/v1': {
-        target: process.env.VITE_BACKEND_URL || 'http://localhost:3001',
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:3002',
         changeOrigin: true,
         secure: false,
       },
