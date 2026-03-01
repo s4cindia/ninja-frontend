@@ -44,37 +44,58 @@ export function IntegrityCheckContent({ documentId, onGoToLocation, onApplyFix: 
   const handleGoToLocation = (issue: IntegrityIssue) => {
     if (!onGoToLocation) return;
 
-    // Try originalText first (cleaned), then fall back to context
     const cleanOriginal = issue.originalText?.replace(/[\n\r]+/g, ' ').trim();
+    const cleanContext = issue.context?.replace(/[\n\r]+/g, ' ').trim();
 
-    // Use originalText if it's meaningful (>4 chars, not just a number)
-    if (cleanOriginal && cleanOriginal.length > 4 && !/^\d+$/.test(cleanOriginal)) {
+    // Skip AI-generated descriptions that won't exist in the document.
+    // Only match known AI summary patterns — do NOT use broad regexes that catch
+    // real document text (e.g. "Common clinical features..." is real text, not a description).
+    const isDescriptive = cleanOriginal && (
+      cleanOriginal.startsWith('N/A') ||
+      cleanOriginal.startsWith('Citations found') ||
+      cleanOriginal.startsWith('citations (') ||
+      cleanOriginal.startsWith('None') ||
+      cleanOriginal.startsWith('Missing ') ||
+      cleanOriginal.startsWith('No ') ||
+      cleanOriginal.startsWith('The document ')
+    );
+
+    // Use originalText if it's real document text (>4 chars, not just a number, not descriptive)
+    if (cleanOriginal && cleanOriginal.length > 4 && !/^\d+$/.test(cleanOriginal) && !isDescriptive) {
       onGoToLocation(cleanOriginal);
       return;
     }
 
-    // Fall back to context field — extract a meaningful search snippet
-    if (issue.context) {
-      const cleanContext = issue.context.replace(/[\n\r]+/g, ' ').trim();
-      // Use middle portion of context (skip truncated edges)
-      if (cleanContext.length > 20) {
-        const start = Math.min(10, Math.floor(cleanContext.length * 0.1));
-        const end = Math.min(cleanContext.length, start + 60);
-        const snippet = cleanContext.substring(start, end).trim();
-        if (snippet.length > 10) {
-          onGoToLocation(snippet);
-          return;
-        }
-      }
-      if (cleanContext.length > 4) {
-        onGoToLocation(cleanContext);
+    // For descriptive originalText, try to extract cited references like (17), (19) etc.
+    if (isDescriptive && cleanOriginal) {
+      const refMatch = cleanOriginal.match(/\((\d{1,3})\)/);
+      if (refMatch) {
+        // Search for the reference number in context like "(17)"
+        onGoToLocation(refMatch[0]);
         return;
       }
     }
 
+    // Fall back to context field — extract a meaningful search snippet.
+    // Use up to 120 chars from the start (not the middle) to avoid cutting words.
+    if (cleanContext && cleanContext.length > 4) {
+      const maxLen = 120;
+      if (cleanContext.length > maxLen) {
+        // Cut at a word boundary
+        const cutIdx = cleanContext.lastIndexOf(' ', maxLen);
+        const snippet = cleanContext.substring(0, cutIdx > 20 ? cutIdx : maxLen).trim();
+        onGoToLocation(snippet);
+      } else {
+        onGoToLocation(cleanContext);
+      }
+      return;
+    }
+
     // Last resort: use cleaned originalText even if short
-    if (cleanOriginal && cleanOriginal.length > 0) {
+    if (cleanOriginal && cleanOriginal.length > 0 && !isDescriptive) {
       onGoToLocation(cleanOriginal);
+    } else {
+      toast.error('No locatable text for this issue');
     }
   };
 
