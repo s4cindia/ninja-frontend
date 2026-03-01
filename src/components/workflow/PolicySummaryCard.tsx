@@ -1,4 +1,4 @@
-import { Bot, User, AlertTriangle, CheckCircle2, XCircle, Sliders } from 'lucide-react';
+import { Bot, User, AlertTriangle, CheckCircle2, XCircle, Sliders, Loader2, Clock, Zap } from 'lucide-react';
 import type {
   BatchAutoApprovalPolicy,
   BatchGatePolicy,
@@ -6,8 +6,20 @@ import type {
   ConditionalGatePolicy,
 } from '@/services/workflowService';
 
+export interface GateLiveStatus {
+  /** Which lifecycle state this gate is in */
+  status: 'completed' | 'active' | 'skipped' | 'pending';
+  /** Files currently waiting at this gate */
+  waitingCount: number;
+  /** Files that have already passed this gate */
+  passedCount: number;
+}
+
 interface PolicySummaryCardProps {
   policy: BatchAutoApprovalPolicy;
+  /** Live gate status derived from perGate / perStage metrics */
+  gateStatus?: Record<string, GateLiveStatus>;
+  totalFiles?: number;
 }
 
 const GATE_LABELS: Record<string, string> = {
@@ -71,7 +83,45 @@ function GatePolicyBadge({ policy }: { policy: BatchGatePolicy | undefined }) {
   );
 }
 
-export function PolicySummaryCard({ policy }: PolicySummaryCardProps) {
+function GateLiveStatusIndicator({
+  status,
+  waitingCount,
+  passedCount,
+  totalFiles,
+}: GateLiveStatus & { totalFiles: number }) {
+  if (status === 'completed') {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700">
+        <CheckCircle2 className="h-3.5 w-3.5" />
+        Done ({passedCount}/{totalFiles})
+      </span>
+    );
+  }
+  if (status === 'active') {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        {waitingCount} waiting
+      </span>
+    );
+  }
+  if (status === 'skipped') {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-600">
+        <Zap className="h-3.5 w-3.5" />
+        Auto-approved
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+      <Clock className="h-3.5 w-3.5" />
+      Pending
+    </span>
+  );
+}
+
+export function PolicySummaryCard({ policy, gateStatus, totalFiles = 0 }: PolicySummaryCardProps) {
   const gates = policy.gates;
 
   const modeCounts = Object.values(gates).reduce(
@@ -113,13 +163,28 @@ export function PolicySummaryCard({ policy }: PolicySummaryCardProps) {
       </div>
 
       {/* Gate policy grid */}
-      <div className="space-y-2 mb-4">
-        {(Object.entries(GATE_LABELS) as [string, string][]).map(([gate, label]) => (
-          <div key={gate} className="flex items-center justify-between min-h-[2rem]">
-            <span className="text-sm text-gray-600">{label}</span>
-            <GatePolicyBadge policy={gates[gate as keyof typeof gates]} />
-          </div>
-        ))}
+      <div className="space-y-3 mb-4">
+        {(Object.entries(GATE_LABELS) as [string, string][]).map(([gate, label]) => {
+          const live = gateStatus?.[gate];
+          const rowBg =
+            live?.status === 'active'    ? 'bg-amber-50 border border-amber-100 rounded-md px-2 py-1.5' :
+            live?.status === 'completed' ? 'bg-green-50 border border-green-100 rounded-md px-2 py-1.5' :
+            live?.status === 'skipped'   ? 'bg-blue-50 border border-blue-100 rounded-md px-2 py-1.5' :
+            'px-2 py-1.5';
+          return (
+            <div key={gate} className={rowBg}>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">{label}</span>
+                <GatePolicyBadge policy={gates[gate as keyof typeof gates]} />
+              </div>
+              {live && (
+                <div className="mt-1">
+                  <GateLiveStatusIndicator {...live} totalFiles={totalFiles} />
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Error strategy */}
