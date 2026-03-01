@@ -8,15 +8,20 @@ export function useNotificationToast() {
   // null = not yet seeded; Set = IDs seen since mount
   const seenIds = useRef<Set<string> | null>(null);
 
-  const { data: notifications = [] } = useQuery({
+  const { data: notifications = [], isSuccess } = useQuery({
     queryKey: ['notifications', 'global'],
     queryFn: () => notificationService.getUnread(),
-    refetchInterval: 15_000,
-    staleTime: 10_000,
+    refetchInterval: 8_000,
+    staleTime: 5_000,
   });
 
   useEffect(() => {
-    // First run: seed existing IDs so we don't toast for pre-existing notifications
+    // Wait for the first real server response before seeding.
+    // Without this, notifications=[] on the initial render seeds an empty set,
+    // and all existing notifications look "new" when the query resolves.
+    if (!isSuccess) return;
+
+    // First successful fetch: seed so we don't toast for pre-existing notifications
     if (seenIds.current === null) {
       seenIds.current = new Set(notifications.map((n) => n.id));
       return;
@@ -45,5 +50,5 @@ export function useNotificationToast() {
       // Refresh the bell badge immediately
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     }
-  }, [notifications, queryClient]);
+  }, [notifications, isSuccess, queryClient]);
 }
