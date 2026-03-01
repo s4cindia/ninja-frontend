@@ -13,7 +13,9 @@ function formatRelativeTime(dateStr: string): string {
 }
 
 function notificationIcon(type: Notification['type']): string {
-  return type === 'BATCH_COMPLETED' || type === 'JOB_COMPLETED' ? '✅' : '❌';
+  if (type === 'BATCH_COMPLETED' || type === 'JOB_COMPLETED') return '✅';
+  if (type === 'SYSTEM_ALERT') return '⚠️';
+  return '❌';
 }
 
 export function NotificationBell() {
