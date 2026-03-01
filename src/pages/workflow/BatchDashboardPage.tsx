@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -19,9 +19,167 @@ import {
   Download,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { PolicySummaryCard } from '@/components/workflow/PolicySummaryCard';
+import { PolicySummaryCard, GateLiveStatus } from '@/components/workflow/PolicySummaryCard';
 import { workflowService } from '@/services/workflowService';
 import { useBatchSocket } from '@/hooks/useBatchSocket';
+
+// ── Pipeline phase definitions ────────────────────────────────────────────────
+const PIPELINE_PHASES = [
+  { key: 'ingest',      label: 'Ingest',      states: ['UPLOAD_RECEIVED', 'PREPROCESSING'],                                            hitlStates: [] as string[] },
+  { key: 'audit',       label: 'Audit',        states: ['RUNNING_EPUBCHECK', 'RUNNING_ACE', 'RUNNING_AI_ANALYSIS', 'AWAITING_AI_REVIEW'], hitlStates: ['AWAITING_AI_REVIEW'] },
+  { key: 'remediation', label: 'Remediation',  states: ['AUTO_REMEDIATION', 'AWAITING_REMEDIATION_REVIEW'],                             hitlStates: ['AWAITING_REMEDIATION_REVIEW'] },
+  { key: 'verify',      label: 'Verify',       states: ['VERIFICATION_AUDIT', 'CONFORMANCE_MAPPING', 'AWAITING_CONFORMANCE_REVIEW'],     hitlStates: ['AWAITING_CONFORMANCE_REVIEW'] },
+  { key: 'certify',     label: 'Certify',      states: ['ACR_GENERATION', 'AWAITING_ACR_SIGNOFF'],                                      hitlStates: ['AWAITING_ACR_SIGNOFF'] },
+  { key: 'done',        label: 'Done',         states: ['COMPLETED'],                                                                   hitlStates: [] as string[] },
+];
+
+// States that come after each HITL gate (used to compute passedCount)
+const STATES_AFTER: Record<string, string[]> = {
+  AI_REVIEW: ['AUTO_REMEDIATION', 'AWAITING_REMEDIATION_REVIEW', 'VERIFICATION_AUDIT', 'CONFORMANCE_MAPPING', 'AWAITING_CONFORMANCE_REVIEW', 'ACR_GENERATION', 'AWAITING_ACR_SIGNOFF', 'COMPLETED'],
+  REMEDIATION_REVIEW: ['VERIFICATION_AUDIT', 'CONFORMANCE_MAPPING', 'AWAITING_CONFORMANCE_REVIEW', 'ACR_GENERATION', 'AWAITING_ACR_SIGNOFF', 'COMPLETED'],
+  CONFORMANCE_REVIEW: ['ACR_GENERATION', 'AWAITING_ACR_SIGNOFF', 'COMPLETED'],
+  ACR_SIGNOFF: ['COMPLETED'],
+};
+const GATE_WAITING_STATE: Record<string, string> = {
+  AI_REVIEW: 'AWAITING_AI_REVIEW',
+  REMEDIATION_REVIEW: 'AWAITING_REMEDIATION_REVIEW',
+  CONFORMANCE_REVIEW: 'AWAITING_CONFORMANCE_REVIEW',
+  ACR_SIGNOFF: 'AWAITING_ACR_SIGNOFF',
+};
+
+const STATE_LABELS: Record<string, string> = {
+  UPLOAD_RECEIVED: 'Uploading',
+  PREPROCESSING: 'Processing',
+  RUNNING_EPUBCHECK: 'Auditing',
+  RUNNING_ACE: 'Auditing',
+  RUNNING_AI_ANALYSIS: 'AI Analysis',
+  AWAITING_AI_REVIEW: 'AI Review ⏸',
+  AUTO_REMEDIATION: 'Remediating',
+  AWAITING_REMEDIATION_REVIEW: 'Remediation Review ⏸',
+  VERIFICATION_AUDIT: 'Verifying',
+  CONFORMANCE_MAPPING: 'Conformance Mapping',
+  AWAITING_CONFORMANCE_REVIEW: 'Conformance Review ⏸',
+  ACR_GENERATION: 'Generating ACR',
+  AWAITING_ACR_SIGNOFF: 'ACR Sign-off ⏸',
+  COMPLETED: 'Completed',
+  FAILED: 'Failed',
+};
+
+const PAST_REMEDIATION = new Set([
+  'AWAITING_REMEDIATION_REVIEW',
+  'VERIFICATION_AUDIT',
+  'CONFORMANCE_MAPPING',
+  'AWAITING_CONFORMANCE_REVIEW',
+  'ACR_GENERATION',
+  'AWAITING_ACR_SIGNOFF',
+  'COMPLETED',
+]);
+
+function countStates(perStage: Record<string, number>, states: string[]): number {
+  return states.reduce((sum, s) => sum + (perStage[s] ?? 0), 0);
+}
+
+// ── Batch pipeline stepper ────────────────────────────────────────────────────
+type PhaseStatus = 'completed' | 'active' | 'pending';
+
+function BatchPipelineStepper({
+  perStage,
+  totalFiles,
+}: {
+  perStage: Record<string, number>;
+  totalFiles: number;
+}) {
+  const phases = PIPELINE_PHASES.map(phase => {
+    const inPhase  = countStates(perStage, [...phase.states]);
+    const hitlWaiting = countStates(perStage, phase.hitlStates);
+    // Count files that are in states AFTER this phase (i.e. have passed it)
+    const phaseIdx  = PIPELINE_PHASES.findIndex(p => p.key === phase.key);
+    const laterStates = PIPELINE_PHASES.slice(phaseIdx + 1).flatMap(p => [...p.states]);
+    const pastPhase = countStates(perStage, laterStates);
+
+    let status: PhaseStatus;
+    if (pastPhase === totalFiles || (phase.key === 'done' && (perStage['COMPLETED'] ?? 0) === totalFiles)) {
+      status = 'completed';
+    } else if (inPhase > 0 || (phase.key === 'done' && (perStage['COMPLETED'] ?? 0) > 0)) {
+      status = 'active';
+    } else {
+      status = 'pending';
+    }
+
+    return { ...phase, inPhase, hitlWaiting, pastPhase, status };
+  });
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-5">
+      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Pipeline Progress</h3>
+      <div className="flex items-start">
+        {phases.map((phase, idx) => {
+          const isLast = idx === phases.length - 1;
+          const isHitlWaiting = phase.status === 'active' && phase.hitlWaiting > 0;
+          const dotColor =
+            phase.status === 'completed' ? 'bg-green-500 border-green-500' :
+            isHitlWaiting                ? 'bg-amber-500 border-amber-500 ring-4 ring-amber-100' :
+            phase.status === 'active'    ? 'bg-blue-500 border-blue-500 ring-4 ring-blue-100' :
+                                           'bg-white border-gray-300';
+          const labelColor =
+            phase.status === 'completed' ? 'text-green-700' :
+            isHitlWaiting                ? 'text-amber-700 font-semibold' :
+            phase.status === 'active'    ? 'text-blue-700 font-semibold' :
+                                           'text-gray-400';
+          const lineColor =
+            phase.status === 'completed' || phases[idx + 1]?.status !== 'pending'
+              ? 'bg-green-200' : 'bg-gray-200';
+
+          return (
+            <div key={phase.key} className="flex-1 flex flex-col items-center relative">
+              {/* Connector line */}
+              {!isLast && (
+                <div className="absolute top-3 left-1/2 w-full h-0.5 z-0">
+                  <div className={`h-full ${lineColor} transition-colors`} />
+                </div>
+              )}
+              {/* Dot */}
+              <div className={`relative z-10 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${dotColor}`}>
+                {phase.status === 'completed' && (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-white" strokeWidth={3} />
+                )}
+                {isHitlWaiting && (
+                  <Pause className="w-3 h-3 text-white" strokeWidth={3} />
+                )}
+                {phase.status === 'active' && !isHitlWaiting && (
+                  <Loader2 className="w-3 h-3 text-white animate-spin" />
+                )}
+              </div>
+              {/* Label */}
+              <div className={`mt-2 text-xs text-center ${labelColor}`}>{phase.label}</div>
+              {/* File count badges — show both waiting and actively-processing counts */}
+              {(() => {
+                const processing = phase.inPhase - phase.hitlWaiting;
+                return (
+                  <>
+                    {phase.hitlWaiting > 0 && (
+                      <div className="mt-0.5 text-xs text-amber-600 font-medium">
+                        {phase.hitlWaiting} waiting
+                      </div>
+                    )}
+                    {processing > 0 && (
+                      <div className="mt-0.5 text-xs text-blue-600 font-medium">
+                        {processing} {phase.hitlWaiting > 0 ? 'processing' : `file${processing !== 1 ? 's' : ''}`}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+              {phase.status === 'completed' && phase.key !== 'done' && (
+                <div className="mt-0.5 text-xs text-green-600">✓ all</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 const STATUS_COLORS: Record<string, string> = {
   COMPLETED: 'text-green-700 bg-green-50 border-green-200',
@@ -55,7 +213,16 @@ export function BatchDashboardPage() {
   });
 
   // WebSocket real-time progress
+  // We subscribe but use it only to trigger refetches — perStage must come from REST
+  // to stay accurate (WS snapshots can be emitted before all workflows are committed to DB)
   const { progress: wsProgress } = useBatchSocket(batchId ?? null);
+
+  useEffect(() => {
+    if (wsProgress) {
+      // Drive UI off authoritative REST data; WS event is just the trigger
+      queryClient.invalidateQueries({ queryKey: ['agentic-batch', batchId] });
+    }
+  }, [wsProgress, batchId, queryClient]);
 
   const pauseMutation = useMutation({
     mutationFn: () => workflowService.pauseBatch(batchId!),
@@ -88,6 +255,19 @@ export function BatchDashboardPage() {
     onError: () => toast.error('Failed to retry workflows'),
   });
 
+  const restartStuckMutation = useMutation({
+    mutationFn: () => workflowService.restartStuckBatch(batchId!),
+    onSuccess: (data) => {
+      if (data.restartedCount === 0) {
+        toast('No stuck workflows found', { icon: 'ℹ️' });
+      } else {
+        toast.success(`Requeued ${data.restartedCount} stuck workflow${data.restartedCount !== 1 ? 's' : ''}`);
+      }
+      queryClient.invalidateQueries({ queryKey: ['agentic-batch', batchId] });
+    },
+    onError: () => toast.error('Failed to restart stuck workflows'),
+  });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -111,7 +291,7 @@ export function BatchDashboardPage() {
     );
   }
 
-  // Prefer WebSocket data for live counts
+  // Prefer WebSocket data for live summary counts (ok to be slightly stale)
   const completedCount = wsProgress?.completed ?? batch.metrics.completedCount;
   const failedCount = wsProgress?.failedCount ?? batch.metrics.failedCount;
   const totalFiles = batch.totalFiles;
@@ -120,6 +300,7 @@ export function BatchDashboardPage() {
   const canPause = !['COMPLETED', 'CANCELLED', 'PAUSED'].includes(batch.status);
   const canResume = batch.status === 'PAUSED';
   const canRetry = failedCount > 0;
+  const canRestartStuck = !['COMPLETED', 'CANCELLED'].includes(batch.status);
 
   const handleAction = (action: string) => {
     if (confirmAction === action) {
@@ -134,11 +315,32 @@ export function BatchDashboardPage() {
     }
   };
 
-  // Stage breakdown from WebSocket or API
-  const currentStages = wsProgress?.currentStages ?? batch.metrics.perStage;
-  const activeStages = Object.entries(currentStages)
-    .filter(([state]) => !['COMPLETED', 'FAILED', 'CANCELLED'].includes(state))
-    .sort((a, b) => b[1] - a[1]);
+  // Always use REST perStage for the stepper — WebSocket snapshots can be taken before all
+  // workflows exist in the DB, causing some files to appear missing from phase counts.
+  const currentStages = batch.metrics.perStage;
+
+  // ── Compute live HITL gate status for the policy card ────────────────────
+  const gateStatus = Object.fromEntries(
+    Object.entries(GATE_WAITING_STATE).map(([gate, waitingState]) => {
+      const waitingCount = currentStages[waitingState] ?? 0;
+      const passedCount  = countStates(currentStages, STATES_AFTER[gate] ?? []);
+      const gatePolicy   = batch.autoApprovalPolicy?.gates?.[gate as keyof typeof batch.autoApprovalPolicy.gates];
+      const isAutoAccept = gatePolicy === 'auto-accept' || (typeof gatePolicy === 'object' && gatePolicy?.mode === 'auto-accept');
+
+      let status: GateLiveStatus['status'];
+      if (waitingCount > 0) {
+        status = 'active';
+      } else if (passedCount > 0 && isAutoAccept) {
+        status = 'skipped';
+      } else if (passedCount > 0) {
+        status = 'completed';
+      } else {
+        status = 'pending';
+      }
+
+      return [gate, { status, waitingCount, passedCount } satisfies GateLiveStatus];
+    })
+  ) as Record<string, GateLiveStatus>;
 
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6">
@@ -216,6 +418,22 @@ export function BatchDashboardPage() {
                 {confirmAction === 'retry' ? `Confirm retry ${failedCount}?` : `Retry failed (${failedCount})`}
               </Button>
             )}
+            {canRestartStuck && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => restartStuckMutation.mutate()}
+                disabled={restartStuckMutation.isPending}
+                title="Re-queue any workflows stuck in a processing state for more than 5 minutes"
+              >
+                {restartStuckMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="h-4 w-4 mr-1" />
+                )}
+                Restart stuck
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -265,128 +483,99 @@ export function BatchDashboardPage() {
             </div>
           </div>
 
-          {/* Active stages breakdown */}
-          {activeStages.length > 0 && (
-            <div className="bg-white rounded-lg border border-gray-200 p-5">
-              <h3 className="text-base font-semibold text-gray-900 mb-3">Current States</h3>
-              <div className="space-y-2">
-                {activeStages.map(([state, count]) => (
-                  <div key={state} className="flex items-center gap-3">
-                    <div className="w-40 text-sm text-gray-600 truncate">{state.replace(/_/g, ' ')}</div>
-                    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary-400 rounded-full"
-                        style={{ width: `${Math.round((count / totalFiles) * 100)}%` }}
-                      />
-                    </div>
-                    <div className="w-8 text-right text-sm font-medium text-gray-700">{count}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Pipeline stepper — replaces raw "Current States" */}
+          <BatchPipelineStepper perStage={currentStages} totalFiles={totalFiles} />
 
-          {/* Failed workflow error details */}
-          {batch.failedWorkflows && batch.failedWorkflows.length > 0 && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <XCircle className="h-4 w-4 text-red-600" />
-                <h3 className="text-base font-semibold text-red-900">Failed Workflows</h3>
-              </div>
-              <div className="space-y-2">
-                {batch.failedWorkflows.map(wf => (
-                  <div key={wf.id} className="text-sm">
-                    <div className="font-medium text-red-800 truncate">{wf.filename}</div>
-                    <div className="text-red-700 text-xs mt-0.5">
-                      {wf.errorMessage ?? 'Unknown error'}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Completed files — all artifacts per workflow */}
-          {batch.completedWorkflows && batch.completedWorkflows.length > 0 && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-5">
+          {/* Files — unified progressive artifact disclosure */}
+          {batch.allWorkflows && batch.allWorkflows.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-lg p-5">
               <div className="flex items-center gap-2 mb-4">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <h3 className="text-base font-semibold text-green-900">Completed Files</h3>
-                <span className="ml-auto text-xs text-green-700">
-                  {batch.completedWorkflows.length} file{batch.completedWorkflows.length !== 1 ? 's' : ''}
+                <FileText className="h-4 w-4 text-gray-600" />
+                <h3 className="text-base font-semibold text-gray-900">Files</h3>
+                <span className="ml-auto text-xs text-gray-500">
+                  {batch.allWorkflows.length} file{batch.allWorkflows.length !== 1 ? 's' : ''}
                 </span>
               </div>
-              <div className="space-y-4">
-                {batch.completedWorkflows.map(wf => (
-                  <div key={wf.workflowId} className="bg-white rounded-md border border-green-200 p-3">
-                    <div className="flex items-center gap-2 mb-3">
-                      <FileText className="h-4 w-4 text-green-600 shrink-0" />
-                      <span className="text-sm font-medium text-gray-900 truncate">{wf.filename}</span>
+              <div className="space-y-3">
+                {batch.allWorkflows.map(wf => {
+                  const badgeColor =
+                    wf.currentState === 'COMPLETED'          ? 'text-green-700 bg-green-50 border-green-200' :
+                    wf.currentState === 'FAILED'             ? 'text-red-700 bg-red-50 border-red-200' :
+                    wf.currentState.startsWith('AWAITING_')  ? 'text-amber-700 bg-amber-50 border-amber-200' :
+                                                               'text-blue-700 bg-blue-50 border-blue-200';
+                  const stateLabel = STATE_LABELS[wf.currentState] ?? wf.currentState;
+                  const showRemediation = wf.jobId != null && PAST_REMEDIATION.has(wf.currentState);
+                  return (
+                    <div key={wf.workflowId} className="rounded-md border border-gray-200 p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <FileText className="h-4 w-4 text-gray-400 shrink-0" />
+                        <span className="text-sm font-medium text-gray-900 truncate flex-1">{wf.filename}</span>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border shrink-0 ${badgeColor}`}>
+                          {stateLabel}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {wf.jobId && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => navigate(
+                              `/jobs/${wf.jobId}?batchId=${batchId}&filename=${encodeURIComponent(wf.filename)}`
+                            )}
+                            className="gap-1 text-xs"
+                          >
+                            <Search className="h-3 w-3" />
+                            Audit Results
+                          </Button>
+                        )}
+                        {showRemediation && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => navigate(
+                              wf.fileType === 'pdf'
+                                ? `/pdf/${wf.jobId}/remediation?batchId=${batchId}&filename=${encodeURIComponent(wf.filename)}`
+                                : `/epub/remediate/${wf.jobId}?batchId=${batchId}&filename=${encodeURIComponent(wf.filename)}`
+                            )}
+                            className="gap-1 text-xs"
+                          >
+                            <Wrench className="h-3 w-3" />
+                            Remediation
+                          </Button>
+                        )}
+                        {wf.remediatedFileName && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => window.open(
+                              `/api/v1/workflows/${wf.workflowId}/download`,
+                              '_blank',
+                              'noopener,noreferrer'
+                            )}
+                            className="gap-1 text-xs"
+                          >
+                            <Download className="h-3 w-3" />
+                            Download Remediated
+                          </Button>
+                        )}
+                        {wf.acrJobId && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => navigate(`/acr/report/review/${wf.acrJobId}?batchId=${batchId}`)}
+                            className="gap-1 text-xs border-green-400 text-green-800 hover:bg-green-100"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            View ACR
+                          </Button>
+                        )}
+                      </div>
+                      {wf.currentState === 'FAILED' && wf.errorMessage && (
+                        <p className="mt-2 text-xs text-red-600">{wf.errorMessage}</p>
+                      )}
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {/* Audit results */}
-                      {wf.jobId && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => navigate(
-                            `/jobs/${wf.jobId}?batchId=${batchId}&filename=${encodeURIComponent(wf.filename)}`
-                          )}
-                          className="gap-1 text-xs"
-                        >
-                          <Search className="h-3 w-3" />
-                          Audit Results
-                        </Button>
-                      )}
-                      {/* Remediation plan */}
-                      {wf.jobId && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => navigate(
-                            wf.fileType === 'pdf'
-                              ? `/pdf/${wf.jobId}/remediation?batchId=${batchId}&filename=${encodeURIComponent(wf.filename)}`
-                              : `/epub/remediate/${wf.jobId}?batchId=${batchId}&filename=${encodeURIComponent(wf.filename)}`
-                          )}
-                          className="gap-1 text-xs"
-                        >
-                          <Wrench className="h-3 w-3" />
-                          Remediation
-                        </Button>
-                      )}
-                      {/* Remediated file download */}
-                      {wf.remediatedFileName && wf.jobId && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => window.open(
-                            `/api/v1/workflows/${wf.workflowId}/download`,
-                            '_blank',
-                            'noopener,noreferrer'
-                          )}
-                          className="gap-1 text-xs"
-                        >
-                          <Download className="h-3 w-3" />
-                          Download Remediated
-                        </Button>
-                      )}
-                      {/* ACR report */}
-                      {wf.acrJobId ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => navigate(`/acr/report/review/${wf.acrJobId}?batchId=${batchId}`)}
-                          className="gap-1 text-xs border-green-400 text-green-800 hover:bg-green-100"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                          View ACR
-                        </Button>
-                      ) : (
-                        <span className="text-xs text-gray-400 self-center">ACR generating…</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -435,7 +624,7 @@ export function BatchDashboardPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => navigate(items[0].reviewUrl)}
+                          onClick={() => navigate(`${items[0].reviewUrl}?batchId=${batchId}`)}
                           className="shrink-0 border-amber-400 text-amber-800 hover:bg-amber-100"
                         >
                           Review
@@ -449,7 +638,7 @@ export function BatchDashboardPage() {
                         <div key={item.workflowId} className="flex items-center justify-between gap-2 text-sm">
                           <span className="text-amber-900 truncate">{item.filename}</span>
                           <button
-                            onClick={() => navigate(item.reviewUrl)}
+                            onClick={() => navigate(`${item.reviewUrl}?batchId=${batchId}`)}
                             className="shrink-0 text-xs text-amber-600 hover:text-amber-800 underline"
                           >
                             Review individually
@@ -467,7 +656,11 @@ export function BatchDashboardPage() {
         {/* Right column: policy card */}
         <div className="space-y-4">
           {batch.autoApprovalPolicy ? (
-            <PolicySummaryCard policy={batch.autoApprovalPolicy} />
+            <PolicySummaryCard
+              policy={batch.autoApprovalPolicy}
+              gateStatus={gateStatus}
+              totalFiles={totalFiles}
+            />
           ) : (
             <div className="bg-white rounded-lg border border-gray-200 p-5">
               <h3 className="text-base font-semibold text-gray-900 mb-2">Review Mode</h3>

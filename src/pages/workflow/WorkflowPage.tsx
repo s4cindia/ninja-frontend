@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
@@ -10,6 +10,10 @@ import { ArrowLeft } from 'lucide-react';
 export function WorkflowPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const fromBatchId = searchParams.get('batchId');
+  const backLabel = fromBatchId ? 'Back to Batch' : 'Back';
+  const backAction = fromBatchId ? () => navigate(`/workflow/batch/${fromBatchId}`) : () => navigate(-1);
 
   if (!workflowId) {
     return (
@@ -36,9 +40,9 @@ export function WorkflowPage() {
           variant="ghost"
           size="sm"
           leftIcon={<ArrowLeft className="w-4 h-4" />}
-          onClick={() => navigate(-1)}
+          onClick={backAction}
         >
-          Back
+          {backLabel}
         </Button>
       </div>
 

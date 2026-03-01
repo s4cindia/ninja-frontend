@@ -309,7 +309,7 @@ export function JobDetails() {
                 <IssuesTable issues={parsedOutput.combinedIssues} isAccessible={parsedOutput.isAccessible} />
 
                 <div data-testid="job-actions">
-                  <JobActions jobId={job.id} />
+                  <JobActions jobId={job.id} batchId={fromBatchId || undefined} />
                 </div>
 
                 <RawDataToggle data={parsedOutput} />

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { ChevronLeft, CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react';
 import { workflowService, type WorkflowStatus } from '@/services/workflowService';
@@ -59,6 +59,10 @@ const SEVERITY_CONFIG = {
 export function AIReviewPage() {
   const { workflowId } = useParams<{ workflowId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const fromBatchId = searchParams.get('batchId');
+  const backLabel = fromBatchId ? 'Back to Batch' : 'Back to Workflow';
+  const backPath = fromBatchId ? `/workflow/batch/${fromBatchId}` : `/workflow/${workflowId}`;
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -204,8 +208,9 @@ export function AIReviewPage() {
 
       toast.success('AI Review submitted successfully!');
 
-      // Navigate back to workflow page
-      navigate(`/workflow/${workflowId}`);
+      // Navigate back to workflow page (preserve batch context if present)
+      const dest = fromBatchId ? `/workflow/${workflowId}?batchId=${fromBatchId}` : `/workflow/${workflowId}`;
+      navigate(dest);
     } catch (err) {
       console.error('[AIReviewPage] Failed to submit review:', err);
       toast.error(getErrorMessage(err));
@@ -232,9 +237,9 @@ export function AIReviewPage() {
           variant="outline"
           className="mt-4"
           leftIcon={<ChevronLeft className="w-4 h-4" />}
-          onClick={() => navigate(`/workflow/${workflowId}`)}
+          onClick={() => navigate(backPath)}
         >
-          Back to Workflow
+          {backLabel}
         </Button>
       </div>
     );
@@ -256,10 +261,10 @@ export function AIReviewPage() {
           variant="ghost"
           size="sm"
           leftIcon={<ChevronLeft className="w-4 h-4" />}
-          onClick={() => navigate(`/workflow/${workflowId}`)}
+          onClick={() => navigate(backPath)}
           className="mb-4"
         >
-          Back to Workflow
+          {backLabel}
         </Button>
 
         <h1 className="text-3xl font-bold text-gray-900">AI Review</h1>
@@ -435,7 +440,7 @@ export function AIReviewPage() {
         <div className="flex justify-end gap-3">
           <Button
             variant="outline"
-            onClick={() => navigate(`/workflow/${workflowId}`)}
+            onClick={() => navigate(backPath)}
             disabled={submitting}
           >
             Cancel
