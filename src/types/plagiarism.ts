@@ -36,6 +36,7 @@ export interface PlagiarismCheckJob {
   startedAt: string | null;
   completedAt: string | null;
   metadata: Record<string, unknown> | null;
+  disclaimer?: string;
 }
 
 export interface PlagiarismMatch {
@@ -66,6 +67,7 @@ export interface PlagiarismSummary {
   byType: Record<string, number>;
   byClassification: Record<string, number>;
   byStatus: Record<string, number>;
+  disclaimer?: string;
 }
 
 export interface PlagiarismMatchFilters {

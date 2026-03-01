@@ -75,6 +75,7 @@ export interface IntegrityIssueSummary {
   suggestions: number;
   pending: number;
   fixed: number;
+  ignored: number;
 }
 
 export type IntegritySummaryMap = Record<string, IntegrityIssueSummary>;

@@ -3,6 +3,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { integrityService } from '@/services/integrity.service';
 import type {
   IntegrityIssueFilters,
@@ -50,6 +51,9 @@ export function useIntegrityCheck(documentId: string) {
     onSuccess: (data) => {
       setJobId(data.jobId);
       setPolling(true);
+      if (data.created === false) {
+        toast('Check already in progress', { icon: 'ℹ️' });
+      }
     },
   });
 

@@ -17,8 +17,8 @@ export const plagiarismService = {
   /**
    * Start a plagiarism check
    */
-  async startCheck(documentId: string): Promise<{ jobId: string; status: string; message: string }> {
-    const response = await api.post<{ success: boolean; data: { jobId: string; status: string; message: string } }>(
+  async startCheck(documentId: string): Promise<{ jobId: string; created: boolean; status: string }> {
+    const response = await api.post<{ success: boolean; data: { jobId: string; created: boolean; status: string } }>(
       '/plagiarism/check',
       { documentId }
     );

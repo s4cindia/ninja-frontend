@@ -7,9 +7,10 @@ import { MATCH_TYPE_LABELS, CLASSIFICATION_LABELS } from '@/types/plagiarism';
 
 interface Props {
   summary: PlagiarismSummaryType;
+  disclaimer?: string;
 }
 
-export function PlagiarismSummary({ summary }: Props) {
+export function PlagiarismSummary({ summary, disclaimer }: Props) {
   if (summary.total === 0) {
     return (
       <div className="text-center py-2">
@@ -20,6 +21,11 @@ export function PlagiarismSummary({ summary }: Props) {
 
   return (
     <div className="space-y-3">
+      {disclaimer && (
+        <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5">
+          {disclaimer}
+        </div>
+      )}
       <div className="flex items-center justify-between text-sm">
         <span className="font-medium text-gray-700">{summary.total} matches found</span>
         <span className="text-xs text-gray-500">

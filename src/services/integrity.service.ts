@@ -18,8 +18,8 @@ export const integrityService = {
   /**
    * Start an integrity check
    */
-  async startCheck(input: StartIntegrityCheckInput): Promise<{ jobId: string; status: string; message: string }> {
-    const response = await api.post<{ success: boolean; data: { jobId: string; status: string; message: string } }>(
+  async startCheck(input: StartIntegrityCheckInput): Promise<{ jobId: string; created: boolean; status: string }> {
+    const response = await api.post<{ success: boolean; data: { jobId: string; created: boolean; status: string } }>(
       '/integrity/check',
       input
     );
@@ -88,8 +88,8 @@ export const integrityService = {
   /**
    * Bulk action on multiple issues
    */
-  async bulkAction(issueIds: string[], action: 'fix' | 'ignore'): Promise<{ updated: number }> {
-    const response = await api.post<{ success: boolean; data: { updated: number } }>(
+  async bulkAction(issueIds: string[], action: 'fix' | 'ignore'): Promise<{ updated: number; requested: number; skipped: number }> {
+    const response = await api.post<{ success: boolean; data: { updated: number; requested: number; skipped: number } }>(
       '/integrity/issues/bulk',
       { issueIds, action }
     );
