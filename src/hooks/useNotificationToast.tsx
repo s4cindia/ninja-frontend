@@ -40,11 +40,11 @@ export function useNotificationToast() {
       );
 
       if (n.type === 'SYSTEM_ALERT') {
-        toast(message, { duration: 8000, position: 'bottom-left', icon: '⚠️' });
+        toast(message, { duration: 8000, position: 'bottom-right', icon: '⚠️' });
       } else if (n.type === 'BATCH_COMPLETED' || n.type === 'JOB_COMPLETED') {
-        toast.success(message, { duration: 6000, position: 'bottom-left' });
+        toast.success(message, { duration: 6000, position: 'bottom-right' });
       } else {
-        toast.error(message, { duration: 6000, position: 'bottom-left' });
+        toast.error(message, { duration: 6000, position: 'bottom-right' });
       }
 
       // Refresh the bell badge immediately
