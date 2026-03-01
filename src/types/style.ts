@@ -49,6 +49,7 @@ export interface StyleViolation {
   endOffset: number;
   originalText: string;
   suggestedText?: string;
+  confidence: number | null;
   status: ViolationStatus;
   appliedFix?: string;
   fixedAt?: string;
@@ -82,6 +83,8 @@ export interface ValidationSummary {
   status: string;
   progress: number;
   totalViolations: number;
+  styleGuide?: string;
+  ruleSetIds?: string[];
   byCategory: Record<string, number>;
   bySeverity: Record<string, number>;
   byStatus: Record<string, number>;

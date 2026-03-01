@@ -1,37 +1,39 @@
+/**
+ * PlagiarismPage - Full plagiarism check page with document context
+ */
+
 import { useParams, Link } from 'react-router-dom';
 import { Search } from 'lucide-react';
+import { PlagiarismCheckContent } from '@/components/plagiarism/PlagiarismCheckPanel';
 
 export function PlagiarismPage() {
-  const { jobId } = useParams<{ jobId: string }>();
+  const { documentId } = useParams<{ documentId: string }>();
 
-  if (!jobId) {
-    return <PlagiarismJobListPlaceholder />;
+  if (!documentId) {
+    return <PlagiarismDocumentList />;
   }
 
   return (
-    <div className="bg-white rounded-lg border p-6">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="p-3 rounded-lg bg-amber-500 text-white">
-          <Search className="w-6 h-6" />
+    <div className="h-full flex flex-col">
+      <div className="flex items-center gap-3 p-4 border-b bg-white">
+        <div className="p-2 rounded-lg bg-amber-500 text-white">
+          <Search className="w-5 h-5" />
         </div>
         <div>
           <h2 className="text-lg font-semibold text-gray-900">Plagiarism Detection</h2>
           <p className="text-sm text-gray-500">
-            Job ID: <code className="bg-gray-100 px-2 py-0.5 rounded">{jobId}</code>
+            Document: <code className="bg-gray-100 px-2 py-0.5 rounded text-xs">{documentId}</code>
           </p>
         </div>
       </div>
-      <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-        <p className="text-sm text-amber-700">
-          <strong>Coming Soon (Sprint E1):</strong> Plagiarism Detection module under development.
-          Features: Semantic fingerprinting, paraphrase detection, source matching.
-        </p>
+      <div className="flex-1 overflow-auto">
+        <PlagiarismCheckContent documentId={documentId} />
       </div>
     </div>
   );
 }
 
-function PlagiarismJobListPlaceholder() {
+function PlagiarismDocumentList() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -55,7 +57,7 @@ function PlagiarismJobListPlaceholder() {
         <Search className="w-12 h-12 text-gray-300 mx-auto mb-4" />
         <p className="text-gray-500">No plagiarism scans yet.</p>
         <p className="text-sm text-gray-400 mt-1">
-          Upload a document to run plagiarism detection.
+          Upload a document or open one in the editor to run plagiarism detection.
         </p>
       </div>
     </div>

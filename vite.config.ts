@@ -45,6 +45,11 @@ export default defineConfig({
     hmr: isReplit ? {
       clientPort: 443,
     } : undefined,
+    watch: {
+      // WSL2 on /mnt/c/ doesn't support inotify — use polling for HMR
+      usePolling: true,
+      interval: 1000,
+    },
     proxy: {
       '/api/v1': {
         target: process.env.VITE_BACKEND_URL || 'http://localhost:3002',

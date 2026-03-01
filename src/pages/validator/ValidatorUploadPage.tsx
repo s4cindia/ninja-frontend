@@ -1,9 +1,18 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Upload, FileText, X, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Upload, FileText, X, AlertCircle, ArrowLeft, FileCheck, ShieldCheck, Search, BookOpen } from 'lucide-react';
 import { api, getErrorMessage } from '@/services/api';
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+
+interface ValidatorStats {
+  totalDocuments: number;
+  totalWords: number;
+  integrityIssues: number;
+  plagiarismMatches: number;
+  styleViolations: number;
+  recentDocuments: { id: string; originalName: string; wordCount: number; contentType: string; createdAt: string }[];
+}
 
 export function ValidatorUploadPage() {
   const navigate = useNavigate();
@@ -11,6 +20,13 @@ export function ValidatorUploadPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [stats, setStats] = useState<ValidatorStats | null>(null);
+
+  useEffect(() => {
+    api.get('/validator/stats')
+      .then(r => setStats(r.data?.data))
+      .catch((err) => { console.debug('[ValidatorUpload] Failed to load stats:', err?.message); });
+  }, []);
 
   const validateFile = (file: File): string | null => {
     const fileName = file.name.toLowerCase();
@@ -200,28 +216,60 @@ export function ValidatorUploadPage() {
           )}
         </div>
 
-        {/* Features Info */}
-        <div className="mt-8 bg-white rounded-xl border shadow-sm p-6">
-          <h3 className="font-semibold text-gray-900 mb-4">What you can do with Validator</h3>
-          <ul className="space-y-3 text-sm text-gray-600">
-            <li className="flex items-start gap-2">
-              <span className="text-emerald-500 mt-0.5">✓</span>
-              Edit documents with built-in rich text editor
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-emerald-500 mt-0.5">✓</span>
-              Automatic version control with snapshots
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-emerald-500 mt-0.5">✓</span>
-              Track changes with accept/reject workflow
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-emerald-500 mt-0.5">✓</span>
-              Compare document versions side by side
-            </li>
-          </ul>
-        </div>
+        {/* Stats */}
+        {stats && (
+          <div className="mt-8 space-y-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-white rounded-xl border shadow-sm p-4 text-center">
+                <FileCheck className="w-5 h-5 mx-auto mb-1.5 text-emerald-500" />
+                <p className="text-2xl font-semibold text-gray-900">{stats.totalDocuments}</p>
+                <p className="text-xs text-gray-500">Documents</p>
+              </div>
+              <div className="bg-white rounded-xl border shadow-sm p-4 text-center">
+                <BookOpen className="w-5 h-5 mx-auto mb-1.5 text-blue-500" />
+                <p className="text-2xl font-semibold text-gray-900">
+                  {stats.totalWords >= 1000 ? `${(stats.totalWords / 1000).toFixed(1)}k` : stats.totalWords}
+                </p>
+                <p className="text-xs text-gray-500">Total Words</p>
+              </div>
+              <div className="bg-white rounded-xl border shadow-sm p-4 text-center">
+                <ShieldCheck className="w-5 h-5 mx-auto mb-1.5 text-amber-500" />
+                <p className="text-2xl font-semibold text-gray-900">{stats.integrityIssues + stats.styleViolations}</p>
+                <p className="text-xs text-gray-500">Issues Found</p>
+              </div>
+              <div className="bg-white rounded-xl border shadow-sm p-4 text-center">
+                <Search className="w-5 h-5 mx-auto mb-1.5 text-purple-500" />
+                <p className="text-2xl font-semibold text-gray-900">{stats.plagiarismMatches}</p>
+                <p className="text-xs text-gray-500">Similarity Matches</p>
+              </div>
+            </div>
+
+            {stats.recentDocuments.length > 0 && (
+              <div className="bg-white rounded-xl border shadow-sm p-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-3">Recent Documents</h3>
+                <div className="space-y-2">
+                  {stats.recentDocuments.map((doc) => (
+                    <Link
+                      key={doc.id}
+                      to={`/validator/editor/${doc.id}`}
+                      className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors group"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        <span className="text-sm text-gray-700 truncate group-hover:text-emerald-600">
+                          {doc.originalName}
+                        </span>
+                      </div>
+                      <span className="text-xs text-gray-400 flex-shrink-0 ml-2">
+                        {doc.wordCount > 0 ? `${doc.wordCount.toLocaleString()} words` : ''}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

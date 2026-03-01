@@ -1,25 +1,20 @@
 /**
- * Track Changes Extension for TipTap
+ * Track Changes Extension for TipTap (Mark-Based)
  *
- * Provides Microsoft Word-like track changes functionality:
- * - Insertions shown with green underline
- * - Deletions shown with red strikethrough
- * - Accept/Reject individual or all changes
+ * Uses ProseMirror marks instead of decorations so that changes:
+ * - Survive save/reload (marks serialize to HTML)
+ * - Have correct positions after edits
+ * - Support reliable accept/reject
  *
- * Based on: https://github.com/chenyuncai/tiptap-track-change-extension
+ * Marks:
+ *   trackInsertion — green underline, text was added
+ *   trackDeletion  — red strikethrough, text was removed (kept in doc)
  */
 
-import { Extension, type Editor, type ChainedCommands, type SingleCommands } from '@tiptap/core';
-import { Plugin, PluginKey, type Transaction, type EditorState } from '@tiptap/pm/state';
-import { Decoration, DecorationSet } from '@tiptap/pm/view';
-import type { Node } from '@tiptap/pm/model';
+import { Mark, mergeAttributes } from '@tiptap/core';
+import type { Editor } from '@tiptap/core';
 
-export interface TrackChangeOptions {
-  enabled: boolean;
-  userId: string;
-  userName: string;
-  onStatusChange?: (enabled: boolean) => void;
-}
+export type TrackChangeSource = 'style' | 'integrity' | 'plagiarism' | 'manual';
 
 export interface TrackedChange {
   id: string;
@@ -30,6 +25,337 @@ export interface TrackedChange {
   userId: string;
   userName: string;
   timestamp: Date;
+  source: TrackChangeSource;
+}
+
+// ─── trackInsertion mark ───────────────────────────────────────────────
+
+export const TrackInsertionMark = Mark.create({
+  name: 'trackInsertion',
+  priority: 1000,
+  keepOnSplit: true,
+
+  addAttributes() {
+    return {
+      changeId: { default: null },
+      userId: { default: null },
+      userName: { default: null },
+      timestamp: { default: null },
+      source: { default: 'manual' },
+    };
+  },
+
+  parseHTML() {
+    return [{
+      tag: 'span.track-insertion',
+      getAttrs: (el) => {
+        const dom = el as HTMLElement;
+        return {
+          changeId: dom.getAttribute('data-change-id') || null,
+          userId: dom.getAttribute('data-user-id') || null,
+          userName: dom.getAttribute('data-user') || null,
+          timestamp: dom.getAttribute('data-timestamp') || null,
+          source: dom.getAttribute('data-source') || 'manual',
+        };
+      },
+    }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return [
+      'span',
+      mergeAttributes(HTMLAttributes, {
+        class: 'track-insertion',
+        'data-change-id': HTMLAttributes.changeId,
+        'data-user-id': HTMLAttributes.userId,
+        'data-user': HTMLAttributes.userName,
+        'data-timestamp': HTMLAttributes.timestamp,
+        'data-source': HTMLAttributes.source || 'manual',
+      }),
+      0,
+    ];
+  },
+});
+
+// ─── trackDeletion mark ────────────────────────────────────────────────
+
+export const TrackDeletionMark = Mark.create({
+  name: 'trackDeletion',
+  priority: 1000,
+  keepOnSplit: true,
+  inclusive: false,
+
+  addAttributes() {
+    return {
+      changeId: { default: null },
+      userId: { default: null },
+      userName: { default: null },
+      timestamp: { default: null },
+      source: { default: 'manual' },
+    };
+  },
+
+  parseHTML() {
+    return [{
+      tag: 'span.track-deletion',
+      getAttrs: (el) => {
+        const dom = el as HTMLElement;
+        return {
+          changeId: dom.getAttribute('data-change-id') || null,
+          userId: dom.getAttribute('data-user-id') || null,
+          userName: dom.getAttribute('data-user') || null,
+          timestamp: dom.getAttribute('data-timestamp') || null,
+          source: dom.getAttribute('data-source') || 'manual',
+        };
+      },
+    }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return [
+      'span',
+      mergeAttributes(HTMLAttributes, {
+        class: 'track-deletion',
+        'data-change-id': HTMLAttributes.changeId,
+        'data-user-id': HTMLAttributes.userId,
+        'data-user': HTMLAttributes.userName,
+        'data-timestamp': HTMLAttributes.timestamp,
+        'data-source': HTMLAttributes.source || 'manual',
+      }),
+      0,
+    ];
+  },
+});
+
+// ─── helpers ───────────────────────────────────────────────────────────
+
+let changeIdCounter = 0;
+
+function generateChangeId(): string {
+  return `change-${Date.now()}-${++changeIdCounter}`;
+}
+
+function normalizeText(text: string): string {
+  return text
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/[\u00A0]/g, ' ')
+    .replace(/['\u2018\u2019]/g, "'")
+    .replace(/["\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, '-')
+    .trim();
+}
+
+/** Returns true for whitespace characters including non-breaking space. */
+function isWS(code: number): boolean {
+  return code === 0x20 || code === 0x09 || code === 0x0A || code === 0x0D ||
+         code === 0x0C || code === 0x0B || code === 0xA0;
+}
+
+/**
+ * Normalize text and build an index map from each normalized character position
+ * back to its position in the original string.  This is critical for mapping
+ * match positions in normalized text back to the original fullText indices.
+ */
+function normalizeWithMap(text: string): { normalized: string; indexMap: number[] } {
+  const indexMap: number[] = [];
+  let result = '';
+  let i = 0;
+  const len = text.length;
+
+  // Skip leading whitespace (trim start)
+  while (i < len && isWS(text.charCodeAt(i))) i++;
+
+  let lastWasSpace = false;
+
+  while (i < len) {
+    const code = text.charCodeAt(i);
+
+    if (isWS(code)) {
+      if (!lastWasSpace) {
+        indexMap.push(i);
+        result += ' ';
+        lastWasSpace = true;
+      }
+      i++;
+      continue;
+    }
+
+    lastWasSpace = false;
+    indexMap.push(i);
+
+    // Normalize smart quotes and dashes
+    if (code === 0x2018 || code === 0x2019) result += "'";
+    else if (code === 0x201C || code === 0x201D) result += '"';
+    else if (code === 0x2013 || code === 0x2014) result += '-';
+    else result += text[i];
+
+    i++;
+  }
+
+  // Trim trailing space
+  while (result.endsWith(' ')) {
+    result = result.slice(0, -1);
+    indexMap.pop();
+  }
+
+  return { normalized: result, indexMap };
+}
+
+/**
+ * Search full document text for `search` and return the ProseMirror
+ * position range. Handles text that spans multiple nodes.
+ */
+function findTextInDoc(
+  editor: Editor,
+  search: string
+): { from: number; to: number } | null {
+  const doc = editor.state.doc;
+
+  // Build a flat string of all text with position mapping
+  const chunks: { text: string; pos: number }[] = [];
+  let fullText = '';
+
+  doc.descendants((node, pos) => {
+    if (node.isText && node.text) {
+      chunks.push({ text: node.text, pos });
+      fullText += node.text;
+    } else if (node.isBlock && fullText.length > 0) {
+      // Add a space for block boundaries to avoid false joins
+      chunks.push({ text: ' ', pos: -1 });
+      fullText += ' ';
+    }
+  });
+
+  // Strategy 1: exact match on full text
+  let fullIdx = fullText.indexOf(search);
+  let fullMatchLen = search.length;
+
+  if (fullIdx === -1) {
+    // Strategy 2+: normalized match with proper index mapping back to fullText
+    const { normalized: normFull, indexMap: normToFullMap } = normalizeWithMap(fullText);
+    const normSearch = normalizeText(search);
+    let normIdx = normFull.indexOf(normSearch);
+    let normMatchLen = normSearch.length;
+
+    if (normIdx === -1 && search.length > 30) {
+      // Strategy 3: partial (first 40 chars, word-boundary aware)
+      let cutoff = 40;
+      const spaceIdx = normSearch.indexOf(' ', 30);
+      if (spaceIdx !== -1 && spaceIdx < 50) cutoff = spaceIdx;
+      const shortSearch = normSearch.substring(0, cutoff);
+      normIdx = normFull.indexOf(shortSearch);
+      if (normIdx !== -1) normMatchLen = shortSearch.length;
+    }
+
+    if (normIdx === -1 && search.length > 10) {
+      // Strategy 4: middle portion (edges may be truncated by AI)
+      const start = Math.floor(normSearch.length * 0.2);
+      const end = Math.min(normSearch.length, start + 50);
+      const midSearch = normSearch.substring(start, end).trim();
+      if (midSearch.length > 8) {
+        normIdx = normFull.indexOf(midSearch);
+        if (normIdx !== -1) normMatchLen = midSearch.length;
+      }
+    }
+
+    if (normIdx === -1) return null;
+
+    // Map normalized indices back to fullText indices
+    fullIdx = normToFullMap[normIdx] ?? normIdx;
+    const lastCharNormIdx = normIdx + normMatchLen - 1;
+    if (lastCharNormIdx < normToFullMap.length) {
+      fullMatchLen = (normToFullMap[lastCharNormIdx] + 1) - fullIdx;
+    } else {
+      fullMatchLen = fullText.length - fullIdx;
+    }
+  }
+
+  // Map fullText string index back to document position
+  let charOffset = 0;
+  let fromPos = -1;
+  let toPos = -1;
+
+  for (const chunk of chunks) {
+    const chunkEnd = charOffset + chunk.text.length;
+
+    if (fromPos === -1 && fullIdx < chunkEnd) {
+      const offsetInChunk = fullIdx - charOffset;
+      fromPos = chunk.pos === -1 ? fromPos : chunk.pos + offsetInChunk;
+    }
+
+    if (fromPos !== -1 && fullIdx + fullMatchLen <= chunkEnd) {
+      const offsetInChunk = fullIdx + fullMatchLen - charOffset;
+      toPos = chunk.pos === -1 ? toPos : chunk.pos + offsetInChunk;
+      break;
+    }
+
+    charOffset = chunkEnd;
+  }
+
+  if (fromPos === -1 || toPos === -1) return null;
+  return { from: fromPos, to: toPos };
+}
+
+// ─── public API ────────────────────────────────────────────────────────
+
+// Module-level tracking state: intentionally shared across the module.
+// This app uses a single editor instance per page, so module-level state is safe.
+// For multi-editor support, this would need to move to editor.storage.
+// Also exposed via editor.storage.trackChange.{enabled,userId,userName} per-instance.
+let trackingEnabled = true;
+let trackingUserId = 'anonymous';
+let trackingUserName = 'Anonymous User';
+
+/**
+ * Scan the editor document for trackInsertion / trackDeletion marks
+ * and return them as TrackedChange objects.
+ */
+export function getTrackedChangesFromEditor(editor: Editor | null): TrackedChange[] {
+  if (!editor) return [];
+
+  const changes: TrackedChange[] = [];
+  const doc = editor.state.doc;
+
+  doc.descendants((node, pos) => {
+    if (!node.isText) return;
+    for (const mark of node.marks) {
+      if (mark.type.name === 'trackInsertion' || mark.type.name === 'trackDeletion') {
+        changes.push({
+          id: mark.attrs.changeId || `pos-${pos}`,
+          type: mark.type.name === 'trackInsertion' ? 'insertion' : 'deletion',
+          from: pos,
+          to: pos + node.nodeSize,
+          text: node.text || '',
+          userId: mark.attrs.userId || '',
+          userName: mark.attrs.userName || '',
+          timestamp: mark.attrs.timestamp ? new Date(mark.attrs.timestamp) : new Date(),
+          source: (mark.attrs.source as TrackChangeSource) || 'manual',
+        });
+      }
+    }
+  });
+
+  return changes;
+}
+
+/** Backwards-compatible wrapper (no-op when called without editor). */
+export function getTrackedChanges(): TrackedChange[] {
+  return [];
+}
+
+/** Clear all tracked changes from the document. */
+export function clearTrackedChanges(): void {
+  // No-op — clearing is done via accept/reject commands on the editor.
+}
+
+// ─── Main Extension (adds commands + state) ────────────────────────────
+
+export interface TrackChangeOptions {
+  enabled: boolean;
+  userId: string;
+  userName: string;
+  onStatusChange?: (enabled: boolean) => void;
 }
 
 declare module '@tiptap/core' {
@@ -38,36 +364,18 @@ declare module '@tiptap/core' {
       enableTrackChanges: () => ReturnType;
       disableTrackChanges: () => ReturnType;
       toggleTrackChanges: () => ReturnType;
-      acceptChange: () => ReturnType;
-      rejectChange: () => ReturnType;
+      acceptChange: (changeId?: string) => ReturnType;
+      rejectChange: (changeId?: string) => ReturnType;
       acceptAllChanges: () => ReturnType;
       rejectAllChanges: () => ReturnType;
       insertWithTracking: (text: string) => ReturnType;
       deleteWithTracking: () => ReturnType;
-      replaceWithTracking: (searchText: string, replaceText: string) => ReturnType;
+      replaceWithTracking: (searchText: string, replaceText: string, source?: TrackChangeSource) => ReturnType;
     };
   }
 }
 
-export const trackChangePluginKey = new PluginKey('trackChange');
-
-// Storage for tracked changes
-const trackedChanges: Map<string, TrackedChange> = new Map();
-
-// Normalize text for comparison (handle whitespace and special chars)
-function normalizeText(text: string): string {
-  return text
-    .replace(/\s+/g, ' ')  // Normalize whitespace
-    .replace(/[\u00A0]/g, ' ')  // Replace non-breaking spaces
-    .replace(/['']/g, "'")  // Normalize quotes
-    .replace(/[""]/g, '"')
-    .trim();
-}
-let changeIdCounter = 0;
-
-function generateChangeId(): string {
-  return `change-${Date.now()}-${++changeIdCounter}`;
-}
+import { Extension } from '@tiptap/core';
 
 export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
   name: 'trackChange',
@@ -84,8 +392,19 @@ export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
   addStorage() {
     return {
       enabled: this.options.enabled,
-      changes: trackedChanges,
+      userId: this.options.userId,
+      userName: this.options.userName,
     };
+  },
+
+  onCreate() {
+    // Sync to both storage (per-instance) and module-level (legacy fallback)
+    this.storage.enabled = this.options.enabled;
+    this.storage.userId = this.options.userId;
+    this.storage.userName = this.options.userName;
+    trackingEnabled = this.options.enabled;
+    trackingUserId = this.options.userId;
+    trackingUserName = this.options.userName;
   },
 
   addCommands() {
@@ -93,6 +412,7 @@ export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
       enableTrackChanges:
         () =>
         ({ editor }: { editor: Editor }) => {
+          trackingEnabled = true;
           this.storage.enabled = true;
           this.options.onStatusChange?.(true);
           editor.view.dispatch(editor.state.tr);
@@ -102,6 +422,7 @@ export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
       disableTrackChanges:
         () =>
         ({ editor }: { editor: Editor }) => {
+          trackingEnabled = false;
           this.storage.enabled = false;
           this.options.onStatusChange?.(false);
           editor.view.dispatch(editor.state.tr);
@@ -110,8 +431,8 @@ export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
 
       toggleTrackChanges:
         () =>
-        ({ commands }: { commands: SingleCommands }) => {
-          if (this.storage.enabled) {
+        ({ commands }) => {
+          if (trackingEnabled) {
             return commands.disableTrackChanges();
           }
           return commands.enableTrackChanges();
@@ -119,313 +440,251 @@ export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
 
       insertWithTracking:
         (text: string) =>
-        ({ editor, chain }: { editor: Editor; chain: () => ChainedCommands }) => {
+        ({ editor, tr, dispatch }) => {
+          if (!dispatch) return true;
           const { from } = editor.state.selection;
           const changeId = generateChangeId();
 
-          // Store the change
-          trackedChanges.set(changeId, {
-            id: changeId,
-            type: 'insertion',
-            from,
-            to: from + text.length,
-            text,
-            userId: this.options.userId,
-            userName: this.options.userName,
-            timestamp: new Date(),
+          const insertionMark = editor.schema.marks.trackInsertion.create({
+            changeId,
+            userId: trackingUserId,
+            userName: trackingUserName,
+            timestamp: new Date().toISOString(),
           });
 
-          return chain()
-            .insertContent(`<span class="track-insertion" data-change-id="${changeId}">${text}</span>`)
-            .run();
+          const textNode = editor.schema.text(text, [insertionMark]);
+          tr.insert(from, textNode);
+          dispatch(tr);
+          return true;
         },
 
       deleteWithTracking:
         () =>
-        ({ editor, chain }: { editor: Editor; chain: () => ChainedCommands }) => {
+        ({ editor, tr, dispatch }) => {
+          if (!dispatch) return true;
           const { from, to } = editor.state.selection;
-          const selectedText = editor.state.doc.textBetween(from, to);
-
-          if (!selectedText) return false;
+          if (from === to) return false;
 
           const changeId = generateChangeId();
 
-          // Store the change
-          trackedChanges.set(changeId, {
-            id: changeId,
-            type: 'deletion',
-            from,
-            to,
-            text: selectedText,
-            userId: this.options.userId,
-            userName: this.options.userName,
-            timestamp: new Date(),
+          const deletionMark = editor.schema.marks.trackDeletion.create({
+            changeId,
+            userId: trackingUserId,
+            userName: trackingUserName,
+            timestamp: new Date().toISOString(),
           });
 
-          // Replace with deletion mark instead of actually deleting
-          return chain()
-            .setMeta('trackChange', { type: 'delete', changeId })
-            .run();
+          tr.addMark(from, to, deletionMark);
+          dispatch(tr);
+          return true;
         },
 
       replaceWithTracking:
-        (searchText: string, replaceText: string) =>
-        ({ editor, chain }: { editor: Editor; chain: () => ChainedCommands }) => {
-          // Find the text in the document
-          const doc = editor.state.doc;
-          let found = false;
-          let foundFrom = 0;
-          let foundTo = 0;
-          let actualSearchText = searchText; // Track the actual matched text
+        (searchText: string, replaceText: string, source?: TrackChangeSource) =>
+        ({ editor, tr, dispatch }) => {
+          if (!dispatch) return true;
 
-          const normalizedSearch = normalizeText(searchText);
-          console.log('[TrackChange] Searching for:', normalizedSearch.substring(0, 50));
+          const match = findTextInDoc(editor, searchText);
+          if (!match) return false;
 
-          // Strategy 1: Exact match
-          doc.descendants((node: Node, nodePos: number) => {
-            if (found) return false;
-            if (node.isText) {
-              const text = node.text || '';
-              const index = text.indexOf(searchText);
-              if (index !== -1) {
-                foundFrom = nodePos + index;
-                foundTo = foundFrom + searchText.length;
-                actualSearchText = searchText;
-                found = true;
-                console.log('[TrackChange] Exact match found at position:', foundFrom);
-                return false;
-              }
-            }
-            return true;
+          const { from, to } = match;
+          const deleteId = generateChangeId();
+          const insertId = generateChangeId();
+          const changeSource = source || 'manual';
+
+          // 1. Mark the original text as deleted (keep it in the doc)
+          const deletionMark = editor.schema.marks.trackDeletion.create({
+            changeId: deleteId,
+            userId: trackingUserId,
+            userName: trackingUserName,
+            timestamp: new Date().toISOString(),
+            source: changeSource,
           });
+          tr.addMark(from, to, deletionMark);
 
-          // Strategy 2: Normalized match
-          if (!found) {
-            doc.descendants((node: Node, nodePos: number) => {
-              if (found) return false;
-              if (node.isText) {
-                const text = node.text || '';
-                const normalizedText = normalizeText(text);
-                const index = normalizedText.indexOf(normalizedSearch);
-                if (index !== -1) {
-                  // Find the actual position in the original text
-                  let actualIndex = 0;
-                  let normalizedIndex = 0;
-                  while (normalizedIndex < index && actualIndex < text.length) {
-                    if (text[actualIndex] !== ' ' || normalizedText[normalizedIndex] === ' ') {
-                      normalizedIndex++;
-                    }
-                    actualIndex++;
-                  }
-                  // Find the end position
-                  let actualEndIndex = actualIndex;
-                  let matchLength = 0;
-                  while (matchLength < normalizedSearch.length && actualEndIndex < text.length) {
-                    if (text[actualEndIndex] !== ' ' || normalizedSearch[matchLength] === ' ') {
-                      matchLength++;
-                    }
-                    actualEndIndex++;
-                  }
-                  foundFrom = nodePos + actualIndex;
-                  foundTo = nodePos + actualEndIndex;
-                  actualSearchText = text.substring(actualIndex, actualEndIndex);
-                  found = true;
-                  console.log('[TrackChange] Normalized match found at position:', foundFrom);
-                  return false;
-                }
-              }
-              return true;
-            });
-          }
-
-          // Strategy 3: Partial match (first 30 chars) for long text
-          if (!found && searchText.length > 30) {
-            const shortSearch = normalizeText(searchText.substring(0, 30));
-            doc.descendants((node: Node, nodePos: number) => {
-              if (found) return false;
-              if (node.isText) {
-                const text = node.text || '';
-                const normalizedText = normalizeText(text);
-                const index = normalizedText.indexOf(shortSearch);
-                if (index !== -1) {
-                  foundFrom = nodePos + index;
-                  foundTo = foundFrom + Math.min(searchText.length, text.length - index);
-                  actualSearchText = text.substring(index, Math.min(index + searchText.length, text.length));
-                  found = true;
-                  console.log('[TrackChange] Partial match found at position:', foundFrom);
-                  return false;
-                }
-              }
-              return true;
-            });
-          }
-
-          if (!found) {
-            console.log('[TrackChange] Could not find position for:', searchText.substring(0, 50));
-            return false;
-          }
-
-          console.log('[TrackChange] Found text at position:', foundFrom, '-', foundTo);
-
-          // Create deletion change (use actual matched text, not search text)
-          const deleteChangeId = generateChangeId();
-          trackedChanges.set(deleteChangeId, {
-            id: deleteChangeId,
-            type: 'deletion',
-            from: foundFrom,
-            to: foundTo,
-            text: actualSearchText,
-            userId: this.options.userId,
-            userName: this.options.userName,
-            timestamp: new Date(),
+          // 2. Insert replacement text right after, with insertion mark
+          const insertionMark = editor.schema.marks.trackInsertion.create({
+            changeId: insertId,
+            userId: trackingUserId,
+            userName: trackingUserName,
+            timestamp: new Date().toISOString(),
+            source: changeSource,
           });
+          const textNode = editor.schema.text(replaceText, [insertionMark]);
+          tr.insert(to, textNode);
 
-          // Create insertion change
-          const insertChangeId = generateChangeId();
-          trackedChanges.set(insertChangeId, {
-            id: insertChangeId,
-            type: 'insertion',
-            from: foundFrom,
-            to: foundFrom + replaceText.length,
-            text: replaceText,
-            userId: this.options.userId,
-            userName: this.options.userName,
-            timestamp: new Date(),
-          });
-
-          // Apply the replacement with tracking marks
-          return chain()
-            .setTextSelection({ from: foundFrom, to: foundTo })
-            .deleteSelection()
-            .insertContent(replaceText)
-            .setTextSelection({ from: foundFrom, to: foundFrom + replaceText.length })
-            .run();
+          dispatch(tr);
+          return true;
         },
 
       acceptChange:
-        () =>
-        ({ editor }: { editor: Editor }) => {
-          // Accept the change at current selection
-          const { from } = editor.state.selection;
+        (changeId?: string) =>
+        ({ editor, tr, dispatch }) => {
+          if (!dispatch) return true;
 
-          // Find change at this position
-          for (const [id, change] of trackedChanges) {
-            if (from >= change.from && from <= change.to) {
-              trackedChanges.delete(id);
-              editor.view.dispatch(editor.state.tr);
-              return true;
+          const doc = editor.state.doc;
+          let handled = false;
+
+          // Collect ranges to process (reverse order for safe mutations)
+          const ops: { type: 'removeInsertionMark' | 'deleteDeletionText'; from: number; to: number }[] = [];
+
+          doc.descendants((node, pos) => {
+            if (!node.isText) return;
+            for (const mark of node.marks) {
+              const isTarget = changeId
+                ? mark.attrs.changeId === changeId
+                : (mark.type.name === 'trackInsertion' || mark.type.name === 'trackDeletion') &&
+                  pos <= editor.state.selection.from &&
+                  pos + node.nodeSize >= editor.state.selection.from;
+
+              if (!isTarget) continue;
+
+              if (mark.type.name === 'trackInsertion') {
+                // Accept insertion → keep text, remove mark
+                ops.push({ type: 'removeInsertionMark', from: pos, to: pos + node.nodeSize });
+              } else if (mark.type.name === 'trackDeletion') {
+                // Accept deletion → remove the deleted text
+                ops.push({ type: 'deleteDeletionText', from: pos, to: pos + node.nodeSize });
+              }
+            }
+          });
+
+          // Process in reverse document order to maintain positions
+          ops.sort((a, b) => b.from - a.from);
+
+          for (const op of ops) {
+            if (op.type === 'removeInsertionMark') {
+              tr.removeMark(op.from, op.to, editor.schema.marks.trackInsertion);
+              handled = true;
+            } else {
+              tr.delete(op.from, op.to);
+              handled = true;
             }
           }
-          return false;
+
+          if (handled) dispatch(tr);
+          return handled;
         },
 
       rejectChange:
-        () =>
-        ({ editor, chain }: { editor: Editor; chain: () => ChainedCommands }) => {
-          const { from } = editor.state.selection;
+        (changeId?: string) =>
+        ({ editor, tr, dispatch }) => {
+          if (!dispatch) return true;
 
-          // Find change at this position
-          for (const [id, change] of trackedChanges) {
-            if (from >= change.from && from <= change.to) {
-              if (change.type === 'insertion') {
-                // Remove inserted text
-                chain()
-                  .setTextSelection({ from: change.from, to: change.to })
-                  .deleteSelection()
-                  .run();
-              } else {
-                // Restore deleted text
-                chain()
-                  .insertContentAt(change.from, change.text)
-                  .run();
+          const doc = editor.state.doc;
+          let handled = false;
+
+          const ops: { type: 'deleteInsertionText' | 'removeDeletionMark'; from: number; to: number }[] = [];
+
+          doc.descendants((node, pos) => {
+            if (!node.isText) return;
+            for (const mark of node.marks) {
+              const isTarget = changeId
+                ? mark.attrs.changeId === changeId
+                : (mark.type.name === 'trackInsertion' || mark.type.name === 'trackDeletion') &&
+                  pos <= editor.state.selection.from &&
+                  pos + node.nodeSize >= editor.state.selection.from;
+
+              if (!isTarget) continue;
+
+              if (mark.type.name === 'trackInsertion') {
+                // Reject insertion → remove the inserted text
+                ops.push({ type: 'deleteInsertionText', from: pos, to: pos + node.nodeSize });
+              } else if (mark.type.name === 'trackDeletion') {
+                // Reject deletion → keep text, remove mark (restore)
+                ops.push({ type: 'removeDeletionMark', from: pos, to: pos + node.nodeSize });
               }
-              trackedChanges.delete(id);
-              return true;
+            }
+          });
+
+          // Process in reverse
+          ops.sort((a, b) => b.from - a.from);
+
+          for (const op of ops) {
+            if (op.type === 'deleteInsertionText') {
+              tr.delete(op.from, op.to);
+              handled = true;
+            } else {
+              tr.removeMark(op.from, op.to, editor.schema.marks.trackDeletion);
+              handled = true;
             }
           }
-          return false;
+
+          if (handled) dispatch(tr);
+          return handled;
         },
 
       acceptAllChanges:
         () =>
-        ({ editor }: { editor: Editor }) => {
-          trackedChanges.clear();
-          editor.view.dispatch(editor.state.tr);
+        ({ editor, tr, dispatch }) => {
+          if (!dispatch) return true;
+
+          const doc = editor.state.doc;
+          const deletions: { from: number; to: number }[] = [];
+          const insertions: { from: number; to: number }[] = [];
+
+          doc.descendants((node, pos) => {
+            if (!node.isText) return;
+            for (const mark of node.marks) {
+              if (mark.type.name === 'trackDeletion') {
+                deletions.push({ from: pos, to: pos + node.nodeSize });
+              } else if (mark.type.name === 'trackInsertion') {
+                insertions.push({ from: pos, to: pos + node.nodeSize });
+              }
+            }
+          });
+
+          // Remove insertion marks first (keep text)
+          for (const ins of insertions) {
+            tr.removeMark(ins.from, ins.to, editor.schema.marks.trackInsertion);
+          }
+
+          // Delete deletion-marked text in reverse order
+          deletions.sort((a, b) => b.from - a.from);
+          for (const del of deletions) {
+            tr.delete(del.from, del.to);
+          }
+
+          dispatch(tr);
           return true;
         },
 
       rejectAllChanges:
         () =>
-        ({ chain }: { chain: () => ChainedCommands }) => {
-          // Process in reverse order to maintain positions
-          const changes = Array.from(trackedChanges.values()).sort((a, b) => b.from - a.from);
+        ({ editor, tr, dispatch }) => {
+          if (!dispatch) return true;
 
-          for (const change of changes) {
-            if (change.type === 'insertion') {
-              chain()
-                .setTextSelection({ from: change.from, to: change.to })
-                .deleteSelection()
-                .run();
+          const doc = editor.state.doc;
+          const insertions: { from: number; to: number }[] = [];
+          const deletions: { from: number; to: number }[] = [];
+
+          doc.descendants((node, pos) => {
+            if (!node.isText) return;
+            for (const mark of node.marks) {
+              if (mark.type.name === 'trackInsertion') {
+                insertions.push({ from: pos, to: pos + node.nodeSize });
+              } else if (mark.type.name === 'trackDeletion') {
+                deletions.push({ from: pos, to: pos + node.nodeSize });
+              }
             }
+          });
+
+          // Remove deletion marks first (restore text)
+          for (const del of deletions) {
+            tr.removeMark(del.from, del.to, editor.schema.marks.trackDeletion);
           }
 
-          trackedChanges.clear();
+          // Delete insertion-marked text in reverse order
+          insertions.sort((a, b) => b.from - a.from);
+          for (const ins of insertions) {
+            tr.delete(ins.from, ins.to);
+          }
+
+          dispatch(tr);
           return true;
         },
     };
   },
-
-  addProseMirrorPlugins() {
-    return [
-      new Plugin({
-        key: trackChangePluginKey,
-        state: {
-          init() {
-            return DecorationSet.empty;
-          },
-          apply(tr: Transaction, _oldDecorations: DecorationSet) {
-            // Rebuild decorations based on tracked changes
-            const decorations: Decoration[] = [];
-
-            for (const [id, change] of trackedChanges) {
-              const className = change.type === 'insertion'
-                ? 'track-insertion'
-                : 'track-deletion';
-
-              try {
-                const deco = Decoration.inline(change.from, change.to, {
-                  class: className,
-                  'data-change-id': id,
-                  'data-user': change.userName,
-                  title: `${change.type === 'insertion' ? 'Added' : 'Deleted'} by ${change.userName}`,
-                });
-                decorations.push(deco);
-              } catch {
-                // Position may be invalid after document changes
-              }
-            }
-
-            return DecorationSet.create(tr.doc, decorations);
-          },
-        },
-        props: {
-          decorations(state: EditorState) {
-            return trackChangePluginKey.getState(state);
-          },
-        },
-      }),
-    ];
-  },
 });
 
 export default TrackChangeExtension;
-
-// Export helper to get all tracked changes
-export function getTrackedChanges(): TrackedChange[] {
-  return Array.from(trackedChanges.values());
-}
-
-// Export helper to clear all tracked changes
-export function clearTrackedChanges(): void {
-  trackedChanges.clear();
-}
