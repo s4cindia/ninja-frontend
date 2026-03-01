@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { Logo } from '@/components/ui/Logo';
 import { FeedbackButton } from '@/components/feedback';
 import { NotificationBell } from '@/components/NotificationBell';
+import { useNotificationToast } from '@/hooks/useNotificationToast';
 import {
   Home,
   FileText,
@@ -35,6 +36,7 @@ type NavSection = {
 };
 
 export function MainLayout() {
+  useNotificationToast();
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
