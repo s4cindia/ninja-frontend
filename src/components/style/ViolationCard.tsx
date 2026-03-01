@@ -85,6 +85,15 @@ export function ViolationCard({
         <div className="flex items-center gap-1.5 min-w-0">
           <SevIcon className={cn('w-4 h-4 flex-shrink-0', sev.color)} />
           <span className="font-medium text-sm truncate">{violation.title}</span>
+          {violation.confidence !== null && violation.confidence !== undefined && (
+            <span className={cn('px-1.5 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0', {
+              'bg-green-100 text-green-700': violation.confidence >= 90,
+              'bg-yellow-100 text-yellow-700': violation.confidence >= 60 && violation.confidence < 90,
+              'bg-orange-100 text-orange-700': violation.confidence < 60,
+            })}>
+              {violation.confidence}%
+            </span>
+          )}
         </div>
         <button
           onClick={() => setIsExpanded(!isExpanded)}
@@ -147,6 +156,14 @@ export function ViolationCard({
             <span className="text-gray-500 font-medium">Style Guide:</span>{' '}
             <span className="text-gray-700">{violation.styleGuide}</span>
           </div>
+          {violation.confidence !== null && violation.confidence !== undefined && (
+            <div>
+              <span className="text-gray-500 font-medium">Confidence:</span>{' '}
+              <span className="text-gray-700">{violation.confidence}%{' '}
+                ({violation.confidence >= 90 ? 'High' : violation.confidence >= 60 ? 'Medium' : 'Low'})
+              </span>
+            </div>
+          )}
           {violation.appliedFix && (
             <div>
               <span className="text-gray-500 font-medium">Applied Fix:</span>{' '}

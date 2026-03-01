@@ -61,6 +61,7 @@ export interface IntegrityIssue {
   actualValue: string | null;
   suggestedFix: string | null;
   context: string | null;
+  confidence: number | null;
   status: IntegrityIssueStatus;
   resolvedAt: string | null;
   resolvedBy: string | null;

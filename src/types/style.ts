@@ -49,6 +49,7 @@ export interface StyleViolation {
   endOffset: number;
   originalText: string;
   suggestedText?: string;
+  confidence: number | null;
   status: ViolationStatus;
   appliedFix?: string;
   fixedAt?: string;

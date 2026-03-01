@@ -137,11 +137,69 @@ function generateChangeId(): string {
 
 function normalizeText(text: string): string {
   return text
+    .replace(/[\r\n]+/g, ' ')
     .replace(/\s+/g, ' ')
     .replace(/[\u00A0]/g, ' ')
-    .replace(/['']/g, "'")
-    .replace(/[""]/g, '"')
+    .replace(/['\u2018\u2019]/g, "'")
+    .replace(/["\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, '-')
     .trim();
+}
+
+/** Returns true for whitespace characters including non-breaking space. */
+function isWS(code: number): boolean {
+  return code === 0x20 || code === 0x09 || code === 0x0A || code === 0x0D ||
+         code === 0x0C || code === 0x0B || code === 0xA0;
+}
+
+/**
+ * Normalize text and build an index map from each normalized character position
+ * back to its position in the original string.  This is critical for mapping
+ * match positions in normalized text back to the original fullText indices.
+ */
+function normalizeWithMap(text: string): { normalized: string; indexMap: number[] } {
+  const indexMap: number[] = [];
+  let result = '';
+  let i = 0;
+  const len = text.length;
+
+  // Skip leading whitespace (trim start)
+  while (i < len && isWS(text.charCodeAt(i))) i++;
+
+  let lastWasSpace = false;
+
+  while (i < len) {
+    const code = text.charCodeAt(i);
+
+    if (isWS(code)) {
+      if (!lastWasSpace) {
+        indexMap.push(i);
+        result += ' ';
+        lastWasSpace = true;
+      }
+      i++;
+      continue;
+    }
+
+    lastWasSpace = false;
+    indexMap.push(i);
+
+    // Normalize smart quotes and dashes
+    if (code === 0x2018 || code === 0x2019) result += "'";
+    else if (code === 0x201C || code === 0x201D) result += '"';
+    else if (code === 0x2013 || code === 0x2014) result += '-';
+    else result += text[i];
+
+    i++;
+  }
+
+  // Trim trailing space
+  while (result.endsWith(' ')) {
+    result = result.slice(0, -1);
+    indexMap.pop();
+  }
+
+  return { normalized: result, indexMap };
 }
 
 /**
@@ -170,24 +228,50 @@ function findTextInDoc(
   });
 
   // Strategy 1: exact match on full text
-  let idx = fullText.indexOf(search);
-  let matchLen = search.length;
-  if (idx === -1) {
-    // Strategy 2: normalized match (use normalized length for correct offset mapping)
-    const normFull = normalizeText(fullText);
+  let fullIdx = fullText.indexOf(search);
+  let fullMatchLen = search.length;
+
+  if (fullIdx === -1) {
+    // Strategy 2+: normalized match with proper index mapping back to fullText
+    const { normalized: normFull, indexMap: normToFullMap } = normalizeWithMap(fullText);
     const normSearch = normalizeText(search);
-    idx = normFull.indexOf(normSearch);
-    matchLen = normSearch.length;
-    if (idx === -1 && search.length > 30) {
-      // Strategy 3: partial (first 30 chars)
-      const shortSearch = normalizeText(search.substring(0, 30));
-      idx = normFull.indexOf(shortSearch);
-      matchLen = shortSearch.length;
+    let normIdx = normFull.indexOf(normSearch);
+    let normMatchLen = normSearch.length;
+
+    if (normIdx === -1 && search.length > 30) {
+      // Strategy 3: partial (first 40 chars, word-boundary aware)
+      let cutoff = 40;
+      const spaceIdx = normSearch.indexOf(' ', 30);
+      if (spaceIdx !== -1 && spaceIdx < 50) cutoff = spaceIdx;
+      const shortSearch = normSearch.substring(0, cutoff);
+      normIdx = normFull.indexOf(shortSearch);
+      if (normIdx !== -1) normMatchLen = shortSearch.length;
     }
-    if (idx === -1) return null;
+
+    if (normIdx === -1 && search.length > 10) {
+      // Strategy 4: middle portion (edges may be truncated by AI)
+      const start = Math.floor(normSearch.length * 0.2);
+      const end = Math.min(normSearch.length, start + 50);
+      const midSearch = normSearch.substring(start, end).trim();
+      if (midSearch.length > 8) {
+        normIdx = normFull.indexOf(midSearch);
+        if (normIdx !== -1) normMatchLen = midSearch.length;
+      }
+    }
+
+    if (normIdx === -1) return null;
+
+    // Map normalized indices back to fullText indices
+    fullIdx = normToFullMap[normIdx] ?? normIdx;
+    const lastCharNormIdx = normIdx + normMatchLen - 1;
+    if (lastCharNormIdx < normToFullMap.length) {
+      fullMatchLen = (normToFullMap[lastCharNormIdx] + 1) - fullIdx;
+    } else {
+      fullMatchLen = fullText.length - fullIdx;
+    }
   }
 
-  // Map string index back to document position
+  // Map fullText string index back to document position
   let charOffset = 0;
   let fromPos = -1;
   let toPos = -1;
@@ -195,13 +279,13 @@ function findTextInDoc(
   for (const chunk of chunks) {
     const chunkEnd = charOffset + chunk.text.length;
 
-    if (fromPos === -1 && idx < chunkEnd) {
-      const offsetInChunk = idx - charOffset;
+    if (fromPos === -1 && fullIdx < chunkEnd) {
+      const offsetInChunk = fullIdx - charOffset;
       fromPos = chunk.pos === -1 ? fromPos : chunk.pos + offsetInChunk;
     }
 
-    if (fromPos !== -1 && idx + matchLen <= chunkEnd) {
-      const offsetInChunk = idx + matchLen - charOffset;
+    if (fromPos !== -1 && fullIdx + fullMatchLen <= chunkEnd) {
+      const offsetInChunk = fullIdx + fullMatchLen - charOffset;
       toPos = chunk.pos === -1 ? toPos : chunk.pos + offsetInChunk;
       break;
     }

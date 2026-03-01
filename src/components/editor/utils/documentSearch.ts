@@ -201,16 +201,19 @@ export function findTextPosition(editor: Editor, search: string): SearchResult |
 }
 
 /**
- * Collect scroll positions of all scrollable ancestors of an element.
+ * Collect scroll positions of ALL scrollable elements on the page.
+ * This captures both editor parents AND sibling panels (e.g., validator panel)
+ * so that focus() doesn't displace any scrollable container.
  */
-function saveParentScrollPositions(el: HTMLElement): Array<{ el: HTMLElement; top: number; left: number }> {
+function saveAllScrollPositions(): Array<{ el: HTMLElement; top: number; left: number }> {
   const saved: Array<{ el: HTMLElement; top: number; left: number }> = [];
-  let parent = el.parentElement;
-  while (parent) {
-    if (parent.scrollHeight > parent.clientHeight || parent.scrollWidth > parent.clientWidth) {
-      saved.push({ el: parent, top: parent.scrollTop, left: parent.scrollLeft });
+  const candidates = document.querySelectorAll<HTMLElement>('*');
+  for (let i = 0; i < candidates.length; i++) {
+    const el = candidates[i];
+    if ((el.scrollTop > 0 || el.scrollLeft > 0) &&
+        (el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth)) {
+      saved.push({ el, top: el.scrollTop, left: el.scrollLeft });
     }
-    parent = parent.parentElement;
   }
   return saved;
 }
@@ -218,7 +221,7 @@ function saveParentScrollPositions(el: HTMLElement): Array<{ el: HTMLElement; to
 /**
  * Restore previously saved scroll positions.
  */
-function restoreParentScrollPositions(saved: Array<{ el: HTMLElement; top: number; left: number }>) {
+function restoreScrollPositions(saved: Array<{ el: HTMLElement; top: number; left: number }>) {
   for (const s of saved) {
     s.el.scrollTop = s.top;
     s.el.scrollLeft = s.left;
@@ -235,10 +238,10 @@ export function findAndSelectText(editor: Editor, searchText: string): boolean {
 
   const editorDom = editor.view.dom;
 
-  // Save scroll positions of ALL ancestors before focus() — the browser's native
-  // focus behaviour scrolls parent containers, which pushes the validator panel
-  // out of view.
-  const savedScrolls = saveParentScrollPositions(editorDom);
+  // Save scroll positions of ALL scrollable elements on the page before focus() —
+  // the browser's native focus behaviour scrolls containers, which pushes sibling
+  // panels (like the validator issue list) out of view.
+  const savedScrolls = saveAllScrollPositions();
 
   // Set selection without TipTap's scrollIntoView
   editor
@@ -247,8 +250,8 @@ export function findAndSelectText(editor: Editor, searchText: string): boolean {
     .setTextSelection({ from: result.from, to: result.to })
     .run();
 
-  // Immediately restore parent scroll positions that the browser moved
-  restoreParentScrollPositions(savedScrolls);
+  // Immediately restore all scroll positions that the browser moved
+  restoreScrollPositions(savedScrolls);
 
   // Now manually scroll only the editor's own scrollable container
   requestAnimationFrame(() => {

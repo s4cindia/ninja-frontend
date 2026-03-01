@@ -36,7 +36,18 @@ export function IntegrityIssueCard({ issue, onApplyFix, onApplyFixToEditor, onIg
           <SevIcon className={`w-4 h-4 flex-shrink-0 ${sev.color}`} />
           <span className="font-medium text-sm truncate">{issue.title}</span>
         </div>
-        <span className="text-xs text-gray-500 flex-shrink-0">{checkLabel}</span>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {issue.confidence !== null && issue.confidence !== undefined && (
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+              issue.confidence >= 90 ? 'bg-green-100 text-green-700' :
+              issue.confidence >= 60 ? 'bg-yellow-100 text-yellow-700' :
+              'bg-orange-100 text-orange-700'
+            }`}>
+              {issue.confidence}%
+            </span>
+          )}
+          <span className="text-xs text-gray-500">{checkLabel}</span>
+        </div>
       </div>
 
       {/* Description */}
@@ -105,8 +116,13 @@ export function IntegrityIssueCard({ issue, onApplyFix, onApplyFixToEditor, onIg
             <button type="button"
               className="flex items-center gap-1 px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
               onClick={() => {
-                if (issue.actualValue && issue.expectedValue && onApplyFixToEditor) {
-                  onApplyFixToEditor(issue.actualValue, issue.expectedValue);
+                if (onApplyFixToEditor) {
+                  // Prefer originalText (exact document text) over actualValue (AI description)
+                  const searchText = issue.originalText || issue.actualValue;
+                  const replaceText = issue.suggestedFix || issue.expectedValue;
+                  if (searchText && replaceText) {
+                    onApplyFixToEditor(searchText, replaceText);
+                  }
                 }
                 onApplyFix(issue.id);
               }}
