@@ -2,6 +2,7 @@ import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth.store';
 import { Logo } from '@/components/ui/Logo';
 import { FeedbackButton } from '@/components/feedback';
+import { NotificationBell } from '@/components/NotificationBell';
 import {
   Home,
   FileText,
@@ -105,6 +106,7 @@ export function MainLayout() {
             <span className="text-sm text-gray-600">
               {user?.firstName} {user?.lastName}
             </span>
+            <NotificationBell />
             <button
               onClick={handleLogout}
               className="flex items-center gap-1 text-gray-600 hover:text-gray-900 text-sm"
