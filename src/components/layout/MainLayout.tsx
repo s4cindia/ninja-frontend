@@ -2,6 +2,8 @@ import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth.store';
 import { Logo } from '@/components/ui/Logo';
 import { FeedbackButton } from '@/components/feedback';
+import { NotificationBell } from '@/components/NotificationBell';
+import { useNotificationToast } from '@/hooks/useNotificationToast';
 import {
   Home,
   FileText,
@@ -34,6 +36,7 @@ type NavSection = {
 };
 
 export function MainLayout() {
+  useNotificationToast();
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
@@ -105,6 +108,7 @@ export function MainLayout() {
             <span className="text-sm text-gray-600">
               {user?.firstName} {user?.lastName}
             </span>
+            <NotificationBell />
             <button
               onClick={handleLogout}
               className="flex items-center gap-1 text-gray-600 hover:text-gray-900 text-sm"
