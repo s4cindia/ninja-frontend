@@ -82,6 +82,8 @@ export interface ValidationSummary {
   status: string;
   progress: number;
   totalViolations: number;
+  styleGuide?: string;
+  ruleSetIds?: string[];
   byCategory: Record<string, number>;
   bySeverity: Record<string, number>;
   byStatus: Record<string, number>;

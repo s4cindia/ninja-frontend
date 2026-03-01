@@ -78,6 +78,15 @@ export function ValidationHeader({
         {summary?.fileName || `Document ${documentId.slice(0, 8)}...`}
       </div>
 
+      {/* Selected Style Guide Badge */}
+      {summary?.styleGuide && summary.styleGuide !== 'GENERAL' && summary.styleGuide !== 'CUSTOM' && (
+        <div className="mt-1">
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800">
+            {summary.styleGuide} Style
+          </span>
+        </div>
+      )}
+
       {/* Rule Set Picker */}
       <div className="mt-2">
         <button type="button"

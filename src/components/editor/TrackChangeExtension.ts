@@ -215,8 +215,10 @@ function findTextInDoc(
 
 // ─── public API ────────────────────────────────────────────────────────
 
-// Deprecated module-level tracking state — kept as fallback.
-// Prefer using editor.storage.trackChange.{enabled,userId,userName} instead.
+// Module-level tracking state: intentionally shared across the module.
+// This app uses a single editor instance per page, so module-level state is safe.
+// For multi-editor support, this would need to move to editor.storage.
+// Also exposed via editor.storage.trackChange.{enabled,userId,userName} per-instance.
 let trackingEnabled = true;
 let trackingUserId = 'anonymous';
 let trackingUserName = 'Anonymous User';
@@ -329,7 +331,6 @@ export const TrackChangeExtension = Extension.create<TrackChangeOptions>({
           trackingEnabled = true;
           this.storage.enabled = true;
           this.options.onStatusChange?.(true);
-          // Force re-render
           editor.view.dispatch(editor.state.tr);
           return true;
         },

@@ -7,6 +7,9 @@ import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import Highlight from '@tiptap/extension-highlight';
+import { TextStyle } from '@tiptap/extension-text-style';
+import { Color } from '@tiptap/extension-color';
+import { FontFamily } from '@tiptap/extension-font-family';
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableHeader } from '@tiptap/extension-table-header';
@@ -14,7 +17,8 @@ import { TableCell } from '@tiptap/extension-table-cell';
 import { Superscript } from '@tiptap/extension-superscript';
 import { Subscript } from '@tiptap/extension-subscript';
 import { Image } from '@tiptap/extension-image';
-import { useCallback, useImperativeHandle, forwardRef, useState, useMemo, useEffect } from 'react';
+import { Extension } from '@tiptap/core';
+import { useCallback, useImperativeHandle, forwardRef, useState, useMemo, useEffect, useRef } from 'react';
 import {
   TrackChangeExtension, TrackInsertionMark, TrackDeletionMark,
   getTrackedChangesFromEditor, type TrackedChange, type TrackChangeSource,
@@ -24,6 +28,26 @@ import { EditorFormattingToolbar } from './EditorFormattingToolbar';
 import { TrackChangesToolbar } from './TrackChangesToolbar';
 import { TrackedChangesPanel } from './TrackedChangesPanel';
 import './TipTapEditor.css';
+
+// Custom FontSize extension — preserves inline font-size from LibreOffice/Pandoc HTML
+const FontSize = Extension.create({
+  name: 'fontSize',
+  addGlobalAttributes() {
+    return [{
+      types: ['textStyle'],
+      attributes: {
+        fontSize: {
+          default: null,
+          parseHTML: (element) => element.style.fontSize || null,
+          renderHTML: (attributes) => {
+            if (!attributes.fontSize) return {};
+            return { style: `font-size: ${attributes.fontSize}` };
+          },
+        },
+      },
+    }];
+  },
+});
 
 type TrackChangeStorage = { trackChange?: { enabled: boolean } };
 
@@ -60,6 +84,27 @@ export const TipTapEditor = forwardRef<TipTapEditorRef, TipTapEditorProps>(
     const [, setRenderTick] = useState(0);
     const [wordCount, setWordCount] = useState(0);
     const [charCount, setCharCount] = useState(0);
+    const contentRef = useRef<HTMLDivElement>(null);
+
+    // Extract <style> blocks from backend fullHtml so TipTap doesn't discard them
+    const { docStyles, cleanContent } = useMemo(() => {
+      const styleRegex = /<style[^>]*>[\s\S]*?<\/style>/gi;
+      const matches = initialContent.match(styleRegex) || [];
+      const clean = initialContent.replace(styleRegex, '').trim();
+      // Rewrite .docx-content selectors to target ProseMirror inside our editor
+      const rewritten = matches.join('\n').replace(/\.docx-content/g, '.tiptap-content .ProseMirror');
+      return { docStyles: rewritten, cleanContent: clean };
+    }, [initialContent]);
+
+    // Inject the rewritten document styles into the editor container
+    useEffect(() => {
+      if (!docStyles || !contentRef.current) return;
+      const styleEl = document.createElement('style');
+      styleEl.setAttribute('data-docx-styles', 'true');
+      styleEl.textContent = docStyles.replace(/<\/?style[^>]*>/gi, '');
+      contentRef.current.appendChild(styleEl);
+      return () => { styleEl.remove(); };
+    }, [docStyles]);
 
     const editor = useEditor({
       extensions: [
@@ -67,6 +112,10 @@ export const TipTapEditor = forwardRef<TipTapEditorRef, TipTapEditorProps>(
         Underline,
         TextAlign.configure({ types: ['heading', 'paragraph'] }),
         Highlight.configure({ multicolor: true }),
+        TextStyle,
+        Color,
+        FontFamily,
+        FontSize,
         Table.configure({ resizable: true, HTMLAttributes: { class: 'editor-table' } }),
         TableRow, TableHeader, TableCell,
         Superscript, Subscript,
@@ -74,12 +123,13 @@ export const TipTapEditor = forwardRef<TipTapEditorRef, TipTapEditorProps>(
         TrackInsertionMark, TrackDeletionMark,
         TrackChangeExtension.configure({
           enabled: trackChangesEnabled, userId, userName,
-          onStatusChange: (_enabled: boolean) => {
-            // Track changes status updated
+          onStatusChange: () => {
+            // Force React re-render so the toolbar button reflects the new state
+            setRenderTick((t) => t + 1);
           },
         }),
       ],
-      content: initialContent,
+      content: cleanContent,
       editable: !readOnly,
       onUpdate: ({ editor }: { editor: Editor }) => {
         onChange?.(editor.getHTML());
@@ -196,7 +246,9 @@ export const TipTapEditor = forwardRef<TipTapEditorRef, TipTapEditorProps>(
           />
         </div>
         <div className="tiptap-main">
-          <EditorContent editor={editor} className="tiptap-content" />
+          <div ref={contentRef} className="tiptap-content">
+            <EditorContent editor={editor} />
+          </div>
           {showChangesPanel && (
             <TrackedChangesPanel
               editor={editor}

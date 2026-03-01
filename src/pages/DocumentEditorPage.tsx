@@ -5,6 +5,7 @@
  * Orchestrates editor layout, toolbar, stats bar, and side panels.
  */
 
+import toast from 'react-hot-toast';
 import { TipTapEditor } from '@/components/editor';
 import { ValidatorPanel } from '@/components/validator/ValidatorPanel';
 import { useDocumentEditor } from '@/hooks/useDocumentEditor';
@@ -94,7 +95,10 @@ export default function DocumentEditorPage() {
           onClose={toggleValidatorPanel}
           onGoToLocation={(text) => {
             if (editorRef.current) {
-              editorRef.current.findAndSelect(text);
+              const found = editorRef.current.findAndSelect(text);
+              if (!found) {
+                toast.error('Could not locate this text in the document', { duration: 3000 });
+              }
             }
           }}
           onApplyFix={handleApplyFixToDocument}
