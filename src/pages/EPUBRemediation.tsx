@@ -1388,7 +1388,20 @@ export const EPUBRemediation: React.FC = () => {
               (fileName !== "Loading..." ? fileName : "document.epub"),
             tasks: dedupedTasks,
           });
-          if (!isReturningCompleted) setPageState("ready");
+          if (!isReturningCompleted) {
+            const allDone = dedupedTasks.length > 0 &&
+              dedupedTasks.every((t: RemediationTask) => t.status === 'completed' || t.status === 'failed' || t.status === 'skipped');
+            if (allDone) {
+              const fixed = dedupedTasks.filter((t: RemediationTask) => t.status === 'completed').length;
+              const failed = dedupedTasks.filter((t: RemediationTask) => t.status === 'failed').length;
+              const skipped = dedupedTasks.filter((t: RemediationTask) => t.status === 'skipped').length;
+              setComparisonSummary({ fixedCount: fixed, failedCount: failed, skippedCount: skipped, beforeScore: 45, afterScore: Math.min(95, 45 + fixed * 10) });
+              setPageState("complete");
+              setSearchParams({ status: "completed" }, { replace: true });
+            } else {
+              setPageState("ready");
+            }
+          }
           setIsDemo(false);
           return;
         }
@@ -1433,7 +1446,20 @@ export const EPUBRemediation: React.FC = () => {
               (fileName !== "Loading..." ? fileName : "document.epub"),
             tasks: dedupedTasks,
           });
-          if (!isReturningCompleted) setPageState("ready");
+          if (!isReturningCompleted) {
+            const allDone = dedupedTasks.length > 0 &&
+              dedupedTasks.every((t: RemediationTask) => t.status === 'completed' || t.status === 'failed' || t.status === 'skipped');
+            if (allDone) {
+              const fixed = dedupedTasks.filter((t: RemediationTask) => t.status === 'completed').length;
+              const failed = dedupedTasks.filter((t: RemediationTask) => t.status === 'failed').length;
+              const skipped = dedupedTasks.filter((t: RemediationTask) => t.status === 'skipped').length;
+              setComparisonSummary({ fixedCount: fixed, failedCount: failed, skippedCount: skipped, beforeScore: 45, afterScore: Math.min(95, 45 + fixed * 10) });
+              setPageState("complete");
+              setSearchParams({ status: "completed" }, { replace: true });
+            } else {
+              setPageState("ready");
+            }
+          }
           setIsDemo(false);
           return;
         }
@@ -1987,69 +2013,58 @@ export const EPUBRemediation: React.FC = () => {
       )}
 
       {pageState === "complete" && comparisonSummary && (
-        <>
-          <Card className="border-green-200 bg-green-50">
-            <CardHeader>
-              <CardTitle className="text-green-800">
-                Remediation Complete
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div className="p-3 bg-white rounded-lg">
-                  <p className="text-2xl font-bold text-green-600">
-                    {fixedCount}
-                  </p>
-                  <p className="text-xs text-gray-600">Issues Fixed</p>
-                </div>
-                <div className="p-3 bg-white rounded-lg">
-                  <p className="text-2xl font-bold text-red-600">
-                    {failedCount}
-                  </p>
-                  <p className="text-xs text-gray-600">Failed</p>
-                </div>
-                <div className="p-3 bg-white rounded-lg">
-                  <p className="text-2xl font-bold text-purple-600">
-                    {comparisonSummary.beforeScore}% →{" "}
-                    {comparisonSummary.afterScore}%
-                  </p>
-                  <p className="text-xs text-gray-600">Score Improvement</p>
-                </div>
+        <Card className="border-green-200 bg-green-50">
+          <CardHeader>
+            <CardTitle className="text-green-800">
+              Remediation Complete
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div className="p-3 bg-white rounded-lg">
+                <p className="text-2xl font-bold text-green-600">
+                  {fixedCount}
+                </p>
+                <p className="text-xs text-gray-600">Issues Fixed</p>
               </div>
-
-              <div className="flex flex-wrap gap-3">
-                <Button onClick={handleViewComparison}>
-                  <Eye className="h-4 w-4 mr-2" />
-                  View Comparison
-                </Button>
-                <Button onClick={() => navigate(`/remediation/${jobId}/comparison`)} variant="outline">
-                  <Eye className="h-4 w-4 mr-2" />
-                  Review Changes
-                </Button>
-                <Button onClick={() => navigate("/epub")} variant="ghost">
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Start New Audit
-                </Button>
+              <div className="p-3 bg-white rounded-lg">
+                <p className="text-2xl font-bold text-red-600">
+                  {failedCount}
+                </p>
+                <p className="text-xs text-gray-600">Failed</p>
               </div>
-
-              <div className="flex items-center gap-3 mt-4 pt-4 border-t border-green-200">
-                <span className="text-sm text-green-700">
-                  Was this remediation helpful?
-                </span>
-                <QuickRating entityType="remediation" entityId={jobId || ""} />
+              <div className="p-3 bg-white rounded-lg">
+                <p className="text-2xl font-bold text-purple-600">
+                  {comparisonSummary.beforeScore}% →{" "}
+                  {comparisonSummary.afterScore}%
+                </p>
+                <p className="text-xs text-gray-600">Score Improvement</p>
               </div>
-            </CardContent>
-          </Card>
+            </div>
 
-          <EPUBExportOptions
-            jobId={jobId || ""}
-            epubFileName={plan?.epubFileName || "remediated.epub"}
-            isDemo={isDemo}
-            fixedCount={fixedCount}
-            beforeScore={comparisonSummary.beforeScore}
-            afterScore={comparisonSummary.afterScore}
-          />
-        </>
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={handleViewComparison}>
+                <Eye className="h-4 w-4 mr-2" />
+                View Comparison
+              </Button>
+              <Button onClick={() => navigate(`/remediation/${jobId}/comparison`)} variant="outline">
+                <Eye className="h-4 w-4 mr-2" />
+                Review Changes
+              </Button>
+              <Button onClick={() => navigate("/epub")} variant="ghost">
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Start New Audit
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-3 mt-4 pt-4 border-t border-green-200">
+              <span className="text-sm text-green-700">
+                Was this remediation helpful?
+              </span>
+              <QuickRating entityType="remediation" entityId={jobId || ""} />
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       <IssueTallyTracker
@@ -2123,8 +2138,18 @@ export const EPUBRemediation: React.FC = () => {
         onRefreshPlan={handleRefreshPlan}
       />
 
-      {pageState === "complete" && (
+      {/* Export, re-audit and ACR transfer — visible once plan is loaded, even with pending tasks */}
+      {pageState !== "running" && (
         <>
+          <EPUBExportOptions
+            jobId={jobId || ""}
+            epubFileName={plan.epubFileName || "remediated.epub"}
+            isDemo={isDemo}
+            fixedCount={fixedCount}
+            beforeScore={comparisonSummary?.beforeScore ?? 45}
+            afterScore={comparisonSummary?.afterScore ?? Math.min(95, 45 + fixedCount * 10)}
+          />
+
           <ReAuditSection
             jobId={jobId || "demo"}
             pendingCount={pendingManualCount}

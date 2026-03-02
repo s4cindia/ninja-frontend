@@ -30,6 +30,16 @@ export interface BatchPolicyTenantConfig {
   allowFullyHeadless: boolean;
 }
 
+export type ExplanationSource = 'hardcoded' | 'gemini' | 'hybrid';
+
+/**
+ * Tenant-level reports configuration.
+ * Controls how AI explanations are sourced for issue explainability.
+ */
+export interface ReportsConfig {
+  explanationSource: ExplanationSource;
+}
+
 /**
  * Complete workflow configuration.
  */
@@ -106,6 +116,32 @@ class TenantConfigService {
       data: WorkflowConfig;
       message: string;
     }>('/tenant/config/workflow', updates);
+    return response.data.data;
+  }
+
+  /**
+   * Get current reports configuration (explanation source setting).
+   */
+  async getReportsConfig(): Promise<ReportsConfig> {
+    try {
+      const response = await api.get<{ success: boolean; data: ReportsConfig }>(
+        '/tenant/config/reports'
+      );
+      return response.data.data;
+    } catch {
+      return { explanationSource: 'hardcoded' };
+    }
+  }
+
+  /**
+   * Update reports configuration for the authenticated tenant.
+   */
+  async updateReportsConfig(updates: Partial<ReportsConfig>): Promise<ReportsConfig> {
+    const response = await api.patch<{
+      success: boolean;
+      data: ReportsConfig;
+      message: string;
+    }>('/tenant/config/reports', updates);
     return response.data.data;
   }
 }
