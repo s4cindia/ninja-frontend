@@ -68,7 +68,7 @@ export function ViolationFilters({
   return (
     <>
       {/* Summary — clickable severity chips that act as filters */}
-      {summary && !isLoadingSummary && (
+      {summary && !isLoadingSummary && summary.bySeverity && (
         <div className="flex-shrink-0 border-b px-4 py-3">
           <div className="grid grid-cols-3 gap-3">
             {(['ERROR', 'WARNING', 'SUGGESTION'] as StyleSeverity[]).map((sev) => {
