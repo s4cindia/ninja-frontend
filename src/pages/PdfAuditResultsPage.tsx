@@ -924,6 +924,7 @@ export const PdfAuditResultsPage: React.FC = () => {
                 <IssueCard
                   key={issue.id}
                   issue={issue}
+                  jobId={jobId}
                   onPageClick={handlePageClick}
                   showMatterhorn={true}
                 />

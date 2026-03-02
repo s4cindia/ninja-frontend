@@ -1,7 +1,19 @@
-import { Zap, CheckCircle, AlertTriangle, FileText, ExternalLink } from 'lucide-react';
+import { useState } from 'react';
+import { Zap, CheckCircle, AlertTriangle, FileText, ExternalLink, ChevronDown, ChevronUp, HelpCircle, Wrench, User } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/utils/cn';
 import { Tooltip } from '../ui/Tooltip';
+import { api } from '@/services/api';
 import type { PdfAuditIssue } from '@/types/pdf.types';
+
+interface IssueExplanation {
+  fixType: 'auto' | 'quickfix' | 'manual';
+  reason: string;
+  whatPlatformDid: string | null;
+  whatUserMustDo: string | null;
+  wcagGuidance: string;
+  estimatedTime: string | null;
+}
 
 // EPUB/Generic Audit Issue
 interface AuditIssue {
@@ -28,6 +40,7 @@ interface IssueCardProps {
   onClick?: () => void;
   onPageClick?: (pageNumber: number) => void;
   showMatterhorn?: boolean;
+  jobId?: string;
 }
 
 export function IssueCard({
@@ -36,8 +49,33 @@ export function IssueCard({
   onClick,
   onPageClick,
   showMatterhorn = false,
+  jobId,
 }: IssueCardProps) {
   const isPdf = isPdfIssue(issue);
+  const [explanationOpen, setExplanationOpen] = useState(false);
+  // PDF issues may arrive with `code` (backend) or `ruleId` (type definition) — handle both
+  const issueCode = isPdf
+    ? (issue as PdfAuditIssue).ruleId || (issue as unknown as { code?: string }).code
+    : (issue as AuditIssue).code;
+
+  const { data: explanation, isLoading: explanationLoading, isError: explanationError } = useQuery<IssueExplanation>({
+    queryKey: ['issue-explanation', jobId, issueCode],
+    queryFn: async () => {
+      const res = await api.get<{ data: IssueExplanation }>(
+        `/jobs/${jobId}/issues/${encodeURIComponent(issueCode ?? '')}/explanation`
+      );
+      return res.data.data;
+    },
+    enabled: explanationOpen && !!jobId && !!issueCode,
+    staleTime: 60 * 60 * 1000,
+  });
+
+  const getExplanationToggleLabel = () => {
+    const fixType = !isPdf && 'fixType' in issue ? issue.fixType : undefined;
+    if (fixType === 'autofix') return 'What was auto-fixed?';
+    if (fixType === 'quickfix') return 'Why quick-fix?';
+    return 'Why manual?';
+  };
   const getConfidenceBadge = () => {
     // Only show confidence for non-PDF issues (AuditIssue type)
     if (isPdf || !('confidence' in issue) || !issue.confidence) return null;
@@ -139,7 +177,7 @@ export function IssueCard({
               <FileText className="h-4 w-4 text-red-600 flex-shrink-0" aria-label="PDF issue" />
             )}
             <span className="font-medium text-gray-900">
-              {isPdf ? (issue as PdfAuditIssue).ruleId : (issue as AuditIssue).code}
+              {issueCode}
             </span>
             <span className={cn(
               'px-2 py-0.5 text-xs font-medium rounded-full',
@@ -209,6 +247,76 @@ export function IssueCard({
           {!isPdf && getConfidenceBadge()}
         </div>
       </div>
+
+      {/* Explanation panel — only shown when jobId is provided */}
+      {jobId && (
+        <div className="mt-2 border-t border-current/10 pt-2">
+          <button
+            type="button"
+            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              setExplanationOpen(o => !o);
+            }}
+          >
+            <HelpCircle size={13} />
+            <span>{getExplanationToggleLabel()}</span>
+            {explanationOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          </button>
+
+          {explanationOpen && (
+            <div className="mt-2 text-xs space-y-2" onClick={(e) => e.stopPropagation()}>
+              {explanationLoading ? (
+                <div className="space-y-1.5 animate-pulse">
+                  <div className="h-3 bg-gray-200 rounded w-3/4" />
+                  <div className="h-3 bg-gray-200 rounded w-full" />
+                  <div className="h-3 bg-gray-200 rounded w-2/3" />
+                </div>
+              ) : explanationError ? (
+                <p className="text-gray-400 italic">Could not load explanation.</p>
+              ) : explanation ? (
+                <>
+                  {/* Why this fix type */}
+                  <p className="text-gray-600 leading-relaxed">{explanation.reason}</p>
+
+                  {/* What the platform did (auto-fix) */}
+                  {explanation.whatPlatformDid && (
+                    <div className="flex gap-2 p-2 bg-blue-50 rounded border border-blue-100">
+                      <Zap size={13} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-medium text-blue-800">What was fixed: </span>
+                        <span className="text-blue-700">{explanation.whatPlatformDid}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* What the user must do (quick/manual) */}
+                  {explanation.whatUserMustDo && (
+                    <div className="flex gap-2 p-2 bg-amber-50 rounded border border-amber-100">
+                      {explanation.fixType === 'quickfix'
+                        ? <Wrench size={13} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                        : <User size={13} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                      }
+                      <div>
+                        <span className="font-medium text-amber-800">What to do: </span>
+                        <span className="text-amber-700">{explanation.whatUserMustDo}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Footer: WCAG guidance + time estimate */}
+                  <div className="flex items-center justify-between text-gray-400 pt-0.5">
+                    <span>{explanation.wcagGuidance}</span>
+                    {explanation.estimatedTime && (
+                      <span className="text-gray-400">~{explanation.estimatedTime}</span>
+                    )}
+                  </div>
+                </>
+              ) : null}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

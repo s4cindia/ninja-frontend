@@ -1,7 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { IssueCard } from './IssueCard';
 import type { PdfAuditIssue } from '@/types/pdf.types';
+
+function renderWithQuery(ui: React.ReactElement) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
 
 // Mock EPUB/Generic issue
 const mockEpubIssue = {
@@ -33,7 +39,7 @@ const mockPdfIssue: PdfAuditIssue = {
 describe('IssueCard', () => {
   describe('EPUB/Generic Issues', () => {
     it('renders basic EPUB issue information', () => {
-      render(<IssueCard issue={mockEpubIssue} />);
+      renderWithQuery(<IssueCard issue={mockEpubIssue} />);
 
       expect(screen.getByText('EPUB-001')).toBeInTheDocument();
       expect(screen.getByText('Missing alternative text for image')).toBeInTheDocument();
@@ -41,25 +47,25 @@ describe('IssueCard', () => {
     });
 
     it('displays location for EPUB issues', () => {
-      render(<IssueCard issue={mockEpubIssue} />);
+      renderWithQuery(<IssueCard issue={mockEpubIssue} />);
 
       expect(screen.getByText('chapter1.xhtml, line 42')).toBeInTheDocument();
     });
 
     it('shows confidence badge for EPUB issues', () => {
-      render(<IssueCard issue={mockEpubIssue} />);
+      renderWithQuery(<IssueCard issue={mockEpubIssue} />);
 
       expect(screen.getByText('98% confident')).toBeInTheDocument();
     });
 
     it('shows fix type badge for EPUB issues', () => {
-      render(<IssueCard issue={mockEpubIssue} />);
+      renderWithQuery(<IssueCard issue={mockEpubIssue} />);
 
       expect(screen.getByText('Auto-Fix')).toBeInTheDocument();
     });
 
     it('applies severity-based styling', () => {
-      const { container } = render(<IssueCard issue={mockEpubIssue} />);
+      const { container } = renderWithQuery(<IssueCard issue={mockEpubIssue} />);
 
       const card = container.querySelector('.border-red-200.bg-red-50');
       expect(card).toBeInTheDocument();
@@ -67,7 +73,7 @@ describe('IssueCard', () => {
 
     it('calls onClick when card is clicked', () => {
       const onClick = vi.fn();
-      render(<IssueCard issue={mockEpubIssue} onClick={onClick} />);
+      renderWithQuery(<IssueCard issue={mockEpubIssue} onClick={onClick} />);
 
       const card = screen.getByRole('button');
       fireEvent.click(card);
@@ -77,7 +83,7 @@ describe('IssueCard', () => {
 
     it('is keyboard accessible when onClick is provided', () => {
       const onClick = vi.fn();
-      render(<IssueCard issue={mockEpubIssue} onClick={onClick} />);
+      renderWithQuery(<IssueCard issue={mockEpubIssue} onClick={onClick} />);
 
       const card = screen.getByRole('button');
       fireEvent.keyDown(card, { key: 'Enter' });
@@ -88,7 +94,7 @@ describe('IssueCard', () => {
 
   describe('PDF Issues', () => {
     it('renders basic PDF issue information', () => {
-      render(<IssueCard issue={mockPdfIssue} />);
+      renderWithQuery(<IssueCard issue={mockPdfIssue} />);
 
       expect(screen.getByText('PDF-ALT-001')).toBeInTheDocument();
       expect(screen.getByText('Image missing alternative text')).toBeInTheDocument();
@@ -96,39 +102,39 @@ describe('IssueCard', () => {
     });
 
     it('displays PDF icon for PDF issues', () => {
-      render(<IssueCard issue={mockPdfIssue} />);
+      renderWithQuery(<IssueCard issue={mockPdfIssue} />);
 
       const icon = screen.getByLabelText('PDF issue');
       expect(icon).toBeInTheDocument();
     });
 
     it('displays page number badge', () => {
-      render(<IssueCard issue={mockPdfIssue} />);
+      renderWithQuery(<IssueCard issue={mockPdfIssue} />);
 
       expect(screen.getByText('Page 5')).toBeInTheDocument();
     });
 
     it('displays element path instead of location', () => {
-      render(<IssueCard issue={mockPdfIssue} />);
+      renderWithQuery(<IssueCard issue={mockPdfIssue} />);
 
       expect(screen.getByText('/Document/Page[5]/Figure[1]')).toBeInTheDocument();
     });
 
     it('shows Matterhorn checkpoint when showMatterhorn is true', () => {
-      render(<IssueCard issue={mockPdfIssue} showMatterhorn={true} />);
+      renderWithQuery(<IssueCard issue={mockPdfIssue} showMatterhorn={true} />);
 
       expect(screen.getByText('01-003')).toBeInTheDocument();
     });
 
     it('hides Matterhorn checkpoint when showMatterhorn is false', () => {
-      render(<IssueCard issue={mockPdfIssue} showMatterhorn={false} />);
+      renderWithQuery(<IssueCard issue={mockPdfIssue} showMatterhorn={false} />);
 
       expect(screen.queryByText('01-003')).not.toBeInTheDocument();
     });
 
     it('calls onPageClick when page badge is clicked', () => {
       const onPageClick = vi.fn();
-      render(<IssueCard issue={mockPdfIssue} onPageClick={onPageClick} />);
+      renderWithQuery(<IssueCard issue={mockPdfIssue} onPageClick={onPageClick} />);
 
       const pageBadge = screen.getByText('Page 5');
       fireEvent.click(pageBadge);
@@ -138,7 +144,7 @@ describe('IssueCard', () => {
 
     it('does not trigger onPageClick when page badge click is disabled', () => {
       const onPageClick = vi.fn();
-      render(<IssueCard issue={mockPdfIssue} />);
+      renderWithQuery(<IssueCard issue={mockPdfIssue} />);
 
       const pageBadge = screen.getByText('Page 5');
       fireEvent.click(pageBadge);
@@ -147,7 +153,7 @@ describe('IssueCard', () => {
     });
 
     it('opens Matterhorn documentation link in new tab', () => {
-      render(<IssueCard issue={mockPdfIssue} showMatterhorn={true} />);
+      renderWithQuery(<IssueCard issue={mockPdfIssue} showMatterhorn={true} />);
 
       const link = screen.getByText('01-003').closest('a');
       expect(link).toHaveAttribute('href', 'https://www.pdfa.org/resource/the-matterhorn-protocol/');
@@ -156,7 +162,7 @@ describe('IssueCard', () => {
     });
 
     it('does not show fix type or confidence badges for PDF issues', () => {
-      render(<IssueCard issue={mockPdfIssue} />);
+      renderWithQuery(<IssueCard issue={mockPdfIssue} />);
 
       expect(screen.queryByText('Auto-Fix')).not.toBeInTheDocument();
       expect(screen.queryByText(/confident/)).not.toBeInTheDocument();
@@ -164,14 +170,14 @@ describe('IssueCard', () => {
 
     it('handles PDF issue without page number', () => {
       const issueWithoutPage = { ...mockPdfIssue, pageNumber: undefined };
-      render(<IssueCard issue={issueWithoutPage} />);
+      renderWithQuery(<IssueCard issue={issueWithoutPage} />);
 
       expect(screen.queryByText(/^Page \d+$/)).not.toBeInTheDocument();
     });
 
     it('handles PDF issue without Matterhorn checkpoint', () => {
       const issueWithoutMatterhorn = { ...mockPdfIssue, matterhornCheckpoint: undefined };
-      render(<IssueCard issue={issueWithoutMatterhorn} showMatterhorn={true} />);
+      renderWithQuery(<IssueCard issue={issueWithoutMatterhorn} showMatterhorn={true} />);
 
       expect(screen.queryByText(/01-003/)).not.toBeInTheDocument();
     });
@@ -179,7 +185,7 @@ describe('IssueCard', () => {
     it('stops event propagation when page badge is clicked', () => {
       const onClick = vi.fn();
       const onPageClick = vi.fn();
-      render(<IssueCard issue={mockPdfIssue} onClick={onClick} onPageClick={onPageClick} />);
+      renderWithQuery(<IssueCard issue={mockPdfIssue} onClick={onClick} onPageClick={onPageClick} />);
 
       const pageBadge = screen.getByText('Page 5');
       fireEvent.click(pageBadge);
@@ -190,7 +196,7 @@ describe('IssueCard', () => {
 
     it('stops event propagation when Matterhorn link is clicked', () => {
       const onClick = vi.fn();
-      render(<IssueCard issue={mockPdfIssue} onClick={onClick} showMatterhorn={true} />);
+      renderWithQuery(<IssueCard issue={mockPdfIssue} onClick={onClick} showMatterhorn={true} />);
 
       const matterhornLink = screen.getByText('01-003');
       fireEvent.click(matterhornLink);
@@ -207,7 +213,7 @@ describe('IssueCard', () => {
       ['minor', 'bg-blue-50', 'bg-blue-100'],
     ])('applies correct styling for %s severity', (severity, bgClass, badgeClass) => {
       const issue = { ...mockEpubIssue, severity };
-      const { container } = render(<IssueCard issue={issue} />);
+      const { container } = renderWithQuery(<IssueCard issue={issue} />);
 
       expect(container.querySelector(`.${bgClass}`)).toBeInTheDocument();
       expect(container.querySelector(`.${badgeClass}`)).toBeInTheDocument();
@@ -216,7 +222,7 @@ describe('IssueCard', () => {
 
   describe('Custom Styling', () => {
     it('applies custom className', () => {
-      const { container } = render(
+      const { container } = renderWithQuery(
         <IssueCard issue={mockEpubIssue} className="custom-class" />
       );
 
@@ -234,7 +240,7 @@ describe('IssueCard', () => {
         status: 'pending',
       };
 
-      render(<IssueCard issue={minimalIssue} />);
+      renderWithQuery(<IssueCard issue={minimalIssue} />);
 
       expect(screen.getByText('TEST-001')).toBeInTheDocument();
       expect(screen.getByText('Test issue')).toBeInTheDocument();

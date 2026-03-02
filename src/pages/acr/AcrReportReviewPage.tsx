@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, ChevronDown, ChevronRight, Edit2, Save, X, PanelLeftClose, PanelLeft } from 'lucide-react';
+import { ArrowLeft, CheckCircle, ChevronDown, ChevronRight, Edit2, Save, X, PanelLeftClose, PanelLeft, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { Spinner } from '@/components/ui/Spinner';
@@ -504,6 +504,13 @@ export function AcrReportReviewPage() {
                     Show Versions
                   </>
                 )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => window.open(`/acr/reports/${jobId}/analysis`, '_blank')}
+              >
+                <BarChart3 className="h-4 w-4 mr-2" />
+                AI Analysis Report
               </Button>
               <Button variant="outline" onClick={() => navigate(`/acr/workflow/${jobId}`)}>
                 <ArrowLeft className="h-4 w-4 mr-2" />

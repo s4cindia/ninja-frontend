@@ -1,9 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  AlertCircle, AlertTriangle, Info, CheckCircle, 
-  Wrench, Hand, FileDown, ClipboardList, ExternalLink, FileCheck, FileSpreadsheet
+import { useQuery } from '@tanstack/react-query';
+import {
+  AlertCircle, AlertTriangle, Info, CheckCircle,
+  Wrench, Hand, FileDown, ClipboardList, ExternalLink, FileCheck, FileSpreadsheet,
+  HelpCircle, ChevronDown, ChevronUp, Zap, User
 } from 'lucide-react';
+import { api } from '@/services/api';
 import { generateCSV, downloadCSV, formatDate } from '@/utils/csvExport';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
@@ -95,8 +98,15 @@ const SEVERITY_CONFIG: Record<Severity, {
   },
 };
 
+// Codes that the JS Auditor detects but that require user input (quick-fix or manual).
+// Must stay in sync with QUICK_FIXABLE_CODES in backend/src/constants/fix-classification.ts.
+const QUICK_FIX_CODES = new Set([
+  'EPUB-STRUCT-002', 'EPUB-SEM-003', 'LANDMARK-UNIQUE',
+  'EPUB-TYPE-HAS-MATCHING-ROLE', 'EPUB-IMG-001', 'IMG-001', 'ACE-IMG-001',
+]);
+
 const isAutoFixable = (issue: AuditIssue): boolean => {
-  return issue.source === 'js-auditor' && issue.code.startsWith('EPUB-');
+  return issue.source === 'js-auditor' && issue.code.startsWith('EPUB-') && !QUICK_FIX_CODES.has(issue.code);
 };
 
 const getScoreColor = (score: number): string => {
@@ -512,9 +522,32 @@ const SummaryCard: React.FC<{
   </div>
 );
 
+interface IssueExplanation {
+  fixType: 'auto' | 'quickfix' | 'manual';
+  reason: string;
+  whatPlatformDid: string | null;
+  whatUserMustDo: string | null;
+  wcagGuidance: string;
+  estimatedTime: string | null;
+}
+
 const IssueCard: React.FC<{ issue: AuditIssue; jobId: string }> = ({ issue, jobId }) => {
   const config = SEVERITY_CONFIG[issue.severity];
   const autoFix = isAutoFixable(issue);
+  const isQuickFix = QUICK_FIX_CODES.has(issue.code);
+  const [explanationOpen, setExplanationOpen] = useState(false);
+
+  const { data: explanation, isLoading: explanationLoading, isError: explanationError } = useQuery<IssueExplanation>({
+    queryKey: ['issue-explanation', jobId, issue.code],
+    queryFn: async () => {
+      const res = await api.get<{ data: IssueExplanation }>(
+        `/jobs/${jobId}/issues/${encodeURIComponent(issue.code)}/explanation`
+      );
+      return res.data.data;
+    },
+    enabled: explanationOpen && !!jobId && !!issue.code,
+    staleTime: 60 * 60 * 1000,
+  });
 
   return (
     <div className={cn('border rounded-lg p-4', config.bgColor, 'border-gray-200')}>
@@ -535,6 +568,11 @@ const IssueCard: React.FC<{ issue: AuditIssue; jobId: string }> = ({ issue, jobI
               <Badge variant="success" size="sm">
                 <Wrench className="h-3 w-3 mr-1" />
                 Auto-fixable
+              </Badge>
+            ) : isQuickFix ? (
+              <Badge variant="info" size="sm">
+                <Wrench className="h-3 w-3 mr-1" />
+                Quick-fix
               </Badge>
             ) : (
               <Badge variant="default" size="sm">
@@ -587,6 +625,60 @@ const IssueCard: React.FC<{ issue: AuditIssue; jobId: string }> = ({ issue, jobI
               )}
             </>
           )}
+
+          {/* Explanation panel */}
+          <div className="mt-2 border-t border-gray-200 pt-2">
+            <button
+              type="button"
+              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+              onClick={(e) => { e.stopPropagation(); setExplanationOpen(o => !o); }}
+            >
+              <HelpCircle size={13} />
+              <span>{autoFix ? 'What was auto-fixed?' : isQuickFix ? 'Why quick-fix?' : 'Why manual?'}</span>
+              {explanationOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            </button>
+
+            {explanationOpen && (
+              <div className="mt-2 text-xs space-y-2">
+                {explanationLoading ? (
+                  <div className="space-y-1.5 animate-pulse">
+                    <div className="h-3 bg-gray-200 rounded w-3/4" />
+                    <div className="h-3 bg-gray-200 rounded w-full" />
+                    <div className="h-3 bg-gray-200 rounded w-2/3" />
+                  </div>
+                ) : explanationError ? (
+                  <p className="text-gray-400 italic">Could not load explanation.</p>
+                ) : explanation ? (
+                  <>
+                    <p className="text-gray-600 leading-relaxed">{explanation.reason}</p>
+                    {explanation.whatPlatformDid && (
+                      <div className="flex gap-2 p-2 bg-blue-50 rounded border border-blue-100">
+                        <Zap size={13} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-medium text-blue-800">What was fixed: </span>
+                          <span className="text-blue-700">{explanation.whatPlatformDid}</span>
+                        </div>
+                      </div>
+                    )}
+                    {explanation.whatUserMustDo && (
+                      <div className="flex gap-2 p-2 bg-amber-50 rounded border border-amber-100">
+                        <User size={13} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-medium text-amber-800">What to do: </span>
+                          <span className="text-amber-700">{explanation.whatUserMustDo}</span>
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-gray-400 pt-0.5">
+                      <span>{explanation.wcagGuidance}</span>
+                      {explanation.estimatedTime && <span>~{explanation.estimatedTime}</span>}
+                    </div>
+                  </>
+                ) : null}
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
     </div>
