@@ -1587,7 +1587,7 @@ export const EPUBRemediation: React.FC = () => {
     };
 
     loadRemediationPlan();
-  }, [jobId, locationState, urlStatus, fileName]);
+  }, [jobId, locationState, urlStatus, fileName, setSearchParams]);
 
   const handleRunAutoRemediation = async () => {
     if (!plan) return;
