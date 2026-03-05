@@ -739,6 +739,7 @@ export const PdfAuditResultsPage: React.FC = () => {
             currentPage={currentPage}
             issuesByPage={issuesByPage}
             onPageChange={handlePageChange}
+            pageLabels={auditResult.metadata?.pageLabels}
             orientation="vertical"
             className="h-full"
           />
@@ -927,6 +928,7 @@ export const PdfAuditResultsPage: React.FC = () => {
                   jobId={jobId}
                   onPageClick={handlePageClick}
                   showMatterhorn={true}
+                  pageLabels={auditResult.metadata?.pageLabels}
                 />
               ))
             )}
