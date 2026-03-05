@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Upload, FileText, CheckCircle, AlertCircle, Loader2, X } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, Loader2, X, Circle } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Progress } from '../ui/Progress';
 import { Alert } from '../ui/Alert';
@@ -412,14 +412,54 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
             </div>
             {state === 'processing' && (() => {
               const totalPages = jobData?.input?.totalPages as number | undefined;
-              const currentPage = totalPages && totalPages > 0
-                ? Math.round(((progress - 20) / 68) * totalPages)
-                : null;
-              return totalPages && totalPages > 0 ? (
-                <p className="text-xs font-mono text-primary-700">
-                  Page {Math.min(currentPage ?? 0, totalPages).toLocaleString()} of {totalPages.toLocaleString()}
-                </p>
-              ) : null;
+              const validatorProgress = jobData?.input?.validatorProgress as Array<{ label: string; issuesFound: number }> | undefined;
+
+              // Page extraction phase
+              if (totalPages && totalPages > 0) {
+                const currentPage = Math.min(Math.round(((progress - 20) / 68) * totalPages), totalPages);
+                const extractionDone = currentPage >= totalPages;
+
+                const VALIDATOR_LABELS = ['Structure & Tags', 'Alt Text', 'Color Contrast', 'Tables'];
+                const doneNames = new Set((validatorProgress ?? []).map(v => v.label));
+
+                return (
+                  <div className="space-y-2">
+                    {!extractionDone ? (
+                      <p className="text-xs font-mono text-primary-700">
+                        Page {currentPage.toLocaleString()} of {totalPages.toLocaleString()}
+                      </p>
+                    ) : (
+                      <div className="text-left mx-auto max-w-xs space-y-1">
+                        {VALIDATOR_LABELS.map((label) => {
+                          const done = doneNames.has(label);
+                          const stat = validatorProgress?.find(v => v.label === label);
+                          const isNext = !done && (validatorProgress ?? []).length === VALIDATOR_LABELS.indexOf(label);
+                          return (
+                            <div key={label} className="flex items-center gap-2 text-xs">
+                              {done ? (
+                                <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                              ) : isNext ? (
+                                <Loader2 className="h-3.5 w-3.5 text-primary-500 animate-spin shrink-0" />
+                              ) : (
+                                <Circle className="h-3.5 w-3.5 text-gray-300 shrink-0" />
+                              )}
+                              <span className={done ? 'text-gray-700' : 'text-gray-400'}>
+                                {label}
+                                {done && stat && (
+                                  <span className={stat.issuesFound > 0 ? 'text-amber-600' : 'text-green-600'}>
+                                    {' — '}{stat.issuesFound} {stat.issuesFound === 1 ? 'issue' : 'issues'}
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              return null;
             })()}
             <p className="text-sm text-gray-500">
               {state === 'uploading' && 'Please wait while your file is being uploaded and audited'}
