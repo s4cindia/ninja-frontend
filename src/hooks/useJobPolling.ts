@@ -12,6 +12,8 @@ export interface JobData {
   output?: Record<string, unknown>;
   error?: string;
   createdAt?: string;
+  startedAt?: string;
+  completedAt?: string;
   updatedAt?: string;
 }
 

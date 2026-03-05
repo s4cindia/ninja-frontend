@@ -36,6 +36,23 @@ interface EPUBUploaderProps {
 
 const MAX_FILE_SIZE = 500 * 1024 * 1024;
 
+function fmtTime(d: Date | null | undefined): string {
+  if (!d) return '—';
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+}
+
+function fmtDur(start: Date | null | undefined, end?: Date | null): string {
+  if (!start) return '—';
+  const ms = (end ?? new Date()).getTime() - start.getTime();
+  if (ms < 0) return '—';
+  if (ms < 1000) return '< 1s';
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ${s % 60}s`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
 const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   acceptedFileTypes = ['epub', 'pdf'],
   endpoints,
@@ -52,6 +69,8 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   const fileNameRef = useRef<string>('');
   const fileTypeRef = useRef<DocumentFileType>('epub');
   const workflowIdRef = useRef<string | undefined>(undefined);
+  const uploadStartRef = useRef<Date | null>(null);
+  const uploadEndRef = useRef<Date | null>(null);
 
   const handleJobComplete = useCallback((jobData: JobData) => {
     setState('complete');
@@ -204,6 +223,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     if (!selectedFile) return;
 
     setState('uploading');
+    uploadStartRef.current = new Date();
     setProgress(0);
     setError(null);
     fileNameRef.current = selectedFile.name;
@@ -244,6 +264,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
 
       setProgress(85);
       setState('queued');
+      uploadEndRef.current = new Date();
 
       let jobId: string;
       let workflowId: string | undefined;
@@ -466,6 +487,67 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
               {state === 'queued' && 'Your audit is in the queue and will start shortly'}
               {state === 'processing' && 'Analyzing document structure and accessibility features'}
             </p>
+            {/* Timing table — visible once upload has started */}
+            {uploadStartRef.current && (() => {
+              type TR = { label: string; start: Date | null; end: Date | null; detail?: string; status: 'done' | 'running' | 'pending' };
+              const vp = (jobData?.input?.validatorProgress ?? []) as Array<{ label: string; issuesFound: number; startedAt: string; completedAt: string }>;
+              const auditStart = jobData?.startedAt ? new Date(jobData.startedAt) : null;
+              const auditEnd   = jobData?.completedAt ? new Date(jobData.completedAt) : null;
+              const totalPages = jobData?.input?.totalPages as number | undefined;
+              const extractionDone = (totalPages ? progress >= 88 : false) || vp.length > 0 || auditEnd !== null;
+              const extractionEnd  = vp.length > 0 ? new Date(vp[0].startedAt) : (extractionDone ? auditEnd : null);
+              const VLABELS = ['Structure & Tags', 'Alt Text', 'Color Contrast', 'Tables'];
+              const rows: TR[] = [
+                { label: 'Upload',    start: uploadStartRef.current, end: uploadEndRef.current, status: uploadEndRef.current ? 'done' : 'running' },
+                { label: 'Queue',     start: uploadEndRef.current,   end: auditStart,            status: auditStart ? 'done' : uploadEndRef.current ? 'running' : 'pending' },
+                { label: 'Extraction', start: auditStart,            end: extractionEnd,          status: extractionDone ? 'done' : auditStart ? 'running' : 'pending' },
+                ...VLABELS.map((lbl, idx) => {
+                  const done = vp.find(v => v.label === lbl);
+                  if (done) return { label: lbl, start: new Date(done.startedAt), end: new Date(done.completedAt), status: 'done' as const, detail: `${done.issuesFound} issue${done.issuesFound !== 1 ? 's' : ''}` };
+                  const isRunning = extractionDone && vp.length === idx;
+                  const prevEnd = vp.length > 0 ? new Date(vp[vp.length - 1].completedAt) : (isRunning ? auditStart : null);
+                  return { label: lbl, start: isRunning ? prevEnd : null, end: null, status: isRunning ? 'running' as const : 'pending' as const };
+                }),
+              ];
+              return (
+                <div className="mt-2 border border-gray-100 rounded-md overflow-hidden text-left text-xs">
+                  <div className="bg-gray-50 px-3 py-1 font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-100 text-[10px]">
+                    Timing
+                  </div>
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-gray-400">
+                        <th className="px-3 py-1 text-left font-medium">Phase</th>
+                        <th className="px-3 py-1 text-left font-medium">Started</th>
+                        <th className="px-3 py-1 text-left font-medium">Ended</th>
+                        <th className="px-3 py-1 text-left font-medium">Duration</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map(row => (
+                        <tr key={row.label} className="border-b border-gray-50 last:border-0">
+                          <td className="px-3 py-1 font-medium text-gray-700">
+                            {row.label}
+                            {row.detail && <span className="ml-1 font-normal text-gray-400">· {row.detail}</span>}
+                          </td>
+                          <td className="px-3 py-1 font-mono text-gray-500">{fmtTime(row.start)}</td>
+                          <td className="px-3 py-1 font-mono text-gray-500">
+                            {row.status === 'running' ? <span className="text-primary-500 not-italic">running…</span> : row.status === 'pending' ? <span className="text-gray-300">—</span> : fmtTime(row.end)}
+                          </td>
+                          <td className="px-3 py-1 font-mono">
+                            {row.status === 'pending'
+                              ? <span className="text-gray-300">—</span>
+                              : row.status === 'running'
+                                ? <span className="text-primary-500">{fmtDur(row.start)}</span>
+                                : <span className="text-gray-600">{fmtDur(row.start, row.end)}</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
           </div>
         )}
 
