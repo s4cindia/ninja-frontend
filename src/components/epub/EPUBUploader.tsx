@@ -34,7 +34,7 @@ interface EPUBUploaderProps {
   onError?: (error: string) => void;
 }
 
-const MAX_FILE_SIZE = 100 * 1024 * 1024;
+const MAX_FILE_SIZE = 500 * 1024 * 1024;
 
 const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   acceptedFileTypes = ['epub', 'pdf'],
@@ -87,7 +87,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     onError?.(errorMsg);
   }, [onError]);
 
-  const { status: jobStatus, startPolling } = useJobPolling({
+  const { status: jobStatus, data: jobData, startPolling } = useJobPolling({
     interval: 2000,
     onComplete: handleJobComplete,
     onError: handleJobError,
@@ -99,9 +99,13 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
       setProgress(88);
     } else if (jobStatus === 'PROCESSING') {
       setState('processing');
-      setProgress(92);
+      // Use the actual progress from the worker (20–88% page range), not a hardcoded value
+      const jobProgress = jobData?.progress;
+      if (typeof jobProgress === 'number' && jobProgress > 20) {
+        setProgress(jobProgress);
+      }
     }
-  }, [jobStatus]);
+  }, [jobStatus, jobData?.progress]);
 
   // Fetch workflow configuration on mount
   useEffect(() => {
@@ -406,6 +410,17 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
             <div className="max-w-xs mx-auto">
               <Progress value={progress} showLabel />
             </div>
+            {state === 'processing' && (() => {
+              const totalPages = jobData?.input?.totalPages as number | undefined;
+              const currentPage = totalPages && totalPages > 0
+                ? Math.round(((progress - 20) / 68) * totalPages)
+                : null;
+              return totalPages && totalPages > 0 ? (
+                <p className="text-xs font-mono text-primary-700">
+                  Page {Math.min(currentPage ?? 0, totalPages).toLocaleString()} of {totalPages.toLocaleString()}
+                </p>
+              ) : null;
+            })()}
             <p className="text-sm text-gray-500">
               {state === 'uploading' && 'Please wait while your file is being uploaded and audited'}
               {state === 'queued' && 'Your audit is in the queue and will start shortly'}

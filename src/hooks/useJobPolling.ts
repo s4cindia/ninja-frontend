@@ -8,6 +8,7 @@ export interface JobData {
   status: JobStatus;
   type: string;
   progress?: number;
+  input?: Record<string, unknown>;
   output?: Record<string, unknown>;
   error?: string;
   createdAt?: string;
