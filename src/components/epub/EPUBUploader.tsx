@@ -115,12 +115,12 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   useEffect(() => {
     if (jobStatus === 'QUEUED') {
       setState('queued');
-      setProgress(88);
+      // Keep progress low — audit hasn't started yet
     } else if (jobStatus === 'PROCESSING') {
       setState('processing');
-      // Use the actual progress from the worker (20–88% page range), not a hardcoded value
+      // Use the actual progress from the worker (10–95% range)
       const jobProgress = jobData?.progress;
-      if (typeof jobProgress === 'number' && jobProgress > 20) {
+      if (typeof jobProgress === 'number' && jobProgress > 0) {
         setProgress(jobProgress);
       }
     }
@@ -257,12 +257,13 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
       const uploadResult = await uploadService.uploadFile(
         selectedFile,
         (uploadProgress) => {
-          setProgress(Math.round(uploadProgress.percentage * 0.8));
+          // Scale upload transfer to 0–15% so progress doesn't falsely imply near-completion
+          setProgress(Math.round(uploadProgress.percentage * 0.15));
         },
         endpoint.directUpload
       );
 
-      setProgress(85);
+      setProgress(5);
       setState('queued');
       uploadEndRef.current = new Date();
 
@@ -429,8 +430,16 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
               {state === 'processing' && 'Running accessibility audit...'}
             </p>
             <div className="max-w-xs mx-auto">
-              <Progress value={progress} showLabel />
+              {/* Only show % label during processing — during uploading/queued it would be misleading */}
+              <Progress value={progress} showLabel={state === 'processing'} />
             </div>
+            {/* Stale queue warning: shown if the job has been queued for > 30s without starting */}
+            {state === 'queued' && uploadEndRef.current &&
+              new Date().getTime() - uploadEndRef.current.getTime() > 30000 && (
+              <p className="text-xs text-amber-600">
+                Taking longer than expected — the worker may be busy. Your job will start when capacity is available.
+              </p>
+            )}
             {state === 'processing' && (() => {
               const totalPages = jobData?.input?.totalPages as number | undefined;
               const validatorProgress = jobData?.input?.validatorProgress as Array<{ label: string; issuesFound: number }> | undefined;
