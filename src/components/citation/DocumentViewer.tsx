@@ -756,7 +756,7 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
 
         for (const variant of enDashVariants) {
           if (result.includes(variant)) {
-            // For superscript matches, rebuild markTag to render as superscript
+            // For superscript matches, wrap existing markTag in <sup> and swap inner content
             let effectiveMarkTag = markTag;
             if (isSuperscriptVariant) {
               const supContent = textToSearch.replace(/<\/?sup>/g, '');
@@ -767,7 +767,22 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
               const supClickable = supNums.length > 0
                 ? supNums.map(n => `<span class="citation-link" data-ref="${n}" style="cursor: pointer;">${n}</span>`).join(',')
                 : `<span class="citation-link" style="cursor: pointer;">${supContent}</span>`;
-              effectiveMarkTag = `<sup><mark class="bg-yellow-200 px-0.5 rounded hover:bg-yellow-300 transition-colors" title="${escapeHtml(supRefInfo)}">${supClickable}</mark></sup>`;
+
+              // Preserve existing markTag attributes (class, data-*, title) from deletion/renumber/orphan rendering
+              const markMatch = markTag.match(/^<mark([^>]*)>([\s\S]*)<\/mark>$/);
+              if (markMatch) {
+                // Update the title attribute with superscript ref info, preserve all other attrs
+                let attrs = markMatch[1];
+                if (/title="[^"]*"/.test(attrs)) {
+                  attrs = attrs.replace(/title="[^"]*"/, `title="${escapeHtml(supRefInfo)}"`);
+                } else {
+                  attrs += ` title="${escapeHtml(supRefInfo)}"`;
+                }
+                effectiveMarkTag = `<sup><mark${attrs}>${supClickable}</mark></sup>`;
+              } else {
+                // Fallback: markTag doesn't match expected pattern — wrap as-is
+                effectiveMarkTag = `<sup><mark class="bg-yellow-200 px-0.5 rounded hover:bg-yellow-300 transition-colors" title="${escapeHtml(supRefInfo)}">${supClickable}</mark></sup>`;
+              }
             }
 
             // Create unique placeholder

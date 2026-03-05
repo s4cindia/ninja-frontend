@@ -192,11 +192,18 @@ export default function CitationEditorPage() {
 
     // Sort citations by position (paragraph then offset) to get true appearance order
     // API returns position data in a nested `position` object
+    // Normalize paragraph to 0-based: position.paragraph and paragraphIndex are 0-based,
+    // paragraphNumber is 1-based so subtract 1 (bounded to >=0)
+    const normPara = (c: AnalysisCitation): number =>
+      c.position?.paragraph ?? c.paragraphIndex ?? (c.paragraphNumber != null ? Math.max(0, c.paragraphNumber - 1) : 0);
+    const normOffset = (c: AnalysisCitation): number =>
+      c.position?.startOffset ?? c.startOffset ?? 0;
+
     const sortedCitations = [...data.citations].sort((a, b) => {
-      const pa = a.position?.paragraph ?? a.paragraphIndex ?? a.paragraphNumber ?? 0;
-      const pb = b.position?.paragraph ?? b.paragraphIndex ?? b.paragraphNumber ?? 0;
+      const pa = normPara(a);
+      const pb = normPara(b);
       if (pa !== pb) return pa - pb;
-      return (a.position?.startOffset ?? a.startOffset ?? 0) - (b.position?.startOffset ?? b.startOffset ?? 0);
+      return normOffset(a) - normOffset(b);
     });
 
     // Extract citation numbers in order of appearance

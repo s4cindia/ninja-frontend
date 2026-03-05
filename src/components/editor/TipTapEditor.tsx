@@ -113,7 +113,28 @@ export const TipTapEditor = forwardRef<TipTapEditorRef, TipTapEditorProps>(
       const styleRegex = /<style[^>]*>[\s\S]*?<\/style>/gi;
       const matches = initialContent.match(styleRegex) || [];
       const clean = initialContent.replace(styleRegex, '').trim();
-      const rewritten = matches.join('\n').replace(/\.docx-content/g, '.tiptap-content.tiptap-content .ProseMirror');
+      const scope = '.tiptap-content.tiptap-content .ProseMirror';
+      // Strip <style> tags, replace .docx-content, then scope all remaining selectors
+      let rewritten = matches.join('\n')
+        .replace(/<\/?style[^>]*>/gi, '')
+        .replace(/\.docx-content/g, scope);
+      // Scope non-@rule selectors: match "selector { ... }" blocks and prefix selectors
+      rewritten = rewritten.replace(
+        /([^{}@]+)\{/g,
+        (_match, selectors: string) => {
+          // Skip if this is inside an @-rule condition (e.g., @media, @keyframes)
+          const trimmed = selectors.trim();
+          if (/^@/.test(trimmed)) return _match;
+          // Skip if already scoped
+          if (trimmed.includes(scope)) return _match;
+          // Prefix each comma-separated selector
+          const scoped = trimmed
+            .split(',')
+            .map((s: string) => `${scope} ${s.trim()}`)
+            .join(', ');
+          return `${scoped} {`;
+        }
+      );
       return { docStyles: rewritten, cleanContent: clean };
     }, [initialContent]);
 
@@ -122,7 +143,7 @@ export const TipTapEditor = forwardRef<TipTapEditorRef, TipTapEditorProps>(
       if (!docStyles) return;
       const styleEl = document.createElement('style');
       styleEl.setAttribute('data-docx-styles', 'true');
-      styleEl.textContent = docStyles.replace(/<\/?style[^>]*>/gi, '');
+      styleEl.textContent = docStyles;
       document.head.appendChild(styleEl);
       return () => { styleEl.remove(); };
     }, [docStyles]);

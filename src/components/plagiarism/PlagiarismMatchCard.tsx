@@ -116,9 +116,12 @@ export function PlagiarismMatchCard({ match, onReview, onGoToLocation, onApplyFi
             <BookOpen className="w-3.5 h-3.5 text-blue-600 flex-shrink-0 mt-0.5" />
             <div className="min-w-0">
               <span className="font-medium text-blue-800">Source:</span>
-              <p className="text-blue-900 mt-0.5 break-words">
-                {match.externalTitle || match.externalSource}
-              </p>
+              {match.externalTitle && (
+                <p className="text-blue-900 mt-0.5 break-words">{match.externalTitle}</p>
+              )}
+              {match.externalSource && match.externalSource !== match.externalTitle && (
+                <p className="text-blue-700 mt-0.5 break-words text-[11px]">{match.externalSource}</p>
+              )}
               {safeExternalUrl && (
                 <a
                   href={safeExternalUrl}
