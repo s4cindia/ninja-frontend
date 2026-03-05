@@ -47,6 +47,9 @@ export function useJobPolling(
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onCompleteRef = useRef(onComplete);
   const onErrorRef = useRef(onError);
+  // Track consecutive poll failures — only stop after 5 to tolerate transient 401s / network blips
+  const consecutiveErrorsRef = useRef(0);
+  const MAX_CONSECUTIVE_ERRORS = 5;
 
   useEffect(() => {
     onCompleteRef.current = onComplete;
@@ -67,6 +70,8 @@ export function useJobPolling(
         const response = await api.get(`/jobs/${id}`);
         const jobData: JobData = response.data.data || response.data;
 
+        // Successful poll — reset error counter
+        consecutiveErrorsRef.current = 0;
         setData(jobData);
 
         // FIX: Normalize status to uppercase for case-insensitive comparison
@@ -87,12 +92,18 @@ export function useJobPolling(
           onErrorRef.current?.(errorMsg);
         }
       } catch (err) {
-        const errorMsg =
-          err instanceof Error ? err.message : "Failed to fetch job status";
-        setError(errorMsg);
-        stopPolling();
-        setIsLoading(false);
-        onErrorRef.current?.(errorMsg);
+        consecutiveErrorsRef.current += 1;
+        // Tolerate transient failures (auth refresh, network blip, brief 401).
+        // Only give up after MAX_CONSECUTIVE_ERRORS failures in a row.
+        if (consecutiveErrorsRef.current >= MAX_CONSECUTIVE_ERRORS) {
+          const errorMsg =
+            err instanceof Error ? err.message : "Failed to fetch job status";
+          setError(errorMsg);
+          stopPolling();
+          setIsLoading(false);
+          onErrorRef.current?.(errorMsg);
+        }
+        // Otherwise: silently skip this poll interval and retry next tick
       }
     },
     [stopPolling],
@@ -101,6 +112,7 @@ export function useJobPolling(
   const startPolling = useCallback(
     (id: string) => {
       stopPolling();
+      consecutiveErrorsRef.current = 0;
 
       setStatus("QUEUED");
       setData(null);
