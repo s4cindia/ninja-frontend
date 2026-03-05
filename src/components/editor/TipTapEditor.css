@@ -118,6 +118,15 @@
   line-height: 1.4;
 }
 
+.tiptap-content .ProseMirror h1,
+.tiptap-content .ProseMirror h2,
+.tiptap-content .ProseMirror h3,
+.tiptap-content .ProseMirror h4,
+.tiptap-content .ProseMirror h5,
+.tiptap-content .ProseMirror h6 {
+  color: inherit;
+}
+
 .tiptap-content .ProseMirror h1 {
   font-size: 2em;
   font-weight: 700;

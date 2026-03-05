@@ -36,6 +36,16 @@ function buildCitationFix(sourceText: string): string {
 export function PlagiarismMatchCard({ match, onReview, onGoToLocation, onApplyFix, isReviewing }: Props) {
   const [expanded, setExpanded] = useState(false);
 
+  const safeExternalUrl = (() => {
+    if (!match.externalUrl) return null;
+    try {
+      const parsed = new URL(match.externalUrl);
+      return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? parsed.href : null;
+    } catch {
+      return null;
+    }
+  })();
+
   const sev = SEVERITY_CONFIG[match.classification] || SEVERITY_CONFIG.NEEDS_REVIEW;
   const SevIcon = sev.icon;
   const isResolved = match.status !== 'PENDING';
@@ -100,7 +110,7 @@ export function PlagiarismMatchCard({ match, onReview, onGoToLocation, onApplyFi
       </div>
 
       {/* Source citation with link — the proof */}
-      {(match.externalSource || match.externalTitle || match.externalUrl) && (
+      {(match.externalSource || match.externalTitle || safeExternalUrl) && (
         <div className="text-xs mb-2 border border-blue-200 bg-blue-50 bg-opacity-50 rounded px-2 py-1.5">
           <div className="flex items-start gap-1.5">
             <BookOpen className="w-3.5 h-3.5 text-blue-600 flex-shrink-0 mt-0.5" />
@@ -109,9 +119,9 @@ export function PlagiarismMatchCard({ match, onReview, onGoToLocation, onApplyFi
               <p className="text-blue-900 mt-0.5 break-words">
                 {match.externalTitle || match.externalSource}
               </p>
-              {match.externalUrl && (
+              {safeExternalUrl && (
                 <a
-                  href={match.externalUrl}
+                  href={safeExternalUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 mt-1 text-blue-600 hover:text-blue-800 hover:underline font-medium"
@@ -121,6 +131,7 @@ export function PlagiarismMatchCard({ match, onReview, onGoToLocation, onApplyFi
                   Verify source
                 </a>
               )}
+              <p className="text-blue-500 italic mt-1">AI-suggested — verify independently</p>
             </div>
           </div>
         </div>
