@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   CheckCircle, AlertTriangle, Info, Zap, Wrench, User,
-  BarChart3, ClipboardList, BookOpen, ExternalLink,
+  BarChart3, ClipboardList, BookOpen, ExternalLink, ArrowLeft,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useAcrAnalysisReport } from '@/hooks/useAcrAnalysisReport';
@@ -187,8 +187,21 @@ export default function ACRAnalysisReportPage() {
   const { jobId } = useParams<{ jobId: string }>();
   const [searchParams] = useSearchParams();
   const shareToken = searchParams.get('token') ?? undefined;
+  const fromBatchId = searchParams.get('batchId');
+  const navigate = useNavigate();
 
   const { data: report, isLoading, error } = useAcrAnalysisReport(jobId ?? '', shareToken);
+
+  const handleBack = () => {
+    if (fromBatchId) {
+      navigate(`/workflow/batch/${fromBatchId}`);
+    } else if (window.history.length <= 1) {
+      // Opened as a new tab with no history — close tab to return to opener
+      window.close();
+    } else {
+      navigate(-1);
+    }
+  };
 
   if (!jobId) {
     return <div className="p-8 text-center text-gray-500">Invalid report URL.</div>;
@@ -204,6 +217,13 @@ export default function ACRAnalysisReportPage() {
         <p className="text-sm text-gray-500">
           The analysis report could not be generated. Ensure the ACR analysis has been completed for this job.
         </p>
+        <button
+          onClick={handleBack}
+          className="mt-6 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+        >
+          <ArrowLeft size={16} />
+          {fromBatchId ? 'Back to Batch' : 'Go Back'}
+        </button>
       </div>
     );
   }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useReviewTimer } from '@/hooks/useReviewTimer';
 import toast from 'react-hot-toast';
 import { ArrowLeft, CheckCircle2, FileText, Shield, AlertCircle } from 'lucide-react';
 import { workflowService, type WorkflowStatus } from '@/services/workflowService';
@@ -18,6 +19,8 @@ export function AcrSignoffPage() {
   const [attestationConfirmed, setAttestationConfirmed] = useState(false);
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  const { getActiveMs, getSessionLog, stop } = useReviewTimer(workflowId ?? '', 'ACR_SIGNOFF');
 
   useEffect(() => {
     if (!workflowId) return;
@@ -50,13 +53,16 @@ export function AcrSignoffPage() {
     try {
       setSubmitting(true);
 
+      stop();
       await workflowService.submitACRSignoff(
         workflowId!,
         {
           text: ATTESTATION_TEXT,
           confirmed: true,
         },
-        notes || undefined
+        notes || undefined,
+        getActiveMs(),
+        getSessionLog()
       );
 
       toast.success('ACR signed off successfully! Workflow complete.');

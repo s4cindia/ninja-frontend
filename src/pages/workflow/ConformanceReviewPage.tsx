@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useReviewTimer } from '@/hooks/useReviewTimer';
 import toast from 'react-hot-toast';
 import { ArrowLeft, CheckCircle2, AlertCircle, Info } from 'lucide-react';
 import { workflowService } from '@/services/workflowService';
@@ -35,6 +36,8 @@ export function ConformanceReviewPage() {
   const [filter, setFilter] = useState<'all' | 'needs-review' | 'not-applicable'>('all');
   const [error, setError] = useState<string | null>(null);
   const [batchId, setBatchId] = useState<string | null>(null);
+
+  const { getActiveMs, getSessionLog, stop } = useReviewTimer(workflowId ?? '', 'CONFORMANCE_REVIEW');
 
   useEffect(() => {
     if (!workflowId) return;
@@ -124,7 +127,8 @@ export function ConformanceReviewPage() {
       });
 
       // Submit to backend
-      await workflowService.submitConformanceReview(workflowId!, reviewDecisions);
+      stop();
+      await workflowService.submitConformanceReview(workflowId!, reviewDecisions, getActiveMs(), getSessionLog());
 
       toast.success('Conformance review submitted! Workflow continuing...');
       if (batchId) {

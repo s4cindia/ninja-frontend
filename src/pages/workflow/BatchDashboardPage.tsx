@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
@@ -17,6 +17,7 @@ import {
   Search,
   Wrench,
   Download,
+  BarChart2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { PolicySummaryCard, GateLiveStatus } from '@/components/workflow/PolicySummaryCard';
@@ -354,9 +355,18 @@ export function BatchDashboardPage() {
             <ChevronLeft className="h-4 w-4" />
             Back
           </button>
-          <Button variant="outline" onClick={() => navigate('/workflow/batch/new')}>
-            + New Agentic Batch
-          </Button>
+          <div className="flex items-center gap-2">
+            <Link
+              to={`/workflow/batch/${batchId}/time-report`}
+              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground border rounded-md px-3 py-1.5 hover:bg-muted/50 transition-colors"
+            >
+              <BarChart2 className="h-4 w-4" />
+              Time Report
+            </Link>
+            <Button variant="outline" onClick={() => navigate('/workflow/batch/new')}>
+              + New Agentic Batch
+            </Button>
+          </div>
         </div>
         <div className="flex items-start justify-between">
           <div>
@@ -515,6 +525,15 @@ export function BatchDashboardPage() {
                         </span>
                       </div>
                       <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => navigate(`/workflow/${wf.workflowId}`)}
+                          className="gap-1 text-xs"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          View
+                        </Button>
                         {wf.jobId && (
                           <Button
                             size="sm"

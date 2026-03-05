@@ -5,6 +5,7 @@ import { Pause, Play, XCircle, RefreshCw, AlertTriangle, ChevronRight, FileText 
 import { workflowService, WorkflowStatus } from '@/services/workflowService';
 import { useWorkflowSocket } from '@/hooks/useWorkflowSocket';
 import { WorkflowProgressBar } from './WorkflowProgressBar';
+import { WorkflowTimeSummaryCard } from './WorkflowTimeSummaryCard';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -393,6 +394,8 @@ export function WorkflowDashboard({ workflowId }: WorkflowDashboardProps) {
           </div>
         </CardContent>
       </Card>
+
+      <WorkflowTimeSummaryCard workflowId={workflowId} />
     </div>
   );
 }

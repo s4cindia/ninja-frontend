@@ -20,6 +20,7 @@ import {
   Settings,
   BookCheck,
   Bot,
+  BarChart2,
 } from 'lucide-react';
 
 type NavItem = {
@@ -83,6 +84,7 @@ export function MainLayout() {
           activePrefix: '/workflow/batch',
         },
         { to: '/feedback', icon: MessageSquare, label: 'Feedback' },
+        { to: '/reports/time', icon: BarChart2, label: 'Time Reports', activePrefix: '/reports' },
         { to: '/settings/workflow', icon: Settings, label: 'Workflow Settings' },
       ],
     },
