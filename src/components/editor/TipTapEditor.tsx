@@ -133,9 +133,10 @@ export const TipTapEditor = forwardRef<TipTapEditorRef, TipTapEditorProps>(
           });
         });
         rewritten = root.toString();
-      } catch {
-        // If parsing fails (malformed CSS), fall back to unscoped
-        rewritten = rawCss;
+      } catch (e) {
+        // If parsing fails (malformed CSS), skip injection to avoid unscoped selectors leaking globally
+        console.warn('[TipTapEditor] CSS parsing failed, skipping document styles:', e);
+        rewritten = '';
       }
       return { docStyles: rewritten, cleanContent: clean };
     }, [initialContent]);
