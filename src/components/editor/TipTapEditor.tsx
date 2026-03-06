@@ -17,6 +17,7 @@ import { Superscript } from '@tiptap/extension-superscript';
 import { Subscript } from '@tiptap/extension-subscript';
 import { Image } from '@tiptap/extension-image';
 import { Extension } from '@tiptap/core';
+import postcss from 'postcss';
 import { useCallback, useImperativeHandle, forwardRef, useState, useMemo, useEffect, useRef } from 'react';
 import {
   TrackChangeExtension, TrackInsertionMark, TrackDeletionMark,
@@ -114,32 +115,28 @@ export const TipTapEditor = forwardRef<TipTapEditorRef, TipTapEditorProps>(
       const matches = initialContent.match(styleRegex) || [];
       const clean = initialContent.replace(styleRegex, '').trim();
       const scope = '.tiptap-content.tiptap-content .ProseMirror';
-      // Strip <style> tags, replace .docx-content, then scope all remaining selectors
-      let rewritten = matches.join('\n')
+      // Strip <style> tags, replace .docx-content, then scope selectors using postcss
+      const rawCss = matches.join('\n')
         .replace(/<\/?style[^>]*>/gi, '')
         .replace(/\.docx-content/g, scope);
-      // Scope non-@rule selectors: match "selector { ... }" blocks and prefix selectors
-      rewritten = rewritten.replace(
-        /([^{}]+)\{/g,
-        (_match, selectors: string) => {
-          const trimmed = selectors.trim();
-          // Skip @-rules (@media, @keyframes, etc.)
-          if (/^@/.test(trimmed)) return _match;
-          // Map each comma-separated selector individually
-          const scoped = trimmed
-            .split(',')
-            .map((s: string) => {
-              const sel = s.trim();
-              // Skip keyframe step tokens (from, to, 50%, etc.)
-              if (/^(from|to|\d+%)$/i.test(sel)) return sel;
-              // Skip if already scoped
-              if (sel.includes(scope)) return sel;
-              return `${scope} ${sel}`;
-            })
-            .join(', ');
-          return `${scoped} {`;
-        }
-      );
+      // Parse CSS properly so braces in strings, nested @-rules, and comments are handled
+      let rewritten: string;
+      try {
+        const root = postcss.parse(rawCss);
+        root.walkRules((rule) => {
+          // Skip keyframe steps (from, to, 50%) — they live inside @keyframes
+          if (rule.parent && 'name' in rule.parent && (rule.parent as postcss.AtRule).name === 'keyframes') return;
+          // Scope each selector individually
+          rule.selectors = rule.selectors.map((sel) => {
+            if (sel.includes(scope)) return sel; // already scoped
+            return `${scope} ${sel}`;
+          });
+        });
+        rewritten = root.toString();
+      } catch {
+        // If parsing fails (malformed CSS), fall back to unscoped
+        rewritten = rawCss;
+      }
       return { docStyles: rewritten, cleanContent: clean };
     }, [initialContent]);
 
