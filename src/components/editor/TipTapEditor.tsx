@@ -122,15 +122,20 @@ export const TipTapEditor = forwardRef<TipTapEditorRef, TipTapEditorProps>(
       rewritten = rewritten.replace(
         /([^{}]+)\{/g,
         (_match, selectors: string) => {
-          // Skip if this is inside an @-rule condition (e.g., @media, @keyframes)
           const trimmed = selectors.trim();
+          // Skip @-rules (@media, @keyframes, etc.)
           if (/^@/.test(trimmed)) return _match;
-          // Skip if already scoped
-          if (trimmed.includes(scope)) return _match;
-          // Prefix each comma-separated selector
+          // Map each comma-separated selector individually
           const scoped = trimmed
             .split(',')
-            .map((s: string) => `${scope} ${s.trim()}`)
+            .map((s: string) => {
+              const sel = s.trim();
+              // Skip keyframe step tokens (from, to, 50%, etc.)
+              if (/^(from|to|\d+%)$/i.test(sel)) return sel;
+              // Skip if already scoped
+              if (sel.includes(scope)) return sel;
+              return `${scope} ${sel}`;
+            })
             .join(', ');
           return `${scoped} {`;
         }
