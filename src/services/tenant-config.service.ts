@@ -144,7 +144,53 @@ class TenantConfigService {
     }>('/tenant/config/reports', updates);
     return response.data.data;
   }
+
+  /**
+   * Get time metrics configuration (idleThresholdMinutes, gateBaselines).
+   */
+  async getTimeMetricsConfig(): Promise<TimeMetricsConfig> {
+    try {
+      const response = await api.get<{ success: boolean; data: TimeMetricsConfig }>(
+        '/tenant/config/time-metrics'
+      );
+      return response.data.data;
+    } catch {
+      return DEFAULT_TIME_METRICS_CONFIG;
+    }
+  }
+
+  /**
+   * Update time metrics configuration.
+   */
+  async updateTimeMetricsConfig(updates: Partial<TimeMetricsConfig>): Promise<TimeMetricsConfig> {
+    const response = await api.patch<{
+      success: boolean;
+      data: TimeMetricsConfig;
+      message: string;
+    }>('/tenant/config/time-metrics', updates);
+    return response.data.data;
+  }
 }
+
+export interface TimeMetricsConfig {
+  idleThresholdMinutes: number;
+  gateBaselines: {
+    AI_REVIEW: number;
+    REMEDIATION_REVIEW: number;
+    CONFORMANCE_REVIEW: number;
+    ACR_SIGNOFF: number;
+  };
+}
+
+const DEFAULT_TIME_METRICS_CONFIG: TimeMetricsConfig = {
+  idleThresholdMinutes: 2,
+  gateBaselines: {
+    AI_REVIEW: 15,
+    REMEDIATION_REVIEW: 20,
+    CONFORMANCE_REVIEW: 25,
+    ACR_SIGNOFF: 10,
+  },
+};
 
 // Export singleton instance
 export const tenantConfigService = new TenantConfigService();

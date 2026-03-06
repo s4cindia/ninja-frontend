@@ -12,6 +12,7 @@ export interface PdfPageNavigatorProps {
   issuesByPage: Map<number, PdfAuditIssue[]>;
   onPageChange: (page: number) => void;
   thumbnails?: string[];
+  pageLabels?: string[];
   orientation?: 'vertical' | 'horizontal';
   className?: string;
 }
@@ -89,7 +90,9 @@ const PageItem: React.FC<{
   thumbnail?: string;
   onClick: () => void;
   showThumbnails: boolean;
-}> = ({ pageNumber, isActive, issueSummary, thumbnail, onClick, showThumbnails }) => {
+  pageLabel?: string;
+}> = ({ pageNumber, isActive, issueSummary, thumbnail, onClick, showThumbnails, pageLabel }) => {
+  const pageDisplay = pageLabel ? `Page ${pageNumber} (${pageLabel})` : `Page ${pageNumber}`;
   const severityConfig = issueSummary?.highestSeverity
     ? SEVERITY_CONFIG[issueSummary.highestSeverity]
     : null;
@@ -110,18 +113,18 @@ const PageItem: React.FC<{
             : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50',
           'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1'
         )}
-        aria-label={`Page ${pageNumber}${issueSummary && issueSummary.total > 0 ? ` - ${issueSummary.total} ${issueSummary.total === 1 ? 'issue' : 'issues'}` : ''}`}
+        aria-label={`${pageDisplay}${issueSummary && issueSummary.total > 0 ? ` - ${issueSummary.total} ${issueSummary.total === 1 ? 'issue' : 'issues'}` : ''}`}
         aria-current={isActive ? 'page' : undefined}
       >
         {showThumbnails && thumbnail ? (
           <div className="space-y-2">
             <img
               src={thumbnail}
-              alt={`Page ${pageNumber} thumbnail`}
+              alt={`${pageDisplay} thumbnail`}
               className="w-full h-auto rounded border border-gray-200"
             />
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-gray-700">Page {pageNumber}</span>
+              <span className="text-xs font-medium text-gray-700">{pageDisplay}</span>
               {issueSummary && issueSummary.total > 0 && severityConfig && (
                 <span
                   className={cn(
@@ -138,7 +141,7 @@ const PageItem: React.FC<{
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <FileText className="h-4 w-4 text-gray-400" />
-              <span className="text-sm font-medium text-gray-700">Page {pageNumber}</span>
+              <span className="text-sm font-medium text-gray-700">{pageDisplay}</span>
             </div>
             {issueSummary && issueSummary.total > 0 && severityConfig && (
               <span
@@ -173,6 +176,7 @@ export const PdfPageNavigator: React.FC<PdfPageNavigatorProps> = ({
   issuesByPage,
   onPageChange,
   thumbnails,
+  pageLabels,
   orientation = 'vertical',
   className,
 }) => {
@@ -385,6 +389,7 @@ export const PdfPageNavigator: React.FC<PdfPageNavigatorProps> = ({
             thumbnail={thumbnails?.[pageNumber - 1]}
             onClick={() => onPageChange(pageNumber)}
             showThumbnails={!!showThumbnails}
+            pageLabel={pageLabels?.[pageNumber - 1]}
           />
         ))}
 
@@ -408,7 +413,7 @@ export const PdfPageNavigator: React.FC<PdfPageNavigatorProps> = ({
         </button>
 
         <span className="text-sm text-gray-700 font-medium">
-          Page {currentPage} / {pageCount}
+          Page {currentPage}{pageLabels?.[currentPage - 1] ? ` (${pageLabels[currentPage - 1]})` : ''} / {pageCount}
         </span>
 
         <button

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useReviewTimer } from '@/hooks/useReviewTimer';
 import toast from 'react-hot-toast';
 import { ChevronLeft, CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react';
 import { workflowService, type WorkflowStatus } from '@/services/workflowService';
@@ -70,6 +71,8 @@ export function AIReviewPage() {
   const [issues, setIssues] = useState<AuditIssue[]>([]);
   const [decisions, setDecisions] = useState<Map<string, ReviewDecision>>(new Map());
   const [error, setError] = useState<string | null>(null);
+
+  const { getActiveMs, getSessionLog, stop } = useReviewTimer(workflowId ?? '', 'AI_REVIEW');
 
   useEffect(() => {
     if (!workflowId) return;
@@ -204,7 +207,8 @@ export function AIReviewPage() {
         justification: d.justification || undefined,
       }));
 
-      await workflowService.submitAIReview(workflowId, decisionsArray);
+      stop();
+      await workflowService.submitAIReview(workflowId, decisionsArray, getActiveMs(), getSessionLog());
 
       toast.success('AI Review submitted successfully!');
 

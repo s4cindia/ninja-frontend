@@ -41,6 +41,7 @@ interface IssueCardProps {
   onPageClick?: (pageNumber: number) => void;
   showMatterhorn?: boolean;
   jobId?: string;
+  pageLabels?: string[];
 }
 
 export function IssueCard({
@@ -50,6 +51,7 @@ export function IssueCard({
   onPageClick,
   showMatterhorn = false,
   jobId,
+  pageLabels,
 }: IssueCardProps) {
   const isPdf = isPdfIssue(issue);
   const [explanationOpen, setExplanationOpen] = useState(false);
@@ -226,7 +228,11 @@ export function IssueCard({
                 }}
                 disabled={!onPageClick}
               >
-                Page {(issue as PdfAuditIssue).pageNumber}
+                {(() => {
+                  const pn = (issue as PdfAuditIssue).pageNumber!;
+                  const label = pageLabels?.[pn - 1];
+                  return label ? `Page ${pn} (${label})` : `Page ${pn}`;
+                })()}
               </button>
             )}
           </div>

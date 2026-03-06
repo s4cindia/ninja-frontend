@@ -206,11 +206,13 @@ export const workflowService = {
 
   async submitAIReview(
     workflowId: string,
-    decisions: AIReviewDecision[]
+    decisions: AIReviewDecision[],
+    activeTimeMs?: number,
+    sessionLog?: object[]
   ): Promise<{ gateComplete: boolean }> {
     const response = await api.post<ApiResponse<{ gateComplete: boolean }>>(
       `/workflows/${workflowId}/hitl/ai-review`,
-      { decisions }
+      { decisions, ...(activeTimeMs !== undefined ? { activeTimeMs, sessionLog: sessionLog ?? [] } : {}) }
     );
     return response.data.data;
   },
@@ -225,22 +227,26 @@ export const workflowService = {
 
   async submitRemediationReview(
     workflowId: string,
-    notes?: string
+    notes?: string,
+    activeTimeMs?: number,
+    sessionLog?: object[]
   ): Promise<{ gateComplete: boolean }> {
     const response = await api.post<ApiResponse<{ gateComplete: boolean; message: string }>>(
       `/workflows/${workflowId}/hitl/remediation-review`,
-      { notes }
+      { notes, ...(activeTimeMs !== undefined ? { activeTimeMs, sessionLog: sessionLog ?? [] } : {}) }
     );
     return response.data.data;
   },
 
   async submitConformanceReview(
     workflowId: string,
-    decisions: ConformanceDecision[]
+    decisions: ConformanceDecision[],
+    activeTimeMs?: number,
+    sessionLog?: object[]
   ): Promise<{ gateComplete: boolean }> {
     const response = await api.post<ApiResponse<{ gateComplete: boolean }>>(
       `/workflows/${workflowId}/hitl/conformance-review`,
-      { decisions }
+      { decisions, ...(activeTimeMs !== undefined ? { activeTimeMs, sessionLog: sessionLog ?? [] } : {}) }
     );
     return response.data.data;
   },
@@ -248,9 +254,15 @@ export const workflowService = {
   async submitACRSignoff(
     workflowId: string,
     attestation: { text: string; confirmed: true },
-    notes?: string
+    notes?: string,
+    activeTimeMs?: number,
+    sessionLog?: object[]
   ): Promise<void> {
-    await api.post(`/workflows/${workflowId}/hitl/acr-signoff`, { attestation, notes });
+    await api.post(`/workflows/${workflowId}/hitl/acr-signoff`, {
+      attestation,
+      notes,
+      ...(activeTimeMs !== undefined ? { activeTimeMs, sessionLog: sessionLog ?? [] } : {}),
+    });
   },
 
   async startBatch(

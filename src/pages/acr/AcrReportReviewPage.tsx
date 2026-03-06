@@ -507,7 +507,7 @@ export function AcrReportReviewPage() {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => window.open(`/acr/reports/${jobId}/analysis`, '_blank')}
+                onClick={() => window.open(`/acr/reports/${jobId}/analysis${fromBatchId ? `?batchId=${fromBatchId}` : ''}`, '_blank')}
               >
                 <BarChart3 className="h-4 w-4 mr-2" />
                 AI Analysis Report

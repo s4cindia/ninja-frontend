@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useReviewTimer } from '@/hooks/useReviewTimer';
 import toast from 'react-hot-toast';
 import { ArrowLeft, CheckCircle2, FileText, AlertTriangle } from 'lucide-react';
 import { workflowService, type WorkflowStatus } from '@/services/workflowService';
@@ -47,6 +48,8 @@ export function RemediationReviewPage() {
   const [workflow, setWorkflow] = useState<WorkflowStatus | null>(null);
   const [items, setItems] = useState<RemediationItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  const { getActiveMs, getSessionLog, stop } = useReviewTimer(workflowId ?? '', 'REMEDIATION_REVIEW');
 
   useEffect(() => {
     if (!workflowId) return;
@@ -121,7 +124,8 @@ export function RemediationReviewPage() {
       setSubmitting(true);
 
       // Submit remediation review acceptance to backend
-      await workflowService.submitRemediationReview(workflowId!);
+      stop();
+      await workflowService.submitRemediationReview(workflowId!, undefined, getActiveMs(), getSessionLog());
 
       toast.success('Remediation review accepted! Workflow continuing...');
       // Return to batch dashboard so the reviewer can process the next file

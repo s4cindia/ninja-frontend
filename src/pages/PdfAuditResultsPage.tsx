@@ -36,6 +36,39 @@ import { PdfPreviewPanel } from '@/components/pdf/PdfPreviewPanel';
 import { ScanLevelBanner } from '@/components/pdf/ScanLevelBanner';
 import { IssueCard } from '@/components/remediation/IssueCard';
 import { api } from '@/services/api';
+
+/**
+ * Maps backend issue category/code fields to Matterhorn category IDs used in the UI filter.
+ * Backend issues don't populate matterhornCheckpoint directly, so we derive it here.
+ */
+const CATEGORY_TO_MATTERHORN: Record<string, string> = {
+  // Structure validator categories
+  structure: '01',
+  metadata: '07',
+  language: '16',
+  headings: '06',
+  'reading-order': '09',
+  lists: '04',
+  tables: '11',
+  // Table validator categories
+  'table-structure': '11',
+  'table-headers': '11',
+  'table-summary': '11',
+  'layout-table': '11',
+  // Alt-text validator categories
+  'alt-text': '13',
+};
+
+/** Derive Matterhorn category ID from an issue, regardless of which field is populated. */
+function getIssueCheckpoint(issue: PdfAuditIssue & { category?: string; code?: string }): string | undefined {
+  if (issue.matterhornCheckpoint) return issue.matterhornCheckpoint;
+  if (issue.category && CATEGORY_TO_MATTERHORN[issue.category]) return CATEGORY_TO_MATTERHORN[issue.category];
+  // Fallback: extract from code like "MATTERHORN-11-001" → "11"
+  const code = issue.code || issue.ruleId || '';
+  const match = code.match(/^MATTERHORN-(\d{2})-/);
+  if (match) return match[1];
+  return undefined;
+}
 import { cn } from '@/utils/cn';
 import { validateJobId } from '@/utils/validation';
 import { useCreateRemediationPlan } from '@/hooks/usePdfRemediation';
@@ -104,7 +137,7 @@ export const PdfAuditResultsPage: React.FC = () => {
   const [selectedIssueId, setSelectedIssueId] = useState<string | undefined>();
   const [filters, setFilters] = useState<IssueFilters>(initialFilters);
   const [showFilters, setShowFilters] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [isDownloading] = useState(false);
   const [isReScanning, setIsReScanning] = useState(false);
   const [currentScanLevel, setCurrentScanLevel] = useState<ScanLevel>('basic');
 
@@ -223,9 +256,10 @@ export const PdfAuditResultsPage: React.FC = () => {
 
     // Filter by Matterhorn category
     if (filters.matterhornCategory !== 'all') {
-      issues = issues.filter((issue) =>
-        issue.matterhornCheckpoint?.startsWith(filters.matterhornCategory)
-      );
+      issues = issues.filter((issue) => {
+        const checkpoint = getIssueCheckpoint(issue as PdfAuditIssue & { category?: string; code?: string });
+        return checkpoint?.startsWith(filters.matterhornCategory);
+      });
     }
 
     // Filter by page number
@@ -341,51 +375,17 @@ export const PdfAuditResultsPage: React.FC = () => {
     setShowFilters(true);
   }, []);
 
-  const handleDownloadReport = async (format: 'pdf' | 'docx' | 'json' = 'json') => {
+  const handleDownloadReport = (_format: 'pdf' | 'docx' | 'json' = 'json') => {
     if (!auditResult || !jobId) return;
-
-    setIsDownloading(true);
-    try {
-      const response = await api.get(`/pdf/job/${encodeURIComponent(jobId)}/report`, {
-        params: { format },
-        responseType: format === 'json' ? 'json' : 'blob',
-      });
-
-      const data = response.data;
-      const blob =
-        format === 'json'
-          ? new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-          : data;
-
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `pdf-audit-report-${jobId}.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.warn('Failed to download report in requested format, falling back to JSON:', err);
-
-      // Notify user about fallback (TODO: Replace with toast notification)
-      alert(`Unable to generate ${format.toUpperCase()} report. Downloading as JSON instead.`);
-
-      // Fallback: download JSON
-      const blob = new Blob([JSON.stringify(auditResult, null, 2)], {
-        type: 'application/json',
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `pdf-audit-report-${jobId}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } finally {
-      setIsDownloading(false);
-    }
+    const blob = new Blob([JSON.stringify(auditResult, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pdf-audit-report-${jobId}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const handleReRunAudit = () => {
@@ -739,6 +739,7 @@ export const PdfAuditResultsPage: React.FC = () => {
             currentPage={currentPage}
             issuesByPage={issuesByPage}
             onPageChange={handlePageChange}
+            pageLabels={auditResult.metadata?.pageLabels}
             orientation="vertical"
             className="h-full"
           />
@@ -927,6 +928,7 @@ export const PdfAuditResultsPage: React.FC = () => {
                   jobId={jobId}
                   onPageClick={handlePageClick}
                   showMatterhorn={true}
+                  pageLabels={auditResult.metadata?.pageLabels}
                 />
               ))
             )}

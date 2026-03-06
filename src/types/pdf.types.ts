@@ -36,6 +36,8 @@ export interface PdfMetadata {
   hasStructureTree: boolean;
   /** Primary language of the document (ISO 639 code) */
   language?: string;
+  /** Logical page labels from PDF PageLabels catalog (e.g. ['i', 'ii', 'iii', '1', '2']) */
+  pageLabels?: string[];
 }
 
 /**

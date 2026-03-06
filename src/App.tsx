@@ -70,6 +70,9 @@ import { RemediationReviewPage } from '@/pages/workflow/RemediationReviewPage';
 import { ConformanceReviewPage } from '@/pages/workflow/ConformanceReviewPage';
 import { AcrSignoffPage } from '@/pages/workflow/AcrSignoffPage';
 import { BatchDashboardPage } from '@/pages/workflow/BatchDashboardPage';
+import { WorkflowTimeReportPage } from '@/pages/metrics/WorkflowTimeReportPage';
+import { BatchTimeReportPage } from '@/pages/metrics/BatchTimeReportPage';
+import { AggregateTimeReportPage } from '@/pages/metrics/AggregateTimeReportPage';
 import { AgenticBatchCreatePage } from '@/pages/workflow/AgenticBatchCreatePage';
 import { BatchHITLDashboardPage } from '@/pages/workflow/BatchHITLDashboardPage';
 import TestEditorPage from '@/pages/TestEditorPage';
@@ -226,6 +229,9 @@ function AppRoutes() {
           <Route path="/workflow/:workflowId/hitl/remediation-review" element={<RemediationReviewPage />} />
           <Route path="/workflow/:workflowId/hitl/conformance-review" element={<ConformanceReviewPage />} />
           <Route path="/workflow/:workflowId/hitl/acr-signoff" element={<AcrSignoffPage />} />
+          <Route path="/workflow/:workflowId/time-report" element={<WorkflowTimeReportPage />} />
+          <Route path="/workflow/batch/:batchId/time-report" element={<BatchTimeReportPage />} />
+          <Route path="/reports/time" element={<AggregateTimeReportPage />} />
 
           {/* Editorial Services Routes */}
           <Route path="/editorial" element={<EditorialLayout />}>

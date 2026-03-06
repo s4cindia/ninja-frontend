@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Upload, FileText, CheckCircle, AlertCircle, Loader2, X } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, Loader2, X, Circle } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Progress } from '../ui/Progress';
 import { Alert } from '../ui/Alert';
@@ -34,7 +34,24 @@ interface EPUBUploaderProps {
   onError?: (error: string) => void;
 }
 
-const MAX_FILE_SIZE = 100 * 1024 * 1024;
+const MAX_FILE_SIZE = 500 * 1024 * 1024;
+
+function fmtTime(d: Date | null | undefined): string {
+  if (!d) return '—';
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+}
+
+function fmtDur(start: Date | null | undefined, end?: Date | null): string {
+  if (!start) return '—';
+  const ms = (end ?? new Date()).getTime() - start.getTime();
+  if (ms < 0) return '—';
+  if (ms < 1000) return '< 1s';
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ${s % 60}s`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
+}
 
 const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   acceptedFileTypes = ['epub', 'pdf'],
@@ -52,6 +69,8 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   const fileNameRef = useRef<string>('');
   const fileTypeRef = useRef<DocumentFileType>('epub');
   const workflowIdRef = useRef<string | undefined>(undefined);
+  const uploadStartRef = useRef<Date | null>(null);
+  const uploadEndRef = useRef<Date | null>(null);
 
   const handleJobComplete = useCallback((jobData: JobData) => {
     setState('complete');
@@ -87,7 +106,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     onError?.(errorMsg);
   }, [onError]);
 
-  const { status: jobStatus, startPolling } = useJobPolling({
+  const { status: jobStatus, data: jobData, startPolling } = useJobPolling({
     interval: 2000,
     onComplete: handleJobComplete,
     onError: handleJobError,
@@ -96,12 +115,16 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   useEffect(() => {
     if (jobStatus === 'QUEUED') {
       setState('queued');
-      setProgress(88);
+      // Keep progress low — audit hasn't started yet
     } else if (jobStatus === 'PROCESSING') {
       setState('processing');
-      setProgress(92);
+      // Use the actual progress from the worker (10–95% range)
+      const jobProgress = jobData?.progress;
+      if (typeof jobProgress === 'number' && jobProgress > 0) {
+        setProgress(jobProgress);
+      }
     }
-  }, [jobStatus]);
+  }, [jobStatus, jobData?.progress]);
 
   // Fetch workflow configuration on mount
   useEffect(() => {
@@ -200,6 +223,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     if (!selectedFile) return;
 
     setState('uploading');
+    uploadStartRef.current = new Date();
     setProgress(0);
     setError(null);
     fileNameRef.current = selectedFile.name;
@@ -233,13 +257,15 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
       const uploadResult = await uploadService.uploadFile(
         selectedFile,
         (uploadProgress) => {
-          setProgress(Math.round(uploadProgress.percentage * 0.8));
+          // Scale upload transfer to 0–15% so progress doesn't falsely imply near-completion
+          setProgress(Math.round(uploadProgress.percentage * 0.15));
         },
         endpoint.directUpload
       );
 
-      setProgress(85);
+      setProgress(5);
       setState('queued');
+      uploadEndRef.current = new Date();
 
       let jobId: string;
       let workflowId: string | undefined;
@@ -404,13 +430,133 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
               {state === 'processing' && 'Running accessibility audit...'}
             </p>
             <div className="max-w-xs mx-auto">
-              <Progress value={progress} showLabel />
+              {/* Only show % label during processing — during uploading/queued it would be misleading */}
+              <Progress value={progress} showLabel={state === 'processing'} />
             </div>
+            {/* Stale queue warning: shown if the job has been queued for > 30s without starting */}
+            {state === 'queued' && uploadEndRef.current &&
+              new Date().getTime() - uploadEndRef.current.getTime() > 30000 && (
+              <p className="text-xs text-amber-600">
+                Taking longer than expected — the worker may be busy. Your job will start when capacity is available.
+              </p>
+            )}
+            {state === 'processing' && (() => {
+              const totalPages = jobData?.input?.totalPages as number | undefined;
+              const validatorProgress = jobData?.input?.validatorProgress as Array<{ label: string; issuesFound: number }> | undefined;
+
+              // Page extraction phase
+              if (totalPages && totalPages > 0) {
+                const currentPage = Math.min(Math.round(((progress - 20) / 68) * totalPages), totalPages);
+                const extractionDone = currentPage >= totalPages;
+
+                const VALIDATOR_LABELS = ['Structure & Tags', 'Alt Text', 'Color Contrast', 'Tables'];
+                const doneNames = new Set((validatorProgress ?? []).map(v => v.label));
+
+                return (
+                  <div className="space-y-2">
+                    {!extractionDone ? (
+                      <p className="text-xs font-mono text-primary-700">
+                        Page {currentPage.toLocaleString()} of {totalPages.toLocaleString()}
+                      </p>
+                    ) : (
+                      <div className="text-left mx-auto max-w-xs space-y-1">
+                        {VALIDATOR_LABELS.map((label) => {
+                          const done = doneNames.has(label);
+                          const stat = validatorProgress?.find(v => v.label === label);
+                          const isNext = !done && (validatorProgress ?? []).length === VALIDATOR_LABELS.indexOf(label);
+                          return (
+                            <div key={label} className="flex items-center gap-2 text-xs">
+                              {done ? (
+                                <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                              ) : isNext ? (
+                                <Loader2 className="h-3.5 w-3.5 text-primary-500 animate-spin shrink-0" />
+                              ) : (
+                                <Circle className="h-3.5 w-3.5 text-gray-300 shrink-0" />
+                              )}
+                              <span className={done ? 'text-gray-700' : 'text-gray-400'}>
+                                {label}
+                                {done && stat && (
+                                  <span className={stat.issuesFound > 0 ? 'text-amber-600' : 'text-green-600'}>
+                                    {' — '}{stat.issuesFound} {stat.issuesFound === 1 ? 'issue' : 'issues'}
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              return null;
+            })()}
             <p className="text-sm text-gray-500">
               {state === 'uploading' && 'Please wait while your file is being uploaded and audited'}
               {state === 'queued' && 'Your audit is in the queue and will start shortly'}
               {state === 'processing' && 'Analyzing document structure and accessibility features'}
             </p>
+            {/* Timing table — visible once upload has started */}
+            {uploadStartRef.current && (() => {
+              type TR = { label: string; start: Date | null; end: Date | null; detail?: string; status: 'done' | 'running' | 'pending' };
+              const vp = (jobData?.input?.validatorProgress ?? []) as Array<{ label: string; issuesFound: number; startedAt: string; completedAt: string }>;
+              const auditStart = jobData?.startedAt ? new Date(jobData.startedAt) : null;
+              const auditEnd   = jobData?.completedAt ? new Date(jobData.completedAt) : null;
+              const totalPages = jobData?.input?.totalPages as number | undefined;
+              const extractionDone = (totalPages ? progress >= 88 : false) || vp.length > 0 || auditEnd !== null;
+              const extractionEnd  = vp.length > 0 ? new Date(vp[0].startedAt) : (extractionDone ? auditEnd : null);
+              const VLABELS = ['Structure & Tags', 'Alt Text', 'Color Contrast', 'Tables'];
+              const rows: TR[] = [
+                { label: 'Upload',    start: uploadStartRef.current, end: uploadEndRef.current, status: uploadEndRef.current ? 'done' : 'running' },
+                { label: 'Queue',     start: uploadEndRef.current,   end: auditStart,            status: auditStart ? 'done' : uploadEndRef.current ? 'running' : 'pending' },
+                { label: 'Extraction', start: auditStart,            end: extractionEnd,          status: extractionDone ? 'done' : auditStart ? 'running' : 'pending' },
+                ...VLABELS.map((lbl, idx) => {
+                  const done = vp.find(v => v.label === lbl);
+                  if (done) return { label: lbl, start: new Date(done.startedAt), end: new Date(done.completedAt), status: 'done' as const, detail: `${done.issuesFound} issue${done.issuesFound !== 1 ? 's' : ''}` };
+                  const isRunning = extractionDone && vp.length === idx;
+                  const prevEnd = vp.length > 0 ? new Date(vp[vp.length - 1].completedAt) : (isRunning ? auditStart : null);
+                  return { label: lbl, start: isRunning ? prevEnd : null, end: null, status: isRunning ? 'running' as const : 'pending' as const };
+                }),
+              ];
+              return (
+                <div className="mt-2 border border-gray-100 rounded-md overflow-hidden text-left text-xs">
+                  <div className="bg-gray-50 px-3 py-1 font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-100 text-[10px]">
+                    Timing
+                  </div>
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-gray-400">
+                        <th className="px-3 py-1 text-left font-medium">Phase</th>
+                        <th className="px-3 py-1 text-left font-medium">Started</th>
+                        <th className="px-3 py-1 text-left font-medium">Ended</th>
+                        <th className="px-3 py-1 text-left font-medium">Duration</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map(row => (
+                        <tr key={row.label} className="border-b border-gray-50 last:border-0">
+                          <td className="px-3 py-1 font-medium text-gray-700">
+                            {row.label}
+                            {row.detail && <span className="ml-1 font-normal text-gray-400">· {row.detail}</span>}
+                          </td>
+                          <td className="px-3 py-1 font-mono text-gray-500">{fmtTime(row.start)}</td>
+                          <td className="px-3 py-1 font-mono text-gray-500">
+                            {row.status === 'running' ? <span className="text-primary-500 not-italic">running…</span> : row.status === 'pending' ? <span className="text-gray-300">—</span> : fmtTime(row.end)}
+                          </td>
+                          <td className="px-3 py-1 font-mono">
+                            {row.status === 'pending'
+                              ? <span className="text-gray-300">—</span>
+                              : row.status === 'running'
+                                ? <span className="text-primary-500">{fmtDur(row.start)}</span>
+                                : <span className="text-gray-600">{fmtDur(row.start, row.end)}</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
           </div>
         )}
 
