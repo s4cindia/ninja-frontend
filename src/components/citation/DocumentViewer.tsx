@@ -715,11 +715,27 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
         for (const v of variants) {
           if (!textsToTry.includes(v)) textsToTry.push(v);
         }
+
+        // Superscript fallback: document may use <sup>N</sup> for Vancouver-style citations
+        // but AI detection returns rawText as "(N)" or "[N]". Try superscript HTML variants.
+        // Add compound superscript variants first (e.g., <sup>3-5</sup>, <sup>2,17</sup>)
+        for (const inner of [spaced, compact, ...(rangeEnDash ? [rangeEnDash] : []), ...(rangeHyphen ? [rangeHyphen] : [])]) {
+          const supVariant = `<sup>${inner}</sup>`;
+          if (!textsToTry.includes(supVariant)) textsToTry.push(supVariant);
+        }
+        // Then individual number superscripts as fallback
+        for (const n of citationNums) {
+          const supVariant = `<sup>${n}</sup>`;
+          if (!textsToTry.includes(supVariant)) textsToTry.push(supVariant);
+        }
       }
 
       let found = false;
       for (const textToSearch of textsToTry) {
         if (found) break;
+
+        // For superscript variants (<sup>N</sup> or <sup>3-5</sup> or <sup>2,17</sup>), don't HTML-encode
+        const isSuperscriptVariant = /^<sup>[\d,\s\-–—]+<\/sup>$/.test(textToSearch);
 
         const htmlEncodedText = textToSearch
           .replace(/&/g, '&amp;')
@@ -727,21 +743,54 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
           .replace(/>/g, '&gt;');
 
         // Handle en-dash encoding variants
-        const enDashVariants = [
-          textToSearch,
-          textToSearch.replace(/–/g, '&#8211;'),
-          textToSearch.replace(/–/g, '&ndash;'),
-          htmlEncodedText,
-          htmlEncodedText.replace(/–/g, '&#8211;'),
-          htmlEncodedText.replace(/–/g, '&ndash;')
-        ];
+        const enDashVariants = isSuperscriptVariant
+          ? [textToSearch] // superscript is raw HTML, don't encode
+          : [
+            textToSearch,
+            textToSearch.replace(/–/g, '&#8211;'),
+            textToSearch.replace(/–/g, '&ndash;'),
+            htmlEncodedText,
+            htmlEncodedText.replace(/–/g, '&#8211;'),
+            htmlEncodedText.replace(/–/g, '&ndash;')
+          ];
 
         for (const variant of enDashVariants) {
           if (result.includes(variant)) {
+            // For superscript matches, wrap existing markTag in <sup> and swap inner content
+            let effectiveMarkTag = markTag;
+            if (isSuperscriptVariant) {
+              const supContent = textToSearch.replace(/<\/?sup>/g, '');
+              // Parse all numbers from the superscript content (handles "3-5", "2,17", "1,3-5,8")
+              const supNums = expandCitationRange(supContent);
+              const supRefInfo = supNums.length > 0 ? buildRefTooltip(supNums, references) : 'Citation';
+              // Build clickable content — each number links to its reference
+              const supClickable = supNums.length > 0
+                ? supNums.map(n => `<span class="citation-link" data-ref="${n}" style="cursor: pointer;">${n}</span>`).join(',')
+                : `<span class="citation-link" style="cursor: pointer;">${supContent}</span>`;
+
+              // Preserve existing markTag attributes AND inner content (deletion/renumber/orphan spans)
+              const markMatch = markTag.match(/^<mark([^>]*)>([\s\S]*)<\/mark>$/);
+              if (markMatch) {
+                // Update the title attribute with superscript ref info, preserve all other attrs
+                let attrs = markMatch[1];
+                if (/title="[^"]*"/.test(attrs)) {
+                  attrs = attrs.replace(/title="[^"]*"/, `title="${escapeHtml(supRefInfo)}"`);
+                } else {
+                  attrs += ` title="${escapeHtml(supRefInfo)}"`;
+                }
+                // Retain original inner HTML (arrows, strikethrough, warning spans) — don't replace with supClickable
+                const originalInner = markMatch[2];
+                effectiveMarkTag = `<sup><mark${attrs}>${originalInner}</mark></sup>`;
+              } else {
+                // Fallback: markTag doesn't match expected pattern — wrap as-is
+                effectiveMarkTag = `<sup><mark class="bg-yellow-200 px-0.5 rounded hover:bg-yellow-300 transition-colors" title="${escapeHtml(supRefInfo)}">${supClickable}</mark></sup>`;
+              }
+            }
+
             // Create unique placeholder
             const placeholder = `__CITE_PLACEHOLDER_${placeholderIndex}__`;
             placeholderIndex++;
-            placeholderMap.set(placeholder, markTag);
+            placeholderMap.set(placeholder, effectiveMarkTag);
 
             // Replace ALL occurrences with placeholder
             const escapedVariant = variant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -750,7 +799,7 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
             result = result.replace(regex, placeholder);
             highlightedCount += matchCount;
             if (DEBUG_CITATIONS) {
-              console.log(`[DocumentViewer] Replaced citation: "${textToSearch}" with placeholder (matched ${matchCount}x)`);
+              console.log(`[DocumentViewer] Replaced citation: "${textToSearch}" with placeholder (matched ${matchCount}x, superscript=${isSuperscriptVariant})`);
             }
             found = true;
             break;
@@ -859,7 +908,10 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
   // Apply citation highlighting to HTML (preserves formatting)
   const highlightedContent = highlightCitationsInHTML(contentToDisplay);
   // Sanitize HTML to prevent XSS attacks
-  const displayContent = DOMPurify.sanitize(highlightedContent, { USE_PROFILES: { html: true } });
+  const displayContent = DOMPurify.sanitize(highlightedContent, {
+    USE_PROFILES: { html: true },
+    ADD_ATTR: ['data-ref', 'data-source'],
+  });
 
   // Get orphaned citations from both the citations array and recentChanges
   const orphanedFromCitations = citations.filter(c => c.isOrphaned);

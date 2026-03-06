@@ -1,10 +1,12 @@
 /**
  * PlagiarismMatchCard - Individual match card with Locate/Fix/Dismiss actions
  * matching the IntegrityIssueCard pattern for track-changes support.
+ *
+ * Shows clear proof: document text, original source text, full source citation with link.
  */
 
 import { useState } from 'react';
-import { AlertCircle, AlertTriangle, Info, Check, X, MapPin, ChevronDown, ChevronUp, Quote } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Info, Check, X, MapPin, ChevronDown, ChevronUp, Quote, ExternalLink, BookOpen } from 'lucide-react';
 import type { PlagiarismMatch, MatchReviewStatus } from '@/types/plagiarism';
 import { MATCH_TYPE_LABELS, CLASSIFICATION_LABELS } from '@/types/plagiarism';
 
@@ -34,6 +36,16 @@ function buildCitationFix(sourceText: string): string {
 export function PlagiarismMatchCard({ match, onReview, onGoToLocation, onApplyFix, isReviewing }: Props) {
   const [expanded, setExpanded] = useState(false);
 
+  const safeExternalUrl = (() => {
+    if (!match.externalUrl) return null;
+    try {
+      const parsed = new URL(match.externalUrl);
+      return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? parsed.href : null;
+    } catch {
+      return null;
+    }
+  })();
+
   const sev = SEVERITY_CONFIG[match.classification] || SEVERITY_CONFIG.NEEDS_REVIEW;
   const SevIcon = sev.icon;
   const isResolved = match.status !== 'PENDING';
@@ -53,7 +65,6 @@ export function PlagiarismMatchCard({ match, onReview, onGoToLocation, onApplyFi
       const searchText = match.sourceText.slice(0, 150);
       const fixText = buildCitationFix(match.sourceText);
       const result = await Promise.resolve(onApplyFix(searchText, fixText));
-      // Only update review status if the fix was applied successfully
       if (result !== false) {
         onReview(match.id, 'PROPERLY_ATTRIBUTED');
       }
@@ -77,12 +88,12 @@ export function PlagiarismMatchCard({ match, onReview, onGoToLocation, onApplyFi
         <span className="text-xs text-gray-500 flex-shrink-0">{matchTypeLabel}</span>
       </div>
 
-      {/* Description */}
+      {/* AI Reasoning */}
       <p className="text-xs text-gray-600 mb-2">
         {match.aiReasoning || CLASSIFICATION_LABELS[match.classification]?.description || 'Similarity detected'}
       </p>
 
-      {/* Source vs Matched comparison (like expected vs actual) */}
+      {/* Document text vs Original source text comparison */}
       <div className="space-y-1.5 mb-2">
         <div>
           <span className="text-xs text-gray-500">Found in document:</span>
@@ -91,12 +102,43 @@ export function PlagiarismMatchCard({ match, onReview, onGoToLocation, onApplyFi
           </p>
         </div>
         <div>
-          <span className="text-xs text-gray-500">Matches with:</span>
+          <span className="text-xs text-gray-500">Original text from source:</span>
           <p className="text-xs text-amber-700 font-mono bg-white bg-opacity-60 rounded px-2 py-1 mt-0.5 line-clamp-2 break-all">
             {match.matchedText}
           </p>
         </div>
       </div>
+
+      {/* Source citation with link — the proof */}
+      {(match.externalSource || match.externalTitle || safeExternalUrl) && (
+        <div className="text-xs mb-2 border border-blue-200 bg-blue-50 bg-opacity-50 rounded px-2 py-1.5">
+          <div className="flex items-start gap-1.5">
+            <BookOpen className="w-3.5 h-3.5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <span className="font-medium text-blue-800">Source:</span>
+              {match.externalTitle && (
+                <p className="text-blue-900 mt-0.5 break-words">{match.externalTitle}</p>
+              )}
+              {match.externalSource && match.externalSource !== match.externalTitle && (
+                <p className="text-blue-700 mt-0.5 break-words text-[11px]">{match.externalSource}</p>
+              )}
+              {safeExternalUrl && (
+                <a
+                  href={safeExternalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 mt-1 text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Verify source
+                </a>
+              )}
+              <p className="text-blue-500 italic mt-1">AI-suggested — verify independently</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Suggested fix preview */}
       {!isResolved && (match.classification === 'VERBATIM_COPY' || match.classification === 'PARAPHRASED') && (
@@ -110,11 +152,11 @@ export function PlagiarismMatchCard({ match, onReview, onGoToLocation, onApplyFi
       {expanded && (
         <div className="mt-2 pt-2 border-t border-gray-100 space-y-2">
           <div>
-            <p className="text-xs text-gray-500 mb-0.5">Full Source Text:</p>
+            <p className="text-xs text-gray-500 mb-0.5">Full text in document:</p>
             <p className="text-xs text-gray-800 bg-white p-2 rounded max-h-32 overflow-y-auto">{match.sourceText}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 mb-0.5">Full Matched Text:</p>
+            <p className="text-xs text-gray-500 mb-0.5">Full original text from source:</p>
             <p className="text-xs text-gray-800 bg-white p-2 rounded max-h-32 overflow-y-auto">{match.matchedText}</p>
           </div>
           {/* Similarity bar */}
@@ -152,7 +194,7 @@ export function PlagiarismMatchCard({ match, onReview, onGoToLocation, onApplyFi
         </div>
       )}
 
-      {/* Actions - matching IntegrityIssueCard pattern */}
+      {/* Actions */}
       <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100">
         <button type="button"
           className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-0.5"
