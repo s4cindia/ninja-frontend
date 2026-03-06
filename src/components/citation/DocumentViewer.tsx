@@ -723,11 +723,8 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
           const supVariant = `<sup>${inner}</sup>`;
           if (!textsToTry.includes(supVariant)) textsToTry.push(supVariant);
         }
-        // Then individual number superscripts as fallback
-        for (const n of citationNums) {
-          const supVariant = `<sup>${n}</sup>`;
-          if (!textsToTry.includes(supVariant)) textsToTry.push(supVariant);
-        }
+        // Note: individual <sup>N</sup> per number is intentionally NOT added —
+        // it would match stray superscripts elsewhere in the document (footnotes, exponents).
       }
 
       let found = false;
@@ -768,19 +765,18 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
                 ? supNums.map(n => `<span class="citation-link" data-ref="${n}" style="cursor: pointer;">${n}</span>`).join(',')
                 : `<span class="citation-link" style="cursor: pointer;">${supContent}</span>`;
 
-              // Preserve existing markTag attributes AND inner content (deletion/renumber/orphan spans)
+              // Preserve existing markTag attributes; use supClickable for normal citations,
+              // keep original inner HTML only for track-change marks (arrows, strikethrough spans)
               const markMatch = markTag.match(/^<mark([^>]*)>([\s\S]*)<\/mark>$/);
               if (markMatch) {
-                // Update the title attribute with superscript ref info, preserve all other attrs
                 let attrs = markMatch[1];
                 if (/title="[^"]*"/.test(attrs)) {
                   attrs = attrs.replace(/title="[^"]*"/, `title="${escapeHtml(supRefInfo)}"`);
                 } else {
                   attrs += ` title="${escapeHtml(supRefInfo)}"`;
                 }
-                // Retain original inner HTML (arrows, strikethrough, warning spans) — don't replace with supClickable
-                const originalInner = markMatch[2];
-                effectiveMarkTag = `<sup><mark${attrs}>${originalInner}</mark></sup>`;
+                const inner = hasTrackChangeMarkTag ? markMatch[2] : supClickable;
+                effectiveMarkTag = `<sup><mark${attrs}>${inner}</mark></sup>`;
               } else {
                 // Fallback: markTag doesn't match expected pattern — wrap as-is
                 effectiveMarkTag = `<sup><mark class="bg-yellow-200 px-0.5 rounded hover:bg-yellow-300 transition-colors" title="${escapeHtml(supRefInfo)}">${supClickable}</mark></sup>`;

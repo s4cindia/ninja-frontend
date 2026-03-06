@@ -131,17 +131,22 @@ export const validatorService = {
     wordCount: number;
     version: number | null;
   }> {
-    // Try presigned S3 save (cloud/production)
+    // Try presigned S3 save (cloud/production).
+    // Falls back to direct PUT on ANY failure (501 = S3 not configured,
+    // CORS/network error on S3 upload, confirm-save failure, etc.).
     try {
       const presignRes = await api.post(`/validator/documents/${documentId}/presign-save`);
       const { uploadUrl, contentKey } = presignRes.data.data;
 
       // Upload HTML directly to S3 (bypasses CloudFront)
-      await fetch(uploadUrl, {
+      const uploadRes = await fetch(uploadUrl, {
         method: 'PUT',
         headers: { 'Content-Type': 'text/html; charset=utf-8' },
         body: content,
       });
+      if (!uploadRes.ok) {
+        throw new Error(`S3 upload failed: ${uploadRes.status} ${await uploadRes.text().catch(() => '')}`);
+      }
 
       // Confirm save — backend reads from S3, persists to DB
       const confirmRes = await api.post(`/validator/documents/${documentId}/confirm-save`, {
@@ -150,12 +155,15 @@ export const validatorService = {
       });
       return confirmRes.data.data;
     } catch (err: unknown) {
-      // 501 = S3 not configured (local dev) — fall back to direct PUT
-      const status = (err as { response?: { status?: number } })?.response?.status;
-      if (status !== 501) throw err;
+      // Fall back to direct PUT for any presigned flow failure:
+      // - 501: S3 not configured (local dev)
+      // - CORS/network: browser can't reach S3 directly (e.g., localhost)
+      // - confirm-save failure: S3 object expired or read error
+      console.warn('[validator] Presigned save failed, falling back to direct PUT:', err);
     }
 
-    // Fallback: direct PUT (works locally, blocked by WAF on large bodies in cloud)
+    // Fallback: direct PUT (works locally; on production CloudFront WAF may
+    // block large bodies, but presigned flow should have succeeded above)
     const response = await api.put(`/validator/documents/${documentId}/content`, {
       content,
       createVersion,

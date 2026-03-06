@@ -195,9 +195,9 @@ export default function CitationEditorPage() {
     // Normalize paragraph to 0-based: position.paragraph and paragraphIndex are 0-based,
     // paragraphNumber is 1-based so subtract 1 (bounded to >=0)
     const normPara = (c: AnalysisCitation): number =>
-      c.position?.paragraph ?? c.paragraphIndex ?? (c.paragraphNumber != null ? Math.max(0, c.paragraphNumber - 1) : 0);
+      c.position?.paragraph ?? c.paragraphIndex ?? (c.paragraphNumber != null ? Math.max(0, c.paragraphNumber - 1) : Number.MAX_SAFE_INTEGER);
     const normOffset = (c: AnalysisCitation): number =>
-      c.position?.startOffset ?? c.startOffset ?? 0;
+      c.position?.startOffset ?? c.startOffset ?? Number.MAX_SAFE_INTEGER;
 
     const sortedCitations = [...data.citations].sort((a, b) => {
       const pa = normPara(a);
