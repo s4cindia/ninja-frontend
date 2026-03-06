@@ -121,7 +121,9 @@ export const validatorService = {
   },
 
   /**
-   * Save document content (HTML)
+   * Save document content (HTML).
+   * Tries presigned S3 upload first (bypasses CloudFront WAF body-size limits),
+   * falls back to direct PUT when S3 is not configured (local dev — 501).
    */
   async saveDocumentContent(documentId: string, content: string, createVersion = true): Promise<{
     documentId: string;
@@ -129,6 +131,31 @@ export const validatorService = {
     wordCount: number;
     version: number | null;
   }> {
+    // Try presigned S3 save (cloud/production)
+    try {
+      const presignRes = await api.post(`/validator/documents/${documentId}/presign-save`);
+      const { uploadUrl, contentKey } = presignRes.data.data;
+
+      // Upload HTML directly to S3 (bypasses CloudFront)
+      await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        body: content,
+      });
+
+      // Confirm save — backend reads from S3, persists to DB
+      const confirmRes = await api.post(`/validator/documents/${documentId}/confirm-save`, {
+        contentKey,
+        createVersion,
+      });
+      return confirmRes.data.data;
+    } catch (err: unknown) {
+      // 501 = S3 not configured (local dev) — fall back to direct PUT
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status !== 501) throw err;
+    }
+
+    // Fallback: direct PUT (works locally, blocked by WAF on large bodies in cloud)
     const response = await api.put(`/validator/documents/${documentId}/content`, {
       content,
       createVersion,
