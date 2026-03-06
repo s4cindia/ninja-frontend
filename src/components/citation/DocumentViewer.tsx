@@ -768,7 +768,7 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
                 ? supNums.map(n => `<span class="citation-link" data-ref="${n}" style="cursor: pointer;">${n}</span>`).join(',')
                 : `<span class="citation-link" style="cursor: pointer;">${supContent}</span>`;
 
-              // Preserve existing markTag attributes (class, data-*, title) from deletion/renumber/orphan rendering
+              // Preserve existing markTag attributes AND inner content (deletion/renumber/orphan spans)
               const markMatch = markTag.match(/^<mark([^>]*)>([\s\S]*)<\/mark>$/);
               if (markMatch) {
                 // Update the title attribute with superscript ref info, preserve all other attrs
@@ -778,7 +778,9 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
                 } else {
                   attrs += ` title="${escapeHtml(supRefInfo)}"`;
                 }
-                effectiveMarkTag = `<sup><mark${attrs}>${supClickable}</mark></sup>`;
+                // Retain original inner HTML (arrows, strikethrough, warning spans) — don't replace with supClickable
+                const originalInner = markMatch[2];
+                effectiveMarkTag = `<sup><mark${attrs}>${originalInner}</mark></sup>`;
               } else {
                 // Fallback: markTag doesn't match expected pattern — wrap as-is
                 effectiveMarkTag = `<sup><mark class="bg-yellow-200 px-0.5 rounded hover:bg-yellow-300 transition-colors" title="${escapeHtml(supRefInfo)}">${supClickable}</mark></sup>`;

@@ -120,7 +120,7 @@ export const TipTapEditor = forwardRef<TipTapEditorRef, TipTapEditorProps>(
         .replace(/\.docx-content/g, scope);
       // Scope non-@rule selectors: match "selector { ... }" blocks and prefix selectors
       rewritten = rewritten.replace(
-        /([^{}@]+)\{/g,
+        /([^{}]+)\{/g,
         (_match, selectors: string) => {
           // Skip if this is inside an @-rule condition (e.g., @media, @keyframes)
           const trimmed = selectors.trim();
