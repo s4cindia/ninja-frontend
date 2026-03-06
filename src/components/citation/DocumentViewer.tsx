@@ -775,7 +775,8 @@ export default function DocumentViewer({ fullText, fullHtml, citations, referenc
                 } else {
                   attrs += ` title="${escapeHtml(supRefInfo)}"`;
                 }
-                const inner = hasTrackChangeMarkTag ? markMatch[2] : supClickable;
+                const hasTrackChangeElements = hasTrackChangeMarkTag && /track-change-(deletion|arrow|addition)/.test(markMatch[2]);
+                const inner = hasTrackChangeElements ? markMatch[2] : supClickable;
                 effectiveMarkTag = `<sup><mark${attrs}>${inner}</mark></sup>`;
               } else {
                 // Fallback: markTag doesn't match expected pattern — wrap as-is

@@ -58,6 +58,11 @@ export interface DocumentVersionDetail extends DocumentVersion {
   fileName: string;
 }
 
+interface PresignResponse {
+  uploadUrl: string;
+  contentKey: string;
+}
+
 export const validatorService = {
   /**
    * Upload a DOCX file for editing
@@ -136,7 +141,7 @@ export const validatorService = {
     // CORS/network error on S3 upload, confirm-save failure, etc.).
     try {
       const presignRes = await api.post(`/validator/documents/${documentId}/presign-save`);
-      const { uploadUrl, contentKey } = presignRes.data.data;
+      const { uploadUrl, contentKey } = presignRes.data.data as PresignResponse;
 
       // Upload HTML directly to S3 (bypasses CloudFront)
       const uploadRes = await fetch(uploadUrl, {
