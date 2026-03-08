@@ -44,6 +44,7 @@ interface AnalysisCitation {
   citationNumber?: number | null;
   linkedReferenceNumbers?: number[];
   isOrphaned?: boolean;
+  position?: { paragraph?: number; startOffset?: number; endOffset?: number };
 }
 
 interface AnalysisReference {
@@ -189,9 +190,25 @@ export default function CitationEditorPage() {
       return { isSequential: true, outOfOrder: [], gaps: [], expectedOrder: [] };
     }
 
+    // Sort citations by position (paragraph then offset) to get true appearance order
+    // API returns position data in a nested `position` object
+    // Normalize paragraph to 0-based: position.paragraph and paragraphIndex are 0-based,
+    // paragraphNumber is 1-based so subtract 1 (bounded to >=0)
+    const normPara = (c: AnalysisCitation): number =>
+      c.position?.paragraph ?? c.paragraphIndex ?? (c.paragraphNumber != null ? Math.max(0, c.paragraphNumber - 1) : Number.MAX_SAFE_INTEGER);
+    const normOffset = (c: AnalysisCitation): number =>
+      c.position?.startOffset ?? c.startOffset ?? Number.MAX_SAFE_INTEGER;
+
+    const sortedCitations = [...data.citations].sort((a, b) => {
+      const pa = normPara(a);
+      const pb = normPara(b);
+      if (pa !== pb) return pa - pb;
+      return normOffset(a) - normOffset(b);
+    });
+
     // Extract citation numbers in order of appearance
     const citationNumbers: number[] = [];
-    for (const citation of data.citations) {
+    for (const citation of sortedCitations) {
       const rawText = citation.rawText || '';
       // Extract all numbers from the citation
       const matches = rawText.match(/\d+/g);

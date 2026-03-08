@@ -4,7 +4,6 @@
  */
 import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import Highlight from '@tiptap/extension-highlight';
 import { TextStyle } from '@tiptap/extension-text-style';
@@ -18,6 +17,7 @@ import { Superscript } from '@tiptap/extension-superscript';
 import { Subscript } from '@tiptap/extension-subscript';
 import { Image } from '@tiptap/extension-image';
 import { Extension } from '@tiptap/core';
+import postcss from 'postcss';
 import { useCallback, useImperativeHandle, forwardRef, useState, useMemo, useEffect, useRef } from 'react';
 import {
   TrackChangeExtension, TrackInsertionMark, TrackDeletionMark,
@@ -42,6 +42,27 @@ const FontSize = Extension.create({
           renderHTML: (attributes) => {
             if (!attributes.fontSize) return {};
             return { style: `font-size: ${attributes.fontSize}` };
+          },
+        },
+      },
+    }];
+  },
+});
+
+// Preserve inline styles on block elements (headings, paragraphs) that TipTap normally strips.
+// Pandoc/backend injects font-family, font-size, color, margins etc. as inline styles.
+const PreserveBlockStyles = Extension.create({
+  name: 'preserveBlockStyles',
+  addGlobalAttributes() {
+    return [{
+      types: ['heading', 'paragraph'],
+      attributes: {
+        preservedStyle: {
+          default: null,
+          parseHTML: (element) => element.getAttribute('style') || null,
+          renderHTML: (attributes) => {
+            if (!attributes.preservedStyle) return {};
+            return { style: attributes.preservedStyle };
           },
         },
       },
@@ -86,36 +107,60 @@ export const TipTapEditor = forwardRef<TipTapEditorRef, TipTapEditorProps>(
     const [charCount, setCharCount] = useState(0);
     const contentRef = useRef<HTMLDivElement>(null);
 
-    // Extract <style> blocks from backend fullHtml so TipTap doesn't discard them
+    // Extract <style> blocks from backend fullHtml so TipTap doesn't discard them.
+    // Rewrite selectors from .docx-content to .tiptap-content.tiptap-content .ProseMirror
+    // (doubled class for higher specificity so document styles win over TipTapEditor.css defaults).
     const { docStyles, cleanContent } = useMemo(() => {
       const styleRegex = /<style[^>]*>[\s\S]*?<\/style>/gi;
       const matches = initialContent.match(styleRegex) || [];
       const clean = initialContent.replace(styleRegex, '').trim();
-      // Rewrite .docx-content selectors to target ProseMirror inside our editor
-      const rewritten = matches.join('\n').replace(/\.docx-content/g, '.tiptap-content .ProseMirror');
+      const scope = '.tiptap-content.tiptap-content .ProseMirror';
+      // Strip <style> tags, replace .docx-content, then scope selectors using postcss
+      const rawCss = matches.join('\n')
+        .replace(/<\/?style[^>]*>/gi, '')
+        .replace(/\.docx-content/g, scope);
+      // Parse CSS properly so braces in strings, nested @-rules, and comments are handled
+      let rewritten: string;
+      try {
+        const root = postcss.parse(rawCss);
+        root.walkRules((rule) => {
+          // Skip keyframe steps (from, to, 50%) — they live inside @keyframes
+          if (rule.parent && 'name' in rule.parent && (rule.parent as postcss.AtRule).name === 'keyframes') return;
+          // Scope each selector individually
+          rule.selectors = rule.selectors.map((sel) => {
+            if (sel.includes(scope)) return sel; // already scoped
+            return `${scope} ${sel}`;
+          });
+        });
+        rewritten = root.toString();
+      } catch (e) {
+        // If parsing fails (malformed CSS), skip injection to avoid unscoped selectors leaking globally
+        console.warn('[TipTapEditor] CSS parsing failed, skipping document styles:', e);
+        rewritten = '';
+      }
       return { docStyles: rewritten, cleanContent: clean };
     }, [initialContent]);
 
-    // Inject the rewritten document styles into the editor container
+    // Inject the rewritten document styles into <head> so they load after static CSS
     useEffect(() => {
-      if (!docStyles || !contentRef.current) return;
+      if (!docStyles) return;
       const styleEl = document.createElement('style');
       styleEl.setAttribute('data-docx-styles', 'true');
-      styleEl.textContent = docStyles.replace(/<\/?style[^>]*>/gi, '');
-      contentRef.current.appendChild(styleEl);
+      styleEl.textContent = docStyles;
+      document.head.appendChild(styleEl);
       return () => { styleEl.remove(); };
     }, [docStyles]);
 
     const editor = useEditor({
       extensions: [
         StarterKit.configure({ heading: { levels: [1, 2, 3, 4, 5, 6] } }),
-        Underline,
         TextAlign.configure({ types: ['heading', 'paragraph'] }),
         Highlight.configure({ multicolor: true }),
         TextStyle,
         Color,
         FontFamily,
         FontSize,
+        PreserveBlockStyles,
         Table.configure({ resizable: true, HTMLAttributes: { class: 'editor-table' } }),
         TableRow, TableHeader, TableCell,
         Superscript, Subscript,
