@@ -165,6 +165,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
       try {
         const res = await api.get(`/pdf/${completedResult.jobId}/ai-analysis`);
         const d = res.data.data;
+        // 'pending' = job done but AI not started yet; keep polling
         if (d.status === 'complete') {
           setAiStatus('complete');
           setAiSuggestionCount(d.analyzed ?? 0);
@@ -174,6 +175,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
           setAiStatus('error');
           if (aiPollRef.current) { clearInterval(aiPollRef.current); aiPollRef.current = null; }
         }
+        // 'pending' and 'processing' → leave interval running
       } catch { /* ignore transient errors */ }
     };
 
