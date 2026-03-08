@@ -20,6 +20,17 @@ import {
   EyeOff,
   Loader2,
   AlertCircle,
+  ImageIcon,
+  Table2,
+  Type,
+  List,
+  Sun,
+  Link as LinkIcon,
+  Bookmark,
+  Globe,
+  AlignLeft,
+  Shield,
+  FileInput,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '../ui/Button';
@@ -46,19 +57,59 @@ type ZoomLevel = 'fit-width' | 'fit-page' | 50 | 75 | 100 | 125 | 150 | 200;
 
 const ZOOM_LEVELS: ZoomLevel[] = [50, 75, 100, 125, 150, 200];
 
-const SEVERITY_COLORS = {
-  critical: 'rgba(239, 68, 68, 0.3)',    // red-500
-  serious: 'rgba(249, 115, 22, 0.3)',    // orange-500
-  moderate: 'rgba(234, 179, 8, 0.3)',    // yellow-500
-  minor: 'rgba(59, 130, 246, 0.3)',      // blue-500
-};
-
 const SEVERITY_BORDER_COLORS = {
   critical: '#ef4444',
   serious: '#f97316',
   moderate: '#eab308',
   minor: '#3b82f6',
 };
+
+// ─── Issue category mapping ───────────────────────────────────────────────────
+
+interface RuleCategory {
+  prefixes: string[];
+  label: string;
+  icon: React.ReactNode;
+  color: string;
+  bgColor: string;
+}
+
+const RULE_CATEGORIES: RuleCategory[] = [
+  { prefixes: ['ALT-TEXT', 'MATTERHORN-ALT'], label: 'Alt Text',      icon: <ImageIcon size={11} />, color: 'text-orange-700', bgColor: 'bg-orange-100' },
+  { prefixes: ['TABLE'],                       label: 'Tables',        icon: <Table2 size={11} />,    color: 'text-blue-700',   bgColor: 'bg-blue-100'   },
+  { prefixes: ['HEADING'],                     label: 'Headings',      icon: <Type size={11} />,      color: 'text-purple-700', bgColor: 'bg-purple-100' },
+  { prefixes: ['LIST'],                        label: 'Lists',         icon: <List size={11} />,      color: 'text-teal-700',   bgColor: 'bg-teal-100'   },
+  { prefixes: ['CONTRAST', 'COLOR-CONTRAST'],  label: 'Contrast',      icon: <Sun size={11} />,       color: 'text-yellow-700', bgColor: 'bg-yellow-100' },
+  { prefixes: ['LINK'],                        label: 'Links',         icon: <LinkIcon size={11} />,  color: 'text-cyan-700',   bgColor: 'bg-cyan-100'   },
+  { prefixes: ['FORM', 'FIELD'],               label: 'Forms',         icon: <FileInput size={11} />, color: 'text-green-700',  bgColor: 'bg-green-100'  },
+  { prefixes: ['BOOKMARK'],                    label: 'Bookmarks',     icon: <Bookmark size={11} />,  color: 'text-indigo-700', bgColor: 'bg-indigo-100' },
+  { prefixes: ['LANGUAGE', 'PDF-NO-LANG'],     label: 'Language',      icon: <Globe size={11} />,     color: 'text-rose-700',   bgColor: 'bg-rose-100'   },
+  { prefixes: ['READING'],                     label: 'Reading Order', icon: <AlignLeft size={11} />, color: 'text-gray-700',   bgColor: 'bg-gray-100'   },
+  { prefixes: ['MATTERHORN', 'PDFUA', 'PDF-UA', 'PDF/UA'], label: 'PDF/UA', icon: <Shield size={11} />, color: 'text-red-700', bgColor: 'bg-red-100'  },
+];
+
+const OTHER_CATEGORY: Omit<RuleCategory, 'prefixes'> = {
+  label: 'Other', icon: <AlertCircle size={11} />, color: 'text-gray-600', bgColor: 'bg-gray-100',
+};
+
+// p-8 padding on the PDF container — overlays must offset by this amount
+const OVERLAY_PADDING_PX = 32;
+
+function categorizePageIssues(issues: PdfAuditIssue[]) {
+  const counts = new Map<string, number>();
+  for (const issue of issues) {
+    const ruleId = (issue.ruleId || '').toUpperCase();
+    const cat = RULE_CATEGORIES.find(c => c.prefixes.some(p => ruleId.startsWith(p)));
+    const label = cat?.label ?? OTHER_CATEGORY.label;
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  }
+  return Array.from(counts.entries()).map(([label, count]) => {
+    const cat = RULE_CATEGORIES.find(c => c.label === label) ?? OTHER_CATEGORY;
+    return { label, count, icon: cat.icon, color: cat.color, bgColor: cat.bgColor };
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface IssueHighlight {
   issue: PdfAuditIssue;
@@ -69,20 +120,13 @@ interface IssueHighlight {
 }
 
 /**
- * Parse issue location to extract coordinates
- * Format examples:
- * - "Page 5, x:100 y:200 w:300 h:50"
- * - "x:100, y:200, width:300, height:50"
- *
- * @param _issue - Prefixed with underscore to indicate intentionally unused.
- *                 Reserved for future implementation when backend provides location data.
+ * Parse issue bounding box at scale=1 (PDF points, top-left origin).
+ * Returns raw coords without scale or padding applied — the caller scales them.
  */
-function parseIssueLocation(_issue: PdfAuditIssue): IssueHighlight | null {
-  // This is a placeholder - actual implementation would parse
-  // _issue.elementPath or a dedicated location field
-  // For now, return null if no valid location data
-  // TODO: Implement coordinate parsing when backend provides location data
-  return null;
+function parseIssueLocation(issue: PdfAuditIssue): { x: number; y: number; width: number; height: number } | null {
+  const bb = issue.boundingBox;
+  if (!bb || bb.width <= 0 || bb.height <= 0) return null;
+  return { x: bb.x, y: bb.y, width: bb.width, height: bb.height };
 }
 
 const IssueOverlay: React.FC<{
@@ -91,21 +135,20 @@ const IssueOverlay: React.FC<{
   onClick: () => void;
   index: number;
 }> = ({ highlight, isSelected, onClick, index }) => {
-  const severity = highlight.issue.severity as keyof typeof SEVERITY_COLORS;
+  const severity = highlight.issue.severity as keyof typeof SEVERITY_BORDER_COLORS;
 
   return (
     <div
-      className={cn(
-        'absolute cursor-pointer transition-all',
-        isSelected && 'animate-pulse'
-      )}
+      className="absolute cursor-pointer transition-all"
       style={{
         left: `${highlight.x}px`,
         top: `${highlight.y}px`,
         width: `${highlight.width}px`,
         height: `${highlight.height}px`,
-        backgroundColor: SEVERITY_COLORS[severity],
-        border: `2px solid ${SEVERITY_BORDER_COLORS[severity]}`,
+        backgroundColor: 'transparent',
+        border: `3px solid #ef4444`,
+        outline: isSelected ? '3px solid #fbbf24' : undefined,
+        outlineOffset: '2px',
         zIndex: isSelected ? 20 : 10,
       }}
       onClick={onClick}
@@ -176,10 +219,29 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
   }, [issues, currentPage]);
 
   const highlights = useMemo(() => {
+    const scale = typeof zoomLevel === 'number' ? zoomLevel / 100 : 1;
     return currentPageIssues
-      .map((issue) => parseIssueLocation(issue))
-      .filter((h): h is IssueHighlight => h !== null);
-  }, [currentPageIssues]);
+      .flatMap((issue) => {
+        const raw = parseIssueLocation(issue);
+        if (!raw) return [];
+        return [{
+          issue,
+          x: raw.x * scale + OVERLAY_PADDING_PX,
+          y: raw.y * scale + OVERLAY_PADDING_PX,
+          width: raw.width * scale,
+          height: raw.height * scale,
+        } as IssueHighlight];
+      });
+  }, [currentPageIssues, zoomLevel]);
+
+  const categoryBreakdown = useMemo(() => categorizePageIssues(currentPageIssues), [currentPageIssues]);
+
+  const selectedIssue = useMemo(() => {
+    if (!selectedIssueId) return null;
+    return currentPageIssues.find(i => i.id === selectedIssueId)
+      ?? issues.find(i => i.id === selectedIssueId)
+      ?? null;
+  }, [selectedIssueId, currentPageIssues, issues]);
 
   const handleDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
@@ -404,13 +466,49 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
             </div>
           )}
         </div>
+
+        {/* Selected issue context strip — below the PDF page, inside the scrollable area */}
+        {!error && selectedIssue && (
+          <div className="mt-3 mx-auto max-w-3xl px-4 py-2.5 bg-purple-50 border border-purple-200 rounded-lg text-xs">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={cn(
+                'px-1.5 py-0.5 rounded font-medium',
+                selectedIssue.severity === 'critical' && 'bg-red-100 text-red-700',
+                selectedIssue.severity === 'serious' && 'bg-orange-100 text-orange-700',
+                selectedIssue.severity === 'moderate' && 'bg-yellow-100 text-yellow-700',
+                selectedIssue.severity === 'minor' && 'bg-blue-100 text-blue-700',
+              )}>
+                {selectedIssue.severity}
+              </span>
+              <span className="font-semibold text-purple-900">{selectedIssue.ruleId}</span>
+              {selectedIssue.elementPath && (
+                <span className="font-mono text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded truncate max-w-xs">
+                  {selectedIssue.elementPath}
+                </span>
+              )}
+            </div>
+            <p className="text-purple-800 mt-1 leading-relaxed">{selectedIssue.message}</p>
+          </div>
+        )}
       </div>
 
-      {/* Issue count indicator */}
+      {/* Issue type breakdown bar */}
       {currentPageIssues.length > 0 && (
-        <div className="px-4 py-2 bg-white border-t border-gray-200 text-sm text-gray-600">
-          {currentPageIssues.length} {currentPageIssues.length === 1 ? 'issue' : 'issues'} on this
-          page
+        <div className="px-4 py-2 bg-white border-t border-gray-200">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs text-gray-500 shrink-0">
+              Page {currentPage} — {currentPageIssues.length} {currentPageIssues.length === 1 ? 'issue' : 'issues'}:
+            </span>
+            {categoryBreakdown.map(({ label, count, icon, color, bgColor }) => (
+              <span
+                key={label}
+                className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium', bgColor, color)}
+              >
+                {icon}
+                {count} {label}
+              </span>
+            ))}
+          </div>
         </div>
       )}
     </div>
