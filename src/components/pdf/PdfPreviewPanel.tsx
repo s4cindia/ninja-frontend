@@ -50,6 +50,7 @@ export interface PdfPreviewPanelProps {
   selectedIssueId?: string;
   onPageChange: (page: number) => void;
   onIssueSelect: (issue: PdfAuditIssue) => void;
+  issueNumberMap?: Map<string, number>;
   className?: string;
 }
 
@@ -134,7 +135,8 @@ const IssueOverlay: React.FC<{
   isSelected: boolean;
   onClick: () => void;
   index: number;
-}> = ({ highlight, isSelected, onClick, index }) => {
+  globalNumber?: number;
+}> = ({ highlight, isSelected, onClick, index, globalNumber }) => {
   const severity = highlight.issue.severity as keyof typeof SEVERITY_BORDER_COLORS;
 
   return (
@@ -172,7 +174,7 @@ const IssueOverlay: React.FC<{
           backgroundColor: SEVERITY_BORDER_COLORS[severity],
         }}
       >
-        {index + 1}
+        {globalNumber ?? index + 1}
       </div>
     </div>
   );
@@ -185,6 +187,7 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
   selectedIssueId,
   onPageChange,
   onIssueSelect,
+  issueNumberMap,
   className,
 }) => {
   const [numPages, setNumPages] = useState<number | null>(null);
@@ -458,6 +461,7 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
                         isSelected={highlight.issue.id === selectedIssueId}
                         onClick={() => onIssueSelect(highlight.issue)}
                         index={index}
+                        globalNumber={issueNumberMap?.get(highlight.issue.id)}
                       />
                     ))}
                   </div>
