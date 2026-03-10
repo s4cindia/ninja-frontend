@@ -34,7 +34,6 @@ import { MatterhornSummary } from '@/components/pdf/MatterhornSummary';
 import { PdfPageNavigator } from '@/components/pdf/PdfPageNavigator';
 import { PdfPreviewPanel } from '@/components/pdf/PdfPreviewPanel';
 import { PdfStatsCards } from '@/components/pdf/PdfStatsCards';
-import { ScanLevelBanner } from '@/components/pdf/ScanLevelBanner';
 import { IssueCard, AiAnalysis } from '@/components/remediation/IssueCard';
 import { api } from '@/services/api';
 
@@ -550,6 +549,30 @@ export const PdfAuditResultsPage: React.FC = () => {
     navigate('/pdf');
   };
 
+  const [isDownloadingRemediated, setIsDownloadingRemediated] = useState(false);
+  const handleDownloadRemediatedPdf = async () => {
+    if (!jobId || !auditResult) return;
+    setIsDownloadingRemediated(true);
+    try {
+      const response = await api.get(`/pdf/${encodeURIComponent(jobId)}/remediation/download`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(response.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = auditResult.fileName.replace(/\.pdf$/i, '_remediated.pdf');
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast.success('Download started');
+    } catch {
+      toast.error('Remediated PDF not available — apply at least one AI fix first');
+    } finally {
+      setIsDownloadingRemediated(false);
+    }
+  };
+
   const handleShareResults = async () => {
     const url = window.location.href;
     try {
@@ -810,6 +833,19 @@ export const PdfAuditResultsPage: React.FC = () => {
               <Download className="h-4 w-4 mr-1" />
               Download Report
             </Button>
+            {Array.from(aiSuggestions.values()).some(s => s.status === 'applied') && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadRemediatedPdf}
+                disabled={isDownloadingRemediated}
+              >
+                {isDownloadingRemediated
+                  ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Downloading…</>
+                  : <><Download className="h-4 w-4 mr-1" />Download AI-Fixed PDF</>
+                }
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={handleShareResults}>
               <Share2 className="h-4 w-4 mr-1" />
               Share
@@ -896,16 +932,6 @@ export const PdfAuditResultsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Scan Level Banner - offer deeper analysis if not already comprehensive */}
-      {currentScanLevel !== 'comprehensive' && auditResult && (
-        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-          <ScanLevelBanner
-            currentScanLevel={currentScanLevel}
-            onReScan={handleReScan}
-            isScanning={isReScanning}
-          />
-        </div>
-      )}
 
       {/* Three-column layout */}
       <div className={isFullscreen ? 'fixed inset-0 z-50 flex flex-col bg-white' : 'flex h-[calc(100vh-320px)]'}>
