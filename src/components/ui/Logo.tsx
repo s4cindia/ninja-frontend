@@ -1,10 +1,14 @@
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg';
+  /** @deprecated Use showNinjaLogo instead */
   showNinjaText?: boolean;
+  showNinjaLogo?: boolean;
   className?: string;
 }
 
-export function Logo({ size = 'md', showNinjaText = true, className = '' }: LogoProps) {
+export function Logo({ size = 'md', showNinjaLogo, showNinjaText, className = '' }: LogoProps) {
+  const showNinja = showNinjaLogo ?? showNinjaText ?? true;
+
   const s4cSizes = {
     sm: 'h-6',
     md: 'h-8',
@@ -25,7 +29,7 @@ export function Logo({ size = 'md', showNinjaText = true, className = '' }: Logo
         className={`${s4cSizes[size]} w-auto object-contain`}
         style={{ imageRendering: 'auto' }}
       />
-      {showNinjaText && (
+      {showNinja && (
         <div className="border-l pl-3">
           <img
             src="/ninja-logo.jpg"
