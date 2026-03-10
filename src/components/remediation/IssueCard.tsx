@@ -1,10 +1,28 @@
 import { useState } from 'react';
-import { Zap, CheckCircle, AlertTriangle, FileText, ExternalLink, ChevronDown, ChevronUp, HelpCircle, Wrench, User } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
+import { Zap, CheckCircle, AlertTriangle, FileText, ExternalLink, ChevronDown, ChevronUp, HelpCircle, Wrench, User, Sparkles, Info, Loader2, ShieldAlert } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/utils/cn';
 import { Tooltip } from '../ui/Tooltip';
 import { api } from '@/services/api';
 import type { PdfAuditIssue } from '@/types/pdf.types';
+
+export interface AiAnalysis {
+  id: string;
+  jobId: string;
+  issueId: string;
+  suggestionType: string;
+  value: string | null;
+  guidance: string | null;
+  confidence: number;
+  rationale: string;
+  model: string;
+  applyMode: 'apply-to-pdf' | 'guidance-only' | 'auto-resolve';
+  status: 'pending' | 'approved' | 'rejected' | 'applied';
+  requiresManualReview?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
 
 interface IssueExplanation {
   fixType: 'auto' | 'quickfix' | 'manual';
@@ -42,6 +60,9 @@ interface IssueCardProps {
   showMatterhorn?: boolean;
   jobId?: string;
   pageLabels?: string[];
+  aiSuggestion?: AiAnalysis;
+  onAiSuggestionChange?: (updated: AiAnalysis) => void;
+  issueNumber?: number;
 }
 
 export function IssueCard({
@@ -52,9 +73,50 @@ export function IssueCard({
   showMatterhorn = false,
   jobId,
   pageLabels,
+  aiSuggestion,
+  onAiSuggestionChange,
+  issueNumber,
 }: IssueCardProps) {
   const isPdf = isPdfIssue(issue);
   const [explanationOpen, setExplanationOpen] = useState(false);
+  const [editedValue, setEditedValue] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async (status: 'approved' | 'rejected') => {
+      if (!jobId || !aiSuggestion) throw new Error('Missing jobId or suggestion');
+      const res = await api.patch<{ data: AiAnalysis }>(
+        `/pdf/${jobId}/ai-analysis/${aiSuggestion.issueId}`,
+        { status }
+      );
+      return res.data.data;
+    },
+    onSuccess: (updated) => {
+      onAiSuggestionChange?.(updated);
+      queryClient.invalidateQueries({ queryKey: ['ai-analysis', jobId] });
+    },
+  });
+
+  const applyMutation = useMutation({
+    mutationFn: async () => {
+      if (!jobId || !aiSuggestion) throw new Error('Missing jobId or suggestion');
+      const body = editedValue !== null ? { value: editedValue } : undefined;
+      const res = await api.post<{ data: AiAnalysis }>(
+        `/pdf/${jobId}/ai-analysis/${aiSuggestion.issueId}/apply`,
+        body
+      );
+      return res.data.data;
+    },
+    onSuccess: () => {
+      onAiSuggestionChange?.({ ...aiSuggestion!, status: 'applied' });
+      queryClient.invalidateQueries({ queryKey: ['ai-analysis', jobId] });
+      toast.success('Fix applied to PDF');
+    },
+    onError: (err: unknown) => {
+      const message = err instanceof Error ? err.message : 'Failed to apply fix';
+      toast.error(message);
+    },
+  });
   // PDF issues may arrive with `code` (backend) or `ruleId` (type definition) — handle both
   const issueCode = isPdf
     ? (issue as PdfAuditIssue).ruleId || (issue as unknown as { code?: string }).code
@@ -156,6 +218,7 @@ export function IssueCard({
 
   return (
     <div
+      id={`issue-card-${issue.id}`}
       className={cn(
         'border rounded-lg p-4 transition-colors',
         getSeverityStyles(),
@@ -177,6 +240,9 @@ export function IssueCard({
           <div className="flex items-center gap-2 flex-wrap mb-1">
             {isPdf && (
               <FileText className="h-4 w-4 text-red-600 flex-shrink-0" aria-label="PDF issue" />
+            )}
+            {issueNumber !== undefined && (
+              <span className="font-mono text-xs text-gray-400 tabular-nums">#{issueNumber}</span>
             )}
             <span className="font-medium text-gray-900">
               {issueCode}
@@ -254,8 +320,109 @@ export function IssueCard({
         </div>
       </div>
 
-      {/* Explanation panel — only shown when jobId is provided */}
-      {jobId && (
+      {/* AI Suggestion Panel */}
+      {aiSuggestion && (
+        <div
+          className="mt-3 border-t border-current/10 pt-3"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {aiSuggestion.requiresManualReview ? (
+            <div className="flex items-start gap-2 p-2 bg-amber-50 rounded border border-amber-200 text-xs">
+              <ShieldAlert size={13} className="text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <span className="font-medium text-amber-800">Manual Review Required</span>
+                <p className="text-amber-700 mt-0.5 leading-relaxed">
+                  {aiSuggestion.guidance || 'This issue requires a subject matter expert to review and remediate.'}
+                </p>
+              </div>
+            </div>
+          ) : aiSuggestion.applyMode === 'auto-resolve' ? (
+            <div className="flex items-start gap-2 p-2 bg-green-50 rounded border border-green-200 text-xs">
+              <CheckCircle size={13} className="text-green-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="font-medium text-green-800">AI Auto-Resolved: </span>
+                <span className="text-green-700">{aiSuggestion.rationale}</span>
+              </div>
+            </div>
+          ) : aiSuggestion.applyMode === 'guidance-only' ? (
+            <div className="flex items-start gap-2 p-2 bg-blue-50 rounded border border-blue-200 text-xs">
+              <Info size={13} className="text-blue-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-medium text-blue-800">AI Guidance</span>
+                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">
+                    {Math.round(aiSuggestion.confidence * 100)}%
+                  </span>
+                </div>
+                <p className="text-blue-700 leading-relaxed">{aiSuggestion.guidance || aiSuggestion.rationale}</p>
+              </div>
+            </div>
+          ) : (
+            /* apply-to-pdf mode */
+            <div className="p-2 bg-purple-50 rounded border border-purple-200 text-xs">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-2">
+                  <Sparkles size={13} className="text-purple-600" />
+                  <span className="font-medium text-purple-800">AI Suggestion</span>
+                  <span className={cn(
+                    'px-1.5 py-0.5 rounded',
+                    aiSuggestion.confidence >= 0.90 ? 'bg-green-100 text-green-700' :
+                    aiSuggestion.confidence >= 0.75 ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-gray-100 text-gray-700'
+                  )}>
+                    {Math.round(aiSuggestion.confidence * 100)}%
+                  </span>
+                </div>
+                {aiSuggestion.status === 'applied' ? (
+                  <span className="flex items-center gap-1 text-green-700 font-medium">
+                    <CheckCircle size={12} /> Applied
+                  </span>
+                ) : aiSuggestion.status === 'rejected' ? (
+                  <span className="text-gray-500 italic">Dismissed</span>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      className="px-2 py-0.5 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors disabled:opacity-50"
+                      disabled={applyMutation.isPending || updateStatusMutation.isPending}
+                      onClick={() => applyMutation.mutate()}
+                    >
+                      {applyMutation.isPending ? <Loader2 size={11} className="animate-spin" /> : 'Apply'}
+                    </button>
+                    <button
+                      type="button"
+                      className="px-2 py-0.5 bg-white text-gray-600 border border-gray-300 rounded hover:bg-gray-50 transition-colors disabled:opacity-50"
+                      disabled={applyMutation.isPending || updateStatusMutation.isPending}
+                      onClick={() => updateStatusMutation.mutate('rejected')}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                )}
+              </div>
+              {(aiSuggestion.suggestionType === 'alt-text' || aiSuggestion.suggestionType === 'alt-text-improvement') ? (
+                <textarea
+                  className="w-full text-purple-700 font-mono text-xs leading-relaxed bg-purple-50 border border-purple-200 rounded p-1.5 resize-y focus:outline-none focus:ring-1 focus:ring-purple-400"
+                  rows={3}
+                  value={editedValue ?? aiSuggestion.value ?? aiSuggestion.guidance ?? ''}
+                  onChange={(e) => setEditedValue(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <p className="text-purple-700 leading-relaxed font-mono break-all">
+                  {aiSuggestion.value || aiSuggestion.guidance}
+                </p>
+              )}
+              {aiSuggestion.rationale && (
+                <p className="text-purple-500 mt-1 italic">{aiSuggestion.rationale}</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Explanation panel — only shown when jobId is provided and no AI suggestion */}
+      {jobId && !aiSuggestion && (
         <div className="mt-2 border-t border-current/10 pt-2">
           <button
             type="button"
