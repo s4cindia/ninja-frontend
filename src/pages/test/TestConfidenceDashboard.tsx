@@ -13,7 +13,7 @@ export function TestConfidenceDashboard() {
       <header className="bg-white shadow-sm border-b sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link to="/dashboard" className="flex items-center">
-            <Logo size="sm" showNinjaText={true} />
+            <Logo size="sm" showNinjaLogo={true} />
           </Link>
         </div>
       </header>
