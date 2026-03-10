@@ -31,6 +31,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { MatterhornSummary } from '@/components/pdf/MatterhornSummary';
+import { PacReportModal } from '@/components/pdf/PacReportModal';
 import { PdfPageNavigator } from '@/components/pdf/PdfPageNavigator';
 import { PdfPreviewPanel } from '@/components/pdf/PdfPreviewPanel';
 import { PdfStatsCards } from '@/components/pdf/PdfStatsCards';
@@ -165,6 +166,7 @@ export const PdfAuditResultsPage: React.FC = () => {
     postRemediationAudit?: { runAt: string; resolved: number; remaining: number; regressions: number; resolutionRate: number };
   } | null>(null);
   const [isRetryingAutoTag, setIsRetryingAutoTag] = useState(false);
+  const [showPacReport, setShowPacReport] = useState(false);
 
   // Fetch audit result
   const fetchAuditResult = useCallback(async () => {
@@ -866,6 +868,14 @@ export const PdfAuditResultsPage: React.FC = () => {
                 : <><FileText className="h-4 w-4 mr-1" />Generate ACR</>
               }
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowPacReport(true)}
+            >
+              <FileText className="h-4 w-4 mr-1" />
+              PAC Report
+            </Button>
           </div>
 
         </div>
@@ -1186,6 +1196,12 @@ export const PdfAuditResultsPage: React.FC = () => {
         </div>
         </div> {/* inner flex row */}
       </div>
+
+      <PacReportModal
+        isOpen={showPacReport}
+        onClose={() => setShowPacReport(false)}
+        jobId={jobId!}
+      />
     </div>
   );
 };
