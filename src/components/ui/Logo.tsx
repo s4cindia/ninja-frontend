@@ -23,12 +23,15 @@ export function Logo({ size = 'md', showNinjaLogo, showNinjaText, className = ''
 
   return (
     <div className={`flex items-center gap-3 ${className}`}>
-      <img
-        src="/s4carlisle-logo.avif"
-        alt="S4Carlisle Publishing Services"
-        className={`${s4cSizes[size]} w-auto object-contain`}
-        style={{ imageRendering: 'auto' }}
-      />
+      <picture>
+        <source srcSet="/s4carlisle-logo.avif" type="image/avif" />
+        <img
+          src="/s4carlisle-logo.jpg"
+          alt="S4Carlisle Publishing Services"
+          className={`${s4cSizes[size]} w-auto object-contain`}
+          style={{ imageRendering: 'auto' }}
+        />
+      </picture>
       {showNinja && (
         <div className="border-l border-gray-300 pl-3">
           <picture>
