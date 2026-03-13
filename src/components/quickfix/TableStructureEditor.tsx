@@ -90,7 +90,8 @@ export function TableStructureEditor({ zoneId, initialData, onSave, onClose }: T
   }, [updateTable]);
 
   const handleRemoveCol = useCallback(() => {
-    updateTable(draft => {
+    setTableData(prev => {
+      const next = cloneTableData(prev);
       const removeFromSection = (sec: TableSection) => {
         sec.rows.forEach(row => {
           if (row.cells.length > 1) {
@@ -98,19 +99,21 @@ export function TableStructureEditor({ zoneId, initialData, onSave, onClose }: T
           }
         });
       };
-      removeFromSection(draft.thead);
-      removeFromSection(draft.tbody);
-    });
-    if (selected) {
-      const maxCells = Math.max(
-        ...tableData.thead.rows.map(r => r.cells.length),
-        ...tableData.tbody.rows.map(r => r.cells.length),
-      );
-      if (selected.cellIndex >= maxCells - 1) {
-        setSelected(null);
+      removeFromSection(next.thead);
+      removeFromSection(next.tbody);
+      // Clear selection if the selected cell no longer exists
+      if (selected) {
+        const maxCells = Math.max(
+          ...next.thead.rows.map(r => r.cells.length),
+          ...next.tbody.rows.map(r => r.cells.length),
+        );
+        if (selected.cellIndex >= maxCells) {
+          setSelected(null);
+        }
       }
-    }
-  }, [updateTable, selected, tableData]);
+      return next;
+    });
+  }, [selected]);
 
   const handleAddRow = useCallback(() => {
     if (!selected) {

@@ -368,15 +368,15 @@ export function IssueCard({
                     <button
                       type="button"
                       className="px-2 py-0.5 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors disabled:opacity-50"
-                      disabled={applyMutation.isPending || updateStatusMutation.isPending}
+                      disabled={!jobId || applyMutation.isPending || updateStatusMutation.isPending}
                       onClick={() => applyMutation.mutate()}
                     >
-                      {applyMutation.isPending ? <Loader2 size={11} className="animate-spin" /> : 'Apply'}
+                      {applyMutation.isPending ? <><Loader2 size={11} className="animate-spin" /> Applying…</> : 'Apply'}
                     </button>
                     <button
                       type="button"
                       className="px-2 py-0.5 bg-white text-gray-600 border border-gray-300 rounded hover:bg-gray-50 transition-colors disabled:opacity-50"
-                      disabled={applyMutation.isPending || updateStatusMutation.isPending}
+                      disabled={!jobId || applyMutation.isPending || updateStatusMutation.isPending}
                       onClick={() => updateStatusMutation.mutate('rejected')}
                     >
                       Dismiss
