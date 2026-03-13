@@ -66,12 +66,14 @@ export function TableStructureEditor({ zoneId, initialData, onSave, onClose }: T
       if (rowIndex + 1 >= rows.length) return;
       const current = rows[rowIndex].cells[cellIndex];
       if (!current) return;
-      current.rowspan += 1;
       const belowRow = rows[rowIndex + 1];
-      if (cellIndex < belowRow.cells.length) {
-        current.content += ' ' + belowRow.cells[cellIndex].content;
-        belowRow.cells.splice(cellIndex, 1);
-      }
+      if (cellIndex >= belowRow.cells.length) return;
+      const below = belowRow.cells[cellIndex];
+      // Only merge if colspan matches to keep table rectangular
+      if (current.colspan !== below.colspan) return;
+      current.rowspan += below.rowspan;
+      current.content += ' ' + below.content;
+      belowRow.cells.splice(cellIndex, 1);
     });
   }, [selected, updateTable]);
 
@@ -168,12 +170,18 @@ export function TableStructureEditor({ zoneId, initialData, onSave, onClose }: T
 
   const handleDeleteCell = useCallback(() => {
     if (!selected) return;
-    const { section, rowIndex, cellIndex } = selected;
+    const { cellIndex } = selected;
     updateTable(draft => {
-      const row = draft[section].rows[rowIndex];
-      if (row && row.cells.length > 1) {
-        row.cells.splice(cellIndex, 1);
-      }
+      // Delete the entire column across both sections to keep the table rectangular
+      const removeCol = (sec: TableSection) => {
+        sec.rows.forEach(row => {
+          if (row.cells.length > 1 && cellIndex < row.cells.length) {
+            row.cells.splice(cellIndex, 1);
+          }
+        });
+      };
+      removeCol(draft.thead);
+      removeCol(draft.tbody);
     });
     setSelected(null);
   }, [selected, updateTable]);

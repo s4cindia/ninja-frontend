@@ -138,16 +138,18 @@ export function ZoneList({ zones, selectedZoneId, onSelectZone, onReorder }: Zon
                   <span className="text-xs text-gray-400 shrink-0">#{zone.readingOrder}</span>
                 )}
 
-                {/* Pencil icon */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (isTable) openEditor(zone);
-                  }}
-                  className="p-1 rounded hover:bg-gray-200 shrink-0"
-                >
-                  <Pencil className="w-3.5 h-3.5 text-gray-500" />
-                </button>
+                {/* Pencil icon — only for TABLE zones */}
+                {isTable && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openEditor(zone);
+                    }}
+                    className="p-1 rounded hover:bg-gray-200 shrink-0"
+                  >
+                    <Pencil className="w-3.5 h-3.5 text-gray-500" />
+                  </button>
+                )}
               </div>
 
               {/* Expanded children for TABLE zones */}

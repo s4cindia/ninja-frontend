@@ -91,6 +91,10 @@ export function IssueCard({
       onAiSuggestionChange?.(updated);
       queryClient.invalidateQueries({ queryKey: ['ai-analysis', jobId] });
     },
+    onError: (err: unknown) => {
+      const message = err instanceof Error ? err.message : 'Failed to update status';
+      toast.error(message);
+    },
   });
 
   const applyMutation = useMutation({
