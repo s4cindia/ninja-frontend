@@ -79,6 +79,7 @@ import TestEditorPage from '@/pages/TestEditorPage';
 import DocumentEditorPage from '@/pages/DocumentEditorPage';
 import PdfViewerPage from '@/pages/PdfViewerPage';
 import { PlagiarismPage } from '@/pages/editorial/PlagiarismPage';
+import BootstrapConsolePage from '@/pages/bootstrap/BootstrapConsolePage';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -251,6 +252,10 @@ function AppRoutes() {
           <Route path="/citation/analysis/:documentId" element={<CitationAnalysisPage />} />
           <Route path="/citation/manuscript/:documentId" element={<CitationManuscriptPage />} />
           <Route path="/citation/editor/:documentId" element={<CitationEditorPage />} />
+
+          {/* Bootstrap Console Routes */}
+          <Route path="/bootstrap" element={<BootstrapConsolePage />} />
+          <Route path="/bootstrap/review/:documentId" element={<BootstrapConsolePage />} />
 
           {/* Test Editor Page (protected) */}
           <Route path="/test/editor" element={<TestEditorPage />} />
