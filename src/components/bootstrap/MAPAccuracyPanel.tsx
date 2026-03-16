@@ -48,7 +48,7 @@ function StatusPill({ row }: { row: ClassAPResult }) {
 }
 
 export default function MAPAccuracyPanel() {
-  const { data: history, isLoading } = useMAPHistory();
+  const { data: history, isLoading, isError } = useMAPHistory();
   const latest = history?.[history.length - 1];
 
   if (isLoading) {
@@ -57,6 +57,14 @@ export default function MAPAccuracyPanel() {
         {[1, 2, 3].map((i) => (
           <div key={i} className="h-6 bg-gray-200 rounded animate-pulse" />
         ))}
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="text-center py-8 text-red-500">
+        Unable to load accuracy data.
       </div>
     );
   }

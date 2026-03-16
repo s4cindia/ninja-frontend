@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ZoneBucketBadge from './ZoneBucketBadge';
 import ZoneLabelDropdown from './ZoneLabelDropdown';
 import type { CalibrationZone } from '../../services/zone-correction.service';
@@ -25,6 +25,10 @@ export default function ZoneDetailPanel({
   isRejecting,
 }: ZoneDetailPanelProps) {
   const [labelValue, setLabelValue] = useState('');
+
+  useEffect(() => {
+    setLabelValue('');
+  }, [zone?.id]);
 
   if (!zone) {
     return (

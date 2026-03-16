@@ -74,7 +74,7 @@ export default function CorpusCompositionPanel() {
         </div>
         <div className="bg-gray-50 rounded-lg p-4 text-center">
           <div className="text-2xl font-bold text-gray-800" data-testid="avg-agreement">
-            {(stats.averageAgreementRate * 100).toFixed(1)}%
+            {((stats.averageAgreementRate ?? 0) * 100).toFixed(1)}%
           </div>
           <div className="text-xs text-gray-500 mt-1">Avg Agreement Rate</div>
         </div>

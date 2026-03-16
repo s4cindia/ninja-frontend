@@ -31,8 +31,9 @@ function CriterionRow({ criterion }: { criterion: PhaseGateCriterion }) {
         className={`w-4 h-4 rounded-full flex-shrink-0 ${
           TRAFFIC_LIGHT[criterion.status] ?? 'bg-gray-300'
         }`}
-        aria-label={`Status: ${criterion.status}`}
+        aria-hidden="true"
       />
+      <span className="sr-only">Status: {criterion.status}</span>
       <div className="flex-1 min-w-0">
         <InfoTooltip content={criterion.tooltip}>
           <span className="font-medium text-gray-800 text-sm">

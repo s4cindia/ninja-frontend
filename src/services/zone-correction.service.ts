@@ -27,25 +27,25 @@ export const getCalibrationZones = async (
   runId: string,
   params?: { bucket?: string; limit?: number; cursor?: string }
 ): Promise<ZonesResponse> =>
-  (await api.get(`/calibration/runs/${runId}/zones`, { params })).data.data;
+  (await api.get(`/calibration/runs/${encodeURIComponent(runId)}/zones`, { params })).data.data;
 
 export const confirmZone = async (
   zoneId: string
 ): Promise<CalibrationZone> =>
-  (await api.post(`/calibration/zones/${zoneId}/confirm`)).data.data;
+  (await api.post(`/calibration/zones/${encodeURIComponent(zoneId)}/confirm`)).data.data;
 
 export const correctZone = async (
   zoneId: string,
   payload: { newLabel: string; bbox?: object }
 ): Promise<CalibrationZone> =>
-  (await api.post(`/calibration/zones/${zoneId}/correct`, payload)).data.data;
+  (await api.post(`/calibration/zones/${encodeURIComponent(zoneId)}/correct`, payload)).data.data;
 
 export const rejectZone = async (
   zoneId: string
 ): Promise<CalibrationZone> =>
-  (await api.post(`/calibration/zones/${zoneId}/reject`)).data.data;
+  (await api.post(`/calibration/zones/${encodeURIComponent(zoneId)}/reject`)).data.data;
 
 export const confirmAllGreen = async (
   runId: string
 ): Promise<{ confirmedCount: number }> =>
-  (await api.post(`/calibration/runs/${runId}/confirm-all-green`)).data.data;
+  (await api.post(`/calibration/runs/${encodeURIComponent(runId)}/confirm-all-green`)).data.data;

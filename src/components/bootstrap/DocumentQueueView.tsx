@@ -68,7 +68,7 @@ export default function DocumentQueueView() {
   };
 
   const renderActions = (doc: CorpusDocument) => {
-    switch (doc.status) {
+    switch (doc.status ?? 'PENDING') {
       case 'PENDING':
         return (
           <button

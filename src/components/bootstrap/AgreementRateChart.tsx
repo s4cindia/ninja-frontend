@@ -1,7 +1,7 @@
 import { useCalibrationRuns } from '../../hooks/useCalibration';
 
 export default function AgreementRateChart() {
-  const { data, isLoading } = useCalibrationRuns({ limit: 20 });
+  const { data, isLoading, isError } = useCalibrationRuns({ limit: 20 });
   const runs = data?.runs ?? [];
 
   const chartData = runs
@@ -34,6 +34,14 @@ export default function AgreementRateChart() {
     );
   }
 
+  if (isError) {
+    return (
+      <div className="text-center py-8 text-red-500">
+        Unable to load agreement rate data.
+      </div>
+    );
+  }
+
   if (chartData.length === 0) {
     return (
       <div className="text-center py-8 text-gray-400">
@@ -41,9 +49,6 @@ export default function AgreementRateChart() {
       </div>
     );
   }
-
-  // Find max for bar scaling
-  const maxRate = Math.max(...chartData.map((d) => d.agreementRate), 1);
 
   return (
     <div>
@@ -88,13 +93,13 @@ export default function AgreementRateChart() {
                               : 'bg-red-400'
                         }`}
                         style={{
-                          width: `${(row.agreementRate / maxRate) * 100}%`,
+                          width: `${row.agreementRate}%`,
                         }}
                       />
                       {/* 75% target marker */}
                       <div
                         className="absolute top-0 bottom-0 border-l-2 border-dashed border-green-500"
-                        style={{ left: `${(75 / maxRate) * 100}%` }}
+                        style={{ left: '75%' }}
                       />
                     </div>
                   </div>

@@ -14,7 +14,7 @@ export const ZONE_KEYS = {
 
 export function useCalibrationZones(
   runId: string,
-  params?: { bucket?: string; limit?: number }
+  params?: { bucket?: string; limit?: number; cursor?: string }
 ) {
   return useQuery({
     queryKey: ZONE_KEYS.zones(runId, params),

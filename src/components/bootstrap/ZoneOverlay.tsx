@@ -27,6 +27,10 @@ export default function ZoneOverlay({
   pdfHeight,
   onSelectZone,
 }: ZoneOverlayProps) {
+  if (pdfWidth <= 0 || pdfHeight <= 0 || pageWidth <= 0 || pageHeight <= 0) {
+    return null;
+  }
+
   return (
     <svg
       width={pageWidth}

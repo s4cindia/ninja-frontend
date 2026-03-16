@@ -10,7 +10,7 @@ export default function BootstrapConsolePage() {
   return (
     <div className="h-full flex flex-col">
       {/* Tab bar */}
-      <div className="border-b bg-white px-6 flex gap-0">
+      <div className="border-b bg-white px-6 flex gap-0" role="tablist">
         {(
           [
             { id: 'queue', label: 'Document Queue' },
@@ -26,6 +26,7 @@ export default function BootstrapConsolePage() {
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
             aria-selected={activeTab === tab.id}
+            aria-controls={`tabpanel-${tab.id}`}
             role="tab"
           >
             {tab.label}
@@ -34,7 +35,7 @@ export default function BootstrapConsolePage() {
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto" role="tabpanel" id={`tabpanel-${activeTab}`}>
         {activeTab === 'queue' ? (
           <div className="p-6">
             <DocumentQueueView />
