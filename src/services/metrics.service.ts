@@ -161,3 +161,49 @@ class MetricsService {
 }
 
 export const metricsService = new MetricsService();
+
+// --- ML Bootstrap Metrics (Sprint ML-3) ---
+
+export interface ClassAPResult {
+  zoneType: string;
+  ap: number;
+  groundTruthCount: number;
+  predictionCount: number;
+  insufficientData: boolean;
+}
+
+export interface MAPResult {
+  overallMAP: number;
+  perClass: ClassAPResult[];
+  insufficientDataWarnings: string[];
+  groundTruthTotal: number;
+  predictionTotal: number;
+}
+
+export interface MAPSnapshot {
+  runId: string;
+  runDate: string;
+  overallMAP: number;
+  perClass: ClassAPResult[];
+}
+
+export interface PhaseGateCriterion {
+  id: string;
+  label: string;
+  status: 'GREEN' | 'AMBER' | 'RED';
+  currentValue: string;
+  threshold: string;
+  tooltip: string;
+}
+
+export interface PhaseGateStatus {
+  criteria: PhaseGateCriterion[];
+  overallStatus: 'GREEN' | 'AMBER' | 'RED';
+  readyForPhase2: boolean;
+}
+
+export const getMAPHistory = async (): Promise<MAPSnapshot[]> =>
+  (await api.get('/ml-metrics/metrics/map/history')).data.data;
+
+export const getPhaseGate = async (): Promise<PhaseGateStatus> =>
+  (await api.get('/ml-metrics/metrics/phase-gate')).data.data;
