@@ -203,7 +203,7 @@ export interface PhaseGateStatus {
 }
 
 export const getMAPHistory = async (): Promise<MAPSnapshot[]> =>
-  (await api.get('/ml-metrics/metrics/map/history')).data.data;
+  (await api.get('/ml-metrics/map/history')).data.data;
 
 export const getPhaseGate = async (): Promise<PhaseGateStatus> =>
-  (await api.get('/ml-metrics/metrics/phase-gate')).data.data;
+  (await api.get('/ml-metrics/phase-gate')).data.data;
