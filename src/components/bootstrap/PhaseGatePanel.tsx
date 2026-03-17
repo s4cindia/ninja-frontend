@@ -23,28 +23,34 @@ const PILL_STYLES: Record<string, string> = {
 function CriterionRow({ criterion }: { criterion: PhaseGateCriterion }) {
   return (
     <div
-      className={`flex items-center gap-4 p-4 rounded-lg border bg-white hover:bg-gray-50 transition-colors ${
+      className={`flex items-start gap-4 p-4 rounded-lg border bg-white hover:bg-gray-50 transition-colors ${
         BORDER_COLOUR[criterion.status] ?? 'border-gray-200'
       }`}
     >
       <div
-        className={`w-4 h-4 rounded-full flex-shrink-0 ${
+        className={`mt-0.5 w-4 h-4 rounded-full flex-shrink-0 ${
           TRAFFIC_LIGHT[criterion.status] ?? 'bg-gray-300'
         }`}
         aria-hidden="true"
       />
       <span className="sr-only">Status: {criterion.status}</span>
-      <div className="flex-1 min-w-0">
+      <div className="flex-shrink-0 w-52">
         <InfoTooltip content={criterion.tooltip}>
-          <span className="font-medium text-gray-800 text-sm">
+          <span className="font-medium text-gray-800 text-sm leading-tight">
             {criterion.label}
           </span>
         </InfoTooltip>
       </div>
-      <span className="text-sm text-gray-600">{criterion.currentValue}</span>
-      <span className="text-xs text-gray-400">
-        Target: {criterion.threshold}
-      </span>
+      <div className="flex-1 min-w-0">
+        <span className="text-sm text-gray-600 break-words">
+          {criterion.currentValue}
+        </span>
+      </div>
+      <div className="flex-shrink-0 text-right">
+        <span className="text-xs text-gray-400 whitespace-nowrap">
+          Target: {criterion.threshold}
+        </span>
+      </div>
     </div>
   );
 }
