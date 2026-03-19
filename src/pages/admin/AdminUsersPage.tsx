@@ -36,6 +36,7 @@ export default function AdminUsersPage() {
   const [formRole, setFormRole] = useState('OPERATOR');
   const [formPassword, setFormPassword] = useState('');
   const [formConfirm, setFormConfirm] = useState('');
+  const [roleError, setRoleError] = useState<string | null>(null);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -101,11 +102,13 @@ export default function AdminUsersPage() {
   };
 
   const handleRoleChange = async (userId: string, newRole: string) => {
+    setRoleError(null);
     try {
       await updateUserRole(userId, newRole);
       await loadUsers();
     } catch {
-      // silently handle
+      setRoleError('Failed to update role. Please try again.');
+      setTimeout(() => setRoleError(null), 4000);
     }
   };
 
@@ -128,6 +131,13 @@ export default function AdminUsersPage() {
 
       {/* User list card */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        {/* Role change error */}
+        {roleError && (
+          <div className="mb-4 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+            {roleError}
+          </div>
+        )}
+
         {/* Filter bar */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">

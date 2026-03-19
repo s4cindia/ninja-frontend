@@ -84,7 +84,6 @@ export default function AdminCorpusPage() {
   const [publisher, setPublisher] = useState('');
   const [contentType, setContentType] = useState('mixed');
   const [pageCount, setPageCount] = useState('');
-  const [language, setLanguage] = useState('en');
   const [uploading, setUploading] = useState(false);
   const [uploadStep, setUploadStep] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -154,11 +153,14 @@ export default function AdminCorpusPage() {
 
       // Step 2: Upload to S3
       setUploadStep('Uploading file to storage…');
-      await fetch(uploadUrl, {
+      const s3Res = await fetch(uploadUrl, {
         method: 'PUT',
         body: file,
         headers: { 'Content-Type': 'application/pdf' },
       });
+      if (!s3Res.ok) {
+        throw new Error(`S3 upload failed (${s3Res.status})`);
+      }
 
       // Step 3: Register document
       setUploadStep('Registering document…');
@@ -175,7 +177,6 @@ export default function AdminCorpusPage() {
       setPublisher('');
       setContentType('mixed');
       setPageCount('');
-      setLanguage('en');
       await loadDocuments();
       setTimeout(() => setUploadSuccess(null), 4000);
     } catch (err: unknown) {
@@ -325,18 +326,6 @@ export default function AdminCorpusPage() {
               onChange={(e) => setPageCount(e.target.value)}
               placeholder="Optional"
               min={1}
-              className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Language
-            </label>
-            <input
-              type="text"
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              placeholder="e.g. en"
               className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
