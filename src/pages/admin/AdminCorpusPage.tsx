@@ -101,10 +101,6 @@ export default function AdminCorpusPage() {
 
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
-  if (user?.role !== 'ADMIN') {
-    return <Navigate to="/" replace />;
-  }
-
   const loadDocuments = useCallback(async () => {
     setLoading(true);
     try {
@@ -123,6 +119,10 @@ export default function AdminCorpusPage() {
   useEffect(() => {
     loadDocuments();
   }, [loadDocuments]);
+
+  if (user?.role !== 'ADMIN') {
+    return <Navigate to="/" replace />;
+  }
 
   const handleRefresh = async () => {
     setRefreshing(true);

@@ -37,10 +37,6 @@ export default function AdminUsersPage() {
   const [formPassword, setFormPassword] = useState('');
   const [formConfirm, setFormConfirm] = useState('');
 
-  if (currentUser?.role !== 'ADMIN') {
-    return <Navigate to="/" replace />;
-  }
-
   const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
@@ -58,6 +54,10 @@ export default function AdminUsersPage() {
   useEffect(() => {
     loadUsers();
   }, [loadUsers]);
+
+  if (currentUser?.role !== 'ADMIN') {
+    return <Navigate to="/" replace />;
+  }
 
   const resetForm = () => {
     setFormEmail('');
