@@ -81,6 +81,8 @@ import PdfViewerPage from '@/pages/PdfViewerPage';
 import { PlagiarismPage } from '@/pages/editorial/PlagiarismPage';
 import BootstrapConsolePage from '@/pages/bootstrap/BootstrapConsolePage';
 import ZoneReviewPage from '@/pages/bootstrap/ZoneReviewPage';
+import AdminCorpusPage from '@/pages/admin/AdminCorpusPage';
+import AdminUsersPage from '@/pages/admin/AdminUsersPage';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -257,6 +259,10 @@ function AppRoutes() {
           {/* Bootstrap Console Routes */}
           <Route path="/bootstrap" element={<BootstrapConsolePage />} />
           <Route path="/bootstrap/review/:documentId" element={<ZoneReviewPage />} />
+
+          {/* Admin Console Routes */}
+          <Route path="/admin/corpus" element={<AdminCorpusPage />} />
+          <Route path="/admin/users" element={<AdminUsersPage />} />
 
           {/* Test Editor Page (protected) */}
           <Route path="/test/editor" element={<TestEditorPage />} />
