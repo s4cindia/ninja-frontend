@@ -21,6 +21,9 @@ import {
   BookCheck,
   Bot,
   BarChart2,
+  Shield,
+  Users,
+  Database,
 } from 'lucide-react';
 
 type NavItem = {
@@ -86,6 +89,14 @@ export function MainLayout() {
         { to: '/feedback', icon: MessageSquare, label: 'Feedback' },
         { to: '/reports/time', icon: BarChart2, label: 'Time Reports', activePrefix: '/reports' },
         { to: '/settings/workflow', icon: Settings, label: 'Workflow Settings' },
+      ],
+    },
+    {
+      title: 'Admin',
+      items: [
+        { to: '/admin/corpus', icon: Database, label: 'Corpus Management', activePrefix: '/admin/corpus' },
+        { to: '/admin/users', icon: Users, label: 'User Management', activePrefix: '/admin/users' },
+        { to: '/bootstrap', icon: Shield, label: 'Bootstrap Console', activePrefix: '/bootstrap' },
       ],
     },
   ];
