@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import DocumentQueueView from '../DocumentQueueView';
 import type { CorpusDocument } from '@/services/calibration.service';
 
@@ -12,16 +13,32 @@ vi.mock('@/hooks/useCalibration', () => ({
     mutate: mockStartCalibration,
     isPending: false,
   }),
+  useUploadTaggedPdf: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+  }),
+  useTriggerCorpusCalibrationRun: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+  }),
+  CALIBRATION_KEYS: {
+    documents: () => ['calibration', 'documents'],
+  },
 }));
 
 const { useCorpusDocumentsWithPolling } = await import('@/hooks/useCalibration');
 const mockUseCorpus = vi.mocked(useCorpusDocumentsWithPolling);
 
 function renderWithRouter() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
-    <MemoryRouter>
-      <DocumentQueueView />
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <DocumentQueueView />
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 }
 
