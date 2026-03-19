@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { useCorpusDocumentsWithPolling, useStartCalibration } from '@/hooks/useCalibration';
+import { useCorpusDocumentsWithPolling, useStartCalibration, useUploadTaggedPdf, useTriggerCorpusCalibrationRun } from '@/hooks/useCalibration';
 import { DocumentStatusBadge } from './DocumentStatusBadge';
-import type { CorpusDocument } from '@/services/calibration.service';
+import { getCorpusDocumentStatus } from '@/services/calibration.service';
+import type { CorpusDocument, CorpusDocumentStatus } from '@/services/calibration.service';
 
 const CONTENT_TYPE_OPTIONS = [
   { value: '', label: 'All Types' },
@@ -29,13 +30,37 @@ function SkeletonRows() {
   );
 }
 
+const OPERATOR_STATUS_CONFIG: Record<CorpusDocumentStatus, { label: string; bg: string; text: string }> = {
+  PENDING:   { label: 'Pending',  bg: 'bg-gray-100',   text: 'text-gray-600' },
+  TAGGED:    { label: 'Tagged',   bg: 'bg-blue-100',   text: 'text-blue-700' },
+  QUEUED:    { label: 'Queued',   bg: 'bg-[#FFF8E8]',  text: 'text-[#C8860A]' },
+  COMPLETED: { label: 'Complete', bg: 'bg-[#E8F5EE]',  text: 'text-[#1A7A3C]' },
+  FAILED:    { label: 'Failed',   bg: 'bg-red-100',    text: 'text-red-700' },
+};
+
+function OperatorStatusBadge({ status }: { status: CorpusDocumentStatus }) {
+  const config = OPERATOR_STATUS_CONFIG[status];
+  return (
+    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${config.bg} ${config.text}`}>
+      {config.label}
+    </span>
+  );
+}
+
 export default function DocumentQueueView() {
   const [publisherFilter, setPublisherFilter] = useState('');
   const [contentTypeFilter, setContentTypeFilter] = useState('');
+  const [uploadingIds, setUploadingIds] = useState<Record<string, boolean>>({});
+  const [triggeringIds, setTriggeringIds] = useState<Record<string, boolean>>({});
+  const [uploadError, setUploadError] = useState<Record<string, string>>({});
+  const [triggerError, setTriggerError] = useState<Record<string, string>>({});
   const navigate = useNavigate();
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const { data, isLoading, isError, error } = useCorpusDocumentsWithPolling();
   const startMutation = useStartCalibration();
+  const uploadMutation = useUploadTaggedPdf();
+  const triggerMutation = useTriggerCorpusCalibrationRun();
 
   const documents = useMemo(() => data?.documents ?? [], [data]);
 
@@ -65,6 +90,45 @@ export default function DocumentQueueView() {
 
   const handleStartCalibration = (doc: CorpusDocument) => {
     startMutation.mutate({ documentId: doc.id, fileId: doc.id });
+  };
+
+  const handleTaggedUpload = (docId: string, file?: File) => {
+    if (!file) return;
+    setUploadingIds((prev) => ({ ...prev, [docId]: true }));
+    setUploadError((prev) => ({ ...prev, [docId]: '' }));
+    uploadMutation.mutate(
+      { documentId: docId, file },
+      {
+        onError: () => {
+          setUploadError((prev) => ({
+            ...prev,
+            [docId]: 'Upload failed — check file and retry',
+          }));
+        },
+        onSettled: () => {
+          setUploadingIds((prev) => ({ ...prev, [docId]: false }));
+        },
+      }
+    );
+  };
+
+  const handleTriggerRun = (docId: string) => {
+    setTriggeringIds((prev) => ({ ...prev, [docId]: true }));
+    setTriggerError((prev) => ({ ...prev, [docId]: '' }));
+    triggerMutation.mutate(docId, {
+      onError: (err: unknown) => {
+        const axiosErr = err as { response?: { status?: number } };
+        if (axiosErr?.response?.status !== 409) {
+          setTriggerError((prev) => ({
+            ...prev,
+            [docId]: 'Failed to queue zone extraction. Please retry.',
+          }));
+        }
+      },
+      onSettled: () => {
+        setTriggeringIds((prev) => ({ ...prev, [docId]: false }));
+      },
+    });
   };
 
   const renderActions = (doc: CorpusDocument) => {
@@ -199,28 +263,67 @@ export default function DocumentQueueView() {
               {isLoading ? (
                 <SkeletonRows />
               ) : (
-                filtered.map((doc) => (
-                  <tr key={doc.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 truncate max-w-xs">
-                      {doc.filename}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {doc.publisher ?? '—'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {doc.contentType ?? '—'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {doc.pageCount ?? '—'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <DocumentStatusBadge status={doc.status ?? 'PENDING'} />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      {renderActions(doc)}
-                    </td>
-                  </tr>
-                ))
+                filtered.map((doc) => {
+                  const opStatus = getCorpusDocumentStatus(doc);
+                  return (
+                    <tr key={doc.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 truncate max-w-xs">
+                        {doc.filename}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {doc.publisher ?? '—'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {doc.contentType ?? '—'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {doc.pageCount ?? '—'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <DocumentStatusBadge status={doc.status ?? 'PENDING'} />
+                          <OperatorStatusBadge status={opStatus} />
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {renderActions(doc)}
+                          <input
+                            type="file"
+                            accept="application/pdf"
+                            className="hidden"
+                            ref={(el) => { fileInputRefs.current[doc.id] = el; }}
+                            onChange={(e) => handleTaggedUpload(doc.id, e.target.files?.[0] ?? undefined)}
+                          />
+                          {(opStatus === 'PENDING' || opStatus === 'TAGGED') && (
+                            <button
+                              onClick={() => fileInputRefs.current[doc.id]?.click()}
+                              disabled={!!uploadingIds[doc.id]}
+                              className="border border-[#1B3A6B] text-[#1B3A6B] text-xs px-3 py-1 rounded hover:bg-[#E8F0F7] disabled:opacity-50 transition-colors"
+                            >
+                              {uploadingIds[doc.id] ? 'Uploading...' : 'Upload tagged PDF'}
+                            </button>
+                          )}
+                          {opStatus === 'TAGGED' && (
+                            <button
+                              onClick={() => handleTriggerRun(doc.id)}
+                              disabled={!!triggeringIds[doc.id]}
+                              className="bg-[#1B3A6B] text-white text-xs px-3 py-1 rounded disabled:opacity-50 transition-colors"
+                            >
+                              {triggeringIds[doc.id] ? 'Queuing...' : 'Run zone extraction'}
+                            </button>
+                          )}
+                        </div>
+                        {uploadError[doc.id] && (
+                          <p className="text-xs text-red-600 mt-1">{uploadError[doc.id]}</p>
+                        )}
+                        {triggerError[doc.id] && (
+                          <p className="text-xs text-red-600 mt-1">{triggerError[doc.id]}</p>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

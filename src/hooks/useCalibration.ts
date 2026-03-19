@@ -4,6 +4,8 @@ import {
   startCalibration,
   getCalibrationRuns,
   getCorpusStats,
+  uploadTaggedPdf,
+  triggerCorpusCalibrationRun,
 } from '../services/calibration.service';
 import type { CorpusDocument } from '../services/calibration.service';
 
@@ -50,6 +52,28 @@ export function useCorpusStats() {
   return useQuery({
     queryKey: CALIBRATION_KEYS.stats(),
     queryFn: getCorpusStats,
+  });
+}
+
+export function useUploadTaggedPdf() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ documentId, file }: { documentId: string; file: File }) =>
+      uploadTaggedPdf(documentId, file),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['calibration', 'documents'] });
+    },
+  });
+}
+
+export function useTriggerCorpusCalibrationRun() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (documentId: string) => triggerCorpusCalibrationRun(documentId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['calibration', 'documents'] });
+      qc.invalidateQueries({ queryKey: ['calibration', 'runs'] });
+    },
   });
 }
 
