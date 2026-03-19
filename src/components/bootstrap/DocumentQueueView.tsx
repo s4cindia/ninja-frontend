@@ -1,9 +1,15 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { useCorpusDocumentsWithPolling, useStartCalibration } from '@/hooks/useCalibration';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCorpusDocumentsWithPolling, useStartCalibration, CALIBRATION_KEYS } from '@/hooks/useCalibration';
 import { DocumentStatusBadge } from './DocumentStatusBadge';
-import type { CorpusDocument } from '@/services/calibration.service';
+import {
+  uploadTaggedPdf,
+  triggerCorpusCalibrationRun,
+  getCorpusDocumentStatus,
+} from '@/services/calibration.service';
+import type { CorpusDocument, CorpusDocumentStatus } from '@/services/calibration.service';
 
 const CONTENT_TYPE_OPTIONS = [
   { value: '', label: 'All Types' },
@@ -29,10 +35,32 @@ function SkeletonRows() {
   );
 }
 
+const OPERATOR_STATUS_CONFIG: Record<CorpusDocumentStatus, { label: string; bg: string; text: string }> = {
+  PENDING:   { label: 'Pending',  bg: 'bg-gray-100',   text: 'text-gray-600' },
+  TAGGED:    { label: 'Tagged',   bg: 'bg-blue-100',   text: 'text-blue-700' },
+  QUEUED:    { label: 'Queued',   bg: 'bg-[#FFF8E8]',  text: 'text-[#C8860A]' },
+  COMPLETED: { label: 'Complete', bg: 'bg-[#E8F5EE]',  text: 'text-[#1A7A3C]' },
+  FAILED:    { label: 'Failed',   bg: 'bg-red-100',    text: 'text-red-700' },
+};
+
+function OperatorStatusBadge({ status }: { status: CorpusDocumentStatus }) {
+  const config = OPERATOR_STATUS_CONFIG[status];
+  return (
+    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${config.bg} ${config.text}`}>
+      {config.label}
+    </span>
+  );
+}
+
 export default function DocumentQueueView() {
   const [publisherFilter, setPublisherFilter] = useState('');
   const [contentTypeFilter, setContentTypeFilter] = useState('');
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [triggeringId, setTriggeringId] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<Record<string, string>>({});
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const { data, isLoading, isError, error } = useCorpusDocumentsWithPolling();
   const startMutation = useStartCalibration();
@@ -65,6 +93,41 @@ export default function DocumentQueueView() {
 
   const handleStartCalibration = (doc: CorpusDocument) => {
     startMutation.mutate({ documentId: doc.id, fileId: doc.id });
+  };
+
+  const refreshDocuments = () =>
+    queryClient.invalidateQueries({ queryKey: CALIBRATION_KEYS.documents() });
+
+  const handleTaggedUpload = async (docId: string, file?: File) => {
+    if (!file) return;
+    setUploadingId(docId);
+    setUploadError((prev) => ({ ...prev, [docId]: '' }));
+    try {
+      await uploadTaggedPdf(docId, file);
+      await refreshDocuments();
+    } catch {
+      setUploadError((prev) => ({
+        ...prev,
+        [docId]: 'Upload failed — check file and retry',
+      }));
+    } finally {
+      setUploadingId(null);
+    }
+  };
+
+  const handleTriggerRun = async (docId: string) => {
+    setTriggeringId(docId);
+    try {
+      await triggerCorpusCalibrationRun(docId);
+      await refreshDocuments();
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { status?: number } };
+      if (axiosErr?.response?.status === 409) {
+        await refreshDocuments();
+      }
+    } finally {
+      setTriggeringId(null);
+    }
   };
 
   const renderActions = (doc: CorpusDocument) => {
@@ -199,28 +262,64 @@ export default function DocumentQueueView() {
               {isLoading ? (
                 <SkeletonRows />
               ) : (
-                filtered.map((doc) => (
-                  <tr key={doc.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 truncate max-w-xs">
-                      {doc.filename}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {doc.publisher ?? '—'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {doc.contentType ?? '—'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {doc.pageCount ?? '—'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <DocumentStatusBadge status={doc.status ?? 'PENDING'} />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      {renderActions(doc)}
-                    </td>
-                  </tr>
-                ))
+                filtered.map((doc) => {
+                  const opStatus = getCorpusDocumentStatus(doc);
+                  return (
+                    <tr key={doc.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 truncate max-w-xs">
+                        {doc.filename}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {doc.publisher ?? '—'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {doc.contentType ?? '—'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {doc.pageCount ?? '—'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <DocumentStatusBadge status={doc.status ?? 'PENDING'} />
+                          <OperatorStatusBadge status={opStatus} />
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {renderActions(doc)}
+                          <input
+                            type="file"
+                            accept="application/pdf"
+                            className="hidden"
+                            ref={(el) => { fileInputRefs.current[doc.id] = el; }}
+                            onChange={(e) => handleTaggedUpload(doc.id, e.target.files?.[0] ?? undefined)}
+                          />
+                          {(opStatus === 'PENDING' || opStatus === 'TAGGED') && (
+                            <button
+                              onClick={() => fileInputRefs.current[doc.id]?.click()}
+                              disabled={uploadingId === doc.id}
+                              className="border border-[#1B3A6B] text-[#1B3A6B] text-xs px-3 py-1 rounded hover:bg-[#E8F0F7] disabled:opacity-50 transition-colors"
+                            >
+                              {uploadingId === doc.id ? 'Uploading...' : 'Upload tagged PDF'}
+                            </button>
+                          )}
+                          {opStatus === 'TAGGED' && (
+                            <button
+                              onClick={() => handleTriggerRun(doc.id)}
+                              disabled={triggeringId === doc.id}
+                              className="bg-[#1B3A6B] text-white text-xs px-3 py-1 rounded disabled:opacity-50 transition-colors"
+                            >
+                              {triggeringId === doc.id ? 'Queuing...' : 'Run zone extraction'}
+                            </button>
+                          )}
+                        </div>
+                        {uploadError[doc.id] && (
+                          <p className="text-xs text-red-600 mt-1">{uploadError[doc.id]}</p>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

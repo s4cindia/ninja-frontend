@@ -10,7 +10,28 @@ export interface CorpusDocument {
   language: string;
   isScanned: boolean;
   uploadedAt: string;
+  taggedPdfPath?: string;
   status?: 'PENDING' | 'IN_PROGRESS' | 'NEEDS_REVIEW' | 'COMPLETE';
+  bootstrapJobs?: Array<{ id: string; status: string; completedAt?: string; error?: string }>;
+}
+
+export type CorpusDocumentStatus =
+  | 'PENDING'
+  | 'TAGGED'
+  | 'QUEUED'
+  | 'COMPLETED'
+  | 'FAILED';
+
+export function getCorpusDocumentStatus(
+  doc: CorpusDocument
+): CorpusDocumentStatus {
+  const latestRun = doc.bootstrapJobs?.[0];
+  if (!latestRun) {
+    return doc.taggedPdfPath ? 'TAGGED' : 'PENDING';
+  }
+  if (latestRun.completedAt) return 'COMPLETED';
+  if (latestRun.error) return 'FAILED';
+  return 'QUEUED';
 }
 
 export interface CalibrationRun {
@@ -71,3 +92,22 @@ export const getCalibrationRun = async (
 
 export const getCorpusStats = async (): Promise<CorpusStats> =>
   (await api.get('/calibration/corpus-stats')).data.data;
+
+export const uploadTaggedPdf = async (
+  documentId: string,
+  file: File
+): Promise<{ documentId: string; taggedPdfPath: string }> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await api.post(
+    `/corpus/documents/${encodeURIComponent(documentId)}/tagged-pdf`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  );
+  return response.data.data;
+};
+
+export const triggerCorpusCalibrationRun = async (
+  documentId: string
+): Promise<{ runId: string; status: string }> =>
+  (await api.post(`/admin/corpus/documents/${encodeURIComponent(documentId)}/run`)).data.data;

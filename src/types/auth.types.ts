@@ -3,7 +3,7 @@ export interface User {
   email: string;
   firstName: string;
   lastName: string;
-  role: 'ADMIN' | 'USER' | 'VIEWER';
+  role: 'ADMIN' | 'USER' | 'VIEWER' | 'OPERATOR';
   tenantId: string;
   tenant?: {
     id: string;
