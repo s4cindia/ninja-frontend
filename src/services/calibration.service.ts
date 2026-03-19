@@ -29,6 +29,9 @@ export function getCorpusDocumentStatus(
   if (!latestRun) {
     return doc.taggedPdfPath ? 'TAGGED' : 'PENDING';
   }
+  const normalizedStatus = latestRun.status.toUpperCase();
+  if (normalizedStatus === 'FAILED') return 'FAILED';
+  if (normalizedStatus === 'COMPLETED' || normalizedStatus === 'COMPLETE') return 'COMPLETED';
   if (latestRun.completedAt) return 'COMPLETED';
   if (latestRun.error) return 'FAILED';
   return 'QUEUED';

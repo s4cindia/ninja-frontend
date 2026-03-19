@@ -13,6 +13,14 @@ vi.mock('@/hooks/useCalibration', () => ({
     mutate: mockStartCalibration,
     isPending: false,
   }),
+  useUploadTaggedPdf: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+  }),
+  useTriggerCorpusCalibrationRun: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+  }),
   CALIBRATION_KEYS: {
     documents: () => ['calibration', 'documents'],
   },

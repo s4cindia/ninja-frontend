@@ -1,14 +1,9 @@
 import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
-import { useCorpusDocumentsWithPolling, useStartCalibration, CALIBRATION_KEYS } from '@/hooks/useCalibration';
+import { useCorpusDocumentsWithPolling, useStartCalibration, useUploadTaggedPdf, useTriggerCorpusCalibrationRun } from '@/hooks/useCalibration';
 import { DocumentStatusBadge } from './DocumentStatusBadge';
-import {
-  uploadTaggedPdf,
-  triggerCorpusCalibrationRun,
-  getCorpusDocumentStatus,
-} from '@/services/calibration.service';
+import { getCorpusDocumentStatus } from '@/services/calibration.service';
 import type { CorpusDocument, CorpusDocumentStatus } from '@/services/calibration.service';
 
 const CONTENT_TYPE_OPTIONS = [
@@ -55,15 +50,17 @@ function OperatorStatusBadge({ status }: { status: CorpusDocumentStatus }) {
 export default function DocumentQueueView() {
   const [publisherFilter, setPublisherFilter] = useState('');
   const [contentTypeFilter, setContentTypeFilter] = useState('');
-  const [uploadingId, setUploadingId] = useState<string | null>(null);
-  const [triggeringId, setTriggeringId] = useState<string | null>(null);
+  const [uploadingIds, setUploadingIds] = useState<Record<string, boolean>>({});
+  const [triggeringIds, setTriggeringIds] = useState<Record<string, boolean>>({});
   const [uploadError, setUploadError] = useState<Record<string, string>>({});
+  const [triggerError, setTriggerError] = useState<Record<string, string>>({});
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const { data, isLoading, isError, error } = useCorpusDocumentsWithPolling();
   const startMutation = useStartCalibration();
+  const uploadMutation = useUploadTaggedPdf();
+  const triggerMutation = useTriggerCorpusCalibrationRun();
 
   const documents = useMemo(() => data?.documents ?? [], [data]);
 
@@ -95,39 +92,43 @@ export default function DocumentQueueView() {
     startMutation.mutate({ documentId: doc.id, fileId: doc.id });
   };
 
-  const refreshDocuments = () =>
-    queryClient.invalidateQueries({ queryKey: CALIBRATION_KEYS.documents() });
-
-  const handleTaggedUpload = async (docId: string, file?: File) => {
+  const handleTaggedUpload = (docId: string, file?: File) => {
     if (!file) return;
-    setUploadingId(docId);
+    setUploadingIds((prev) => ({ ...prev, [docId]: true }));
     setUploadError((prev) => ({ ...prev, [docId]: '' }));
-    try {
-      await uploadTaggedPdf(docId, file);
-      await refreshDocuments();
-    } catch {
-      setUploadError((prev) => ({
-        ...prev,
-        [docId]: 'Upload failed — check file and retry',
-      }));
-    } finally {
-      setUploadingId(null);
-    }
+    uploadMutation.mutate(
+      { documentId: docId, file },
+      {
+        onError: () => {
+          setUploadError((prev) => ({
+            ...prev,
+            [docId]: 'Upload failed — check file and retry',
+          }));
+        },
+        onSettled: () => {
+          setUploadingIds((prev) => ({ ...prev, [docId]: false }));
+        },
+      }
+    );
   };
 
-  const handleTriggerRun = async (docId: string) => {
-    setTriggeringId(docId);
-    try {
-      await triggerCorpusCalibrationRun(docId);
-      await refreshDocuments();
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { status?: number } };
-      if (axiosErr?.response?.status === 409) {
-        await refreshDocuments();
-      }
-    } finally {
-      setTriggeringId(null);
-    }
+  const handleTriggerRun = (docId: string) => {
+    setTriggeringIds((prev) => ({ ...prev, [docId]: true }));
+    setTriggerError((prev) => ({ ...prev, [docId]: '' }));
+    triggerMutation.mutate(docId, {
+      onError: (err: unknown) => {
+        const axiosErr = err as { response?: { status?: number } };
+        if (axiosErr?.response?.status !== 409) {
+          setTriggerError((prev) => ({
+            ...prev,
+            [docId]: 'Failed to queue zone extraction. Please retry.',
+          }));
+        }
+      },
+      onSettled: () => {
+        setTriggeringIds((prev) => ({ ...prev, [docId]: false }));
+      },
+    });
   };
 
   const renderActions = (doc: CorpusDocument) => {
@@ -297,24 +298,27 @@ export default function DocumentQueueView() {
                           {(opStatus === 'PENDING' || opStatus === 'TAGGED') && (
                             <button
                               onClick={() => fileInputRefs.current[doc.id]?.click()}
-                              disabled={uploadingId === doc.id}
+                              disabled={!!uploadingIds[doc.id]}
                               className="border border-[#1B3A6B] text-[#1B3A6B] text-xs px-3 py-1 rounded hover:bg-[#E8F0F7] disabled:opacity-50 transition-colors"
                             >
-                              {uploadingId === doc.id ? 'Uploading...' : 'Upload tagged PDF'}
+                              {uploadingIds[doc.id] ? 'Uploading...' : 'Upload tagged PDF'}
                             </button>
                           )}
                           {opStatus === 'TAGGED' && (
                             <button
                               onClick={() => handleTriggerRun(doc.id)}
-                              disabled={triggeringId === doc.id}
+                              disabled={!!triggeringIds[doc.id]}
                               className="bg-[#1B3A6B] text-white text-xs px-3 py-1 rounded disabled:opacity-50 transition-colors"
                             >
-                              {triggeringId === doc.id ? 'Queuing...' : 'Run zone extraction'}
+                              {triggeringIds[doc.id] ? 'Queuing...' : 'Run zone extraction'}
                             </button>
                           )}
                         </div>
                         {uploadError[doc.id] && (
                           <p className="text-xs text-red-600 mt-1">{uploadError[doc.id]}</p>
+                        )}
+                        {triggerError[doc.id] && (
+                          <p className="text-xs text-red-600 mt-1">{triggerError[doc.id]}</p>
                         )}
                       </td>
                     </tr>
