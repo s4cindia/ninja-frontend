@@ -100,14 +100,33 @@ export const uploadTaggedPdf = async (
   documentId: string,
   file: File
 ): Promise<{ documentId: string; taggedPdfPath: string }> => {
-  const formData = new FormData();
-  formData.append('file', file);
-  const response = await api.post(
-    `/admin/corpus/documents/${encodeURIComponent(documentId)}/tagged-pdf`,
-    formData,
-    { headers: { 'Content-Type': 'multipart/form-data' } }
+  const encodedId = encodeURIComponent(documentId);
+
+  // Step 1: Get presigned S3 upload URL from backend
+  const presignRes = await api.post(
+    `/admin/corpus/documents/${encodedId}/tagged-pdf-upload-url`
   );
-  return response.data.data;
+  const { uploadUrl, s3Key } = presignRes.data.data as {
+    uploadUrl: string;
+    s3Key: string;
+  };
+
+  // Step 2: Upload PDF directly to S3 (bypasses CloudFront WAF)
+  const s3Res = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/pdf' },
+    body: file,
+  });
+  if (!s3Res.ok) {
+    throw new Error(`S3 upload failed: ${s3Res.status}`);
+  }
+
+  // Step 3: Confirm upload — backend persists the taggedPdfPath
+  const confirmRes = await api.post(
+    `/admin/corpus/documents/${encodedId}/tagged-pdf-confirm`,
+    { s3Key }
+  );
+  return confirmRes.data.data;
 };
 
 export const triggerCorpusCalibrationRun = async (
