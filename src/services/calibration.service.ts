@@ -103,7 +103,7 @@ export const uploadTaggedPdf = async (
   const formData = new FormData();
   formData.append('file', file);
   const response = await api.post(
-    `/corpus/documents/${encodeURIComponent(documentId)}/tagged-pdf`,
+    `/admin/corpus/documents/${encodeURIComponent(documentId)}/tagged-pdf`,
     formData,
     { headers: { 'Content-Type': 'multipart/form-data' } }
   );
