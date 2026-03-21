@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useCorpusDocumentsWithPolling, useStartCalibration, useUploadTaggedPdf, useTriggerCorpusCalibrationRun } from '@/hooks/useCalibration';
 import { DocumentStatusBadge } from './DocumentStatusBadge';
-import { getCorpusDocumentStatus } from '@/services/calibration.service';
+import { getCorpusDocumentStatus, resetCorpus } from '@/services/calibration.service';
 import type { CorpusDocument, CorpusDocumentStatus } from '@/services/calibration.service';
 
 const CONTENT_TYPE_OPTIONS = [
@@ -54,6 +54,7 @@ export default function DocumentQueueView() {
   const [triggeringIds, setTriggeringIds] = useState<Record<string, boolean>>({});
   const [uploadError, setUploadError] = useState<Record<string, string>>({});
   const [triggerError, setTriggerError] = useState<Record<string, string>>({});
+  const [resetting, setResetting] = useState(false);
   const navigate = useNavigate();
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -110,6 +111,20 @@ export default function DocumentQueueView() {
         },
       }
     );
+  };
+
+  const handleReset = async () => {
+    if (!window.confirm('Delete ALL corpus documents, calibration runs, and zones? This cannot be undone.')) return;
+    setResetting(true);
+    try {
+      const result = await resetCorpus();
+      alert(`Reset complete: ${result.deletedDocuments} docs, ${result.deletedCalibrationRuns} runs, ${result.deletedZones} zones deleted.`);
+      window.location.reload();
+    } catch {
+      alert('Reset failed — check console for details.');
+    } finally {
+      setResetting(false);
+    }
   };
 
   const handleTriggerRun = (docId: string) => {
@@ -180,6 +195,13 @@ export default function DocumentQueueView() {
         <p className="mt-1 text-sm text-gray-500">
           Review and annotate documents for ML zone detection training
         </p>
+        <button
+          onClick={handleReset}
+          disabled={resetting}
+          className="mt-2 px-3 py-1.5 text-xs font-medium rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+        >
+          {resetting ? 'Resetting...' : 'Reset Corpus'}
+        </button>
       </div>
 
       {/* Filter bar */}
