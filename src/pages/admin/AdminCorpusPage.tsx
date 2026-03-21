@@ -7,6 +7,7 @@ import {
   registerCorpusDocument,
   listCorpusDocuments,
   triggerCalibrationRun,
+  resetCorpus,
 } from '@/services/adminApi';
 import type { CorpusDocument } from '@/services/adminApi';
 
@@ -97,6 +98,7 @@ export default function AdminCorpusPage() {
   const [filterPublisher, setFilterPublisher] = useState('');
   const [filterContentType, setFilterContentType] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -129,6 +131,20 @@ export default function AdminCorpusPage() {
       await loadDocuments();
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  const handleReset = async () => {
+    if (!window.confirm('Delete ALL corpus documents, calibration runs, and zones? This cannot be undone.')) return;
+    setResetting(true);
+    try {
+      const result = await resetCorpus();
+      alert(`Reset complete: ${result.deletedDocuments} docs, ${result.deletedCalibrationRuns} runs, ${result.deletedZones} zones deleted.`);
+      await loadDocuments();
+    } catch {
+      alert('Reset failed — check console for details.');
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -367,14 +383,23 @@ export default function AdminCorpusPage() {
           <h2 className="text-base font-semibold text-gray-800">
             Corpus Documents
           </h2>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-300 rounded text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleReset}
+              disabled={resetting}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-red-300 rounded text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+            >
+              {resetting ? 'Resetting...' : 'Reset Corpus'}
+            </button>
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-300 rounded text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
         </div>
 
         {/* Filter bar */}

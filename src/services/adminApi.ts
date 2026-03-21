@@ -57,6 +57,14 @@ export async function triggerCalibrationRun(
   return res.data.data;
 }
 
+export const resetCorpus = async (): Promise<{
+  deletedDocuments: number;
+  deletedCalibrationRuns: number;
+  deletedBootstrapJobs: number;
+  deletedZones: number;
+}> =>
+  (await api.post('/admin/corpus/reset')).data.data;
+
 // ── Users ────────────────────────────────────────────
 
 export interface AdminUser {
