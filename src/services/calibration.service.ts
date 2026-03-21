@@ -145,3 +145,11 @@ export const triggerCorpusCalibrationRun = async (
   documentId: string
 ): Promise<{ runId: string; status: string }> =>
   (await api.post(`/admin/corpus/documents/${encodeURIComponent(documentId)}/run`)).data.data;
+
+export const resetCorpus = async (): Promise<{
+  deletedDocuments: number;
+  deletedCalibrationRuns: number;
+  deletedBootstrapJobs: number;
+  deletedZones: number;
+}> =>
+  (await api.post('/admin/corpus/reset')).data.data;
