@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { useCorpusDocumentsWithPolling, useStartCalibration, useUploadTaggedPdf, useTriggerCorpusCalibrationRun } from '@/hooks/useCalibration';
+import { useCorpusDocumentsWithPolling, useUploadTaggedPdf, useTriggerCorpusCalibrationRun } from '@/hooks/useCalibration';
 import { DocumentStatusBadge } from './DocumentStatusBadge';
 import { getCorpusDocumentStatus, resetCorpus } from '@/services/calibration.service';
 import type { CorpusDocument, CorpusDocumentStatus } from '@/services/calibration.service';
@@ -59,7 +59,6 @@ export default function DocumentQueueView() {
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const { data, isLoading, isError, error } = useCorpusDocumentsWithPolling();
-  const startMutation = useStartCalibration();
   const uploadMutation = useUploadTaggedPdf();
   const triggerMutation = useTriggerCorpusCalibrationRun();
 
@@ -88,10 +87,6 @@ export default function DocumentQueueView() {
       complete: filtered.filter((d) => d.status === 'COMPLETE').length,
     };
   }, [filtered]);
-
-  const handleStartCalibration = (doc: CorpusDocument) => {
-    startMutation.mutate({ documentId: doc.id, fileId: doc.id });
-  };
 
   const handleTaggedUpload = (docId: string, file?: File) => {
     if (!file) return;
@@ -149,20 +144,7 @@ export default function DocumentQueueView() {
   const renderActions = (doc: CorpusDocument) => {
     switch (doc.status ?? 'PENDING') {
       case 'PENDING':
-        return (
-          <button
-            onClick={() => handleStartCalibration(doc)}
-            disabled={startMutation.isPending}
-            aria-label={`Start calibration for ${doc.filename}`}
-            className="px-3 py-1.5 text-xs font-medium rounded bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50 transition-colors"
-          >
-            {startMutation.isPending ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-            ) : (
-              'Start Calibration'
-            )}
-          </button>
-        );
+        return null;
       case 'IN_PROGRESS':
         return (
           <span className="inline-flex items-center gap-1.5 text-xs text-amber-700">

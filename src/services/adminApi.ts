@@ -19,6 +19,12 @@ export interface CorpusDocument {
   language: string;
   createdAt: string;
   bootstrapJobs?: Array<{ id: string; status: string }>;
+  taggedPdfPath?: string;
+  calibrationRuns?: Array<{
+    id: string;
+    completedAt: string | null;
+    summary: Record<string, unknown> | null;
+  }>;
 }
 
 export async function getUploadUrl(
