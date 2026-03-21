@@ -13,6 +13,7 @@ export interface CorpusDocument {
   taggedPdfPath?: string;
   status?: 'PENDING' | 'IN_PROGRESS' | 'NEEDS_REVIEW' | 'COMPLETE';
   bootstrapJobs?: Array<{ id: string; status: string; completedAt?: string; error?: string }>;
+  calibrationRuns?: Array<{ id: string; runDate: string; completedAt?: string; summary?: Record<string, unknown> }>;
 }
 
 export type CorpusDocumentStatus =
@@ -25,6 +26,17 @@ export type CorpusDocumentStatus =
 export function getCorpusDocumentStatus(
   doc: CorpusDocument
 ): CorpusDocumentStatus {
+  // Check calibration runs first (from "Run zone extraction")
+  const latestCalibration = doc.calibrationRuns?.[0];
+  if (latestCalibration) {
+    if (latestCalibration.completedAt) {
+      const status = (latestCalibration.summary as Record<string, unknown>)?.status;
+      return status === 'FAILED' ? 'FAILED' : 'COMPLETED';
+    }
+    return 'QUEUED';
+  }
+
+  // Fall back to bootstrap jobs
   const latestRun = doc.bootstrapJobs?.[0];
   if (!latestRun) {
     return doc.taggedPdfPath ? 'TAGGED' : 'PENDING';
