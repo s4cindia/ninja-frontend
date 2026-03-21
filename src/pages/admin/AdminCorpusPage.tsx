@@ -205,17 +205,27 @@ export default function AdminCorpusPage() {
     }
   };
 
-  const handleRunExtraction = async (docId: string) => {
-    setRunningIds((prev) => new Set(prev).add(docId));
+  const handleRunExtraction = async (doc: CorpusDocument) => {
+    if (!doc.taggedPdfPath) {
+      const confirmed = window.confirm(
+        'No tagged PDF has been uploaded for this document.\n\n' +
+        'Running without a tagged PDF will run Docling-only and will NOT produce ' +
+        'GREEN/AMBER/RED comparison data.\n\n' +
+        'This run cannot contribute to Phase Gate scores (C1 mAP or C2 zone counts).' +
+        '\n\nContinue anyway?'
+      );
+      if (!confirmed) return;
+    }
+    setRunningIds((prev) => new Set(prev).add(doc.id));
     try {
-      await triggerCalibrationRun(docId);
+      await triggerCalibrationRun(doc.id);
       await loadDocuments();
     } catch {
       // silently handle
     } finally {
       setRunningIds((prev) => {
         const next = new Set(prev);
-        next.delete(docId);
+        next.delete(doc.id);
         return next;
       });
     }
@@ -515,11 +525,11 @@ export default function AdminCorpusPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
-                          onClick={() => handleRunExtraction(doc.id)}
+                          onClick={() => handleRunExtraction(doc)}
                           disabled={isRunning}
                           className="px-3 py-1.5 text-xs font-medium rounded bg-[#006B6B] text-white hover:bg-[#005858] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
-                          Run zone extraction
+                          {doc.taggedPdfPath ? 'Run zone extraction' : 'Run Docling check'}
                         </button>
                       </td>
                     </tr>

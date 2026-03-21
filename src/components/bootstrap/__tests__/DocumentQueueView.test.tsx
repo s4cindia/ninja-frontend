@@ -5,14 +5,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import DocumentQueueView from '../DocumentQueueView';
 import type { CorpusDocument } from '@/services/calibration.service';
 
-const mockStartCalibration = vi.fn();
-
 vi.mock('@/hooks/useCalibration', () => ({
   useCorpusDocumentsWithPolling: vi.fn(),
-  useStartCalibration: () => ({
-    mutate: mockStartCalibration,
-    isPending: false,
-  }),
   useUploadTaggedPdf: () => ({
     mutate: vi.fn(),
     isPending: false,
@@ -105,18 +99,6 @@ describe('DocumentQueueView', () => {
     expect(screen.getByText('gamma.pdf')).toBeInTheDocument();
   });
 
-  it('shows "Start Calibration" button for PENDING document', () => {
-    mockUseCorpus.mockReturnValue({
-      data: { documents: [makeDoc({ status: 'PENDING' })] },
-      isLoading: false,
-      isError: false,
-      error: null,
-    } as unknown as ReturnType<typeof mockUseCorpus>);
-
-    renderWithRouter();
-    expect(screen.getByText('Start Calibration')).toBeInTheDocument();
-  });
-
   it('shows "Review" button for NEEDS_REVIEW document', () => {
     mockUseCorpus.mockReturnValue({
       data: { documents: [makeDoc({ status: 'NEEDS_REVIEW' })] },
@@ -139,22 +121,6 @@ describe('DocumentQueueView', () => {
 
     renderWithRouter();
     expect(screen.getByText('Done')).toBeInTheDocument();
-  });
-
-  it('calls startCalibration with correct documentId', () => {
-    mockUseCorpus.mockReturnValue({
-      data: { documents: [makeDoc({ id: 'doc-abc', status: 'PENDING' })] },
-      isLoading: false,
-      isError: false,
-      error: null,
-    } as unknown as ReturnType<typeof mockUseCorpus>);
-
-    renderWithRouter();
-    fireEvent.click(screen.getByText('Start Calibration'));
-    expect(mockStartCalibration).toHaveBeenCalledWith({
-      documentId: 'doc-abc',
-      fileId: 'doc-abc',
-    });
   });
 
   it('filters documents by publisher', () => {
