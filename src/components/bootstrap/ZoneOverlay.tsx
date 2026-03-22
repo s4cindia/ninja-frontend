@@ -43,10 +43,12 @@ export default function ZoneOverlay({
         .map((zone) => {
           const scaleX = pageWidth / pdfWidth;
           const scaleY = pageHeight / pdfHeight;
-          const x = zone.bounds.x * scaleX;
-          const y = zone.bounds.y * scaleY;
-          const w = zone.bounds.w * scaleX;
-          const h = zone.bounds.h * scaleY;
+          const rawW = Math.abs(zone.bounds.w) * scaleX;
+          const rawH = Math.abs(zone.bounds.h) * scaleY;
+          const x = (zone.bounds.w < 0 ? zone.bounds.x + zone.bounds.w : zone.bounds.x) * scaleX;
+          const y = (zone.bounds.h < 0 ? zone.bounds.y + zone.bounds.h : zone.bounds.y) * scaleY;
+          const w = rawW;
+          const h = rawH;
 
           const isSelected = zone.id === selectedZoneId;
           const isVerified = zone.operatorVerified;
