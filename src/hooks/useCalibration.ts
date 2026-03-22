@@ -86,9 +86,13 @@ export function useCorpusDocumentsWithPolling(params?: {
     queryFn: () => getCorpusDocuments(params),
     refetchInterval: (query) => {
       const docs = (query.state.data as { documents: CorpusDocument[] } | undefined)?.documents ?? [];
-      const hasActive = docs.some(
-        (d: CorpusDocument) => d.status === 'IN_PROGRESS'
-      );
+      const hasActive = docs.some((d: CorpusDocument) => {
+        const latestRun = d.calibrationRuns?.[0];
+        if (latestRun && !latestRun.completedAt) return true;
+        const latestJob = d.bootstrapJobs?.[0];
+        if (latestJob && !['COMPLETED', 'COMPLETE', 'FAILED'].includes(latestJob.status.toUpperCase())) return true;
+        return false;
+      });
       return hasActive ? 5000 : false;
     },
   });
