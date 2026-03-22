@@ -21,11 +21,9 @@ function makeZone(overrides: Partial<CalibrationZone> = {}): CalibrationZone {
 const defaultProps = {
   selectedZoneId: null,
   pageNumber: 1,
-  pageWidth: 800,
-  pageHeight: 1000,
-  pdfWidth: 595,
-  pdfHeight: 842,
-  onSelectZone: vi.fn(),
+  scaleX: 800 / 595,
+  scaleY: 1000 / 842,
+  onZoneClick: vi.fn(),
 };
 
 describe('ZoneOverlay', () => {
@@ -105,31 +103,31 @@ describe('ZoneOverlay', () => {
     expect(rect?.getAttribute('stroke-width')).toBe('3');
   });
 
-  it('clicking a zone calls onSelectZone with correct id', () => {
-    const onSelectZone = vi.fn();
+  it('clicking a zone calls onZoneClick with correct id', () => {
+    const onZoneClick = vi.fn();
     const { container } = render(
       <ZoneOverlay
         {...defaultProps}
         zones={[makeZone({ id: 'z-click' })]}
-        onSelectZone={onSelectZone}
+        onZoneClick={onZoneClick}
       />
     );
     const g = container.querySelector('g');
     fireEvent.click(g!);
-    expect(onSelectZone).toHaveBeenCalledWith('z-click');
+    expect(onZoneClick).toHaveBeenCalledWith('z-click');
   });
 
-  it('pressing Enter on a zone calls onSelectZone', () => {
-    const onSelectZone = vi.fn();
+  it('pressing Enter on a zone calls onZoneClick', () => {
+    const onZoneClick = vi.fn();
     const { container } = render(
       <ZoneOverlay
         {...defaultProps}
         zones={[makeZone({ id: 'z-enter' })]}
-        onSelectZone={onSelectZone}
+        onZoneClick={onZoneClick}
       />
     );
     const g = container.querySelector('g');
     fireEvent.keyDown(g!, { key: 'Enter' });
-    expect(onSelectZone).toHaveBeenCalledWith('z-enter');
+    expect(onZoneClick).toHaveBeenCalledWith('z-enter');
   });
 });
