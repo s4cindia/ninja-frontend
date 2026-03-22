@@ -90,6 +90,7 @@ export default function ZonePdfPanel({
           <div className="flex justify-center p-2">
             <div className="relative" style={{ width: PDF_WIDTH }}>
               <Document
+                key={pdfUrl}
                 file={{ url: pdfUrl }}
                 onLoadSuccess={(pdf) => onDocumentLoad?.(pdf.numPages)}
                 loading={
