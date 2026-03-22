@@ -18,7 +18,7 @@ export function useCalibrationZones(
 ) {
   return useQuery({
     queryKey: ZONE_KEYS.zones(runId, params),
-    queryFn: () => getCalibrationZones(runId, params),
+    queryFn: () => getCalibrationZones(runId, { ...params, limit: 500 }),
     enabled: !!runId,
   });
 }
