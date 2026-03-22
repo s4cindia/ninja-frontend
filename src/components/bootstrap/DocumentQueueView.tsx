@@ -317,6 +317,14 @@ export default function DocumentQueueView() {
                               {triggeringIds[doc.id] ? 'Queuing...' : 'Run zone extraction'}
                             </button>
                           )}
+                          {opStatus === 'COMPLETED' && (
+                            <button
+                              onClick={() => navigate(`/bootstrap/review/${doc.id}`)}
+                              className="bg-teal-600 text-white text-xs px-3 py-1 rounded hover:bg-teal-700 transition-colors"
+                            >
+                              Review Zones
+                            </button>
+                          )}
                         </div>
                         {uploadError[doc.id] && (
                           <p className="text-xs text-red-600 mt-1">{uploadError[doc.id]}</p>
