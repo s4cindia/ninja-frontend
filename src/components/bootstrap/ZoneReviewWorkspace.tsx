@@ -24,19 +24,6 @@ interface ZoneReviewWorkspaceProps {
   runId: string;
 }
 
-function getAuthToken(): string | null {
-  try {
-    const stored = localStorage.getItem('ninja-auth');
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      return parsed.state?.accessToken || null;
-    }
-  } catch {
-    // Ignore parse errors
-  }
-  return null;
-}
-
 export default function ZoneReviewWorkspace({
   documentId,
   runId: runIdProp,
@@ -66,16 +53,11 @@ export default function ZoneReviewWorkspace({
     fetchUrl();
   }, [docId]);
 
-  // Auth token for react-pdf
-  const token = getAuthToken();
+  // Presigned URL carries auth in query params — no headers needed
   const pdfFile = useMemo(() => {
     if (!pdfUrl) return null;
-    return {
-      url: pdfUrl,
-      httpHeaders: token ? { Authorization: `Bearer ${token}` } : {},
-      withCredentials: false,
-    };
-  }, [pdfUrl, token]);
+    return { url: pdfUrl };
+  }, [pdfUrl]);
 
   // Local state
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
