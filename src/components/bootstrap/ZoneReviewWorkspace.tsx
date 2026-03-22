@@ -10,7 +10,7 @@ import {
   useRejectZone,
   useConfirmAllGreen,
 } from '../../hooks/useZoneReview';
-import { useCalibrationRuns, useCorpusDocuments } from '../../hooks/useCalibration';
+import { useCalibrationRuns } from '../../hooks/useCalibration';
 import ZoneOverlay from './ZoneOverlay';
 import ZoneDetailPanel from './ZoneDetailPanel';
 import { TableStructureEditor } from '../quickfix/TableStructureEditor';
@@ -50,10 +50,21 @@ export default function ZoneReviewWorkspace({
   );
   const runId = runIdProp || runsData?.runs?.[0]?.id || '';
 
-  // Fetch corpus document for PDF URL
-  const { data: docsData } = useCorpusDocuments();
-  const doc = docsData?.documents?.find((d) => d.id === docId);
-  const pdfUrl = doc?.s3Path ?? '';
+  // Fetch presigned download URL for the source PDF
+  const [pdfUrl, setPdfUrl] = useState<string>('');
+  useEffect(() => {
+    if (!docId) return;
+    const fetchUrl = async () => {
+      try {
+        const { api } = await import('../../services/api');
+        const res = await api.get(`/admin/corpus/documents/${docId}/download-url`);
+        setPdfUrl(res.data?.data?.downloadUrl ?? '');
+      } catch (err) {
+        console.error('Failed to fetch PDF download URL', err);
+      }
+    };
+    fetchUrl();
+  }, [docId]);
 
   // Auth token for react-pdf
   const token = getAuthToken();
@@ -62,7 +73,7 @@ export default function ZoneReviewWorkspace({
     return {
       url: pdfUrl,
       httpHeaders: token ? { Authorization: `Bearer ${token}` } : {},
-      withCredentials: true,
+      withCredentials: false,
     };
   }, [pdfUrl, token]);
 
