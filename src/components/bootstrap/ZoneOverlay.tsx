@@ -2,13 +2,12 @@ import type { CalibrationZone } from '../../services/zone-correction.service';
 
 interface ZoneOverlayProps {
   zones: CalibrationZone[];
-  selectedZoneId: string | null;
   pageNumber: number;
-  pageWidth: number;
-  pageHeight: number;
-  pdfWidth: number;
-  pdfHeight: number;
-  onSelectZone: (zoneId: string) => void;
+  scaleX: number;
+  scaleY: number;
+  selectedZoneId: string | null;
+  onZoneClick: (zoneId: string) => void;
+  source?: 'docling' | 'pdfxt';
 }
 
 const BUCKET_STYLE = {
@@ -19,30 +18,34 @@ const BUCKET_STYLE = {
 
 export default function ZoneOverlay({
   zones,
-  selectedZoneId,
   pageNumber,
-  pageWidth,
-  pageHeight,
-  pdfWidth,
-  pdfHeight,
-  onSelectZone,
+  scaleX,
+  scaleY,
+  selectedZoneId,
+  onZoneClick,
+  source,
 }: ZoneOverlayProps) {
-  if (pdfWidth <= 0 || pdfHeight <= 0 || pageWidth <= 0 || pageHeight <= 0) {
+  if (scaleX <= 0 || scaleY <= 0) {
     return null;
   }
 
+  // Filter zones by source if specified
+  const displayZones = source
+    ? zones.filter((z) =>
+        source === 'docling' ? z.doclingLabel != null : z.pdfxtLabel != null,
+      )
+    : zones;
+
   return (
     <svg
-      width={pageWidth}
-      height={pageHeight}
+      width="100%"
+      height="100%"
       style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
       aria-label="Zone detection overlay"
     >
-      {zones
+      {displayZones
         .filter((z) => z.pageNumber === pageNumber)
         .map((zone) => {
-          const scaleX = pageWidth / pdfWidth;
-          const scaleY = pageHeight / pdfHeight;
           const rawW = Math.abs(zone.bounds.w) * scaleX;
           const rawH = Math.abs(zone.bounds.h) * scaleY;
           const x = (zone.bounds.w < 0 ? zone.bounds.x + zone.bounds.w : zone.bounds.x) * scaleX;
@@ -61,20 +64,26 @@ export default function ZoneOverlay({
             ? 'rgba(15,118,110,0.12)'
             : bucketStyle?.fill ?? 'rgba(0,0,0,0.05)';
           const strokeWidth = isSelected ? 3 : 1.5;
-          const strokeDash = isVerified ? undefined : undefined;
+
+          const displayLabel = source === 'pdfxt'
+            ? zone.pdfxtLabel ?? zone.type
+            : zone.doclingLabel ?? zone.type;
+          const displayConfidence = source === 'docling' && zone.doclingConfidence
+            ? ` ${Math.round(zone.doclingConfidence * 100)}%`
+            : '';
 
           return (
             <g
               key={zone.id}
               style={{ pointerEvents: 'all', cursor: 'pointer' }}
               role="button"
-              aria-label={`Zone: ${zone.type}, ${zone.reconciliationBucket}`}
+              aria-label={`Zone: ${displayLabel}, ${zone.reconciliationBucket}`}
               tabIndex={0}
-              onClick={() => onSelectZone(zone.id)}
+              onClick={() => onZoneClick(zone.id)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  onSelectZone(zone.id);
+                  onZoneClick(zone.id);
                 }
               }}
             >
@@ -86,9 +95,18 @@ export default function ZoneOverlay({
                 stroke={strokeColor}
                 fill={fillColor}
                 strokeWidth={strokeWidth}
-                strokeDasharray={strokeDash}
                 rx={2}
               />
+              {/* Label */}
+              <text
+                x={x + 3}
+                y={y + 12}
+                fontSize={10}
+                fill={strokeColor}
+                style={{ pointerEvents: 'none', userSelect: 'none' }}
+              >
+                {displayLabel}{displayConfidence}
+              </text>
             </g>
           );
         })}
