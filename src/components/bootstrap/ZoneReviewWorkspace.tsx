@@ -56,7 +56,7 @@ export default function ZoneReviewWorkspace({
     if (!docId) return;
     const fetchUrl = async () => {
       try {
-        const { default: api } = await import('../../services/api');
+        const { api } = await import('../../services/api');
         const res = await api.get(`/admin/corpus/documents/${docId}/download-url`);
         setPdfUrl(res.data?.data?.downloadUrl ?? '');
       } catch (err) {
