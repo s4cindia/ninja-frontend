@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
@@ -46,6 +46,8 @@ export default function ZoneReviewWorkspace({
   const [syncedScrollTop, setSyncedScrollTop] = useState(0);
   const [tableEditorZone, setTableEditorZone] = useState<CalibrationZone | null>(null);
   const [sourcePdfUrl, setSourcePdfUrl] = useState('');
+  const rightScrollRef = useRef<HTMLDivElement>(null);
+  const isRightExternalScroll = useRef(false);
 
   // Fetch source PDF presigned URL
   useEffect(() => {
@@ -160,6 +162,14 @@ export default function ZoneReviewWorkspace({
   useEffect(() => {
     setSyncedScrollTop(0);
   }, [currentPage]);
+
+  // Sync right panel scroll from syncedScrollTop
+  useEffect(() => {
+    if (rightScrollRef.current && rightScrollRef.current.scrollTop !== syncedScrollTop) {
+      isRightExternalScroll.current = true;
+      rightScrollRef.current.scrollTop = syncedScrollTop;
+    }
+  }, [syncedScrollTop]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] bg-gray-50">
@@ -280,8 +290,13 @@ export default function ZoneReviewWorkspace({
           </div>
           {/* Right panel PDF content */}
           <div
+            ref={rightScrollRef}
             className="flex-1 overflow-auto bg-gray-100"
             onScroll={(e) => {
+              if (isRightExternalScroll.current) {
+                isRightExternalScroll.current = false;
+                return;
+              }
               setSyncedScrollTop(e.currentTarget.scrollTop);
             }}
           >

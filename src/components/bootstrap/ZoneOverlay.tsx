@@ -97,11 +97,24 @@ export default function ZoneOverlay({
                 strokeWidth={strokeWidth}
                 rx={2}
               />
-              {/* Label */}
+              {/* Label badge with background */}
+              <rect
+                x={x}
+                y={y}
+                width={Math.min(
+                  (displayLabel.length + displayConfidence.length) * 6.5 + 8,
+                  w,
+                )}
+                height={16}
+                fill="rgba(255,255,255,0.85)"
+                rx={2}
+                style={{ pointerEvents: 'none' }}
+              />
               <text
-                x={x + 3}
+                x={x + 4}
                 y={y + 12}
-                fontSize={10}
+                fontSize={11}
+                fontWeight={600}
                 fill={strokeColor}
                 style={{ pointerEvents: 'none', userSelect: 'none' }}
               >
