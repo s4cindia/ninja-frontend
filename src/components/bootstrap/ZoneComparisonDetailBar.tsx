@@ -47,9 +47,9 @@ export default function ZoneComparisonDetailBar({
 
   return (
     <div className="border-t-2 border-gray-300 bg-white shadow-lg">
-      <div className="flex items-start gap-6 px-5 py-3">
+      <div className="flex items-start gap-4 px-4 py-3 overflow-x-auto">
         {/* Zone metadata */}
-        <div className="flex flex-col gap-1 min-w-[140px]">
+        <div className="flex flex-col gap-1 shrink-0">
           <ZoneBucketBadge bucket={zone.reconciliationBucket} />
           <span className="text-xs text-gray-500">Page {zone.pageNumber}</span>
           {zone.operatorVerified && (
@@ -61,7 +61,7 @@ export default function ZoneComparisonDetailBar({
         </div>
 
         {/* Docling column */}
-        <div className="flex-1 min-w-[160px]">
+        <div className="flex-1 min-w-0">
           <h4 className="text-xs font-semibold text-gray-400 uppercase mb-1">Docling</h4>
           <p className="text-sm font-medium text-gray-800">
             {zone.doclingLabel ?? <span className="text-gray-400 italic">no detection</span>}
@@ -74,7 +74,7 @@ export default function ZoneComparisonDetailBar({
         </div>
 
         {/* pdfxt column */}
-        <div className="flex-1 min-w-[160px]">
+        <div className="flex-1 min-w-0">
           <h4 className="text-xs font-semibold text-gray-400 uppercase mb-1">pdfxt</h4>
           <p className="text-sm font-medium text-gray-800">
             {zone.pdfxtLabel ?? <span className="text-gray-400 italic">no detection</span>}
@@ -82,7 +82,7 @@ export default function ZoneComparisonDetailBar({
         </div>
 
         {/* Decision column */}
-        <div className="flex flex-col gap-2 min-w-[200px]">
+        <div className="flex flex-col gap-2 shrink-0 w-[180px]">
           <h4 className="text-xs font-semibold text-gray-400 uppercase mb-1">Decision</h4>
           <select
             value={selectedLabel}

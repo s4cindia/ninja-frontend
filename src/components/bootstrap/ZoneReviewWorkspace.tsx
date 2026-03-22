@@ -48,6 +48,7 @@ export default function ZoneReviewWorkspace({
   const [sourcePdfUrl, setSourcePdfUrl] = useState('');
   const rightScrollRef = useRef<HTMLDivElement>(null);
   const isRightExternalScroll = useRef(false);
+  const [rightPanelWidth, setRightPanelWidth] = useState(0);
 
   // Fetch source PDF presigned URL
   useEffect(() => {
@@ -162,6 +163,19 @@ export default function ZoneReviewWorkspace({
   useEffect(() => {
     setSyncedScrollTop(0);
   }, [currentPage]);
+
+  // Measure right panel width
+  useEffect(() => {
+    const el = rightScrollRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setRightPanelWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Sync right panel scroll from syncedScrollTop
   useEffect(() => {
@@ -291,7 +305,7 @@ export default function ZoneReviewWorkspace({
           {/* Right panel PDF content */}
           <div
             ref={rightScrollRef}
-            className="flex-1 overflow-auto bg-gray-100"
+            className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-100"
             onScroll={(e) => {
               if (isRightExternalScroll.current) {
                 isRightExternalScroll.current = false;
@@ -300,15 +314,16 @@ export default function ZoneReviewWorkspace({
               setSyncedScrollTop(e.currentTarget.scrollTop);
             }}
           >
-            {rightPanelUrl ? (
+            {rightPanelUrl && rightPanelWidth > 0 ? (
               <div className="flex justify-center p-2">
-                <div className="relative" style={{ width: 800 }}>
+                <div className="relative" style={{ width: rightPanelWidth - 16 }}>
                   <RightPanelPdf
                     pdfUrl={rightPanelUrl}
                     page={currentPage}
                     zones={zones}
                     selectedZoneId={selectedZoneId}
                     onZoneClick={setSelectedZoneId}
+                    width={rightPanelWidth - 16}
                   />
                 </div>
               </div>
@@ -360,18 +375,20 @@ function RightPanelPdf({
   zones,
   selectedZoneId,
   onZoneClick,
+  width,
 }: {
   pdfUrl: string;
   page: number;
   zones: CalibrationZone[];
   selectedZoneId: string | null;
   onZoneClick: (zoneId: string) => void;
+  width: number;
 }) {
   const [pageHeight, setPageHeight] = useState(0);
   const [pdfWidth, setPdfWidth] = useState(595);
   const [pdfHeight, setPdfHeight] = useState(842);
 
-  const scaleX = 800 / pdfWidth;
+  const scaleX = width / pdfWidth;
   const scaleY = pageHeight / pdfHeight;
   const pageZones = zones.filter((z) => z.pageNumber === page);
 
@@ -388,11 +405,11 @@ function RightPanelPdf({
       >
         <Page
           pageNumber={page}
-          width={800}
+          width={width}
           onLoadSuccess={(p) => {
             setPdfWidth(p.originalWidth);
             setPdfHeight(p.originalHeight);
-            setPageHeight(p.originalHeight * (800 / p.originalWidth));
+            setPageHeight(p.originalHeight * (width / p.originalWidth));
           }}
           renderTextLayer={false}
           renderAnnotationLayer={false}

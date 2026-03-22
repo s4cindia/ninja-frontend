@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState } from 'react';
+import { useRef, useCallback, useState, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
@@ -20,8 +20,6 @@ interface ZonePdfPanelProps {
   label: string;
 }
 
-const PDF_WIDTH = 800;
-
 export default function ZonePdfPanel({
   pdfUrl,
   page,
@@ -36,9 +34,26 @@ export default function ZonePdfPanel({
 }: ZonePdfPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isExternalScroll = useRef(false);
+  const [containerWidth, setContainerWidth] = useState(0);
   const [pageHeight, setPageHeight] = useState(0);
   const [pdfWidth, setPdfWidth] = useState(595);
   const [pdfHeight, setPdfHeight] = useState(842);
+
+  // Measure container width with ResizeObserver
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // PDF renders at container width minus padding (2*8px)
+  const renderWidth = Math.max(containerWidth - 16, 200);
 
   // Sync scroll position from the other panel
   const prevScrollTop = useRef(scrollTop);
@@ -62,13 +77,13 @@ export default function ZonePdfPanel({
     (pageObj: { width: number; height: number; originalWidth: number; originalHeight: number }) => {
       setPdfWidth(pageObj.originalWidth);
       setPdfHeight(pageObj.originalHeight);
-      const scale = PDF_WIDTH / pageObj.originalWidth;
+      const scale = renderWidth / pageObj.originalWidth;
       setPageHeight(pageObj.originalHeight * scale);
     },
-    [],
+    [renderWidth],
   );
 
-  const scaleX = PDF_WIDTH / pdfWidth;
+  const scaleX = renderWidth / pdfWidth;
   const scaleY = pageHeight / pdfHeight;
 
   const pageZones = zones.filter((z) => z.pageNumber === page);
@@ -83,12 +98,12 @@ export default function ZonePdfPanel({
       {/* Scrollable PDF area */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-auto bg-gray-100"
+        className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-100"
         onScroll={handleScroll}
       >
-        {pdfUrl ? (
+        {pdfUrl && containerWidth > 0 ? (
           <div className="flex justify-center p-2">
-            <div className="relative" style={{ width: PDF_WIDTH }}>
+            <div className="relative" style={{ width: renderWidth }}>
               <Document
                 key={pdfUrl}
                 file={{ url: pdfUrl }}
@@ -101,7 +116,7 @@ export default function ZonePdfPanel({
               >
                 <Page
                   pageNumber={page}
-                  width={PDF_WIDTH}
+                  width={renderWidth}
                   onLoadSuccess={handlePageLoad}
                   renderTextLayer={false}
                   renderAnnotationLayer={false}
@@ -122,11 +137,11 @@ export default function ZonePdfPanel({
               )}
             </div>
           </div>
-        ) : (
+        ) : !pdfUrl ? (
           <div className="flex items-center justify-center h-96 text-gray-400">
             No PDF available
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
