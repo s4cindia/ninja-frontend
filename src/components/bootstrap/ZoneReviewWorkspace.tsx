@@ -363,6 +363,7 @@ function RightPanelPdf({
   return (
     <>
       <Document
+        key={pdfUrl}
         file={{ url: pdfUrl }}
         loading={
           <div className="flex items-center justify-center h-96 text-gray-400">
