@@ -429,12 +429,13 @@ function RightPanelPdf({
   const scaleX = width / pdfWidth;
   const scaleY = pageHeight / pdfHeight;
   const pageZones = zones.filter((z) => z.pageNumber === page);
+  const fileObj = useMemo(() => ({ url: pdfUrl }), [pdfUrl]);
 
   return (
     <>
       <Document
         key={pdfUrl}
-        file={{ url: pdfUrl }}
+        file={fileObj}
         loading={
           <div className="flex items-center justify-center h-96 text-gray-400">
             Loading PDF...
