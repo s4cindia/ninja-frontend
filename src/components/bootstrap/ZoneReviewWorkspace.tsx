@@ -181,13 +181,16 @@ export default function ZoneReviewWorkspace({
     setSyncedScrollTop(0);
   }, [currentPage]);
 
-  // Measure right panel width
+  // Measure right panel width — only update on meaningful changes
   useEffect(() => {
     const el = rightScrollRef.current;
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setRightPanelWidth(entry.contentRect.width);
+        const w = Math.round(entry.contentRect.width);
+        if (w > 0) {
+          setRightPanelWidth((prev) => (Math.abs(prev - w) > 2 ? w : prev));
+        }
       }
     });
     observer.observe(el);
@@ -341,16 +344,16 @@ export default function ZoneReviewWorkspace({
               setSyncedScrollTop(e.currentTarget.scrollTop);
             }}
           >
-            {rightPanelUrl && rightPanelWidth > 0 ? (
+            {rightPanelUrl ? (
               <div className="flex justify-center p-2">
-                <div className="relative" style={{ width: rightPanelWidth - 16 }}>
+                <div className="relative" style={{ width: (rightPanelWidth || 600) - 16 }}>
                   <RightPanelPdf
                     pdfUrl={rightPanelUrl}
                     page={currentPage}
                     zones={zones}
                     selectedZoneId={selectedZoneId}
                     onZoneClick={setSelectedZoneId}
-                    width={rightPanelWidth - 16}
+                    width={(rightPanelWidth || 600) - 16}
                   />
                 </div>
               </div>
