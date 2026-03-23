@@ -17,6 +17,7 @@ import ZonePdfPanel from './ZonePdfPanel';
 import ZoneComparisonDetailBar from './ZoneComparisonDetailBar';
 import ZoneOverlay from './ZoneOverlay';
 import ZoneListSidebar from './ZoneListSidebar';
+import { useZoneNumberMap } from '@/hooks/useZoneNumberMap';
 import { TableStructureEditor } from '../quickfix/TableStructureEditor';
 import type { TableSection } from '@/types/zone.types';
 import type { CalibrationZone } from '@/services/zone-correction.service';
@@ -107,12 +108,11 @@ export default function ZoneReviewWorkspace({
     [zones, currentPage],
   );
 
+  // Unified zone numbering
+  const zoneNumberMap = useZoneNumberMap(zones, currentPage);
+
   // Selected zone number
-  const selectedZoneNumber = useMemo(() => {
-    if (!selectedZone) return undefined;
-    const pageZones = zones.filter((z) => z.pageNumber === selectedZone.pageNumber);
-    return pageZones.findIndex((z) => z.id === selectedZone.id) + 1;
-  }, [zones, selectedZone]);
+  const selectedZoneNumber = selectedZone ? zoneNumberMap.get(selectedZone.id) ?? undefined : undefined;
 
   // Per-page zone counts
   const pageZoneCounts = useMemo(() => {
@@ -314,6 +314,7 @@ export default function ZoneReviewWorkspace({
           onScroll={setSyncedScrollTop}
           onDocumentLoad={setNumPages}
           label="Docling — Source PDF"
+          zoneNumberMap={zoneNumberMap}
         />
 
         {/* Right panel: Tagged PDF (default) + pdfxt zones */}
@@ -354,6 +355,7 @@ export default function ZoneReviewWorkspace({
                     selectedZoneId={selectedZoneId}
                     onZoneClick={setSelectedZoneId}
                     width={(rightPanelWidth || 600) - 16}
+                    zoneNumberMap={zoneNumberMap}
                   />
                 </div>
               </div>
@@ -372,6 +374,7 @@ export default function ZoneReviewWorkspace({
               currentPage={currentPage}
               selectedZoneId={selectedZoneId}
               onZoneClick={setSelectedZoneId}
+              zoneNumberMap={zoneNumberMap}
             />
           )}
       </div>
@@ -417,6 +420,7 @@ function RightPanelPdf({
   selectedZoneId,
   onZoneClick,
   width,
+  zoneNumberMap,
 }: {
   pdfUrl: string;
   page: number;
@@ -424,6 +428,7 @@ function RightPanelPdf({
   selectedZoneId: string | null;
   onZoneClick: (zoneId: string) => void;
   width: number;
+  zoneNumberMap?: Map<string, number>;
 }) {
   const [pageHeight, setPageHeight] = useState(0);
   const [pdfWidth, setPdfWidth] = useState(595);
@@ -466,6 +471,7 @@ function RightPanelPdf({
           selectedZoneId={selectedZoneId}
           onZoneClick={onZoneClick}
           source="pdfxt"
+          zoneNumberMap={zoneNumberMap}
         />
       )}
     </>
