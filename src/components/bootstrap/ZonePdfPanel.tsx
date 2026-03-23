@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState, useEffect } from 'react';
+import { useRef, useCallback, useState, useEffect, useMemo } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
@@ -88,6 +88,8 @@ export default function ZonePdfPanel({
 
   const pageZones = zones.filter((z) => z.pageNumber === page);
 
+  const fileObj = useMemo(() => (pdfUrl ? { url: pdfUrl } : undefined), [pdfUrl]);
+
   return (
     <div className="flex-1 flex flex-col min-w-0 border-r border-gray-200 last:border-r-0">
       {/* Panel header */}
@@ -106,7 +108,7 @@ export default function ZonePdfPanel({
             <div className="relative" style={{ width: renderWidth }}>
               <Document
                 key={pdfUrl}
-                file={{ url: pdfUrl }}
+                file={fileObj}
                 onLoadSuccess={(pdf) => onDocumentLoad?.(pdf.numPages)}
                 loading={
                   <div className="flex items-center justify-center h-96 text-gray-400">
