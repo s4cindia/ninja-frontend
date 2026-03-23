@@ -22,6 +22,7 @@ interface ZoneComparisonDetailBarProps {
   confirmPending?: boolean;
   rejectPending?: boolean;
   correctPending?: boolean;
+  zoneNumber?: number;
 }
 
 export default function ZoneComparisonDetailBar({
@@ -33,6 +34,7 @@ export default function ZoneComparisonDetailBar({
   confirmPending,
   rejectPending,
   correctPending,
+  zoneNumber,
 }: ZoneComparisonDetailBarProps) {
   const [showTechnical, setShowTechnical] = useState(false);
   const [selectedLabel, setSelectedLabel] = useState(
@@ -50,6 +52,9 @@ export default function ZoneComparisonDetailBar({
       <div className="flex items-start gap-4 px-4 py-3 overflow-x-auto">
         {/* Zone metadata */}
         <div className="flex flex-col gap-1 shrink-0">
+          {zoneNumber != null && (
+            <span className="text-lg font-bold text-gray-700 mr-2">#{zoneNumber}</span>
+          )}
           <ZoneBucketBadge bucket={zone.reconciliationBucket} />
           <span className="text-xs text-gray-500">Page {zone.pageNumber}</span>
           {zone.operatorVerified && (

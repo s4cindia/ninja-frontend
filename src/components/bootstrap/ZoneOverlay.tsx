@@ -16,6 +16,40 @@ const BUCKET_STYLE = {
   RED: { stroke: '#dc2626', fill: 'rgba(220,38,38,0.08)' },
 };
 
+const TAG_ABBREV: Record<string, string> = {
+  paragraph: 'P',
+  'section-header': 'H',
+  table: 'TBL',
+  figure: 'FIG',
+  caption: 'CAP',
+  footnote: 'FN',
+  header: 'HDR',
+  footer: 'FTR',
+  // Raw Docling labels
+  Text: 'P',
+  'Section-Header': 'H',
+  Table: 'TBL',
+  Picture: 'FIG',
+  Caption: 'CAP',
+  Footnote: 'FN',
+  'Page-Header': 'HDR',
+  'Page-Footer': 'FTR',
+  // pdfxt structure tags
+  P: 'P',
+  H1: 'H1',
+  H2: 'H2',
+  H3: 'H3',
+  H4: 'H4',
+  H5: 'H5',
+  H6: 'H6',
+  Span: 'SP',
+  Figure: 'FIG',
+  L: 'LIST',
+  LI: 'LI',
+  LBody: 'LB',
+  Div: 'DIV',
+};
+
 export default function ZoneOverlay({
   zones,
   pageNumber,
@@ -45,7 +79,8 @@ export default function ZoneOverlay({
     >
       {displayZones
         .filter((z) => z.pageNumber === pageNumber)
-        .map((zone) => {
+        .map((zone, index) => {
+          const zoneNumber = index + 1;
           const rawW = Math.abs(zone.bounds.w) * scaleX;
           const rawH = Math.abs(zone.bounds.h) * scaleY;
           const x = (zone.bounds.w < 0 ? zone.bounds.x + zone.bounds.w : zone.bounds.x) * scaleX;
@@ -68,16 +103,22 @@ export default function ZoneOverlay({
           const displayLabel = source === 'pdfxt'
             ? zone.pdfxtLabel ?? zone.type
             : zone.doclingLabel ?? zone.type;
-          const displayConfidence = source === 'docling' && zone.doclingConfidence
+          const displayConfidence = source === 'docling' && zone.doclingConfidence != null
             ? ` ${Math.round(zone.doclingConfidence * 100)}%`
-            : '';
+            : source === 'docling'
+              ? ' N/A'
+              : '';
+
+          const abbrev = TAG_ABBREV[displayLabel] ?? displayLabel.slice(0, 4).toUpperCase();
+          const badgeText = `${abbrev}${displayConfidence}`;
+          const badgeWidth = badgeText.length * 7 + 10;
 
           return (
             <g
               key={zone.id}
               style={{ pointerEvents: 'all', cursor: 'pointer' }}
               role="button"
-              aria-label={`Zone: ${displayLabel}, ${zone.reconciliationBucket}`}
+              aria-label={`Zone ${zoneNumber}: ${displayLabel}, ${zone.reconciliationBucket}`}
               tabIndex={0}
               onClick={() => onZoneClick(zone.id)}
               onKeyDown={(e) => {
@@ -97,28 +138,44 @@ export default function ZoneOverlay({
                 strokeWidth={strokeWidth}
                 rx={2}
               />
-              {/* Label badge with background */}
+              {/* Label badge with solid background */}
               <rect
                 x={x}
                 y={y}
-                width={Math.min(
-                  (displayLabel.length + displayConfidence.length) * 6.5 + 8,
-                  w,
-                )}
-                height={16}
-                fill="rgba(255,255,255,0.85)"
+                width={Math.min(badgeWidth, w)}
+                height={18}
+                fill={strokeColor}
                 rx={2}
                 style={{ pointerEvents: 'none' }}
               />
               <text
-                x={x + 4}
-                y={y + 12}
+                x={x + 5}
+                y={y + 13}
                 fontSize={11}
-                fontWeight={600}
-                fill={strokeColor}
+                fontWeight={700}
+                fill="white"
                 style={{ pointerEvents: 'none', userSelect: 'none' }}
               >
-                {displayLabel}{displayConfidence}
+                {badgeText}
+              </text>
+              {/* Zone number badge */}
+              <circle
+                cx={x + 8}
+                cy={y - 8}
+                r={9}
+                fill={strokeColor}
+                style={{ pointerEvents: 'none' }}
+              />
+              <text
+                x={x + 8}
+                y={y - 4}
+                fontSize={10}
+                fontWeight={700}
+                fill="white"
+                textAnchor="middle"
+                style={{ pointerEvents: 'none', userSelect: 'none' }}
+              >
+                {zoneNumber}
               </text>
             </g>
           );
