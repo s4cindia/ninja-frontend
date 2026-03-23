@@ -16,6 +16,7 @@ import { api } from '@/services/api';
 import ZonePdfPanel from './ZonePdfPanel';
 import ZoneComparisonDetailBar from './ZoneComparisonDetailBar';
 import ZoneOverlay from './ZoneOverlay';
+import ZoneListSidebar from './ZoneListSidebar';
 import { TableStructureEditor } from '../quickfix/TableStructureEditor';
 import type { TableSection } from '@/types/zone.types';
 import type { CalibrationZone } from '@/services/zone-correction.service';
@@ -49,6 +50,7 @@ export default function ZoneReviewWorkspace({
   const rightScrollRef = useRef<HTMLDivElement>(null);
   const isRightExternalScroll = useRef(false);
   const [rightPanelWidth, setRightPanelWidth] = useState(0);
+  const [showZoneList, setShowZoneList] = useState(true);
 
   // Fetch source PDF presigned URL
   useEffect(() => {
@@ -104,6 +106,21 @@ export default function ZoneReviewWorkspace({
       ).length,
     [zones, currentPage],
   );
+
+  // Selected zone number
+  const selectedZoneNumber = useMemo(() => {
+    if (!selectedZone) return undefined;
+    const pageZones = zones.filter((z) => z.pageNumber === selectedZone.pageNumber);
+    return pageZones.findIndex((z) => z.id === selectedZone.id) + 1;
+  }, [zones, selectedZone]);
+
+  // Per-page zone counts
+  const pageZoneCounts = useMemo(() => {
+    const pageZones = zones.filter((z) => z.pageNumber === currentPage);
+    const docling = pageZones.filter((z) => z.doclingLabel != null).length;
+    const pdfxt = pageZones.filter((z) => z.pdfxtLabel != null).length;
+    return { total: pageZones.length, docling, pdfxt };
+  }, [zones, currentPage]);
 
   // Handlers
   const handleConfirm = useCallback(
@@ -241,6 +258,13 @@ export default function ZoneReviewWorkspace({
               : `Confirm All Green (${unconfirmedGreenOnPage})`}
           </button>
 
+          <button
+            onClick={() => setShowZoneList((v) => !v)}
+            className="px-3 py-1.5 text-xs font-medium rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
+          >
+            {showZoneList ? 'Hide List' : 'Show List'}
+          </button>
+
           {/* Page navigation */}
           <div className="flex items-center gap-1 text-sm text-gray-600">
             <button
@@ -255,6 +279,9 @@ export default function ZoneReviewWorkspace({
             </button>
             <span className="min-w-[80px] text-center">
               Page {currentPage} of {numPages || '?'}
+            </span>
+            <span className="text-xs text-gray-400 ml-2">
+              ({pageZoneCounts.total} zones: {pageZoneCounts.docling} docling, {pageZoneCounts.pdfxt} pdfxt)
             </span>
             <button
               onClick={() => {
@@ -334,6 +361,16 @@ export default function ZoneReviewWorkspace({
             )}
           </div>
         </div>
+
+          {/* Zone list sidebar */}
+          {showZoneList && (
+            <ZoneListSidebar
+              zones={zones}
+              currentPage={currentPage}
+              selectedZoneId={selectedZoneId}
+              onZoneClick={setSelectedZoneId}
+            />
+          )}
       </div>
 
       {/* Bottom detail bar — visible only when zone selected */}
@@ -347,6 +384,7 @@ export default function ZoneReviewWorkspace({
           confirmPending={confirmZone.isPending}
           rejectPending={rejectZone.isPending}
           correctPending={correctZone.isPending}
+          zoneNumber={selectedZoneNumber}
         />
       )}
 
