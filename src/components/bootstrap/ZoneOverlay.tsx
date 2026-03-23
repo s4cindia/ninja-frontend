@@ -1,4 +1,5 @@
 import type { CalibrationZone } from '../../services/zone-correction.service';
+import { friendlyLabel } from './zone-label-utils';
 
 interface ZoneOverlayProps {
   zones: CalibrationZone[];
@@ -8,6 +9,7 @@ interface ZoneOverlayProps {
   selectedZoneId: string | null;
   onZoneClick: (zoneId: string) => void;
   source?: 'docling' | 'pdfxt';
+  zoneNumberMap?: Map<string, number>;
 }
 
 const BUCKET_STYLE = {
@@ -16,39 +18,6 @@ const BUCKET_STYLE = {
   RED: { stroke: '#dc2626', fill: 'rgba(220,38,38,0.08)' },
 };
 
-const TAG_ABBREV: Record<string, string> = {
-  paragraph: 'P',
-  'section-header': 'H',
-  table: 'TBL',
-  figure: 'FIG',
-  caption: 'CAP',
-  footnote: 'FN',
-  header: 'HDR',
-  footer: 'FTR',
-  // Raw Docling labels
-  Text: 'P',
-  'Section-Header': 'H',
-  Table: 'TBL',
-  Picture: 'FIG',
-  Caption: 'CAP',
-  Footnote: 'FN',
-  'Page-Header': 'HDR',
-  'Page-Footer': 'FTR',
-  // pdfxt structure tags
-  P: 'P',
-  H1: 'H1',
-  H2: 'H2',
-  H3: 'H3',
-  H4: 'H4',
-  H5: 'H5',
-  H6: 'H6',
-  Span: 'SP',
-  Figure: 'FIG',
-  L: 'LIST',
-  LI: 'LI',
-  LBody: 'LB',
-  Div: 'DIV',
-};
 
 export default function ZoneOverlay({
   zones,
@@ -58,6 +27,7 @@ export default function ZoneOverlay({
   selectedZoneId,
   onZoneClick,
   source,
+  zoneNumberMap,
 }: ZoneOverlayProps) {
   if (scaleX <= 0 || scaleY <= 0) {
     return null;
@@ -80,7 +50,7 @@ export default function ZoneOverlay({
       {displayZones
         .filter((z) => z.pageNumber === pageNumber)
         .map((zone, index) => {
-          const zoneNumber = index + 1;
+          const zoneNumber = zoneNumberMap?.get(zone.id) ?? index + 1;
           const rawW = Math.abs(zone.bounds.w) * scaleX;
           const rawH = Math.abs(zone.bounds.h) * scaleY;
           const x = (zone.bounds.w < 0 ? zone.bounds.x + zone.bounds.w : zone.bounds.x) * scaleX;
@@ -100,17 +70,8 @@ export default function ZoneOverlay({
             : bucketStyle?.fill ?? 'rgba(0,0,0,0.05)';
           const strokeWidth = isSelected ? 3 : 1.5;
 
-          const displayLabel = source === 'pdfxt'
-            ? zone.pdfxtLabel ?? zone.type
-            : zone.doclingLabel ?? zone.type;
-          const displayConfidence = source === 'docling' && zone.doclingConfidence != null
-            ? ` ${Math.round(zone.doclingConfidence * 100)}%`
-            : source === 'docling'
-              ? ' N/A'
-              : '';
-
-          const abbrev = TAG_ABBREV[displayLabel] ?? displayLabel.slice(0, 4).toUpperCase();
-          const badgeText = `${abbrev}${displayConfidence}`;
+          const abbrev = source ? friendlyLabel(zone, source) : '?';
+          const badgeText = `#${zoneNumber} ${abbrev}`;
           const badgeWidth = badgeText.length * 7 + 10;
 
           return (
@@ -118,7 +79,7 @@ export default function ZoneOverlay({
               key={zone.id}
               style={{ pointerEvents: 'all', cursor: 'pointer' }}
               role="button"
-              aria-label={`Zone ${zoneNumber}: ${displayLabel}, ${zone.reconciliationBucket}`}
+              aria-label={`Zone ${zoneNumber}: ${abbrev}, ${zone.reconciliationBucket}`}
               tabIndex={0}
               onClick={() => onZoneClick(zone.id)}
               onKeyDown={(e) => {
