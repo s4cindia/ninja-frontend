@@ -18,6 +18,7 @@ interface ZonePdfPanelProps {
   onScroll: (scrollTop: number) => void;
   onDocumentLoad?: (numPages: number) => void;
   label: string;
+  zoneNumberMap?: Map<string, number>;
 }
 
 const FALLBACK_WIDTH = 600;
@@ -33,6 +34,7 @@ export default function ZonePdfPanel({
   onScroll,
   onDocumentLoad,
   label,
+  zoneNumberMap,
 }: ZonePdfPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isExternalScroll = useRef(false);
@@ -140,6 +142,7 @@ export default function ZonePdfPanel({
                   selectedZoneId={selectedZoneId}
                   onZoneClick={onZoneClick}
                   source={source}
+                  zoneNumberMap={zoneNumberMap}
                 />
               )}
             </div>

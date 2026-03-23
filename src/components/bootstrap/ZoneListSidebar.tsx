@@ -1,11 +1,13 @@
 import { useMemo } from 'react';
 import type { CalibrationZone } from '@/services/zone-correction.service';
+import { friendlyLabel } from './zone-label-utils';
 
 interface ZoneListSidebarProps {
   zones: CalibrationZone[];
   currentPage: number;
   selectedZoneId: string | null;
   onZoneClick: (zoneId: string) => void;
+  zoneNumberMap?: Map<string, number>;
 }
 
 const BUCKET_COLOR = {
@@ -19,6 +21,7 @@ export default function ZoneListSidebar({
   currentPage,
   selectedZoneId,
   onZoneClick,
+  zoneNumberMap,
 }: ZoneListSidebarProps) {
   const pageZones = useMemo(
     () => zones.filter((z) => z.pageNumber === currentPage),
@@ -54,20 +57,25 @@ export default function ZoneListSidebar({
               }`}
             >
               <div className="flex items-center gap-2">
-                <span className="font-bold text-gray-500 w-5">{i + 1}</span>
+                <span className="font-bold text-gray-500 w-5">{zoneNumberMap?.get(zone.id) ?? i + 1}</span>
+                <span className="inline-flex gap-0.5 mr-1">
+                  {zone.doclingLabel && <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block" title="Docling" />}
+                  {zone.pdfxtLabel && <span className="w-2 h-2 rounded-full bg-orange-500 inline-block" title="pdfxt" />}
+                </span>
                 <span
                   className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border ${bucketClass}`}
                 >
                   {zone.reconciliationBucket}
                 </span>
               </div>
-              <div className="ml-7 mt-0.5 flex gap-2">
-                {zone.doclingLabel && (
-                  <span className="text-gray-500">D: {zone.doclingLabel}</span>
-                )}
-                {zone.pdfxtLabel && (
-                  <span className="text-gray-500">P: {zone.pdfxtLabel}</span>
-                )}
+              <div className="ml-7 mt-0.5 text-gray-500">
+                {zone.doclingLabel && zone.pdfxtLabel
+                  ? `${friendlyLabel(zone, 'docling')} / ${friendlyLabel(zone, 'pdfxt')}`
+                  : zone.doclingLabel
+                    ? friendlyLabel(zone, 'docling')
+                    : zone.pdfxtLabel
+                      ? friendlyLabel(zone, 'pdfxt')
+                      : '?'}
               </div>
               {zone.operatorVerified && (
                 <div className="ml-7 mt-0.5 text-teal-600 font-medium">
