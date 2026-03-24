@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import type { CalibrationZone } from '../../services/zone-correction.service';
 import { friendlyLabel } from './zone-label-utils';
 
@@ -19,7 +20,7 @@ const BUCKET_STYLE = {
 };
 
 
-export default function ZoneOverlay({
+function ZoneOverlayInner({
   zones,
   pageNumber,
   scaleX,
@@ -153,3 +154,5 @@ export default function ZoneOverlay({
     </svg>
   );
 }
+
+export default memo(ZoneOverlayInner);
