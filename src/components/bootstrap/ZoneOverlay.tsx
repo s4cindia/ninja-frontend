@@ -89,6 +89,7 @@ export default function ZoneOverlay({
                 }
               }}
             >
+              {/* Zone rect */}
               <rect
                 x={x}
                 y={y}
@@ -98,38 +99,20 @@ export default function ZoneOverlay({
                 fill={fillColor}
                 strokeWidth={strokeWidth}
                 rx={2}
-              />
-              {/* Label badge with solid background */}
-              <rect
-                x={x}
-                y={y}
-                width={Math.min(badgeWidth, w)}
-                height={18}
-                fill={strokeColor}
-                rx={2}
-                style={{ pointerEvents: 'none' }}
-              />
-              <text
-                x={x + 5}
-                y={y + 13}
-                fontSize={11}
-                fontWeight={700}
-                fill="white"
-                style={{ pointerEvents: 'none', userSelect: 'none' }}
               >
-                {badgeText}
-              </text>
-              {/* Zone number badge */}
+                <title>{`#${zoneNumber} ${abbrev} · ${zone.reconciliationBucket}`}</title>
+              </rect>
+              {/* Number circle at top-left corner */}
               <circle
-                cx={x + 8}
-                cy={y - 8}
+                cx={x + 10}
+                cy={y + 10}
                 r={9}
                 fill={strokeColor}
                 style={{ pointerEvents: 'none' }}
               />
               <text
-                x={x + 8}
-                y={y - 4}
+                x={x + 10}
+                y={y + 14}
                 fontSize={10}
                 fontWeight={700}
                 fill="white"
@@ -138,6 +121,30 @@ export default function ZoneOverlay({
               >
                 {zoneNumber}
               </text>
+              {/* Full label badge — only on selected zone */}
+              {isSelected && (
+                <>
+                  <rect
+                    x={x + 22}
+                    y={y + 1}
+                    width={Math.min(badgeWidth, w - 22)}
+                    height={18}
+                    fill={strokeColor}
+                    rx={2}
+                    style={{ pointerEvents: 'none' }}
+                  />
+                  <text
+                    x={x + 27}
+                    y={y + 14}
+                    fontSize={11}
+                    fontWeight={700}
+                    fill="white"
+                    style={{ pointerEvents: 'none', userSelect: 'none' }}
+                  >
+                    {badgeText}
+                  </text>
+                </>
+              )}
             </g>
           );
         })}
