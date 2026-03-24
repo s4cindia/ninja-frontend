@@ -317,6 +317,15 @@ export default function DocumentQueueView() {
                               {triggeringIds[doc.id] ? 'Queuing...' : 'Run zone extraction'}
                             </button>
                           )}
+                          {opStatus === 'FAILED' && (
+                            <button
+                              onClick={() => handleTriggerRun(doc.id)}
+                              disabled={!!triggeringIds[doc.id]}
+                              className="bg-red-600 text-white text-xs px-3 py-1 rounded hover:bg-red-700 disabled:opacity-50 transition-colors"
+                            >
+                              {triggeringIds[doc.id] ? 'Queuing...' : 'Retry'}
+                            </button>
+                          )}
                           {opStatus === 'COMPLETED' && (
                             <button
                               onClick={() => navigate(`/bootstrap/review/${doc.id}`)}
