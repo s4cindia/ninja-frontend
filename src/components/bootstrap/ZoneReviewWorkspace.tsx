@@ -13,6 +13,7 @@ import {
 } from '@/hooks/useZoneReview';
 import { useTaggedPdfUrl } from '@/hooks/useTaggedPdfUrl';
 import { api } from '@/services/api';
+import { PageThumbnailNav } from './PageThumbnailNav';
 import ZonePdfPanel from './ZonePdfPanel';
 import ZoneComparisonDetailBar from './ZoneComparisonDetailBar';
 import ZoneOverlay from './ZoneOverlay';
@@ -52,6 +53,7 @@ export default function ZoneReviewWorkspace({
   const isRightExternalScroll = useRef(false);
   const [rightPanelWidth, setRightPanelWidth] = useState(0);
   const [showZoneList, setShowZoneList] = useState(true);
+  const [showPages, setShowPages] = useState(false);
 
   // Fetch source PDF presigned URL
   useEffect(() => {
@@ -121,6 +123,15 @@ export default function ZoneReviewWorkspace({
     const pdfxt = pageZones.filter((z) => z.pdfxtLabel != null).length;
     return { total: pageZones.length, docling, pdfxt };
   }, [zones, currentPage]);
+
+  // Zone count per page (for thumbnail navigator)
+  const zoneCountByPage = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const zone of zones) {
+      map.set(zone.pageNumber, (map.get(zone.pageNumber) ?? 0) + 1);
+    }
+    return map;
+  }, [zones]);
 
   // Handlers
   const handleConfirm = useCallback(
@@ -262,6 +273,17 @@ export default function ZoneReviewWorkspace({
           </button>
 
           <button
+            onClick={() => setShowPages((v) => !v)}
+            className={`px-3 py-1.5 text-xs font-medium rounded border transition-colors ${
+              showPages
+                ? 'bg-blue-50 text-blue-700 border-blue-300'
+                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            {showPages ? 'Hide Pages' : 'Pages'}
+          </button>
+
+          <button
             onClick={() => setShowZoneList((v) => !v)}
             className="px-3 py-1.5 text-xs font-medium rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
           >
@@ -302,6 +324,20 @@ export default function ZoneReviewWorkspace({
 
       {/* Two PDF panels side by side */}
       <div className="flex flex-1 min-h-0">
+        {/* Page thumbnail navigator */}
+        {showPages && sourcePdfUrl && (
+          <PageThumbnailNav
+            pdfUrl={sourcePdfUrl}
+            totalPages={numPages}
+            currentPage={currentPage}
+            zoneCountByPage={zoneCountByPage}
+            onPageSelect={(page) => {
+              setCurrentPage(page);
+              setSelectedZoneId(null);
+            }}
+          />
+        )}
+
         {/* Left panel: Source PDF + Docling zones */}
         <ZonePdfPanel
           pdfUrl={sourcePdfUrl || undefined}
