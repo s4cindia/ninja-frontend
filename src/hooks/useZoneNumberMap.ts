@@ -14,10 +14,14 @@ export function useZoneNumberMap(
     const pageZones = zones
       .filter((z) => z.pageNumber === page)
       .sort((a, b) => {
-        const ay = a.bounds.y;
-        const by = b.bounds.y;
+        // Guard against ghost zones with null bounds
+        if (!a.bounds && !b.bounds) return 0;
+        if (!a.bounds) return 1;
+        if (!b.bounds) return -1;
+        const ay = a.bounds.y ?? 0;
+        const by = b.bounds.y ?? 0;
         if (Math.abs(ay - by) > 5) return ay - by; // 5px threshold for "same row"
-        return a.bounds.x - b.bounds.x;
+        return (a.bounds.x ?? 0) - (b.bounds.x ?? 0);
       });
 
     const map = new Map<string, number>();
