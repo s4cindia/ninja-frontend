@@ -48,7 +48,9 @@ export default function ZoneOverlay({
       aria-label="Zone detection overlay"
     >
       {displayZones
-        .filter((z) => z.pageNumber === pageNumber)
+        .filter((z): z is CalibrationZone & { bounds: NonNullable<CalibrationZone['bounds']> } =>
+          z.pageNumber === pageNumber && z.bounds != null,
+        )
         .map((zone, index) => {
           const zoneNumber = zoneNumberMap?.get(zone.id) ?? index + 1;
           const rawW = Math.abs(zone.bounds.w) * scaleX;
