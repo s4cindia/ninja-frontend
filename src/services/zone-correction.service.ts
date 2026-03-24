@@ -4,7 +4,7 @@ export interface CalibrationZone {
   id: string;
   calibrationRunId: string;
   pageNumber: number;
-  bounds: { x: number; y: number; w: number; h: number };
+  bounds: { x: number; y: number; w: number; h: number } | null;
   type: string;
   source: string;
   reconciliationBucket: 'GREEN' | 'AMBER' | 'RED';
