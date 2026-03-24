@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState, useEffect, useMemo } from 'react';
+import { useRef, useCallback, useState, useEffect, useMemo, memo } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
@@ -23,7 +23,13 @@ interface ZonePdfPanelProps {
 
 const FALLBACK_WIDTH = 600;
 
-export default function ZonePdfPanel({
+const PDF_LOADING = (
+  <div className="flex items-center justify-center h-96 text-gray-400">
+    Loading PDF...
+  </div>
+);
+
+function ZonePdfPanelInner({
   pdfUrl,
   page,
   zones,
@@ -93,7 +99,10 @@ export default function ZonePdfPanel({
   const scaleX = renderWidth / pdfWidth;
   const scaleY = pageHeight / pdfHeight;
 
-  const pageZones = zones.filter((z) => z.pageNumber === page);
+  const pageZones = useMemo(
+    () => zones.filter((z) => z.pageNumber === page),
+    [zones, page],
+  );
 
   const fileObj = useMemo(() => (pdfUrl ? { url: pdfUrl } : undefined), [pdfUrl]);
 
@@ -117,11 +126,7 @@ export default function ZonePdfPanel({
                 key={pdfUrl}
                 file={fileObj}
                 onLoadSuccess={(pdf) => onDocumentLoad?.(pdf.numPages)}
-                loading={
-                  <div className="flex items-center justify-center h-96 text-gray-400">
-                    Loading PDF...
-                  </div>
-                }
+                loading={PDF_LOADING}
               >
                 <Page
                   pageNumber={page}
@@ -156,3 +161,5 @@ export default function ZonePdfPanel({
     </div>
   );
 }
+
+export default memo(ZonePdfPanelInner);
