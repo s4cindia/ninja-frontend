@@ -183,13 +183,18 @@ export function MainLayout() {
           </nav>
           <button
             onClick={toggleSidebar}
-            className="flex items-center justify-center p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 border-t border-gray-200"
+            className={`flex items-center gap-2 p-3 border-t border-gray-200 bg-gray-50 hover:bg-gray-200 text-gray-600 transition-colors ${
+              collapsed ? 'justify-center' : 'px-4'
+            }`}
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {collapsed ? (
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-5 h-5" />
             ) : (
-              <ChevronLeft className="w-4 h-4" />
+              <>
+                <ChevronLeft className="w-5 h-5" />
+                <span className="text-xs font-medium">Collapse</span>
+              </>
             )}
           </button>
         </aside>
