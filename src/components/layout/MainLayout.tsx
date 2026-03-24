@@ -137,9 +137,9 @@ export function MainLayout() {
         </div>
       </header>
 
-      <div className="flex">
+      <div className="flex h-[calc(100vh-57px)]">
         <aside
-          className={`flex flex-col bg-white border-r min-h-[calc(100vh-57px)] transition-all duration-200 ease-in-out ${
+          className={`flex flex-col bg-white border-r h-full transition-all duration-200 ease-in-out shrink-0 ${
             collapsed ? 'w-[60px]' : 'w-64'
           }`}
         >
@@ -194,7 +194,7 @@ export function MainLayout() {
           </button>
         </aside>
 
-        <main className="flex-1 min-w-0 p-6">
+        <main className="flex-1 min-w-0 p-6 overflow-auto">
           <Outlet />
         </main>
       </div>
