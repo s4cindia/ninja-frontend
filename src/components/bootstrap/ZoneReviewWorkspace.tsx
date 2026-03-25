@@ -485,6 +485,12 @@ function RightPanelPdf({
             Loading PDF...
           </div>
         }
+        onLoadError={(err) => console.error('[RightPanelPdf] PDF load error:', err)}
+        error={
+          <div className="flex items-center justify-center h-96 text-red-400">
+            Failed to load PDF. Check console for details.
+          </div>
+        }
       >
         <Page
           pageNumber={page}
