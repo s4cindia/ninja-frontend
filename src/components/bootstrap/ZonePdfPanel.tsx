@@ -29,6 +29,12 @@ const PDF_LOADING = (
   </div>
 );
 
+const PDF_ERROR = (
+  <div className="flex items-center justify-center h-96 text-red-400">
+    Failed to load PDF. Check console for details.
+  </div>
+);
+
 function ZonePdfPanelInner({
   pdfUrl,
   page,
@@ -126,7 +132,9 @@ function ZonePdfPanelInner({
                 key={pdfUrl}
                 file={fileObj}
                 onLoadSuccess={(pdf) => onDocumentLoad?.(pdf.numPages)}
+                onLoadError={(err) => console.error(`[ZonePdfPanel] PDF load error for ${label}:`, err)}
                 loading={PDF_LOADING}
+                error={PDF_ERROR}
               >
                 <Page
                   pageNumber={page}
