@@ -51,9 +51,7 @@ function ZonePdfPanelInner({
   const scrollRef = useRef<HTMLDivElement>(null);
   const isExternalScroll = useRef(false);
   const [containerWidth, setContainerWidth] = useState(0);
-  const [pageHeight, setPageHeight] = useState(0);
-  const [pdfWidth, setPdfWidth] = useState(595);
-  const [pdfHeight, setPdfHeight] = useState(842);
+  const [dims, setDims] = useState({ pageHeight: 0, pdfWidth: 595, pdfHeight: 842 });
 
   // Measure container width with ResizeObserver — only update on meaningful changes
   useEffect(() => {
@@ -94,16 +92,18 @@ function ZonePdfPanelInner({
 
   const handlePageLoad = useCallback(
     (pageObj: { width: number; height: number; originalWidth: number; originalHeight: number }) => {
-      setPdfWidth(pageObj.originalWidth);
-      setPdfHeight(pageObj.originalHeight);
       const scale = renderWidth / pageObj.originalWidth;
-      setPageHeight(pageObj.originalHeight * scale);
+      setDims({
+        pdfWidth: pageObj.originalWidth,
+        pdfHeight: pageObj.originalHeight,
+        pageHeight: pageObj.originalHeight * scale,
+      });
     },
     [renderWidth],
   );
 
-  const scaleX = renderWidth / pdfWidth;
-  const scaleY = pageHeight / pdfHeight;
+  const scaleX = renderWidth / dims.pdfWidth;
+  const scaleY = dims.pageHeight / dims.pdfHeight;
 
   const pageZones = useMemo(
     () => zones.filter((z) => z.pageNumber === page),
@@ -146,7 +146,7 @@ function ZonePdfPanelInner({
               </Document>
 
               {/* Zone overlay */}
-              {pageHeight > 0 && (
+              {dims.pageHeight > 0 && (
                 <ZoneOverlay
                   zones={pageZones}
                   pageNumber={page}
