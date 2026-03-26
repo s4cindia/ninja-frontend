@@ -43,6 +43,7 @@ export default function ZoneReviewWorkspace({
   // State
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageInputValue, setPageInputValue] = useState('1');
   const [numPages, setNumPages] = useState(0);
   const [bucketFilter, setBucketFilter] = useState<BucketFilter>('ALL');
   const [rightPanelMode, setRightPanelMode] = useState<'tagged' | 'source'>('tagged');
@@ -54,6 +55,11 @@ export default function ZoneReviewWorkspace({
   const [rightPanelWidth, setRightPanelWidth] = useState(0);
   const [showZoneList, setShowZoneList] = useState(true);
   const [showPages, setShowPages] = useState(false);
+
+  // Keep page input in sync with currentPage (arrow buttons, thumbnail clicks, etc.)
+  useEffect(() => {
+    setPageInputValue(String(currentPage));
+  }, [currentPage]);
 
   // Fetch source PDF presigned URL
   useEffect(() => {
@@ -302,8 +308,36 @@ export default function ZoneReviewWorkspace({
             >
               &larr;
             </button>
-            <span className="min-w-[80px] text-center">
-              Page {currentPage} of {numPages || '?'}
+            <span className="flex items-center gap-1 min-w-[80px] justify-center">
+              Page{' '}
+              <input
+                type="text"
+                inputMode="numeric"
+                className="w-10 text-center border border-gray-300 rounded px-0.5 py-0 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                value={pageInputValue}
+                onChange={(e) => setPageInputValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const n = parseInt(pageInputValue, 10);
+                    if (!isNaN(n) && n >= 1 && n <= numPages) {
+                      setCurrentPage(n);
+                      setSelectedZoneId(null);
+                    } else {
+                      setPageInputValue(String(currentPage));
+                    }
+                  }
+                }}
+                onBlur={() => {
+                  const n = parseInt(pageInputValue, 10);
+                  if (!isNaN(n) && n >= 1 && n <= numPages) {
+                    setCurrentPage(n);
+                    setSelectedZoneId(null);
+                  } else {
+                    setPageInputValue(String(currentPage));
+                  }
+                }}
+              />{' '}
+              of {numPages || '?'}
             </span>
             <span className="text-xs text-gray-400 ml-2">
               ({pageZoneCounts.total} zones: {pageZoneCounts.docling} docling, {pageZoneCounts.pdfxt} pdfxt)
