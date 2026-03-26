@@ -81,6 +81,8 @@ import PdfViewerPage from '@/pages/PdfViewerPage';
 import { PlagiarismPage } from '@/pages/editorial/PlagiarismPage';
 import BootstrapConsolePage from '@/pages/bootstrap/BootstrapConsolePage';
 import ZoneReviewPage from '@/pages/bootstrap/ZoneReviewPage';
+import AnnotationReportPage from '@/pages/calibration/AnnotationReportPage';
+import AnnotationTimesheetPage from '@/pages/calibration/AnnotationTimesheetPage';
 import AdminCorpusPage from '@/pages/admin/AdminCorpusPage';
 import AdminUsersPage from '@/pages/admin/AdminUsersPage';
 const queryClient = new QueryClient({
@@ -259,6 +261,8 @@ function AppRoutes() {
           {/* Bootstrap Console Routes */}
           <Route path="/bootstrap" element={<BootstrapConsolePage />} />
           <Route path="/bootstrap/review/:documentId" element={<ZoneReviewPage />} />
+          <Route path="/calibration/runs/:runId/annotation-report" element={<AnnotationReportPage />} />
+          <Route path="/calibration/runs/:runId/timesheet" element={<AnnotationTimesheetPage />} />
 
           {/* Admin Console Routes */}
           <Route path="/admin/corpus" element={<AdminCorpusPage />} />

@@ -1,0 +1,328 @@
+import { useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { annotationReportService } from '@/services/annotation-report.service';
+import { Spinner } from '@/components/ui/Spinner';
+
+function fmtDate(d: string | null | undefined): string {
+  if (!d) return '--';
+  return new Date(d).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+}
+
+function pct(n: number, total: number): string {
+  if (total === 0) return '0%';
+  return `${Math.round((n / total) * 100)}%`;
+}
+
+type Tab = 'summary' | 'zones' | 'quality' | 'corrections';
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export default function AnnotationReportPage() {
+  const { runId } = useParams<{ runId: string }>();
+  const [tab, setTab] = useState<Tab>('summary');
+  const [decisionFilter, setDecisionFilter] = useState('ALL');
+  const [bucketFilter, setBucketFilter] = useState('ALL');
+
+  const { data: report, isLoading, error } = useQuery({
+    queryKey: ['annotation-report', runId],
+    queryFn: () => annotationReportService.getAnnotationReport(runId!),
+    enabled: !!runId,
+  });
+
+  if (isLoading) {
+    return <div className="flex justify-center py-16"><Spinner size="lg" /></div>;
+  }
+
+  if (error || !report) {
+    return (
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="text-center py-12 text-red-500">
+          Failed to load annotation report. {error instanceof Error ? error.message : ''}
+        </div>
+      </div>
+    );
+  }
+
+  const summary = report.summary ?? {};
+  const zones: any[] = report.zones ?? [];
+  const quality = report.qualityMetrics ?? {};
+  const corrections: any[] = report.corrections ?? [];
+  const totalZones = summary.totalZones ?? 0;
+  const confirmed = summary.confirmed ?? 0;
+  const corrected = summary.corrected ?? 0;
+  const rejected = summary.rejected ?? 0;
+  const unreviewed = summary.unreviewed ?? 0;
+
+  const filteredZones = zones.filter((z: any) => {
+    if (decisionFilter !== 'ALL' && z.decision !== decisionFilter) return false;
+    if (bucketFilter !== 'ALL' && z.bucket !== bucketFilter) return false;
+    return true;
+  });
+
+  const tabs: { key: Tab; label: string }[] = [
+    { key: 'summary', label: 'Summary' },
+    { key: 'zones', label: 'Zone Details' },
+    { key: 'quality', label: 'Quality Metrics' },
+    { key: 'corrections', label: 'Corrections Log' },
+  ];
+
+  return (
+    <div className="max-w-7xl mx-auto space-y-6 p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Link to={`/bootstrap/review/${report.documentId ?? ''}`} className="text-sm text-gray-500 hover:text-gray-700">
+            &larr; Back to Zone Review
+          </Link>
+          <h1 className="text-xl font-semibold">Annotation Report</h1>
+        </div>
+        <div className="flex gap-2">
+          <a
+            href={annotationReportService.getAnnotationReportCsvUrl(runId!)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
+          >
+            CSV &darr;
+          </a>
+          <a
+            href={annotationReportService.getAnnotationReportPdfUrl(runId!)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
+          >
+            PDF &darr;
+          </a>
+        </div>
+      </div>
+
+      {/* Document info */}
+      <div className="bg-white rounded-lg shadow p-4 flex flex-wrap gap-6 text-sm">
+        <div><span className="text-gray-500">Document:</span> <span className="font-medium">{report.documentName ?? '--'}</span></div>
+        <div><span className="text-gray-500">Run ID:</span> <span className="font-mono text-xs">{runId?.slice(0, 12)}...</span></div>
+        <div><span className="text-gray-500">Pages:</span> <span className="font-medium">{summary.pageCount ?? '--'}</span></div>
+        <div><span className="text-gray-500">Date:</span> <span className="font-medium">{fmtDate(report.createdAt)}</span></div>
+        {report.annotators && (
+          <div><span className="text-gray-500">Annotators:</span> <span className="font-medium">{(report.annotators as string[]).join(', ')}</span></div>
+        )}
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        {[
+          { label: 'Total Zones', value: totalZones, color: 'text-gray-900' },
+          { label: 'Confirmed', value: `${confirmed} (${pct(confirmed, totalZones)})`, color: 'text-green-600' },
+          { label: 'Corrected', value: `${corrected} (${pct(corrected, totalZones)})`, color: 'text-yellow-600' },
+          { label: 'Rejected', value: `${rejected} (${pct(rejected, totalZones)})`, color: 'text-red-600' },
+          { label: 'Unreviewed', value: `${unreviewed} (${pct(unreviewed, totalZones)})`, color: 'text-gray-500' },
+        ].map(k => (
+          <div key={k.label} className="bg-white rounded-lg shadow p-4 text-center">
+            <p className="text-2xl font-bold tabular-nums">{k.value}</p>
+            <p className={`text-xs mt-1 ${k.color}`}>{k.label}</p>
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        {[
+          { label: 'GREEN', value: summary.greenCount ?? 0, color: 'text-green-600' },
+          { label: 'AMBER', value: summary.amberCount ?? 0, color: 'text-amber-600' },
+          { label: 'RED', value: summary.redCount ?? 0, color: 'text-red-600' },
+          { label: 'Accuracy Rate', value: summary.accuracyRate != null ? `${Math.round(summary.accuracyRate * 100)}%` : '--', color: 'text-blue-600' },
+          { label: 'Auto-Annotated', value: summary.autoAnnotatedCount ?? 0, color: 'text-indigo-600' },
+        ].map(k => (
+          <div key={k.label} className="bg-white rounded-lg shadow p-4 text-center">
+            <p className={`text-2xl font-bold tabular-nums ${k.color}`}>{k.value}</p>
+            <p className="text-xs mt-1 text-gray-500">{k.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Tabs */}
+      <div className="border-b border-gray-200">
+        <div className="flex gap-4">
+          {tabs.map(t => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`pb-2 text-sm font-medium border-b-2 transition-colors ${
+                tab === t.key
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tab content */}
+      {tab === 'summary' && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-sm font-semibold mb-4">Summary Statistics</h3>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            {Object.entries(summary).map(([key, val]) => (
+              <div key={key} className="flex justify-between py-1 border-b border-gray-100">
+                <span className="text-gray-500">{key}</span>
+                <span className="font-medium">{typeof val === 'number' ? val : String(val ?? '--')}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab === 'zones' && (
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex gap-3 mb-4">
+            <select
+              value={decisionFilter}
+              onChange={e => setDecisionFilter(e.target.value)}
+              className="text-xs border border-gray-300 rounded px-2 py-1"
+            >
+              <option value="ALL">All Decisions</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="corrected">Corrected</option>
+              <option value="rejected">Rejected</option>
+              <option value="unreviewed">Unreviewed</option>
+            </select>
+            <select
+              value={bucketFilter}
+              onChange={e => setBucketFilter(e.target.value)}
+              className="text-xs border border-gray-300 rounded px-2 py-1"
+            >
+              <option value="ALL">All Buckets</option>
+              <option value="GREEN">GREEN</option>
+              <option value="AMBER">AMBER</option>
+              <option value="RED">RED</option>
+            </select>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-xs text-gray-500">
+                  <th className="text-left py-2 pr-3">Page</th>
+                  <th className="text-left py-2 pr-3">Zone#</th>
+                  <th className="text-left py-2 pr-3">Source</th>
+                  <th className="text-left py-2 pr-3">Original Type</th>
+                  <th className="text-left py-2 pr-3">Label</th>
+                  <th className="text-left py-2 pr-3">Bucket</th>
+                  <th className="text-left py-2 pr-3">Decision</th>
+                  <th className="text-left py-2 pr-3">Final Label</th>
+                  <th className="text-left py-2">By</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredZones.map((z: any, i: number) => (
+                  <tr key={z.id ?? i} className="border-b last:border-0 hover:bg-gray-50">
+                    <td className="py-2 pr-3">{z.pageNumber}</td>
+                    <td className="py-2 pr-3">{z.zoneNumber ?? i + 1}</td>
+                    <td className="py-2 pr-3 text-xs">{z.source}</td>
+                    <td className="py-2 pr-3 text-xs">{z.originalType}</td>
+                    <td className="py-2 pr-3 text-xs">{z.label}</td>
+                    <td className="py-2 pr-3">
+                      <span className={`text-xs font-medium ${
+                        z.bucket === 'GREEN' ? 'text-green-600' : z.bucket === 'AMBER' ? 'text-amber-600' : 'text-red-600'
+                      }`}>{z.bucket}</span>
+                    </td>
+                    <td className="py-2 pr-3">
+                      <span className={`text-xs font-medium ${
+                        z.decision === 'confirmed' ? 'text-green-600' :
+                        z.decision === 'corrected' ? 'text-yellow-600' :
+                        z.decision === 'rejected' ? 'text-red-600' : 'text-gray-400'
+                      }`}>{z.decision ?? 'unreviewed'}</span>
+                    </td>
+                    <td className="py-2 pr-3 text-xs">{z.finalLabel ?? '--'}</td>
+                    <td className="py-2 text-xs text-gray-500">{z.reviewedBy ?? '--'}</td>
+                  </tr>
+                ))}
+                {filteredZones.length === 0 && (
+                  <tr><td colSpan={9} className="py-8 text-center text-gray-400">No zones match filters</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {tab === 'quality' && (
+        <div className="bg-white rounded-lg shadow p-6 space-y-4">
+          <h3 className="text-sm font-semibold mb-4">Quality Metrics</h3>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            {[
+              { label: 'Extractor Agreement Rate', value: quality.extractorAgreementRate != null ? `${Math.round(quality.extractorAgreementRate * 100)}%` : '--' },
+              { label: 'Auto-Annotation Coverage', value: quality.autoAnnotationCoverage != null ? `${Math.round(quality.autoAnnotationCoverage * 100)}%` : '--' },
+              { label: 'Human Review Required', value: quality.humanReviewRequired != null ? `${Math.round(quality.humanReviewRequired * 100)}%` : '--' },
+              { label: 'Correction Rate', value: quality.correctionRate != null ? `${Math.round(quality.correctionRate * 100)}%` : '--' },
+              { label: 'Rejection Rate', value: quality.rejectionRate != null ? `${Math.round(quality.rejectionRate * 100)}%` : '--' },
+              { label: 'Pages With Zero Corrections', value: quality.pagesWithZeroCorrections ?? '--' },
+              { label: 'Most Corrected Page', value: quality.mostCorrectedPage ?? '--' },
+            ].map(m => (
+              <div key={m.label} className="flex justify-between py-2 border-b border-gray-100">
+                <span className="text-gray-500">{m.label}</span>
+                <span className="font-medium">{m.value}</span>
+              </div>
+            ))}
+          </div>
+          {quality.typeDistribution && (
+            <div className="mt-6">
+              <h4 className="text-xs font-semibold text-gray-500 uppercase mb-3">Type Distribution</h4>
+              <div className="space-y-2">
+                {Object.entries(quality.typeDistribution as Record<string, number>).map(([type, count]) => {
+                  const maxCount = Math.max(...Object.values(quality.typeDistribution as Record<string, number>));
+                  const widthPct = maxCount > 0 ? (count / maxCount) * 100 : 0;
+                  return (
+                    <div key={type} className="flex items-center gap-3 text-sm">
+                      <span className="w-24 text-gray-600 truncate">{type}</span>
+                      <div className="flex-1 bg-gray-100 rounded-full h-4">
+                        <div className="bg-blue-500 rounded-full h-4" style={{ width: `${widthPct}%` }} />
+                      </div>
+                      <span className="text-xs text-gray-500 w-8 text-right">{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'corrections' && (
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-xs text-gray-500">
+                  <th className="text-left py-2 pr-3">Zone ID</th>
+                  <th className="text-left py-2 pr-3">Page</th>
+                  <th className="text-left py-2 pr-3">From → To</th>
+                  <th className="text-left py-2 pr-3">Reason</th>
+                  <th className="text-left py-2 pr-3">By</th>
+                  <th className="text-left py-2">When</th>
+                </tr>
+              </thead>
+              <tbody>
+                {corrections.map((c: any, i: number) => (
+                  <tr key={c.id ?? i} className="border-b last:border-0 hover:bg-gray-50">
+                    <td className="py-2 pr-3 font-mono text-xs">{(c.zoneId ?? '').slice(0, 12)}...</td>
+                    <td className="py-2 pr-3">{c.pageNumber}</td>
+                    <td className="py-2 pr-3 text-xs">
+                      <span className="text-red-500">{c.fromLabel}</span> → <span className="text-green-600">{c.toLabel}</span>
+                    </td>
+                    <td className="py-2 pr-3 text-xs text-gray-500 max-w-[200px] truncate">{c.reason || '--'}</td>
+                    <td className="py-2 pr-3 text-xs text-gray-500">{c.reviewedBy ?? '--'}</td>
+                    <td className="py-2 text-xs text-gray-500">{fmtDate(c.createdAt)}</td>
+                  </tr>
+                ))}
+                {corrections.length === 0 && (
+                  <tr><td colSpan={6} className="py-8 text-center text-gray-400">No corrections recorded</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -14,6 +14,7 @@ import {
 } from '@/hooks/useZoneReview';
 import type { AutoAnnotationResult } from '@/services/zone-correction.service';
 import { useTaggedPdfUrl } from '@/hooks/useTaggedPdfUrl';
+import { useAnnotationTimer } from '@/hooks/useAnnotationTimer';
 import { api } from '@/services/api';
 import { PageThumbnailNav } from './PageThumbnailNav';
 import ZonePdfPanel from './ZonePdfPanel';
@@ -100,6 +101,12 @@ export default function ZoneReviewWorkspace({
   const confirmAllGreen = useConfirmAllGreen(runId);
   const autoAnnotateMutation = useAutoAnnotate(runId);
 
+  // Annotation timer
+  const { recordDecision } = useAnnotationTimer(runId);
+
+  // Correction reason
+  const [correctionReason, setCorrectionReason] = useState('');
+
   // Selected zone
   const selectedZone = useMemo(
     () => zones.find((z) => z.id === selectedZoneId) ?? null,
@@ -151,24 +158,29 @@ export default function ZoneReviewWorkspace({
   const handleConfirm = useCallback(
     (zoneId: string) => {
       confirmZone.mutate(zoneId);
+      recordDecision('confirm');
       setSelectedZoneId(null);
+      setCorrectionReason('');
     },
-    [confirmZone],
+    [confirmZone, recordDecision],
   );
 
   const handleReject = useCallback(
     (zoneId: string) => {
-      rejectZone.mutate(zoneId);
+      rejectZone.mutate({ zoneId, correctionReason: correctionReason || undefined });
+      recordDecision('reject');
       setSelectedZoneId(null);
+      setCorrectionReason('');
     },
-    [rejectZone],
+    [rejectZone, recordDecision, correctionReason],
   );
 
   const handleReclassify = useCallback(
     (zoneId: string, newLabel: string) => {
-      correctZone.mutate({ zoneId, payload: { newLabel } });
+      correctZone.mutate({ zoneId, payload: { newLabel, correctionReason: correctionReason || undefined } });
+      recordDecision('correct');
     },
-    [correctZone],
+    [correctZone, recordDecision, correctionReason],
   );
 
   const handleDismiss = useCallback(() => setSelectedZoneId(null), []);
@@ -305,6 +317,24 @@ export default function ZoneReviewWorkspace({
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Report links */}
+          {runId && (
+            <>
+              <button
+                onClick={() => navigate(`/calibration/runs/${runId}/annotation-report`)}
+                className="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
+              >
+                Annotation Report
+              </button>
+              <button
+                onClick={() => navigate(`/calibration/runs/${runId}/timesheet`)}
+                className="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
+              >
+                Timesheet
+              </button>
+            </>
+          )}
+
           {/* Confirm All Green */}
           <button
             onClick={handleConfirmAllGreen}
@@ -554,6 +584,8 @@ export default function ZoneReviewWorkspace({
           rejectPending={rejectZone.isPending}
           correctPending={correctZone.isPending}
           zoneNumber={selectedZoneNumber}
+          correctionReason={correctionReason}
+          onCorrectionReasonChange={setCorrectionReason}
         />
       )}
 

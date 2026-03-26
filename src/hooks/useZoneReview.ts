@@ -41,7 +41,7 @@ export function useCorrectZone(runId: string) {
       payload,
     }: {
       zoneId: string;
-      payload: { newLabel: string; bbox?: object };
+      payload: { newLabel: string; correctionReason?: string; bbox?: object };
     }) => correctZone(zoneId, payload),
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ['calibration', 'zones', runId] }),
@@ -51,7 +51,8 @@ export function useCorrectZone(runId: string) {
 export function useRejectZone(runId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: rejectZone,
+    mutationFn: ({ zoneId, correctionReason }: { zoneId: string; correctionReason?: string }) =>
+      rejectZone(zoneId, correctionReason ? { correctionReason } : undefined),
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ['calibration', 'zones', runId] }),
   });
