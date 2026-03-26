@@ -16,6 +16,19 @@ function pct(n: number, total: number): string {
   return `${Math.round((n / total) * 100)}%`;
 }
 
+function fmtRate(val: unknown): string {
+  if (val == null || typeof val !== 'number') return '--';
+  return `${(val * 100).toFixed(1)}%`;
+}
+
+function fmtSummaryValue(key: string, val: unknown): string {
+  if (val == null) return '--';
+  if (typeof val === 'number' && key.toLowerCase().endsWith('rate')) {
+    return fmtRate(val);
+  }
+  return typeof val === 'number' ? String(val) : String(val);
+}
+
 type Tab = 'summary' | 'zones' | 'quality' | 'corrections';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -100,12 +113,12 @@ export default function AnnotationReportPage() {
 
       {/* Document info */}
       <div className="bg-white rounded-lg shadow p-4 flex flex-wrap gap-6 text-sm">
-        <div><span className="text-gray-500">Document:</span> <span className="font-medium">{report.documentName ?? '--'}</span></div>
+        <div><span className="text-gray-500">Document:</span> <span className="font-medium">{report.header?.documentName ?? report.documentName ?? 'Unknown'}</span></div>
         <div><span className="text-gray-500">Run ID:</span> <span className="font-mono text-xs">{runId?.slice(0, 12)}...</span></div>
-        <div><span className="text-gray-500">Pages:</span> <span className="font-medium">{summary.pageCount ?? '--'}</span></div>
-        <div><span className="text-gray-500">Date:</span> <span className="font-medium">{fmtDate(report.createdAt)}</span></div>
-        {report.annotators && (
-          <div><span className="text-gray-500">Annotators:</span> <span className="font-medium">{(report.annotators as string[]).join(', ')}</span></div>
+        <div><span className="text-gray-500">Pages:</span> <span className="font-medium">{report.header?.totalPages ?? summary.pageCount ?? '--'}</span></div>
+        <div><span className="text-gray-500">Date:</span> <span className="font-medium">{fmtDate(report.header?.createdAt ?? report.createdAt)}</span></div>
+        {(report.header?.annotators ?? report.annotators) && (
+          <div><span className="text-gray-500">Annotators:</span> <span className="font-medium">{((report.header?.annotators ?? report.annotators) as string[]).join(', ')}</span></div>
         )}
       </div>
 
@@ -130,7 +143,7 @@ export default function AnnotationReportPage() {
           { label: 'AMBER', value: summary.amberCount ?? 0, color: 'text-amber-600' },
           { label: 'RED', value: summary.redCount ?? 0, color: 'text-red-600' },
           { label: 'Accuracy Rate', value: summary.accuracyRate != null ? `${Math.round(summary.accuracyRate * 100)}%` : '--', color: 'text-blue-600' },
-          { label: 'Auto-Annotated', value: summary.autoAnnotatedCount ?? 0, color: 'text-indigo-600' },
+          { label: 'Auto-Annotated', value: summary.autoAnnotated ?? summary.autoAnnotatedCount ?? 0, color: 'text-indigo-600' },
         ].map(k => (
           <div key={k.label} className="bg-white rounded-lg shadow p-4 text-center">
             <p className={`text-2xl font-bold tabular-nums ${k.color}`}>{k.value}</p>
@@ -166,7 +179,7 @@ export default function AnnotationReportPage() {
             {Object.entries(summary).map(([key, val]) => (
               <div key={key} className="flex justify-between py-1 border-b border-gray-100">
                 <span className="text-gray-500">{key}</span>
-                <span className="font-medium">{typeof val === 'number' ? val : String(val ?? '--')}</span>
+                <span className="font-medium">{fmtSummaryValue(key, val)}</span>
               </div>
             ))}
           </div>
@@ -251,11 +264,11 @@ export default function AnnotationReportPage() {
           <h3 className="text-sm font-semibold mb-4">Quality Metrics</h3>
           <div className="grid grid-cols-2 gap-4 text-sm">
             {[
-              { label: 'Extractor Agreement Rate', value: quality.extractorAgreementRate != null ? `${Math.round(quality.extractorAgreementRate * 100)}%` : '--' },
-              { label: 'Auto-Annotation Coverage', value: quality.autoAnnotationCoverage != null ? `${Math.round(quality.autoAnnotationCoverage * 100)}%` : '--' },
-              { label: 'Human Review Required', value: quality.humanReviewRequired != null ? `${Math.round(quality.humanReviewRequired * 100)}%` : '--' },
-              { label: 'Correction Rate', value: quality.correctionRate != null ? `${Math.round(quality.correctionRate * 100)}%` : '--' },
-              { label: 'Rejection Rate', value: quality.rejectionRate != null ? `${Math.round(quality.rejectionRate * 100)}%` : '--' },
+              { label: 'Extractor Agreement Rate', value: fmtRate(quality.extractorAgreementRate) },
+              { label: 'Auto-Annotation Coverage', value: fmtRate(quality.autoAnnotationCoverage) },
+              { label: 'Human Review Required', value: fmtRate(quality.humanReviewRequiredPct ?? quality.humanReviewRequired) },
+              { label: 'Correction Rate', value: fmtRate(quality.correctionRate) },
+              { label: 'Rejection Rate', value: fmtRate(quality.rejectionRate) },
               { label: 'Pages With Zero Corrections', value: quality.pagesWithZeroCorrections ?? '--' },
               { label: 'Most Corrected Page', value: quality.mostCorrectedPage ?? '--' },
             ].map(m => (
