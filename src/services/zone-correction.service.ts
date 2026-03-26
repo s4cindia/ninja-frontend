@@ -16,6 +16,7 @@ export interface CalibrationZone {
   tableStructure?: { thead: unknown; tbody: unknown };
   isArtefact: boolean;
   confidence?: number;
+  verifiedBy?: string;
 }
 
 export interface ZonesResponse {

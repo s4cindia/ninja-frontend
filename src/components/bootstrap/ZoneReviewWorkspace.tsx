@@ -201,7 +201,7 @@ export default function ZoneReviewWorkspace({
       } else if (e.key === 'ArrowRight' && currentPage < numPages) {
         setCurrentPage((p) => p + 1);
         setSelectedZoneId(null);
-      } else if (e.key === 'c' && selectedZoneId && selectedZone && !selectedZone.operatorVerified) {
+      } else if (e.key === 'c' && selectedZoneId && selectedZone) {
         handleConfirm(selectedZoneId);
       } else if (e.key === 'r' && selectedZoneId && selectedZone && !selectedZone.isArtefact) {
         handleReject(selectedZoneId);
