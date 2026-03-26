@@ -263,14 +263,17 @@ export default function ZoneReviewWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoAnnotateToggle, runId, zones]);
 
-  const handleManualAutoAnnotate = useCallback(() => {
-    autoAnnotateMutation.mutate(undefined, {
-      onSuccess: (result) => {
-        setAutoAnnotateResult(result);
-        setTimeout(() => setAutoAnnotateResult(null), 5000);
-      },
-    });
-  }, [autoAnnotateMutation]);
+  const handleToggleAutoAnnotate = useCallback((newValue: boolean) => {
+    setAutoAnnotateToggle(newValue);
+    if (newValue && runId) {
+      autoAnnotateMutation.mutate(undefined, {
+        onSuccess: (result) => {
+          setAutoAnnotateResult(result);
+          setTimeout(() => setAutoAnnotateResult(null), 5000);
+        },
+      });
+    }
+  }, [runId, autoAnnotateMutation]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] bg-gray-50">
@@ -346,33 +349,22 @@ export default function ZoneReviewWorkspace({
               : `Confirm All Green (${unconfirmedGreenOnPage})`}
           </button>
 
-          {/* Auto-Annotate button */}
-          <button
-            onClick={handleManualAutoAnnotate}
-            disabled={autoAnnotateMutation.isPending || !runId}
-            className="px-3 py-1.5 text-xs font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {autoAnnotateMutation.isPending ? (
-              <span className="flex items-center gap-1">
-                <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+          {/* Auto-Annotation toggle */}
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <span className="text-xs text-gray-500 flex items-center gap-1">
+              Auto Annotation
+              {autoAnnotateMutation.isPending && (
+                <svg className="animate-spin h-3 w-3 text-indigo-600" viewBox="0 0 24 24" fill="none">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                Running...
-              </span>
-            ) : (
-              'Auto-Annotate'
-            )}
-          </button>
-
-          {/* Auto-Annotate toggle */}
-          <label className="flex items-center gap-1.5 cursor-pointer select-none">
-            <span className="text-xs text-gray-500">Auto</span>
+              )}
+            </span>
             <button
               type="button"
               role="switch"
               aria-checked={autoAnnotateToggle}
-              onClick={() => setAutoAnnotateToggle((v) => !v)}
+              onClick={() => handleToggleAutoAnnotate(!autoAnnotateToggle)}
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
                 autoAnnotateToggle ? 'bg-indigo-600' : 'bg-gray-300'
               }`}
