@@ -129,7 +129,7 @@ describe('ZoneDetailPanel', () => {
     expect(onReject).toHaveBeenCalledWith('zone-abc-123-def');
   });
 
-  it('disables Confirm button when operatorVerified=true', () => {
+  it('shows Re-confirm button when operatorVerified=true', () => {
     render(
       <ZoneDetailPanel
         zone={makeZone({ operatorVerified: true })}
@@ -142,8 +142,8 @@ describe('ZoneDetailPanel', () => {
         isRejecting={false}
       />
     );
-    const btn = screen.getByText('✓ Confirmed');
-    expect(btn).toBeDisabled();
+    const btn = screen.getByText('Re-confirm');
+    expect(btn).toBeEnabled();
   });
 
   it('shows "Edit Table Structure" for table zones', () => {

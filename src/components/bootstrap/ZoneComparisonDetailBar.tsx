@@ -117,17 +117,23 @@ export default function ZoneComparisonDetailBar({
             onChange={(e) => onCorrectionReasonChange?.(e.target.value)}
             className="text-sm border border-gray-300 rounded px-2 py-1 w-full placeholder:text-gray-400"
           />
+          {zone.operatorVerified && (
+            <div className="text-xs text-gray-500 flex items-center gap-1">
+              <span>Previously: {zone.isArtefact ? 'Rejected' : 'Confirmed'} as {zone.operatorLabel ?? zone.type}</span>
+              {zone.verifiedBy && <span>by {zone.verifiedBy}</span>}
+            </div>
+          )}
           <div className="flex gap-2">
             <button
               onClick={() => onConfirm(zone.id)}
-              disabled={confirmPending || zone.operatorVerified}
+              disabled={confirmPending}
               className="flex-1 px-3 py-1.5 text-xs font-medium rounded bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {confirmPending ? 'Confirming...' : 'Confirm'}
+              {confirmPending ? 'Confirming...' : zone.operatorVerified ? 'Re-confirm' : 'Confirm'}
             </button>
             <button
               onClick={() => onReject(zone.id)}
-              disabled={rejectPending || zone.isArtefact}
+              disabled={rejectPending}
               className="flex-1 px-3 py-1.5 text-xs font-medium rounded border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {rejectPending ? 'Rejecting...' : 'Reject'}

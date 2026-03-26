@@ -90,22 +90,24 @@ export default function ZoneDetailPanel({
       <ZoneLabelDropdown
         value={labelValue || zone.operatorLabel || zone.type}
         onChange={handleLabelChange}
-        disabled={zone.operatorVerified || isConfirming || isCorrecting}
+        disabled={isConfirming || isCorrecting}
       />
 
       {/* Section 4 — Action buttons */}
       <div className="space-y-2">
+        {zone.operatorVerified && (
+          <div className="text-xs text-gray-500 flex items-center gap-1">
+            <span>Previously: {zone.isArtefact ? 'Rejected' : 'Confirmed'} as {zone.operatorLabel ?? zone.type}</span>
+            {zone.verifiedBy && <span>by {zone.verifiedBy}</span>}
+          </div>
+        )}
         <button
           onClick={() => onConfirm(zone.id)}
-          disabled={zone.operatorVerified || zone.isArtefact || isConfirming}
+          disabled={zone.isArtefact || isConfirming}
           aria-label={`Confirm zone ${zone.id.slice(0, 8)}`}
-          className={`w-full rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-            zone.operatorVerified
-              ? 'bg-green-600 text-white'
-              : 'bg-teal-600 text-white hover:bg-teal-700'
-          }`}
+          className="w-full rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-teal-600 text-white hover:bg-teal-700"
         >
-          {zone.operatorVerified ? '✓ Confirmed' : 'Confirm'}
+          {zone.operatorVerified ? 'Re-confirm' : 'Confirm'}
         </button>
 
         {zone.type === 'table' && (
