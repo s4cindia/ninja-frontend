@@ -122,7 +122,7 @@ function ZonePdfPanelInner({
       {/* Scrollable PDF area */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-100"
+        className="flex-1 overflow-y-scroll overflow-x-hidden bg-gray-100"
         onScroll={handleScroll}
       >
         {pdfUrl ? (

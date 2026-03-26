@@ -406,7 +406,7 @@ export default function ZoneReviewWorkspace({
           {/* Right panel PDF content */}
           <div
             ref={rightScrollRef}
-            className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-100"
+            className="flex-1 overflow-y-scroll overflow-x-hidden bg-gray-100"
             onScroll={(e) => {
               if (isRightExternalScroll.current) {
                 isRightExternalScroll.current = false;
