@@ -10,7 +10,9 @@ import {
   useCorrectZone,
   useRejectZone,
   useConfirmAllGreen,
+  useAutoAnnotate,
 } from '@/hooks/useZoneReview';
+import type { AutoAnnotationResult } from '@/services/zone-correction.service';
 import { useTaggedPdfUrl } from '@/hooks/useTaggedPdfUrl';
 import { api } from '@/services/api';
 import { PageThumbnailNav } from './PageThumbnailNav';
@@ -55,6 +57,11 @@ export default function ZoneReviewWorkspace({
   const [rightPanelWidth, setRightPanelWidth] = useState(0);
   const [showZoneList, setShowZoneList] = useState(true);
   const [showPages, setShowPages] = useState(false);
+  const [autoAnnotateToggle, setAutoAnnotateToggle] = useState(
+    () => localStorage.getItem('ninja:autoAnnotateEnabled') !== 'false',
+  );
+  const autoAnnotateRanRef = useRef<string | null>(null);
+  const [autoAnnotateResult, setAutoAnnotateResult] = useState<AutoAnnotationResult | null>(null);
 
   // Keep page input in sync with currentPage (arrow buttons, thumbnail clicks, etc.)
   useEffect(() => {
@@ -91,6 +98,7 @@ export default function ZoneReviewWorkspace({
   const correctZone = useCorrectZone(runId);
   const rejectZone = useRejectZone(runId);
   const confirmAllGreen = useConfirmAllGreen(runId);
+  const autoAnnotateMutation = useAutoAnnotate(runId);
 
   // Selected zone
   const selectedZone = useMemo(
@@ -222,6 +230,36 @@ export default function ZoneReviewWorkspace({
     }
   }, [syncedScrollTop]);
 
+  // Persist auto-annotate toggle preference
+  useEffect(() => {
+    localStorage.setItem('ninja:autoAnnotateEnabled', String(autoAnnotateToggle));
+  }, [autoAnnotateToggle]);
+
+  // Auto-trigger auto-annotate once when zones load
+  useEffect(() => {
+    if (!autoAnnotateToggle) return;
+    if (!runId || autoAnnotateRanRef.current === runId) return;
+    if (!zones || zones.length === 0) return;
+
+    autoAnnotateRanRef.current = runId;
+    autoAnnotateMutation.mutate(undefined, {
+      onSuccess: (result) => {
+        setAutoAnnotateResult(result);
+        setTimeout(() => setAutoAnnotateResult(null), 5000);
+      },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoAnnotateToggle, runId, zones]);
+
+  const handleManualAutoAnnotate = useCallback(() => {
+    autoAnnotateMutation.mutate(undefined, {
+      onSuccess: (result) => {
+        setAutoAnnotateResult(result);
+        setTimeout(() => setAutoAnnotateResult(null), 5000);
+      },
+    });
+  }, [autoAnnotateMutation]);
+
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] bg-gray-50">
       {/* Toolbar */}
@@ -277,6 +315,45 @@ export default function ZoneReviewWorkspace({
               ? 'Confirming...'
               : `Confirm All Green (${unconfirmedGreenOnPage})`}
           </button>
+
+          {/* Auto-Annotate button */}
+          <button
+            onClick={handleManualAutoAnnotate}
+            disabled={autoAnnotateMutation.isPending || !runId}
+            className="px-3 py-1.5 text-xs font-medium rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {autoAnnotateMutation.isPending ? (
+              <span className="flex items-center gap-1">
+                <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Running...
+              </span>
+            ) : (
+              'Auto-Annotate'
+            )}
+          </button>
+
+          {/* Auto-Annotate toggle */}
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <span className="text-xs text-gray-500">Auto</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={autoAnnotateToggle}
+              onClick={() => setAutoAnnotateToggle((v) => !v)}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                autoAnnotateToggle ? 'bg-indigo-600' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                  autoAnnotateToggle ? 'translate-x-4' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </label>
 
           <button
             onClick={() => setShowPages((v) => !v)}
@@ -355,6 +432,22 @@ export default function ZoneReviewWorkspace({
           </div>
         </div>
       </div>
+
+      {/* Auto-annotate result banner */}
+      {autoAnnotateResult && (
+        <div className="flex items-center justify-between px-4 py-2 bg-green-50 border-b border-green-200 text-sm text-green-800">
+          <span>
+            Auto-annotated: {autoAnnotateResult.totalConfirmed} confirmed, {autoAnnotateResult.totalCorrected} corrected, {autoAnnotateResult.totalRejected} rejected
+            <span className="text-green-600 ml-1">({(autoAnnotateResult.durationMs / 1000).toFixed(1)}s)</span>
+          </span>
+          <button
+            onClick={() => setAutoAnnotateResult(null)}
+            className="text-green-600 hover:text-green-800 text-lg leading-none"
+          >
+            &times;
+          </button>
+        </div>
+      )}
 
       {/* Two PDF panels side by side */}
       <div className="flex flex-1 min-h-0">
