@@ -36,14 +36,15 @@ export const confirmZone = async (
 
 export const correctZone = async (
   zoneId: string,
-  payload: { newLabel: string; bbox?: object }
+  payload: { newLabel: string; correctionReason?: string; bbox?: object }
 ): Promise<CalibrationZone> =>
   (await api.post(`/calibration/zones/${encodeURIComponent(zoneId)}/correct`, payload)).data.data;
 
 export const rejectZone = async (
-  zoneId: string
+  zoneId: string,
+  payload?: { correctionReason?: string }
 ): Promise<CalibrationZone> =>
-  (await api.post(`/calibration/zones/${encodeURIComponent(zoneId)}/reject`)).data.data;
+  (await api.post(`/calibration/zones/${encodeURIComponent(zoneId)}/reject`, payload)).data.data;
 
 export const confirmAllGreen = async (
   runId: string

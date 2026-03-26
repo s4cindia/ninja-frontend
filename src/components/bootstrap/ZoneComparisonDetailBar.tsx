@@ -23,6 +23,8 @@ interface ZoneComparisonDetailBarProps {
   rejectPending?: boolean;
   correctPending?: boolean;
   zoneNumber?: number;
+  correctionReason?: string;
+  onCorrectionReasonChange?: (reason: string) => void;
 }
 
 export default function ZoneComparisonDetailBar({
@@ -35,6 +37,8 @@ export default function ZoneComparisonDetailBar({
   rejectPending,
   correctPending,
   zoneNumber,
+  correctionReason = '',
+  onCorrectionReasonChange,
 }: ZoneComparisonDetailBarProps) {
   const [showTechnical, setShowTechnical] = useState(false);
   const [selectedLabel, setSelectedLabel] = useState(
@@ -101,6 +105,13 @@ export default function ZoneComparisonDetailBar({
               </option>
             ))}
           </select>
+          <input
+            type="text"
+            placeholder="Reason for correction (optional)"
+            value={correctionReason}
+            onChange={(e) => onCorrectionReasonChange?.(e.target.value)}
+            className="text-sm border border-gray-300 rounded px-2 py-1 w-full placeholder:text-gray-400"
+          />
           <div className="flex gap-2">
             <button
               onClick={() => onConfirm(zone.id)}
