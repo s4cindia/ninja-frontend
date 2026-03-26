@@ -122,7 +122,7 @@ export default function ZoneDetailPanel({
 
         <button
           onClick={() => onReject(zone.id)}
-          disabled={isRejecting}
+          disabled={zone.isArtefact || isRejecting}
           aria-label={`Reject zone ${zone.id.slice(0, 8)} as artefact`}
           className="w-full border border-red-300 text-red-600 rounded-md px-4 py-2 text-sm hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
