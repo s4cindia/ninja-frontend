@@ -53,6 +53,11 @@ export default function ZoneComparisonDetailBar({
 
   return (
     <div className="border-t-2 border-gray-300 bg-white shadow-lg">
+      {!zone.bounds && (
+        <div className="mx-4 mt-3 bg-gray-50 border border-gray-200 rounded p-2 text-xs text-gray-500">
+          This zone was detected in the PDF structure tree but has no computed bounding box. It cannot be highlighted on the canvas.
+        </div>
+      )}
       <div className="flex items-start gap-4 px-4 py-3 overflow-x-auto">
         {/* Zone metadata */}
         <div className="flex flex-col gap-1 shrink-0">
