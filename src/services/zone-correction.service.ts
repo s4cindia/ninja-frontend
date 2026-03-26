@@ -49,3 +49,30 @@ export const confirmAllGreen = async (
   runId: string
 ): Promise<{ confirmedCount: number }> =>
   (await api.post(`/calibration/runs/${encodeURIComponent(runId)}/confirm-all-green`)).data.data;
+
+export interface AutoAnnotationResult {
+  runId: string;
+  patternsApplied: {
+    pattern: string;
+    description: string;
+    confirmed: number;
+    corrected: number;
+    rejected: number;
+    skipped: number;
+    details: string[];
+  }[];
+  totalConfirmed: number;
+  totalCorrected: number;
+  totalRejected: number;
+  totalSkipped: number;
+  durationMs: number;
+}
+
+export const runAutoAnnotation = async (
+  runId: string,
+  patterns?: string[]
+): Promise<AutoAnnotationResult> =>
+  (await api.post(
+    `/calibration/runs/${encodeURIComponent(runId)}/auto-annotate`,
+    patterns ? { patterns } : undefined
+  )).data.data;
