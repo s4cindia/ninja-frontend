@@ -4,11 +4,18 @@ import type { CalibrationZone } from '@/services/zone-correction.service';
 
 const ZONE_TYPE_OPTIONS = [
   { value: 'paragraph', label: 'Body Text' },
-  { value: 'section-header', label: 'Heading' },
+  { value: 'section-header', label: 'Heading (generic)' },
+  { value: 'h1', label: 'H1 — Title' },
+  { value: 'h2', label: 'H2 — Section' },
+  { value: 'h3', label: 'H3 — Sub-section' },
+  { value: 'h4', label: 'H4' },
+  { value: 'h5', label: 'H5' },
+  { value: 'h6', label: 'H6' },
   { value: 'table', label: 'Table' },
   { value: 'figure', label: 'Figure / Image' },
   { value: 'caption', label: 'Caption' },
   { value: 'footnote', label: 'Footnote' },
+  { value: 'list-item', label: 'List Item' },
   { value: 'header', label: 'Page Header' },
   { value: 'footer', label: 'Page Footer' },
 ];
@@ -42,7 +49,7 @@ export default function ZoneComparisonDetailBar({
 }: ZoneComparisonDetailBarProps) {
   const [showTechnical, setShowTechnical] = useState(false);
   const [selectedLabel, setSelectedLabel] = useState(
-    zone.operatorLabel ?? zone.doclingLabel ?? zone.pdfxtLabel ?? zone.type,
+    zone.operatorLabel ?? zone.pdfxtLabel ?? zone.doclingLabel ?? zone.type,
   );
 
   const handleLabelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -104,6 +111,9 @@ export default function ZoneComparisonDetailBar({
             disabled={correctPending}
             className="text-sm border border-gray-300 rounded px-2 py-1 w-full"
           >
+            {!ZONE_TYPE_OPTIONS.some((o) => o.value === selectedLabel) && (
+              <option value={selectedLabel}>{selectedLabel}</option>
+            )}
             {ZONE_TYPE_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}

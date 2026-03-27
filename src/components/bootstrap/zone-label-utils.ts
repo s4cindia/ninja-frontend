@@ -38,8 +38,19 @@ const LABEL_MAP: Record<string, string> = {
   'div': 'DIV',
 };
 
-export function friendlyLabel(zone: CalibrationZone, source: 'docling' | 'pdfxt'): string {
-  const raw = source === 'docling' ? zone.doclingLabel : zone.pdfxtLabel;
+export function friendlyLabel(zone: CalibrationZone, source: 'docling' | 'pdfxt' | 'operator'): string {
+  const raw =
+    source === 'operator' ? zone.operatorLabel :
+    source === 'docling' ? zone.doclingLabel :
+    zone.pdfxtLabel;
   if (!raw) return '?';
   return LABEL_MAP[raw.toLowerCase()] ?? raw.slice(0, 3).toUpperCase();
+}
+
+/** Returns the best available friendly label: operatorLabel > pdfxtLabel > doclingLabel > type */
+export function bestFriendlyLabel(zone: CalibrationZone): string {
+  if (zone.operatorLabel) return friendlyLabel(zone, 'operator');
+  if (zone.pdfxtLabel) return friendlyLabel(zone, 'pdfxt');
+  if (zone.doclingLabel) return friendlyLabel(zone, 'docling');
+  return LABEL_MAP[zone.type.toLowerCase()] ?? zone.type.slice(0, 3).toUpperCase();
 }

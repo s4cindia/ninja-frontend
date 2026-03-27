@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { CalibrationZone } from '@/services/zone-correction.service';
-import { friendlyLabel } from './zone-label-utils';
+import { bestFriendlyLabel } from './zone-label-utils';
 
 interface ZoneListSidebarProps {
   zones: CalibrationZone[];
@@ -69,15 +69,7 @@ export default function ZoneListSidebar({
                 </span>
               </div>
               <div className="ml-7 mt-0.5 text-gray-500 flex items-center gap-1">
-                <span>
-                  {zone.doclingLabel && zone.pdfxtLabel
-                    ? `${friendlyLabel(zone, 'docling')} / ${friendlyLabel(zone, 'pdfxt')}`
-                    : zone.doclingLabel
-                      ? friendlyLabel(zone, 'docling')
-                      : zone.pdfxtLabel
-                        ? friendlyLabel(zone, 'pdfxt')
-                        : '?'}
-                </span>
+                <span>{bestFriendlyLabel(zone)}</span>
                 {!zone.bounds && (
                   <span className="text-xs text-gray-400 italic flex items-center gap-0.5">
                     <span className="border border-dashed border-gray-400 w-3 h-3 inline-block rounded-sm" />
