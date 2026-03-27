@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Upload, Database, RefreshCw, Loader2 } from 'lucide-react';
+import { Upload, Database, RefreshCw, Loader2, Trash2 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import {
   getUploadUrl,
@@ -8,6 +8,7 @@ import {
   listCorpusDocuments,
   triggerCalibrationRun,
   resetCorpus,
+  resetCorpusDocuments,
 } from '@/services/adminApi';
 import type { CorpusDocument } from '@/services/adminApi';
 
@@ -68,7 +69,7 @@ function RunStatusBadge({ status }: { status: string | undefined }) {
 function SkeletonRow() {
   return (
     <tr>
-      {Array.from({ length: 6 }).map((_, i) => (
+      {Array.from({ length: 7 }).map((_, i) => (
         <td key={i} className="px-4 py-3">
           <div className="h-4 bg-gray-200 rounded animate-pulse" />
         </td>
@@ -99,6 +100,8 @@ export default function AdminCorpusPage() {
   const [filterContentType, setFilterContentType] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [resettingSelected, setResettingSelected] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -145,6 +148,39 @@ export default function AdminCorpusPage() {
       alert('Reset failed — check console for details.');
     } finally {
       setResetting(false);
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredDocuments.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredDocuments.map((d) => d.id)));
+    }
+  };
+
+  const handleResetSelected = async () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Delete ${selectedIds.size} selected document(s) and all their calibration data? This cannot be undone.`)) return;
+    setResettingSelected(true);
+    try {
+      const result = await resetCorpusDocuments(Array.from(selectedIds));
+      alert(`Reset complete: ${result.deletedDocuments} docs, ${result.deletedCalibrationRuns} runs, ${result.deletedZones} zones deleted.`);
+      setSelectedIds(new Set());
+      await loadDocuments();
+    } catch {
+      alert('Reset failed — check console for details.');
+    } finally {
+      setResettingSelected(false);
     }
   };
 
@@ -394,6 +430,16 @@ export default function AdminCorpusPage() {
             Corpus Documents
           </h2>
           <div className="flex items-center gap-2">
+            {selectedIds.size > 0 && (
+              <button
+                onClick={handleResetSelected}
+                disabled={resettingSelected}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-red-300 rounded text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {resettingSelected ? 'Resetting...' : `Reset Selected (${selectedIds.size})`}
+              </button>
+            )}
             <button
               onClick={handleReset}
               disabled={resetting}
@@ -441,6 +487,7 @@ export default function AdminCorpusPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-4 py-3 w-10"></th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Filename</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Publisher</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Content Type</th>
@@ -469,6 +516,14 @@ export default function AdminCorpusPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-4 py-3 w-10">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.size === filteredDocuments.length && filteredDocuments.length > 0}
+                      onChange={toggleSelectAll}
+                      className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                    />
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Filename
                   </th>
@@ -498,6 +553,14 @@ export default function AdminCorpusPage() {
                     lastRun?.status === 'RUNNING';
                   return (
                     <tr key={doc.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(doc.id)}
+                          onChange={() => toggleSelect(doc.id)}
+                          className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                        />
+                      </td>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900 truncate max-w-xs">
                         {doc.filename}
                       </td>

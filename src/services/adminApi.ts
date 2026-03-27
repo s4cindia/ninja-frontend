@@ -71,6 +71,16 @@ export const resetCorpus = async (): Promise<{
 }> =>
   (await api.post('/admin/corpus/reset')).data.data;
 
+export const resetCorpusDocuments = async (
+  documentIds: string[]
+): Promise<{
+  deletedDocuments: number;
+  deletedCalibrationRuns: number;
+  deletedBootstrapJobs: number;
+  deletedZones: number;
+  deletedAnnotationSessions: number;
+}> => (await api.post('/admin/corpus/reset-documents', { documentIds })).data.data;
+
 // ── Users ────────────────────────────────────────────
 
 export interface AdminUser {
