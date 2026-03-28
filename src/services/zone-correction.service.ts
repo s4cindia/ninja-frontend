@@ -17,6 +17,8 @@ export interface CalibrationZone {
   isArtefact: boolean;
   confidence?: number;
   verifiedBy?: string;
+  aiConfidence?: number;
+  aiReason?: string;
 }
 
 export interface ZonesResponse {
@@ -78,3 +80,35 @@ export const runAutoAnnotation = async (
     `/calibration/runs/${encodeURIComponent(runId)}/auto-annotate`,
     patterns ? { patterns } : undefined
   )).data.data;
+
+export interface AiAnnotationResult {
+  runId: string;
+  aiRunId: string;
+  totalZones: number;
+  annotatedZones: number;
+  skippedZones: number;
+  confirmedCount: number;
+  correctedCount: number;
+  rejectedCount: number;
+  highConfCount: number;
+  medConfCount: number;
+  lowConfCount: number;
+  inputTokens: number;
+  outputTokens: number;
+  estimatedCostUsd: number;
+  durationMs: number;
+}
+
+export const runAiAnnotation = async (
+  runId: string,
+  options?: { dryRun?: boolean }
+): Promise<AiAnnotationResult> =>
+  (await api.post(
+    `/calibration/runs/${encodeURIComponent(runId)}/ai-annotate`,
+    options,
+  )).data.data;
+
+export const getAiAnnotationReport = async (
+  runId: string
+): Promise<unknown> =>
+  (await api.get(`/calibration/runs/${encodeURIComponent(runId)}/ai-annotation-report`)).data.data;

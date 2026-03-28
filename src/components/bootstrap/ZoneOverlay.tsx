@@ -124,6 +124,26 @@ function ZoneOverlayInner({
               >
                 {zoneNumber}
               </text>
+              {/* AI confidence dot */}
+              {zone.aiConfidence != null && (
+                <circle
+                  cx={x + 22}
+                  cy={y + 6}
+                  r={4}
+                  fill={
+                    zone.aiConfidence >= 0.95
+                      ? '#22c55e'
+                      : zone.aiConfidence >= 0.80
+                        ? '#eab308'
+                        : '#ef4444'
+                  }
+                  stroke="white"
+                  strokeWidth={1}
+                  style={{ pointerEvents: 'none' }}
+                >
+                  <title>{zone.aiReason ?? `AI confidence: ${Math.round(zone.aiConfidence * 100)}%`}</title>
+                </circle>
+              )}
               {/* Full label badge — only on selected zone */}
               {isSelected && (
                 <>

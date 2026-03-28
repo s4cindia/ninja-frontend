@@ -11,8 +11,9 @@ import {
   useRejectZone,
   useConfirmAllGreen,
   useAutoAnnotate,
+  useAiAnnotate,
 } from '@/hooks/useZoneReview';
-import type { AutoAnnotationResult } from '@/services/zone-correction.service';
+import type { AutoAnnotationResult, AiAnnotationResult } from '@/services/zone-correction.service';
 import { useTaggedPdfUrl } from '@/hooks/useTaggedPdfUrl';
 import { useAnnotationTimer } from '@/hooks/useAnnotationTimer';
 import { api } from '@/services/api';
@@ -63,6 +64,7 @@ export default function ZoneReviewWorkspace({
   );
   const autoAnnotateRanRef = useRef<string | null>(null);
   const [autoAnnotateResult, setAutoAnnotateResult] = useState<AutoAnnotationResult | null>(null);
+  const [aiAnnotateResult, setAiAnnotateResult] = useState<AiAnnotationResult | null>(null);
 
   // Keep page input in sync with currentPage (arrow buttons, thumbnail clicks, etc.)
   useEffect(() => {
@@ -100,6 +102,7 @@ export default function ZoneReviewWorkspace({
   const rejectZone = useRejectZone(runId);
   const confirmAllGreen = useConfirmAllGreen(runId);
   const autoAnnotateMutation = useAutoAnnotate(runId);
+  const aiAnnotateMutation = useAiAnnotate(runId);
 
   // Annotation timer
   const { recordDecision } = useAnnotationTimer(runId);
@@ -275,6 +278,14 @@ export default function ZoneReviewWorkspace({
     }
   }, [runId, autoAnnotateMutation]);
 
+  const handleAiAnnotate = useCallback(() => {
+    aiAnnotateMutation.mutate(undefined, {
+      onSuccess: (result) => {
+        setAiAnnotateResult(result);
+      },
+    });
+  }, [aiAnnotateMutation]);
+
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] bg-gray-50">
       {/* Toolbar */}
@@ -347,6 +358,21 @@ export default function ZoneReviewWorkspace({
             {confirmAllGreen.isPending
               ? 'Confirming...'
               : `Confirm All Green (${unconfirmedGreenOnPage})`}
+          </button>
+
+          {/* AI Annotate button */}
+          <button
+            onClick={handleAiAnnotate}
+            disabled={aiAnnotateMutation.isPending}
+            className="px-3 py-1.5 text-xs font-medium rounded bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+          >
+            {aiAnnotateMutation.isPending && (
+              <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            )}
+            {aiAnnotateMutation.isPending ? 'Running...' : 'AI Annotate'}
           </button>
 
           {/* Auto-Annotation toggle */}
@@ -465,6 +491,24 @@ export default function ZoneReviewWorkspace({
           <button
             onClick={() => setAutoAnnotateResult(null)}
             className="text-green-600 hover:text-green-800 text-lg leading-none"
+          >
+            &times;
+          </button>
+        </div>
+      )}
+
+      {/* AI annotation result banner */}
+      {aiAnnotateResult && (
+        <div className="flex items-center justify-between px-4 py-2 bg-purple-50 border-b border-purple-200 text-sm text-purple-800">
+          <span>
+            AI annotated: {aiAnnotateResult.confirmedCount} confirmed, {aiAnnotateResult.correctedCount} corrected, {aiAnnotateResult.skippedZones} skipped
+            <span className="text-purple-600 ml-1">
+              (cost: ${aiAnnotateResult.estimatedCostUsd.toFixed(2)}, {(aiAnnotateResult.durationMs / 1000).toFixed(1)}s)
+            </span>
+          </span>
+          <button
+            onClick={() => setAiAnnotateResult(null)}
+            className="text-purple-600 hover:text-purple-800 text-lg leading-none"
           >
             &times;
           </button>

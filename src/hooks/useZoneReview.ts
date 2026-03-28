@@ -6,6 +6,7 @@ import {
   rejectZone,
   confirmAllGreen,
   runAutoAnnotation,
+  runAiAnnotation,
 } from '../services/zone-correction.service';
 
 export const ZONE_KEYS = {
@@ -71,6 +72,15 @@ export function useAutoAnnotate(runId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => runAutoAnnotation(runId),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['calibration', 'zones', runId] }),
+  });
+}
+
+export function useAiAnnotate(runId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (options?: { dryRun?: boolean }) => runAiAnnotation(runId, options),
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ['calibration', 'zones', runId] }),
   });

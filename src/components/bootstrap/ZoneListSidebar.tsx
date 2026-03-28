@@ -70,6 +70,18 @@ export default function ZoneListSidebar({
               </div>
               <div className="ml-7 mt-0.5 text-gray-500 flex items-center gap-1">
                 <span>{bestFriendlyLabel(zone)}</span>
+                {zone.aiConfidence != null && (
+                  <span
+                    className={`w-2 h-2 rounded-full inline-block shrink-0 ${
+                      zone.aiConfidence >= 0.95
+                        ? 'bg-green-500'
+                        : zone.aiConfidence >= 0.80
+                          ? 'bg-yellow-500'
+                          : 'bg-red-500'
+                    }`}
+                    title={zone.aiReason ?? `AI confidence: ${Math.round(zone.aiConfidence * 100)}%`}
+                  />
+                )}
                 {!zone.bounds && (
                   <span className="text-xs text-gray-400 italic flex items-center gap-0.5">
                     <span className="border border-dashed border-gray-400 w-3 h-3 inline-block rounded-sm" />
