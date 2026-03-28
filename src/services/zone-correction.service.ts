@@ -108,7 +108,96 @@ export const runAiAnnotation = async (
     options,
   )).data.data;
 
+export interface AiAnnotationReportData {
+  runs: {
+    id: string;
+    calibrationRunId: string;
+    model: string;
+    status: string;
+    totalZones: number;
+    annotatedZones: number;
+    skippedZones: number;
+    confirmedCount: number;
+    correctedCount: number;
+    rejectedCount: number;
+    highConfCount: number;
+    medConfCount: number;
+    lowConfCount: number;
+    inputTokens: number;
+    outputTokens: number;
+    estimatedCostUsd: number;
+    durationMs: number;
+    createdAt: string;
+    completedAt: string;
+  }[];
+  totalAiAnnotatedZones: number;
+  aiOverriddenByHuman: number;
+  zones: unknown[];
+}
+
 export const getAiAnnotationReport = async (
   runId: string
-): Promise<unknown> =>
+): Promise<AiAnnotationReportData> =>
   (await api.get(`/calibration/runs/${encodeURIComponent(runId)}/ai-annotation-report`)).data.data;
+
+export interface ComparisonResult {
+  comparisonId: string;
+  calibrationRunId: string;
+  totalZones: number;
+  comparableZones: number;
+  agreementCount: number;
+  disagreementCount: number;
+  agreementRate: number;
+  cohensKappa: number | null;
+  perTypeAccuracy: Record<string, number>;
+  perBucketAccuracy: Record<string, number>;
+  confidenceCalibration: Array<{
+    bucket: string;
+    predicted: number;
+    actual: number;
+    count: number;
+  }>;
+  commonMistakes: Array<{
+    from: string;
+    to: string;
+    count: number;
+  }>;
+  zoneDetails: Array<{
+    zoneId: string;
+    pageNumber: number;
+    type: string;
+    reconciliationBucket: string | null;
+    humanDecision: string;
+    humanLabel: string;
+    aiDecision: string;
+    aiLabel: string;
+    aiConfidence: number;
+    agrees: boolean;
+  }>;
+  durationMs: number;
+}
+
+export const runComparison = async (
+  runId: string
+): Promise<ComparisonResult> =>
+  (await api.post(`/calibration/runs/${encodeURIComponent(runId)}/compare`)).data.data;
+
+export const getComparisonReport = async (
+  runId: string
+): Promise<{ comparisons: ComparisonResult[] }> =>
+  (await api.get(`/calibration/runs/${encodeURIComponent(runId)}/comparison-report`)).data.data;
+
+export interface AnnotationGuideData {
+  pages: {
+    pageNumber: number;
+    title: string;
+    zoneCount: number;
+    markdown: string;
+  }[];
+  generatedAt: string;
+}
+
+export const getAnnotationGuide = async (
+  runId: string
+): Promise<AnnotationGuideData> =>
+  (await api.get(`/calibration/runs/${encodeURIComponent(runId)}/annotation-guide`)).data.data;

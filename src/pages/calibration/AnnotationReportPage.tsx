@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { annotationReportService } from '@/services/annotation-report.service';
+import { useAiAnnotationReport } from '@/hooks/useZoneReview';
 import { Spinner } from '@/components/ui/Spinner';
 
 function fmtDate(d: string | null | undefined): string {
@@ -29,7 +30,7 @@ function fmtSummaryValue(key: string, val: unknown): string {
   return typeof val === 'number' ? String(val) : String(val);
 }
 
-type Tab = 'summary' | 'zones' | 'quality' | 'corrections';
+type Tab = 'summary' | 'zones' | 'quality' | 'corrections' | 'ai-costs';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export default function AnnotationReportPage() {
@@ -79,6 +80,7 @@ export default function AnnotationReportPage() {
     { key: 'zones', label: 'Zone Details' },
     { key: 'quality', label: 'Quality Metrics' },
     { key: 'corrections', label: 'Corrections Log' },
+    { key: 'ai-costs', label: 'AI Costs' },
   ];
 
   return (
@@ -333,6 +335,147 @@ export default function AnnotationReportPage() {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {tab === 'ai-costs' && <AiCostsTab runId={runId!} />}
+    </div>
+  );
+}
+
+function AiCostsTab({ runId }: { runId: string }) {
+  const { data: aiReport, isLoading } = useAiAnnotationReport(runId);
+
+  if (isLoading) return <div className="flex justify-center py-8"><Spinner size="md" /></div>;
+  if (!aiReport) return <div className="text-center py-8 text-gray-400">No AI annotation data available.</div>;
+
+  const runs = aiReport.runs ?? [];
+  const latestRun = runs[0];
+  const overrideRate = aiReport.totalAiAnnotatedZones > 0
+    ? ((aiReport.aiOverriddenByHuman / aiReport.totalAiAnnotatedZones) * 100).toFixed(1)
+    : '0.0';
+
+  const fmtTokens = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(0)}k` : String(n);
+  const fmtDuration = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
+  const fmtCost = (n: number) => `$${n.toFixed(3)}`;
+  const fmtShortDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+  return (
+    <div className="space-y-6">
+      {/* Row 1: Summary Metrics */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Total AI Runs', value: runs.length, color: 'text-gray-900' },
+          { label: 'Zones Annotated', value: `${aiReport.totalAiAnnotatedZones} / ${latestRun?.totalZones ?? '--'}`, color: 'text-blue-600' },
+          { label: 'Human Overrides', value: aiReport.aiOverriddenByHuman, color: 'text-amber-600' },
+          { label: 'Override Rate', value: `${overrideRate}%`, color: 'text-red-600' },
+        ].map((k) => (
+          <div key={k.label} className="bg-white rounded-lg shadow p-4 text-center">
+            <p className={`text-2xl font-bold tabular-nums ${k.color}`}>{k.value}</p>
+            <p className="text-xs mt-1 text-gray-500">{k.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Row 2: Cost & Performance Table */}
+      {runs.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-sm font-semibold mb-4">Cost &amp; Performance (per run)</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-xs text-gray-500">
+                  <th className="text-left py-2 pr-3">Run</th>
+                  <th className="text-left py-2 pr-3">Model</th>
+                  <th className="text-right py-2 pr-3">Zones</th>
+                  <th className="text-right py-2 pr-3">Tokens (in/out)</th>
+                  <th className="text-right py-2 pr-3">Cost</th>
+                  <th className="text-right py-2 pr-3">Duration</th>
+                  <th className="text-left py-2">Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {runs.map((r, i) => (
+                  <tr key={r.id} className="border-b last:border-0 hover:bg-gray-50">
+                    <td className="py-2 pr-3 font-medium">{runs.length - i}</td>
+                    <td className="py-2 pr-3 text-xs text-gray-500">{r.model}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums">{r.annotatedZones}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums text-xs">{fmtTokens(r.inputTokens)}/{fmtTokens(r.outputTokens)}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums font-medium">{fmtCost(r.estimatedCostUsd)}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums">{fmtDuration(r.durationMs)}</td>
+                    <td className="py-2 text-xs text-gray-500">{fmtShortDate(r.createdAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Row 3: Decision Distribution (latest run) */}
+      {latestRun && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-sm font-semibold mb-4">Decision Distribution (latest run)</h3>
+          <div className="flex h-6 rounded-full overflow-hidden">
+            {[
+              { label: 'Confirmed', count: latestRun.confirmedCount, color: 'bg-green-500' },
+              { label: 'Corrected', count: latestRun.correctedCount, color: 'bg-yellow-500' },
+              { label: 'Rejected', count: latestRun.rejectedCount, color: 'bg-red-500' },
+              { label: 'Skipped', count: latestRun.skippedZones, color: 'bg-gray-400' },
+            ].map((s) => {
+              const pct = latestRun.totalZones > 0 ? (s.count / latestRun.totalZones) * 100 : 0;
+              if (pct === 0) return null;
+              return (
+                <div
+                  key={s.label}
+                  className={`${s.color} flex items-center justify-center text-[10px] font-bold text-white`}
+                  style={{ width: `${pct}%` }}
+                  title={`${s.label}: ${s.count}`}
+                >
+                  {pct > 8 ? s.count : ''}
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex gap-4 mt-2 text-xs text-gray-500">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> Confirmed: {latestRun.confirmedCount}</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500 inline-block" /> Corrected: {latestRun.correctedCount}</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> Rejected: {latestRun.rejectedCount}</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-400 inline-block" /> Skipped: {latestRun.skippedZones}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Row 4: Confidence Distribution (latest run) */}
+      {latestRun && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-sm font-semibold mb-4">Confidence Distribution (latest run)</h3>
+          <div className="flex h-6 rounded-full overflow-hidden">
+            {[
+              { label: 'High (>= 0.95)', count: latestRun.highConfCount, color: 'bg-green-500' },
+              { label: 'Medium (0.80-0.95)', count: latestRun.medConfCount, color: 'bg-yellow-500' },
+              { label: 'Low (< 0.80)', count: latestRun.lowConfCount, color: 'bg-red-500' },
+            ].map((s) => {
+              const total = latestRun.highConfCount + latestRun.medConfCount + latestRun.lowConfCount;
+              const pct = total > 0 ? (s.count / total) * 100 : 0;
+              if (pct === 0) return null;
+              return (
+                <div
+                  key={s.label}
+                  className={`${s.color} flex items-center justify-center text-[10px] font-bold text-white`}
+                  style={{ width: `${pct}%` }}
+                  title={`${s.label}: ${s.count}`}
+                >
+                  {pct > 8 ? s.count : ''}
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex gap-4 mt-2 text-xs text-gray-500">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> High: {latestRun.highConfCount}</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500 inline-block" /> Medium: {latestRun.medConfCount}</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> Low: {latestRun.lowConfCount}</span>
           </div>
         </div>
       )}

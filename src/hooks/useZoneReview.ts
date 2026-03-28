@@ -7,6 +7,10 @@ import {
   confirmAllGreen,
   runAutoAnnotation,
   runAiAnnotation,
+  runComparison,
+  getComparisonReport,
+  getAiAnnotationReport,
+  getAnnotationGuide,
 } from '../services/zone-correction.service';
 
 export const ZONE_KEYS = {
@@ -83,5 +87,39 @@ export function useAiAnnotate(runId: string) {
     mutationFn: (options?: { dryRun?: boolean }) => runAiAnnotation(runId, options),
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ['calibration', 'zones', runId] }),
+  });
+}
+
+export function useRunComparison(runId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => runComparison(runId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['comparison-report', runId] });
+    },
+  });
+}
+
+export function useComparisonReport(runId: string) {
+  return useQuery({
+    queryKey: ['comparison-report', runId],
+    queryFn: () => getComparisonReport(runId),
+    enabled: !!runId,
+  });
+}
+
+export function useAiAnnotationReport(runId: string) {
+  return useQuery({
+    queryKey: ['ai-annotation-report', runId],
+    queryFn: () => getAiAnnotationReport(runId),
+    enabled: !!runId,
+  });
+}
+
+export function useAnnotationGuide(runId: string) {
+  return useQuery({
+    queryKey: ['annotation-guide', runId],
+    queryFn: () => getAnnotationGuide(runId),
+    enabled: !!runId,
   });
 }
