@@ -12,8 +12,9 @@ import {
   useConfirmAllGreen,
   useAutoAnnotate,
   useAiAnnotate,
+  useRunComparison,
 } from '@/hooks/useZoneReview';
-import type { AutoAnnotationResult, AiAnnotationResult } from '@/services/zone-correction.service';
+import type { AutoAnnotationResult, AiAnnotationResult, ComparisonResult } from '@/services/zone-correction.service';
 import { useTaggedPdfUrl } from '@/hooks/useTaggedPdfUrl';
 import { useAnnotationTimer } from '@/hooks/useAnnotationTimer';
 import { api } from '@/services/api';
@@ -65,6 +66,7 @@ export default function ZoneReviewWorkspace({
   const autoAnnotateRanRef = useRef<string | null>(null);
   const [autoAnnotateResult, setAutoAnnotateResult] = useState<AutoAnnotationResult | null>(null);
   const [aiAnnotateResult, setAiAnnotateResult] = useState<AiAnnotationResult | null>(null);
+  const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null);
 
   // Keep page input in sync with currentPage (arrow buttons, thumbnail clicks, etc.)
   useEffect(() => {
@@ -103,6 +105,7 @@ export default function ZoneReviewWorkspace({
   const confirmAllGreen = useConfirmAllGreen(runId);
   const autoAnnotateMutation = useAutoAnnotate(runId);
   const aiAnnotateMutation = useAiAnnotate(runId);
+  const comparisonMutation = useRunComparison(runId);
 
   // Annotation timer
   const { recordDecision } = useAnnotationTimer(runId);
@@ -286,6 +289,14 @@ export default function ZoneReviewWorkspace({
     });
   }, [aiAnnotateMutation]);
 
+  const handleCompare = useCallback(() => {
+    comparisonMutation.mutate(undefined, {
+      onSuccess: (result) => {
+        setComparisonResult(result);
+      },
+    });
+  }, [comparisonMutation]);
+
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] bg-gray-50">
       {/* Toolbar */}
@@ -373,6 +384,22 @@ export default function ZoneReviewWorkspace({
               </svg>
             )}
             {aiAnnotateMutation.isPending ? 'Running...' : 'AI Annotate'}
+          </button>
+
+          {/* Compare Human vs AI button */}
+          <button
+            onClick={handleCompare}
+            disabled={comparisonMutation.isPending || !zones.some((z) => z.aiConfidence != null)}
+            title={!zones.some((z) => z.aiConfidence != null) ? 'Run AI annotation first' : 'Compare human vs AI decisions'}
+            className="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+          >
+            {comparisonMutation.isPending && (
+              <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            )}
+            {comparisonMutation.isPending ? 'Comparing...' : 'Compare'}
           </button>
 
           {/* Auto-Annotation toggle */}
@@ -509,6 +536,29 @@ export default function ZoneReviewWorkspace({
           <button
             onClick={() => setAiAnnotateResult(null)}
             className="text-purple-600 hover:text-purple-800 text-lg leading-none"
+          >
+            &times;
+          </button>
+        </div>
+      )}
+
+      {/* Comparison result banner */}
+      {comparisonResult && (
+        <div className="flex items-center justify-between px-4 py-2 bg-blue-50 border-b border-blue-200 text-sm text-blue-800">
+          <span>
+            Agreement: {(comparisonResult.agreementRate * 100).toFixed(1)}%
+            {comparisonResult.cohensKappa != null && ` (\u03BA=${comparisonResult.cohensKappa.toFixed(3)})`}
+            {' \u2014 '}{comparisonResult.agreementCount}/{comparisonResult.comparableZones} zones agree
+            <button
+              onClick={() => navigate(`/calibration/comparison-report/${runId}`)}
+              className="ml-2 text-blue-600 underline hover:text-blue-800"
+            >
+              View full report &rarr;
+            </button>
+          </span>
+          <button
+            onClick={() => setComparisonResult(null)}
+            className="text-blue-600 hover:text-blue-800 text-lg leading-none"
           >
             &times;
           </button>
