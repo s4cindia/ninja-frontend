@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { annotationReportService } from '@/services/annotation-report.service';
-import { useAiAnnotationReport } from '@/hooks/useZoneReview';
+import { useAiAnnotationReport, useAnnotationFeedback } from '@/hooks/useZoneReview';
 import { Spinner } from '@/components/ui/Spinner';
 
 function fmtDate(d: string | null | undefined): string {
@@ -30,7 +30,7 @@ function fmtSummaryValue(key: string, val: unknown): string {
   return typeof val === 'number' ? String(val) : String(val);
 }
 
-type Tab = 'summary' | 'zones' | 'quality' | 'corrections' | 'ai-costs';
+type Tab = 'summary' | 'zones' | 'quality' | 'corrections' | 'ai-costs' | 'feedback';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export default function AnnotationReportPage() {
@@ -81,6 +81,7 @@ export default function AnnotationReportPage() {
     { key: 'quality', label: 'Quality Metrics' },
     { key: 'corrections', label: 'Corrections Log' },
     { key: 'ai-costs', label: 'AI Costs' },
+    { key: 'feedback', label: 'Feedback' },
   ];
 
   return (
@@ -340,6 +341,8 @@ export default function AnnotationReportPage() {
       )}
 
       {tab === 'ai-costs' && <AiCostsTab runId={runId!} />}
+
+      {tab === 'feedback' && <FeedbackTab runId={runId!} />}
     </div>
   );
 }
@@ -476,6 +479,121 @@ function AiCostsTab({ runId }: { runId: string }) {
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> High: {latestRun.highConfCount}</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500 inline-block" /> Medium: {latestRun.medConfCount}</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> Low: {latestRun.lowConfCount}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FeedbackTab({ runId }: { runId: string }) {
+  const { data: fb, isLoading } = useAnnotationFeedback(runId);
+
+  if (isLoading) return <div className="flex justify-center py-8"><Spinner size="md" /></div>;
+  if (!fb) return <div className="text-center py-8 text-gray-400">No feedback data available.</div>;
+
+  const overrideColor = fb.overrideRate < 0.10 ? 'text-green-600' : fb.overrideRate < 0.20 ? 'text-yellow-600' : 'text-red-600';
+  const confColor = fb.averageOverriddenConfidence >= 0.95 ? 'text-green-600' : fb.averageOverriddenConfidence >= 0.80 ? 'text-yellow-600' : 'text-red-600';
+
+  const matrix = fb.overridesByDecision;
+  const matrixRows = [
+    { label: 'AI Confirmed', confirmed: '—', corrected: matrix.aiConfirmedHumanCorrected, rejected: matrix.aiConfirmedHumanRejected },
+    { label: 'AI Corrected', confirmed: matrix.aiCorrectedHumanConfirmed, corrected: matrix.aiCorrectedHumanCorrected, rejected: matrix.aiCorrectedHumanRejected },
+    { label: 'AI Rejected', confirmed: matrix.aiRejectedHumanConfirmed, corrected: matrix.aiRejectedHumanCorrected, rejected: '—' },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Section A: KPI cards */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white rounded-lg shadow p-4 text-center">
+          <p className={`text-2xl font-bold tabular-nums ${overrideColor}`}>{(fb.overrideRate * 100).toFixed(1)}%</p>
+          <p className="text-xs mt-1 text-gray-500">Override Rate</p>
+        </div>
+        <div className="bg-white rounded-lg shadow p-4 text-center">
+          <p className="text-2xl font-bold tabular-nums text-gray-900">{fb.totalHumanOverrides} <span className="text-lg font-normal text-gray-400">/ {fb.totalAiAnnotated}</span></p>
+          <p className="text-xs mt-1 text-gray-500">Total Overrides</p>
+        </div>
+        <div className="bg-white rounded-lg shadow p-4 text-center">
+          <p className={`text-2xl font-bold tabular-nums ${confColor}`}>{fb.averageOverriddenConfidence.toFixed(2)}</p>
+          <p className="text-xs mt-1 text-gray-500">Avg Override Confidence</p>
+        </div>
+      </div>
+
+      {/* Section B: Override by Label */}
+      {fb.overridesByType.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-sm font-semibold mb-4">Overrides by Label</h3>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-xs text-gray-500">
+                <th className="text-left py-2 pr-3">AI Predicted</th>
+                <th className="text-left py-2 pr-3">Human Changed To</th>
+                <th className="text-right py-2">Count</th>
+              </tr>
+            </thead>
+            <tbody>
+              {fb.overridesByType.map((o, i) => (
+                <tr key={i} className="border-b last:border-0 hover:bg-gray-50">
+                  <td className="py-2 pr-3 text-red-600">{o.aiLabel}</td>
+                  <td className="py-2 pr-3 text-green-600">&rarr; {o.humanLabel}</td>
+                  <td className="py-2 text-right font-semibold tabular-nums">{o.count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Section C: Decision Matrix */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-sm font-semibold mb-4">Override Decision Matrix</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-xs text-gray-500">
+                <th className="text-left py-2 pr-3"></th>
+                <th className="text-center py-2 px-3">Human Confirmed</th>
+                <th className="text-center py-2 px-3">Human Corrected</th>
+                <th className="text-center py-2 px-3">Human Rejected</th>
+              </tr>
+            </thead>
+            <tbody>
+              {matrixRows.map((row) => (
+                <tr key={row.label} className="border-b last:border-0 hover:bg-gray-50">
+                  <td className="py-2 pr-3 font-medium text-xs">{row.label}</td>
+                  {[row.confirmed, row.corrected, row.rejected].map((val, i) => (
+                    <td key={i} className={`py-2 px-3 text-center tabular-nums ${val === '—' ? 'text-gray-300' : typeof val === 'number' && val > 10 ? 'bg-red-50 text-red-700 font-semibold' : typeof val === 'number' && val > 0 ? 'bg-yellow-50 text-yellow-700' : ''}`}>
+                      {val}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Section D: Confidence vs Override Rate */}
+      {fb.confidenceDistribution.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-sm font-semibold mb-4">Confidence vs Override Rate</h3>
+          <div className="space-y-2">
+            {fb.confidenceDistribution.map((row) => {
+              const barWidth = Math.max(row.overrideRate * 100, 2);
+              const barColor = row.overrideRate < 0.05 ? 'bg-green-500' : row.overrideRate < 0.15 ? 'bg-yellow-500' : 'bg-red-500';
+              return (
+                <div key={row.bucket} className="flex items-center gap-3">
+                  <span className="w-24 text-xs font-mono text-gray-600">{row.bucket}</span>
+                  <div className="flex-1 bg-gray-100 rounded-full h-5">
+                    <div className={`${barColor} rounded-full h-5 flex items-center justify-end pr-2`} style={{ width: `${barWidth}%` }}>
+                      <span className="text-[10px] font-bold text-white">{(row.overrideRate * 100).toFixed(1)}%</span>
+                    </div>
+                  </div>
+                  <span className="w-20 text-xs text-gray-400 text-right">{row.overrides}/{row.total}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

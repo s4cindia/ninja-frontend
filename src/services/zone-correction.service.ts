@@ -201,3 +201,121 @@ export const getAnnotationGuide = async (
   runId: string
 ): Promise<AnnotationGuideData> =>
   (await api.get(`/calibration/runs/${encodeURIComponent(runId)}/annotation-guide`)).data.data;
+
+// ── Feedback ──
+
+export interface FeedbackData {
+  calibrationRunId: string;
+  totalAiAnnotated: number;
+  totalHumanOverrides: number;
+  overrideRate: number;
+  overridesByType: Array<{ aiLabel: string; humanLabel: string; count: number }>;
+  overridesByDecision: {
+    aiConfirmedHumanCorrected: number;
+    aiConfirmedHumanRejected: number;
+    aiCorrectedHumanConfirmed: number;
+    aiCorrectedHumanCorrected: number;
+    aiCorrectedHumanRejected: number;
+    aiRejectedHumanConfirmed: number;
+    aiRejectedHumanCorrected: number;
+  };
+  averageOverriddenConfidence: number;
+  confidenceDistribution: Array<{
+    bucket: string;
+    overrides: number;
+    total: number;
+    overrideRate: number;
+  }>;
+}
+
+export const getAnnotationFeedback = async (
+  runId: string
+): Promise<FeedbackData> =>
+  (await api.get(`/calibration/runs/${encodeURIComponent(runId)}/feedback`)).data.data;
+
+// ── Bulk AI Annotation ──
+
+export interface BulkAiAnnotationResult {
+  totalRuns: number;
+  completedRuns: number;
+  failedRuns: number;
+  results: Array<{
+    calibrationRunId: string;
+    documentId: string;
+    documentName: string;
+    status: string;
+    result?: { totalZones: number; annotatedZones: number };
+  }>;
+  totalZones: number;
+  totalAnnotated: number;
+  totalCostUsd: number;
+  totalDurationMs: number;
+}
+
+export const runBulkAiAnnotation = async (options: {
+  documentIds?: string[];
+  runIds?: string[];
+  confidenceThreshold?: number;
+  dryRun?: boolean;
+}): Promise<BulkAiAnnotationResult> =>
+  (await api.post('/calibration/ai-annotate-batch', options)).data.data;
+
+// ── Aggregate Comparison ──
+
+export interface AggregateComparisonResult {
+  totalRuns: number;
+  totalComparableZones: number;
+  overallAgreementRate: number;
+  overallCohensKappa: number | null;
+  perRunSummary: Array<{
+    calibrationRunId: string;
+    documentName: string;
+    publisher: string;
+    comparableZones: number;
+    agreementRate: number;
+    cohensKappa: number | null;
+    createdAt: string;
+  }>;
+  perTypeAccuracy: Record<string, { agree: number; total: number; rate: number }>;
+  perBucketAccuracy: Record<string, { agree: number; total: number; rate: number }>;
+  perPublisherAccuracy: Record<string, { agree: number; total: number; rate: number }>;
+  topMistakes: Array<{ from: string; to: string; count: number }>;
+  promptVersionStats: Array<{
+    promptVersion: string;
+    runs: number;
+    avgAgreementRate: number;
+    avgCohensKappa: number | null;
+  }>;
+  timeSavingsEstimate?: {
+    avgHumanTimePerZoneMs: number;
+    avgAiAssistedTimePerZoneMs: number;
+    estimatedSpeedup: number;
+  };
+}
+
+export const getAggregateComparison = async (options?: {
+  documentIds?: string[];
+  fromDate?: string;
+}): Promise<AggregateComparisonResult> =>
+  (await api.post('/calibration/comparison/aggregate', options ?? {})).data.data;
+
+// ── Training Export ──
+
+export interface TrainingExportResult {
+  documents: unknown[];
+  stats: {
+    totalDocuments: number;
+    totalZones: number;
+    zonesWithHumanLabel: number;
+    zonesWithAiLabel: number;
+    zonesRejected: number;
+    byPublisher: Record<string, number>;
+  };
+}
+
+export const exportTrainingData = async (options: {
+  documentIds?: string[];
+  minConfidence?: number;
+  includeAiOnly?: boolean;
+}): Promise<TrainingExportResult> =>
+  (await api.post('/calibration/export-training', options)).data.data;

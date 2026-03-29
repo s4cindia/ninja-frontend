@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Upload, Database, RefreshCw, Loader2, Trash2 } from 'lucide-react';
+import { Upload, Database, RefreshCw, Loader2, Trash2, Sparkles, Download } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import {
   getUploadUrl,
@@ -10,6 +10,7 @@ import {
   resetCorpus,
   resetCorpusDocuments,
 } from '@/services/adminApi';
+import { runBulkAiAnnotation, exportTrainingData } from '@/services/zone-correction.service';
 import type { CorpusDocument } from '@/services/adminApi';
 
 const CONTENT_TYPE_OPTIONS = [
@@ -102,6 +103,10 @@ export default function AdminCorpusPage() {
   const [resetting, setResetting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [resettingSelected, setResettingSelected] = useState(false);
+  const [bulkAnnotating, setBulkAnnotating] = useState(false);
+  const [bulkAnnotateResult, setBulkAnnotateResult] = useState<string | null>(null);
+  const [exportingTraining, setExportingTraining] = useState(false);
+  const [exportResult, setExportResult] = useState<string | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -181,6 +186,55 @@ export default function AdminCorpusPage() {
       alert('Reset failed — check console for details.');
     } finally {
       setResettingSelected(false);
+    }
+  };
+
+  const handleBulkAiAnnotate = async () => {
+    if (selectedIds.size === 0) return;
+    const dryRun = !window.confirm(
+      `AI annotate ${selectedIds.size} document(s)?\n\nOK = Auto-apply (>= 0.95 confidence)\nCancel = Abort`,
+    );
+    if (dryRun) return;
+    setBulkAnnotating(true);
+    setBulkAnnotateResult(null);
+    try {
+      const result = await runBulkAiAnnotation({
+        documentIds: Array.from(selectedIds),
+        confidenceThreshold: 0.95,
+        dryRun: false,
+      });
+      setBulkAnnotateResult(
+        `Annotated ${result.completedRuns} documents: ${result.totalAnnotated} zones, $${result.totalCostUsd.toFixed(3)} cost`,
+      );
+      setTimeout(() => setBulkAnnotateResult(null), 8000);
+    } catch {
+      alert('Bulk AI annotation failed — check console for details.');
+    } finally {
+      setBulkAnnotating(false);
+    }
+  };
+
+  const handleExportTraining = async () => {
+    const ids = selectedIds.size > 0 ? Array.from(selectedIds) : undefined;
+    const label = ids ? `${ids.length} selected documents` : 'all documents';
+    if (!window.confirm(`Export training data for ${label}?`)) return;
+    setExportingTraining(true);
+    setExportResult(null);
+    try {
+      const result = await exportTrainingData({
+        documentIds: ids,
+        minConfidence: 0.95,
+        includeAiOnly: true,
+      });
+      const s = result.stats;
+      setExportResult(
+        `Ready: ${s.totalDocuments} docs, ${s.totalZones} zones (${s.zonesWithHumanLabel} human, ${s.zonesWithAiLabel} AI)`,
+      );
+      setTimeout(() => setExportResult(null), 10000);
+    } catch {
+      alert('Export failed — check console for details.');
+    } finally {
+      setExportingTraining(false);
     }
   };
 
@@ -431,15 +485,33 @@ export default function AdminCorpusPage() {
           </h2>
           <div className="flex items-center gap-2">
             {selectedIds.size > 0 && (
-              <button
-                onClick={handleResetSelected}
-                disabled={resettingSelected}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-red-300 rounded text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                {resettingSelected ? 'Resetting...' : `Reset Selected (${selectedIds.size})`}
-              </button>
+              <>
+                <button
+                  onClick={handleBulkAiAnnotate}
+                  disabled={bulkAnnotating}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-purple-300 rounded text-purple-600 hover:bg-purple-50 disabled:opacity-50 transition-colors"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {bulkAnnotating ? 'Annotating...' : `AI Annotate (${selectedIds.size})`}
+                </button>
+                <button
+                  onClick={handleResetSelected}
+                  disabled={resettingSelected}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-red-300 rounded text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {resettingSelected ? 'Resetting...' : `Reset Selected (${selectedIds.size})`}
+                </button>
+              </>
             )}
+            <button
+              onClick={handleExportTraining}
+              disabled={exportingTraining}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-teal-300 rounded text-teal-600 hover:bg-teal-50 disabled:opacity-50 transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {exportingTraining ? 'Exporting...' : 'Export for Training'}
+            </button>
             <button
               onClick={handleReset}
               disabled={resetting}
@@ -457,6 +529,20 @@ export default function AdminCorpusPage() {
             </button>
           </div>
         </div>
+
+        {/* Result banners */}
+        {bulkAnnotateResult && (
+          <div className="mb-3 px-3 py-2 rounded bg-purple-50 border border-purple-200 text-sm text-purple-800 flex items-center justify-between">
+            <span><Sparkles className="h-3.5 w-3.5 inline mr-1" />{bulkAnnotateResult}</span>
+            <button onClick={() => setBulkAnnotateResult(null)} className="text-purple-600 hover:text-purple-800">&times;</button>
+          </div>
+        )}
+        {exportResult && (
+          <div className="mb-3 px-3 py-2 rounded bg-teal-50 border border-teal-200 text-sm text-teal-800 flex items-center justify-between">
+            <span><Download className="h-3.5 w-3.5 inline mr-1" />{exportResult}</span>
+            <button onClick={() => setExportResult(null)} className="text-teal-600 hover:text-teal-800">&times;</button>
+          </div>
+        )}
 
         {/* Filter bar */}
         <div className="flex items-center gap-4 mb-4">
