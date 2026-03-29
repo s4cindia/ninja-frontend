@@ -11,6 +11,8 @@ import {
   getComparisonReport,
   getAiAnnotationReport,
   getAnnotationGuide,
+  getAnnotationFeedback,
+  getAggregateComparison,
 } from '../services/zone-correction.service';
 
 export const ZONE_KEYS = {
@@ -121,5 +123,20 @@ export function useAnnotationGuide(runId: string) {
     queryKey: ['annotation-guide', runId],
     queryFn: () => getAnnotationGuide(runId),
     enabled: !!runId,
+  });
+}
+
+export function useAnnotationFeedback(runId: string) {
+  return useQuery({
+    queryKey: ['annotation-feedback', runId],
+    queryFn: () => getAnnotationFeedback(runId),
+    enabled: !!runId,
+  });
+}
+
+export function useAggregateComparison(options?: { documentIds?: string[]; fromDate?: string }) {
+  return useQuery({
+    queryKey: ['aggregate-comparison', options],
+    queryFn: () => getAggregateComparison(options),
   });
 }
