@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@/stores/auth.store';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
@@ -45,6 +46,8 @@ export default function ZoneReviewWorkspace({
 }: ZoneReviewWorkspaceProps) {
   const params = useParams<{ documentId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const isOperator = user?.role === 'OPERATOR';
   const docId = documentId || params.documentId || '';
 
   // State
@@ -386,8 +389,8 @@ export default function ZoneReviewWorkspace({
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Report links */}
-          {runId && (
+          {/* Report links (hidden for OPERATOR) */}
+          {!isOperator && runId && (
             <>
               <button
                 onClick={() => navigate(`/calibration/runs/${runId}/annotation-report`)}
@@ -404,75 +407,83 @@ export default function ZoneReviewWorkspace({
             </>
           )}
 
-          {/* Confirm All Green */}
-          <button
-            onClick={handleConfirmAllGreen}
-            disabled={greenCount === 0 || confirmAllGreen.isPending}
-            className="px-3 py-1.5 text-xs font-medium rounded bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {confirmAllGreen.isPending
-              ? 'Confirming...'
-              : `Confirm All Green (${unconfirmedGreenOnPage})`}
-          </button>
+          {/* Confirm All Green (hidden for OPERATOR) */}
+          {!isOperator && (
+            <button
+              onClick={handleConfirmAllGreen}
+              disabled={greenCount === 0 || confirmAllGreen.isPending}
+              className="px-3 py-1.5 text-xs font-medium rounded bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {confirmAllGreen.isPending
+                ? 'Confirming...'
+                : `Confirm All Green (${unconfirmedGreenOnPage})`}
+            </button>
+          )}
 
-          {/* AI Annotate button */}
-          <button
-            onClick={handleAiAnnotate}
-            disabled={aiAnnotating}
-            className="px-3 py-1.5 text-xs font-medium rounded bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
-          >
-            {aiAnnotating && (
-              <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-            )}
-            {aiAnnotating ? 'AI Annotating...' : 'AI Annotate'}
-          </button>
-
-          {/* Compare Human vs AI button */}
-          <button
-            onClick={handleCompare}
-            disabled={comparisonMutation.isPending || !zones.some((z) => z.aiConfidence != null)}
-            title={!zones.some((z) => z.aiConfidence != null) ? 'Run AI annotation first' : 'Compare human vs AI decisions'}
-            className="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
-          >
-            {comparisonMutation.isPending && (
-              <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-            )}
-            {comparisonMutation.isPending ? 'Comparing...' : 'Compare'}
-          </button>
-
-          {/* Auto-Annotation toggle */}
-          <label className="flex items-center gap-1.5 cursor-pointer select-none">
-            <span className="text-xs text-gray-500 flex items-center gap-1">
-              Auto Annotation
-              {autoAnnotateMutation.isPending && (
-                <svg className="animate-spin h-3 w-3 text-indigo-600" viewBox="0 0 24 24" fill="none">
+          {/* AI Annotate button (hidden for OPERATOR) */}
+          {!isOperator && (
+            <button
+              onClick={handleAiAnnotate}
+              disabled={aiAnnotating}
+              className="px-3 py-1.5 text-xs font-medium rounded bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+            >
+              {aiAnnotating && (
+                <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
               )}
-            </span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={autoAnnotateToggle}
-              onClick={() => handleToggleAutoAnnotate(!autoAnnotateToggle)}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                autoAnnotateToggle ? 'bg-indigo-600' : 'bg-gray-300'
-              }`}
-            >
-              <span
-                className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                  autoAnnotateToggle ? 'translate-x-4' : 'translate-x-0.5'
-                }`}
-              />
+              {aiAnnotating ? 'AI Annotating...' : 'AI Annotate'}
             </button>
-          </label>
+          )}
+
+          {/* Compare Human vs AI button (hidden for OPERATOR) */}
+          {!isOperator && (
+            <button
+              onClick={handleCompare}
+              disabled={comparisonMutation.isPending || !zones.some((z) => z.aiConfidence != null)}
+              title={!zones.some((z) => z.aiConfidence != null) ? 'Run AI annotation first' : 'Compare human vs AI decisions'}
+              className="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+            >
+              {comparisonMutation.isPending && (
+                <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              )}
+              {comparisonMutation.isPending ? 'Comparing...' : 'Compare'}
+            </button>
+          )}
+
+          {/* Auto-Annotation toggle (hidden for OPERATOR) */}
+          {!isOperator && (
+            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+              <span className="text-xs text-gray-500 flex items-center gap-1">
+                Auto Annotation
+                {autoAnnotateMutation.isPending && (
+                  <svg className="animate-spin h-3 w-3 text-indigo-600" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                )}
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={autoAnnotateToggle}
+                onClick={() => handleToggleAutoAnnotate(!autoAnnotateToggle)}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                  autoAnnotateToggle ? 'bg-indigo-600' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                    autoAnnotateToggle ? 'translate-x-4' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </label>
+          )}
 
           <button
             onClick={() => setShowPages((v) => !v)}
@@ -698,6 +709,7 @@ export default function ZoneReviewWorkspace({
               selectedZoneId={selectedZoneId}
               onZoneClick={setSelectedZoneId}
               zoneNumberMap={zoneNumberMap}
+              hideAiBadges={isOperator}
             />
           )}
       </div>

@@ -35,6 +35,8 @@ type NavItem = {
   label: string;
   /** If set, the nav item is highlighted when the pathname starts with this prefix instead of `to`. */
   activePrefix?: string;
+  /** If true, this item is hidden from users with the OPERATOR role. */
+  operatorHidden?: boolean;
 };
 
 type NavSection = {
@@ -48,6 +50,7 @@ export function MainLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { collapsed, toggle: toggleSidebar } = useSidebarCollapsed();
+  const isOperator = user?.role === 'OPERATOR';
 
   const handleLogout = () => {
     logout();
@@ -89,8 +92,9 @@ export function MainLayout() {
           icon: Bot,
           label: 'Agentic Batch',
           activePrefix: '/workflow/batch',
+          operatorHidden: true,
         },
-        { to: '/feedback', icon: MessageSquare, label: 'Feedback' },
+        { to: '/feedback', icon: MessageSquare, label: 'Feedback', operatorHidden: true },
         { to: '/reports/time', icon: BarChart2, label: 'Time Reports', activePrefix: '/reports' },
         { to: '/settings/workflow', icon: Settings, label: 'Workflow Settings' },
       ],
@@ -157,7 +161,7 @@ export function MainLayout() {
                   <hr className="my-2 mx-2 border-gray-200" />
                 )}
                 <div className="space-y-1">
-                  {section.items.map((item) => (
+                  {section.items.filter((item) => !(isOperator && item.operatorHidden)).map((item) => (
                     <Link
                       key={item.to}
                       to={item.to}
