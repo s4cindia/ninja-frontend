@@ -8,6 +8,7 @@ interface ZoneListSidebarProps {
   selectedZoneId: string | null;
   onZoneClick: (zoneId: string) => void;
   zoneNumberMap?: Map<string, number>;
+  hideAiBadges?: boolean;
 }
 
 const BUCKET_COLOR = {
@@ -22,6 +23,7 @@ export default function ZoneListSidebar({
   selectedZoneId,
   onZoneClick,
   zoneNumberMap,
+  hideAiBadges,
 }: ZoneListSidebarProps) {
   const pageZones = useMemo(
     () => zones.filter((z) => z.pageNumber === currentPage),
@@ -70,7 +72,7 @@ export default function ZoneListSidebar({
               </div>
               <div className="ml-7 mt-0.5 text-gray-500 flex items-center gap-1">
                 <span>{bestFriendlyLabel(zone)}</span>
-                {zone.aiConfidence != null && (
+                {!hideAiBadges && zone.aiConfidence != null && (
                   <span
                     className={`w-2 h-2 rounded-full inline-block shrink-0 ${
                       zone.aiConfidence >= 0.95
