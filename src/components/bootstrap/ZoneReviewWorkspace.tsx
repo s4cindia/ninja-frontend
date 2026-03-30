@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
@@ -11,10 +12,11 @@ import {
   useRejectZone,
   useConfirmAllGreen,
   useAutoAnnotate,
-  useAiAnnotate,
   useRunComparison,
 } from '@/hooks/useZoneReview';
-import type { AutoAnnotationResult, AiAnnotationResult, ComparisonResult } from '@/services/zone-correction.service';
+import type { AutoAnnotationResult, ComparisonResult } from '@/services/zone-correction.service';
+import { triggerAiAnnotation, getAiAnnotationStatus } from '@/services/zone-correction.service';
+import type { AiAnnotationStatusResponse } from '@/services/zone-correction.service';
 import { useTaggedPdfUrl } from '@/hooks/useTaggedPdfUrl';
 import { useAnnotationTimer } from '@/hooks/useAnnotationTimer';
 import { api } from '@/services/api';
@@ -65,7 +67,9 @@ export default function ZoneReviewWorkspace({
   );
   const autoAnnotateRanRef = useRef<string | null>(null);
   const [autoAnnotateResult, setAutoAnnotateResult] = useState<AutoAnnotationResult | null>(null);
-  const [aiAnnotateResult, setAiAnnotateResult] = useState<AiAnnotationResult | null>(null);
+  const [aiAnnotating, setAiAnnotating] = useState(false);
+  const [aiAnnotateResult, setAiAnnotateResult] = useState<AiAnnotationStatusResponse | null>(null);
+  const aiPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null);
 
   // Keep page input in sync with currentPage (arrow buttons, thumbnail clicks, etc.)
@@ -104,7 +108,6 @@ export default function ZoneReviewWorkspace({
   const rejectZone = useRejectZone(runId);
   const confirmAllGreen = useConfirmAllGreen(runId);
   const autoAnnotateMutation = useAutoAnnotate(runId);
-  const aiAnnotateMutation = useAiAnnotate(runId);
   const comparisonMutation = useRunComparison(runId);
 
   // Annotation timer
@@ -281,13 +284,54 @@ export default function ZoneReviewWorkspace({
     }
   }, [runId, autoAnnotateMutation]);
 
-  const handleAiAnnotate = useCallback(() => {
-    aiAnnotateMutation.mutate(undefined, {
-      onSuccess: (result) => {
-        setAiAnnotateResult(result);
-      },
-    });
-  }, [aiAnnotateMutation]);
+  // Clean up polling on unmount
+  useEffect(() => {
+    return () => {
+      if (aiPollRef.current) clearInterval(aiPollRef.current);
+    };
+  }, []);
+
+  const queryClient = useQueryClient();
+
+  const handleAiAnnotate = useCallback(async () => {
+    if (aiAnnotating) return; // prevent double-click
+    setAiAnnotating(true);
+
+    try {
+      const triggerResult = await triggerAiAnnotation(runId);
+      const aiRunId = triggerResult.aiRunId;
+
+      // Poll every 3 seconds
+      aiPollRef.current = setInterval(async () => {
+        try {
+          const status = await getAiAnnotationStatus(runId, aiRunId);
+
+          if (status.status === 'COMPLETED') {
+            if (aiPollRef.current) clearInterval(aiPollRef.current);
+            aiPollRef.current = null;
+            setAiAnnotating(false);
+            setAiAnnotateResult(status);
+            // Reload zones to show AI annotations
+            queryClient.invalidateQueries({ queryKey: ['calibration', 'zones', runId] });
+          } else if (status.status === 'FAILED') {
+            if (aiPollRef.current) clearInterval(aiPollRef.current);
+            aiPollRef.current = null;
+            setAiAnnotating(false);
+            console.error('AI annotation failed:', status.error);
+          }
+          // While RUNNING — keep polling
+        } catch {
+          if (aiPollRef.current) clearInterval(aiPollRef.current);
+          aiPollRef.current = null;
+          setAiAnnotating(false);
+          console.error('Failed to check AI annotation status');
+        }
+      }, 3000);
+    } catch {
+      setAiAnnotating(false);
+      console.error('Failed to start AI annotation');
+    }
+  }, [aiAnnotating, runId, queryClient]);
 
   const handleCompare = useCallback(() => {
     comparisonMutation.mutate(undefined, {
@@ -374,16 +418,16 @@ export default function ZoneReviewWorkspace({
           {/* AI Annotate button */}
           <button
             onClick={handleAiAnnotate}
-            disabled={aiAnnotateMutation.isPending}
+            disabled={aiAnnotating}
             className="px-3 py-1.5 text-xs font-medium rounded bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
           >
-            {aiAnnotateMutation.isPending && (
+            {aiAnnotating && (
               <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
             )}
-            {aiAnnotateMutation.isPending ? 'Running...' : 'AI Annotate'}
+            {aiAnnotating ? 'AI Annotating...' : 'AI Annotate'}
           </button>
 
           {/* Compare Human vs AI button */}

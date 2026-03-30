@@ -108,6 +108,48 @@ export const runAiAnnotation = async (
     options,
   )).data.data;
 
+// Async AI annotation (non-blocking — returns 202)
+export interface AiAnnotationTriggerResponse {
+  status: 'STARTED' | 'ALREADY_RUNNING';
+  aiRunId: string;
+}
+
+export interface AiAnnotationStatusResponse {
+  id: string;
+  status: 'RUNNING' | 'COMPLETED' | 'FAILED';
+  confirmedCount: number;
+  correctedCount: number;
+  skippedZones: number;
+  estimatedCostUsd: number;
+  durationMs: number;
+  error: string | null;
+  totalZones: number;
+  annotatedZones: number;
+  highConfCount: number;
+  medConfCount: number;
+  lowConfCount: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export const triggerAiAnnotation = async (
+  runId: string,
+  options?: { confidenceThreshold?: number; dryRun?: boolean }
+): Promise<AiAnnotationTriggerResponse> =>
+  (await api.post(
+    `/calibration/runs/${encodeURIComponent(runId)}/ai-annotate`,
+    options,
+  )).data.data;
+
+export const getAiAnnotationStatus = async (
+  runId: string,
+  aiRunId: string
+): Promise<AiAnnotationStatusResponse> =>
+  (await api.get(
+    `/calibration/runs/${encodeURIComponent(runId)}/ai-annotation-status`,
+    { params: { aiRunId } },
+  )).data.data;
+
 export interface AiAnnotationReportData {
   runs: {
     id: string;
