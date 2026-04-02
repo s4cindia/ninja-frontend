@@ -10,6 +10,9 @@ export const annotationReportService = {
   getAnnotationReportPdfUrl: (runId: string) =>
     `/api/v1/calibration/runs/${runId}/annotation-report/export/pdf`,
 
+  getLineageCsvUrl: (runId: string) =>
+    `/api/v1/calibration/runs/${runId}/annotation-report/export/lineage-csv`,
+
   getTimesheetReport: (runId: string) =>
     api.get(`/calibration/runs/${runId}/timesheet-report`).then(r => r.data.data),
 

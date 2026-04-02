@@ -30,7 +30,7 @@ function fmtSummaryValue(key: string, val: unknown): string {
   return typeof val === 'number' ? String(val) : String(val);
 }
 
-type Tab = 'summary' | 'zones' | 'quality' | 'corrections' | 'ai-costs' | 'feedback';
+type Tab = 'summary' | 'zones' | 'quality' | 'corrections' | 'ai-costs' | 'feedback' | 'lineage';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export default function AnnotationReportPage() {
@@ -82,6 +82,7 @@ export default function AnnotationReportPage() {
     { key: 'corrections', label: 'Corrections Log' },
     { key: 'ai-costs', label: 'AI Costs' },
     { key: 'feedback', label: 'Feedback' },
+    { key: 'lineage', label: 'Lineage' },
   ];
 
   return (
@@ -343,6 +344,8 @@ export default function AnnotationReportPage() {
       {tab === 'ai-costs' && <AiCostsTab runId={runId!} />}
 
       {tab === 'feedback' && <FeedbackTab runId={runId!} />}
+
+      {tab === 'lineage' && <LineageTab report={report} runId={runId!} />}
     </div>
   );
 }
@@ -597,6 +600,143 @@ function FeedbackTab({ runId }: { runId: string }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function LineageTab({ report, runId }: { report: any; runId: string }) {
+  const [pageFilter, setPageFilter] = useState('ALL');
+  const [bucketFilter, setBucketFilter] = useState('ALL');
+  const [decisionFilter, setDecisionFilter] = useState('ALL');
+
+  const lineage: any[] = report.lineageDetails ?? [];
+
+  const pages = [...new Set(lineage.map((z: any) => z.pageNumber))].sort((a, b) => a - b);
+
+  const filtered = lineage.filter((z: any) => {
+    if (pageFilter !== 'ALL' && z.pageNumber !== Number(pageFilter)) return false;
+    if (bucketFilter !== 'ALL' && z.reconciliationBucket !== bucketFilter) return false;
+    if (decisionFilter === 'ai-only' && !z.aiDecision) return false;
+    if (decisionFilter === 'human-only' && !z.humanDecision) return false;
+    if (decisionFilter === 'both' && (!z.aiDecision || !z.humanDecision)) return false;
+    if (decisionFilter === 'unreviewed' && (z.aiDecision || z.humanDecision)) return false;
+    return true;
+  });
+
+  const bucketColor = (b: string | null) =>
+    b === 'GREEN' ? 'text-green-600' : b === 'AMBER' ? 'text-amber-600' : b === 'RED' ? 'text-red-600' : 'text-gray-400';
+
+  const decisionColor = (d: string | null) =>
+    d === 'CONFIRMED' ? 'text-green-600' : d === 'CORRECTED' ? 'text-yellow-600' : d === 'REJECTED' ? 'text-red-600' : 'text-gray-400';
+
+  if (lineage.length === 0) {
+    return <div className="text-center py-12 text-gray-400">No lineage data available. Ensure the backend returns lineageDetails in the annotation report.</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex gap-3">
+          <select
+            value={pageFilter}
+            onChange={e => setPageFilter(e.target.value)}
+            className="text-xs border border-gray-300 rounded px-2 py-1"
+          >
+            <option value="ALL">All Pages</option>
+            {pages.map(p => (
+              <option key={p} value={p}>Page {p}</option>
+            ))}
+          </select>
+          <select
+            value={bucketFilter}
+            onChange={e => setBucketFilter(e.target.value)}
+            className="text-xs border border-gray-300 rounded px-2 py-1"
+          >
+            <option value="ALL">All Buckets</option>
+            <option value="GREEN">GREEN</option>
+            <option value="AMBER">AMBER</option>
+            <option value="RED">RED</option>
+          </select>
+          <select
+            value={decisionFilter}
+            onChange={e => setDecisionFilter(e.target.value)}
+            className="text-xs border border-gray-300 rounded px-2 py-1"
+          >
+            <option value="ALL">All Annotations</option>
+            <option value="ai-only">AI Annotated</option>
+            <option value="human-only">Human Annotated</option>
+            <option value="both">AI + Human</option>
+            <option value="unreviewed">Unreviewed</option>
+          </select>
+        </div>
+        <a
+          href={annotationReportService.getLineageCsvUrl(runId)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
+        >
+          Lineage CSV &darr;
+        </a>
+      </div>
+
+      <div className="bg-white rounded-lg shadow">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-xs text-gray-500 bg-gray-50">
+                <th className="text-left py-2 px-3">Page</th>
+                <th className="text-left py-2 px-3">Zone#</th>
+                <th className="text-left py-2 px-3">Docling</th>
+                <th className="text-left py-2 px-3">PDFXT</th>
+                <th className="text-left py-2 px-3">Bucket</th>
+                <th className="text-left py-2 px-3">AI Decision</th>
+                <th className="text-left py-2 px-3">AI Label</th>
+                <th className="text-left py-2 px-3">AI Conf</th>
+                <th className="text-left py-2 px-3">Human Decision</th>
+                <th className="text-left py-2 px-3">Human Label</th>
+                <th className="text-left py-2 px-3">Final</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((z: any, i: number) => (
+                <tr key={z.zoneId ?? i} className="border-b last:border-0 hover:bg-gray-50">
+                  <td className="py-2 px-3">{z.pageNumber}</td>
+                  <td className="py-2 px-3">{z.zoneIndex ?? i + 1}</td>
+                  <td className="py-2 px-3 text-xs">{z.doclingLabel ?? '--'}</td>
+                  <td className="py-2 px-3 text-xs">{z.pdfxtLabel ?? '--'}</td>
+                  <td className="py-2 px-3">
+                    <span className={`text-xs font-medium ${bucketColor(z.reconciliationBucket)}`}>
+                      {z.reconciliationBucket ?? '--'}
+                    </span>
+                  </td>
+                  <td className="py-2 px-3">
+                    <span className={`text-xs font-medium ${decisionColor(z.aiDecision)}`}>
+                      {z.aiDecision ?? '--'}
+                    </span>
+                  </td>
+                  <td className="py-2 px-3 text-xs">{z.aiLabel ?? '--'}</td>
+                  <td className="py-2 px-3 text-xs tabular-nums">
+                    {z.aiConfidence != null ? z.aiConfidence.toFixed(2) : '--'}
+                  </td>
+                  <td className="py-2 px-3">
+                    <span className={`text-xs font-medium ${decisionColor(z.humanDecision)}`}>
+                      {z.humanDecision ?? '--'}
+                    </span>
+                  </td>
+                  <td className="py-2 px-3 text-xs">{z.humanLabel ?? '--'}</td>
+                  <td className="py-2 px-3 text-xs font-medium">{z.finalLabel ?? '--'}</td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr><td colSpan={11} className="py-8 text-center text-gray-400">No zones match filters</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="px-3 py-2 border-t text-xs text-gray-400">
+          Showing {filtered.length} of {lineage.length} zones
+        </div>
+      </div>
     </div>
   );
 }
