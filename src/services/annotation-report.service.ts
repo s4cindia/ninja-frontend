@@ -1,28 +1,36 @@
 import { api } from './api';
 
-const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
+async function downloadFile(url: string, filename: string) {
+  const response = await api.get(url, { responseType: 'blob' });
+  const blob = new Blob([response.data]);
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
 
 export const annotationReportService = {
   getAnnotationReport: (runId: string) =>
     api.get(`/calibration/runs/${runId}/annotation-report`).then(r => r.data.data),
 
-  getAnnotationReportCsvUrl: (runId: string) =>
-    `${API_BASE}/calibration/runs/${runId}/annotation-report/export/csv`,
+  downloadCsv: (runId: string) =>
+    downloadFile(`/calibration/runs/${runId}/annotation-report/export/csv`, `annotation-report-${runId.slice(0, 8)}.csv`),
 
-  getAnnotationReportPdfUrl: (runId: string) =>
-    `${API_BASE}/calibration/runs/${runId}/annotation-report/export/pdf`,
+  downloadPdf: (runId: string) =>
+    downloadFile(`/calibration/runs/${runId}/annotation-report/export/pdf`, `annotation-report-${runId.slice(0, 8)}.pdf`),
 
-  getLineageCsvUrl: (runId: string) =>
-    `${API_BASE}/calibration/runs/${runId}/annotation-report/export/lineage-csv`,
+  downloadLineageCsv: (runId: string) =>
+    downloadFile(`/calibration/runs/${runId}/annotation-report/export/lineage-csv`, `lineage-report-${runId.slice(0, 8)}.csv`),
 
   getTimesheetReport: (runId: string) =>
     api.get(`/calibration/runs/${runId}/timesheet-report`).then(r => r.data.data),
 
-  getTimesheetReportCsvUrl: (runId: string) =>
-    `${API_BASE}/calibration/runs/${runId}/timesheet-report/export/csv`,
+  downloadTimesheetCsv: (runId: string) =>
+    downloadFile(`/calibration/runs/${runId}/timesheet-report/export/csv`, `timesheet-${runId.slice(0, 8)}.csv`),
 
-  getTimesheetReportPdfUrl: (runId: string) =>
-    `${API_BASE}/calibration/runs/${runId}/timesheet-report/export/pdf`,
+  downloadTimesheetPdf: (runId: string) =>
+    downloadFile(`/calibration/runs/${runId}/timesheet-report/export/pdf`, `timesheet-${runId.slice(0, 8)}.pdf`),
 
   startSession: (runId: string, pageNumber?: number) =>
     api.post(`/calibration/runs/${runId}/sessions/start`, { pageNumber }).then(r => r.data.data),
