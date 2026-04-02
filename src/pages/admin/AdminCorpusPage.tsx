@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { Upload, Database, RefreshCw, Loader2, Trash2, Sparkles, Download } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import {
@@ -130,7 +130,7 @@ export default function AdminCorpusPage() {
   }, [loadDocuments]);
 
   if (user?.role !== 'ADMIN') {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/unauthorized" replace />;
   }
 
   const handleRefresh = async () => {
@@ -672,7 +672,15 @@ export default function AdminCorpusPage() {
                       <td className="px-4 py-3">
                         <RunStatusBadge status={lastRun?.status} />
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right space-x-2">
+                        {doc.calibrationRuns?.[0]?.id && (
+                          <Link
+                            to={`/calibration/runs/${doc.calibrationRuns[0].id}/annotation-report`}
+                            className="px-3 py-1.5 text-xs font-medium rounded border border-blue-300 text-blue-600 hover:bg-blue-50 transition-colors"
+                          >
+                            View Report
+                          </Link>
+                        )}
                         <button
                           onClick={() => handleRunExtraction(doc)}
                           disabled={isRunning}
