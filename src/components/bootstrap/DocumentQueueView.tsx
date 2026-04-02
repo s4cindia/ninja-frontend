@@ -19,7 +19,7 @@ function SkeletonRows() {
     <>
       {Array.from({ length: 5 }, (_, i) => (
         <tr key={i}>
-          {Array.from({ length: 6 }, (_, j) => (
+          {Array.from({ length: 7 }, (_, j) => (
             <td key={j} className="px-6 py-4">
               <div className="h-4 bg-gray-200 rounded animate-pulse" />
             </td>
@@ -43,6 +43,38 @@ function OperatorStatusBadge({ status }: { status: CorpusDocumentStatus }) {
   return (
     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${config.bg} ${config.text}`}>
       {config.label}
+    </span>
+  );
+}
+
+function AnnotationStatusBadge({ progress }: { progress?: CorpusDocument['annotationProgress'] }) {
+  if (!progress) return <span className="text-xs text-gray-400">—</span>;
+
+  const { totalZones, annotatedZones, status } = progress;
+
+  if (status === 'COMPLETED') {
+    return (
+      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+        Completed
+      </span>
+    );
+  }
+
+  if (status === 'IN_PROGRESS') {
+    const pct = totalZones > 0 ? Math.round((annotatedZones / totalZones) * 100) : 0;
+    return (
+      <div className="flex items-center gap-1.5">
+        <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }} />
+        </div>
+        <span className="text-xs text-blue-700 font-medium">{annotatedZones}/{totalZones}</span>
+      </div>
+    );
+  }
+
+  return (
+    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+      Not Started
     </span>
   );
 }
@@ -260,6 +292,7 @@ export default function DocumentQueueView() {
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Content Type</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pages</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Annotation</th>
                 <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -288,6 +321,9 @@ export default function DocumentQueueView() {
                           <DocumentStatusBadge status={doc.status ?? 'PENDING'} />
                           <OperatorStatusBadge status={opStatus} />
                         </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <AnnotationStatusBadge progress={doc.annotationProgress} />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end gap-2">
