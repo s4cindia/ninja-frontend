@@ -327,12 +327,22 @@ export default function DocumentQueueView() {
                             </button>
                           )}
                           {opStatus === 'COMPLETED' && (
-                            <button
-                              onClick={() => navigate(`/bootstrap/review/${doc.id}`)}
-                              className="bg-teal-600 text-white text-xs px-3 py-1 rounded hover:bg-teal-700 transition-colors"
-                            >
-                              Review Zones
-                            </button>
+                            <>
+                              <button
+                                onClick={() => navigate(`/bootstrap/review/${doc.id}`)}
+                                className="bg-teal-600 text-white text-xs px-3 py-1 rounded hover:bg-teal-700 transition-colors"
+                              >
+                                Review Zones
+                              </button>
+                              {doc.calibrationRuns?.[0]?.id && (
+                                <button
+                                  onClick={() => navigate(`/bootstrap/lineage/${doc.calibrationRuns![0].id}`)}
+                                  className="border border-gray-300 text-gray-600 text-xs px-3 py-1 rounded hover:bg-gray-50 transition-colors"
+                                >
+                                  Lineage
+                                </button>
+                              )}
+                            </>
                           )}
                         </div>
                         {uploadError[doc.id] && (
