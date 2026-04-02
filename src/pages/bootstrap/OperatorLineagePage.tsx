@@ -33,7 +33,7 @@ export default function OperatorLineagePage() {
   }
 
   const lineage: any[] = report.lineageDetails ?? [];
-  const documentId = report.header?.documentId ?? report.documentId ?? '';
+  const documentId = report.header?.documentId ?? report.documentId;
   const documentName = report.header?.documentName ?? report.documentName ?? 'Unknown';
 
   const pages = [...new Set(lineage.map((z: any) => z.pageNumber))].sort((a: number, b: number) => a - b);
@@ -76,12 +76,14 @@ export default function OperatorLineagePage() {
           >
             Export CSV &darr;
           </button>
-          <Link
-            to={`/bootstrap/review/${documentId}`}
-            className="px-3 py-1.5 text-xs font-medium rounded bg-teal-600 text-white hover:bg-teal-700"
-          >
-            Review Zones
-          </Link>
+          {documentId && (
+            <Link
+              to={`/bootstrap/review/${documentId}`}
+              className="px-3 py-1.5 text-xs font-medium rounded bg-teal-600 text-white hover:bg-teal-700"
+            >
+              Review Zones
+            </Link>
+          )}
         </div>
       </div>
 
@@ -126,6 +128,7 @@ export default function OperatorLineagePage() {
         <select
           value={pageFilter}
           onChange={e => setPageFilter(e.target.value)}
+          aria-label="Filter by page"
           className="text-xs border border-gray-300 rounded px-2 py-1"
         >
           <option value="ALL">All Pages</option>
@@ -136,6 +139,7 @@ export default function OperatorLineagePage() {
         <select
           value={bucketFilter}
           onChange={e => setBucketFilter(e.target.value)}
+          aria-label="Filter by bucket"
           className="text-xs border border-gray-300 rounded px-2 py-1"
         >
           <option value="ALL">All Buckets</option>
@@ -146,6 +150,7 @@ export default function OperatorLineagePage() {
         <select
           value={statusFilter}
           onChange={e => setStatusFilter(e.target.value)}
+          aria-label="Filter by annotation status"
           className="text-xs border border-gray-300 rounded px-2 py-1"
         >
           <option value="ALL">All Status</option>
