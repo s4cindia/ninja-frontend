@@ -694,6 +694,7 @@ function LineageTab({ report, runId }: { report: any; runId: string }) {
                 <th className="text-left py-2 px-3">AI Conf</th>
                 <th className="text-left py-2 px-3">Human Decision</th>
                 <th className="text-left py-2 px-3">Human Label</th>
+                <th className="text-left py-2 px-3">Verified By</th>
                 <th className="text-left py-2 px-3">Final</th>
               </tr>
             </thead>
@@ -724,11 +725,12 @@ function LineageTab({ report, runId }: { report: any; runId: string }) {
                     </span>
                   </td>
                   <td className="py-2 px-3 text-xs">{z.humanLabel ?? '--'}</td>
+                  <td className="py-2 px-3 text-xs text-gray-500">{z.verifiedBy ?? '--'}</td>
                   <td className="py-2 px-3 text-xs font-medium">{z.finalLabel ?? '--'}</td>
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={11} className="py-8 text-center text-gray-400">No zones match filters</td></tr>
+                <tr><td colSpan={12} className="py-8 text-center text-gray-400">No zones match filters</td></tr>
               )}
             </tbody>
           </table>
