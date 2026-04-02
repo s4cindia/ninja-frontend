@@ -61,10 +61,17 @@ function AnnotationStatusBadge({ progress }: { progress?: CorpusDocument['annota
   }
 
   if (status === 'IN_PROGRESS') {
-    const pct = totalZones > 0 ? Math.round((annotatedZones / totalZones) * 100) : 0;
+    const pct = totalZones > 0 ? Math.min(100, Math.round((annotatedZones / totalZones) * 100)) : 0;
     return (
       <div className="flex items-center gap-1.5">
-        <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+        <div
+          className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden"
+          role="progressbar"
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`Annotation progress: ${annotatedZones} of ${totalZones} zones`}
+        >
           <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }} />
         </div>
         <span className="text-xs text-blue-700 font-medium">{annotatedZones}/{totalZones}</span>
