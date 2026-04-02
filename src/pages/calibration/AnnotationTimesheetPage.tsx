@@ -74,22 +74,18 @@ export default function AnnotationTimesheetPage() {
           <h1 className="text-xl font-semibold">Timesheet Report</h1>
         </div>
         <div className="flex gap-2">
-          <a
-            href={annotationReportService.getTimesheetReportCsvUrl(runId!)}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={() => annotationReportService.downloadTimesheetCsv(runId!)}
             className="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
           >
             CSV &darr;
-          </a>
-          <a
-            href={annotationReportService.getTimesheetReportPdfUrl(runId!)}
-            target="_blank"
-            rel="noopener noreferrer"
+          </button>
+          <button
+            onClick={() => annotationReportService.downloadTimesheetPdf(runId!)}
             className="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
           >
             PDF &darr;
-          </a>
+          </button>
         </div>
       </div>
 

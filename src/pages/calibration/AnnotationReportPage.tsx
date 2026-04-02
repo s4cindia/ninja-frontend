@@ -96,22 +96,18 @@ export default function AnnotationReportPage() {
           <h1 className="text-xl font-semibold">Annotation Report</h1>
         </div>
         <div className="flex gap-2">
-          <a
-            href={annotationReportService.getAnnotationReportCsvUrl(runId!)}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={() => annotationReportService.downloadCsv(runId!)}
             className="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
           >
             CSV &darr;
-          </a>
-          <a
-            href={annotationReportService.getAnnotationReportPdfUrl(runId!)}
-            target="_blank"
-            rel="noopener noreferrer"
+          </button>
+          <button
+            onClick={() => annotationReportService.downloadPdf(runId!)}
             className="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
           >
             PDF &darr;
-          </a>
+          </button>
         </div>
       </div>
 
@@ -669,14 +665,12 @@ function LineageTab({ report, runId }: { report: any; runId: string }) {
             <option value="unreviewed">Unreviewed</option>
           </select>
         </div>
-        <a
-          href={annotationReportService.getLineageCsvUrl(runId)}
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          onClick={() => annotationReportService.downloadLineageCsv(runId)}
           className="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
         >
           Lineage CSV &darr;
-        </a>
+        </button>
       </div>
 
       <div className="bg-white rounded-lg shadow">
