@@ -430,11 +430,17 @@ export default function AdminCorpusPage() {
             </label>
             <input
               type="text"
+              list="publisher-options"
               value={publisher}
               onChange={(e) => setPublisher(e.target.value)}
-              placeholder="e.g. Penguin Random House"
+              placeholder="Select or type a publisher"
               className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
+            <datalist id="publisher-options">
+              {[...new Set(documents.map(d => d.publisher).filter(Boolean))].sort().map(p => (
+                <option key={p} value={p!} />
+              ))}
+            </datalist>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
