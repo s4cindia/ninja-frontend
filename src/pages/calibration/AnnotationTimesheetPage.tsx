@@ -68,7 +68,7 @@ export default function AnnotationTimesheetPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link to={`/bootstrap/review/${report.documentId ?? ''}`} className="text-sm text-gray-500 hover:text-gray-700">
+          <Link to={`/bootstrap/review/${report.header?.documentId ?? report.documentId ?? ''}`} className="text-sm text-gray-500 hover:text-gray-700">
             &larr; Back to Zone Review
           </Link>
           <h1 className="text-xl font-semibold">Timesheet Report</h1>
