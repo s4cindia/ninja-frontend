@@ -335,12 +335,20 @@ export default function DocumentQueueView() {
                                 Review Zones
                               </button>
                               {doc.calibrationRuns?.[0]?.id && (
-                                <button
-                                  onClick={() => navigate(`/calibration/runs/${doc.calibrationRuns![0].id}/timesheet`)}
-                                  className="border border-gray-300 text-gray-600 text-xs px-3 py-1 rounded hover:bg-gray-50 transition-colors"
-                                >
-                                  Timesheet
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() => navigate(`/bootstrap/lineage/${doc.calibrationRuns![0].id}`)}
+                                    className="border border-gray-300 text-gray-600 text-xs px-3 py-1 rounded hover:bg-gray-50 transition-colors"
+                                  >
+                                    Lineage
+                                  </button>
+                                  <button
+                                    onClick={() => navigate(`/calibration/runs/${doc.calibrationRuns![0].id}/timesheet`)}
+                                    className="border border-gray-300 text-gray-600 text-xs px-3 py-1 rounded hover:bg-gray-50 transition-colors"
+                                  >
+                                    Timesheet
+                                  </button>
+                                </>
                               )}
                             </>
                           )}

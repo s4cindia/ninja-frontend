@@ -81,6 +81,7 @@ import PdfViewerPage from '@/pages/PdfViewerPage';
 import { PlagiarismPage } from '@/pages/editorial/PlagiarismPage';
 import BootstrapConsolePage from '@/pages/bootstrap/BootstrapConsolePage';
 import ZoneReviewPage from '@/pages/bootstrap/ZoneReviewPage';
+import OperatorLineagePage from '@/pages/bootstrap/OperatorLineagePage';
 import AnnotationReportPage from '@/pages/calibration/AnnotationReportPage';
 import AnnotationTimesheetPage from '@/pages/calibration/AnnotationTimesheetPage';
 import ComparisonReportPage from '@/pages/calibration/ComparisonReportPage';
@@ -264,6 +265,7 @@ function AppRoutes() {
           {/* Bootstrap Console Routes */}
           <Route path="/bootstrap" element={<BootstrapConsolePage />} />
           <Route path="/bootstrap/review/:documentId" element={<ZoneReviewPage />} />
+          <Route path="/bootstrap/lineage/:runId" element={<OperatorLineagePage />} />
           <Route path="/calibration/runs/:runId/annotation-report" element={<AnnotationReportPage />} />
           <Route path="/calibration/runs/:runId/timesheet" element={<AnnotationTimesheetPage />} />
           <Route path="/calibration/comparison-report/:runId" element={<ComparisonReportPage />} />
