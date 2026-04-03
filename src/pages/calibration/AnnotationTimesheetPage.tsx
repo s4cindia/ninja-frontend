@@ -106,7 +106,7 @@ export default function AnnotationTimesheetPage() {
           { label: 'Wall-Clock Time', value: fmtMs(ts.wallClockMs), color: 'text-blue-600' },
           { label: 'Active Time', value: fmtMs(ts.activeMs), color: 'text-blue-600' },
           { label: 'Idle Time', value: fmtMs(ts.idleMs), color: 'text-gray-500' },
-          { label: 'Zones/Hour', value: ts.zonesPerHour != null ? ts.zonesPerHour.toFixed(1) : '--', color: 'text-blue-600' },
+          { label: 'Zones/Hour', value: ts.zonesPerHour != null ? Number(ts.zonesPerHour).toFixed(2) : '--', color: 'text-blue-600' },
         ].map(k => (
           <div key={k.label} className="bg-white rounded-lg shadow p-4 text-center">
             <p className={`text-2xl font-bold tabular-nums ${k.color}`}>{k.value}</p>
@@ -118,10 +118,10 @@ export default function AnnotationTimesheetPage() {
       {/* KPI Cards Row 2 */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { label: 'Avg Secs/Zone', value: ts.avgSecsPerZone != null ? `${ts.avgSecsPerZone.toFixed(1)}s` : '--', color: 'text-blue-600' },
+          { label: 'Avg Secs/Zone', value: ts.avgSecsPerZone != null ? `${Number(ts.avgSecsPerZone).toFixed(2)}s` : '--', color: 'text-blue-600' },
           { label: 'Auto-Annotation Time', value: fmtMs(ts.autoAnnotationMs), color: 'text-indigo-600' },
           { label: 'Manual Review Time', value: fmtMs(ts.manualReviewMs), color: 'text-blue-600' },
-          { label: 'Pages/Hour', value: ts.pagesPerHour != null ? ts.pagesPerHour.toFixed(1) : '--', color: 'text-blue-600' },
+          { label: 'Pages/Hour', value: ts.pagesPerHour != null ? Number(ts.pagesPerHour).toFixed(2) : '--', color: 'text-blue-600' },
         ].map(k => (
           <div key={k.label} className="bg-white rounded-lg shadow p-4 text-center">
             <p className={`text-2xl font-bold tabular-nums ${k.color}`}>{k.value}</p>
@@ -153,18 +153,25 @@ export default function AnnotationTimesheetPage() {
       {tab === 'summary' && (
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-sm font-semibold mb-4">Time Summary</h3>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            {Object.entries(ts).map(([key, val]) => (
-              <div key={key} className="flex justify-between py-2 border-b border-gray-100">
-                <span className="text-gray-500">{key}</span>
-                <span className="font-medium">
-                  {typeof val === 'number'
-                    ? key.toLowerCase().includes('ms') ? fmtMs(val) : val
-                    : String(val ?? '--')}
-                </span>
-              </div>
-            ))}
-          </div>
+          <table className="w-full text-sm">
+            <tbody>
+              {[
+                { label: 'Total Wall-Clock Time', value: fmtMs(ts.totalWallClockMs) },
+                { label: 'Total Active Time', value: fmtMs(ts.totalActiveMs ?? ts.activeMs) },
+                { label: 'Total Idle Time', value: fmtMs(ts.totalIdleMs ?? ts.idleMs) },
+                { label: 'Auto-Annotation Time', value: fmtMs(ts.autoAnnotationMs) },
+                { label: 'Manual Review Time', value: fmtMs(ts.manualReviewMs) },
+                { label: 'Avg. Seconds per Zone', value: ts.avgSecsPerZone != null ? `${Number(ts.avgSecsPerZone).toFixed(2)}s` : '--' },
+                { label: 'Zones per Hour', value: ts.zonesPerHour != null ? Number(ts.zonesPerHour).toFixed(2) : '--' },
+                { label: 'Pages per Hour', value: ts.pagesPerHour != null ? Number(ts.pagesPerHour).toFixed(2) : '--' },
+              ].map(row => (
+                <tr key={row.label} className="border-b border-gray-100">
+                  <td className="py-2.5 pr-4 text-gray-500 w-1/2">{row.label}</td>
+                  <td className="py-2.5 font-medium text-right tabular-nums">{row.value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
