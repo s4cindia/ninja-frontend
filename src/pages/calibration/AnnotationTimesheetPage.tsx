@@ -71,7 +71,9 @@ export default function AnnotationTimesheetPage() {
           <Link to={`/bootstrap/review/${report.header?.documentId ?? report.documentId ?? ''}`} className="text-sm text-gray-500 hover:text-gray-700">
             &larr; Back to Zone Review
           </Link>
-          <h1 className="text-xl font-semibold">Timesheet Report</h1>
+          <h1 className="text-xl font-semibold">
+            Timesheet Report{report.header?.documentName || report.documentName ? ` — ${report.header?.documentName ?? report.documentName}` : ''}
+          </h1>
         </div>
         <div className="flex gap-2">
           <button
@@ -91,10 +93,10 @@ export default function AnnotationTimesheetPage() {
 
       {/* Document info */}
       <div className="bg-white rounded-lg shadow p-4 flex flex-wrap gap-6 text-sm">
-        <div><span className="text-gray-500">Document:</span> <span className="font-medium">{report.documentName ?? '--'}</span></div>
+        <div><span className="text-gray-500">Document:</span> <span className="font-medium">{report.header?.documentName ?? report.documentName ?? '--'}</span></div>
         <div><span className="text-gray-500">Run ID:</span> <span className="font-mono text-xs">{runId?.slice(0, 12)}...</span></div>
-        <div><span className="text-gray-500">Pages:</span> <span className="font-medium">{report.pageCount ?? '--'}</span></div>
-        <div><span className="text-gray-500">Zones:</span> <span className="font-medium">{report.zoneCount ?? '--'}</span></div>
+        <div><span className="text-gray-500">Pages:</span> <span className="font-medium">{report.header?.pageCount ?? report.pageCount ?? '--'}</span></div>
+        <div><span className="text-gray-500">Zones:</span> <span className="font-medium">{report.header?.zoneCount ?? report.zoneCount ?? '--'}</span></div>
         {report.periodFrom && report.periodTo && (
           <div><span className="text-gray-500">Period:</span> <span className="font-medium">{fmtDate(report.periodFrom)} — {fmtDate(report.periodTo)}</span></div>
         )}
@@ -103,9 +105,9 @@ export default function AnnotationTimesheetPage() {
       {/* KPI Cards Row 1 */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { label: 'Wall-Clock Time', value: fmtMs(ts.wallClockMs), color: 'text-blue-600' },
-          { label: 'Active Time', value: fmtMs(ts.activeMs), color: 'text-blue-600' },
-          { label: 'Idle Time', value: fmtMs(ts.idleMs), color: 'text-gray-500' },
+          { label: 'Wall-Clock Time', value: fmtMs(ts.wallClockMs ?? ts.totalWallClockMs), color: 'text-blue-600' },
+          { label: 'Active Time', value: fmtMs(ts.activeMs ?? ts.totalActiveMs), color: 'text-blue-600' },
+          { label: 'Idle Time', value: fmtMs(ts.idleMs ?? ts.totalIdleMs), color: 'text-gray-500' },
           { label: 'Zones/Hour', value: ts.zonesPerHour != null ? Number(ts.zonesPerHour).toFixed(2) : '--', color: 'text-blue-600' },
         ].map(k => (
           <div key={k.label} className="bg-white rounded-lg shadow p-4 text-center">
