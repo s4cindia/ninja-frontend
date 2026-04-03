@@ -1,7 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { Upload, Database, RefreshCw, Loader2, Trash2, Sparkles, Download } from 'lucide-react';
+import * as pdfjsLib from 'pdfjs-dist';
 import { useAuthStore } from '@/stores/auth.store';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.mjs',
+  import.meta.url,
+).toString();
 import {
   getUploadUrl,
   registerCorpusDocument,
@@ -87,6 +93,7 @@ export default function AdminCorpusPage() {
   const [publisher, setPublisher] = useState('');
   const [contentType, setContentType] = useState('mixed');
   const [pageCount, setPageCount] = useState('');
+  const [countingPages, setCountingPages] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadStep, setUploadStep] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -321,12 +328,28 @@ export default function AdminCorpusPage() {
     }
   };
 
+  const selectFile = async (f: File | null) => {
+    setFile(f);
+    setPageCount('');
+    if (!f) return;
+    setCountingPages(true);
+    try {
+      const buf = await f.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      setPageCount(String(pdf.numPages));
+    } catch {
+      // silently fail — user can still enter manually
+    } finally {
+      setCountingPages(false);
+    }
+  };
+
   const handleFileDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
     const dropped = e.dataTransfer.files[0];
     if (dropped?.type === 'application/pdf') {
-      setFile(dropped);
+      selectFile(dropped);
     }
   };
 
@@ -376,7 +399,7 @@ export default function AdminCorpusPage() {
               Selected: <span className="font-medium">{file.name}</span>
               <button
                 type="button"
-                onClick={() => setFile(null)}
+                onClick={() => selectFile(null)}
                 className="ml-2 text-red-500 hover:text-red-700 text-xs"
               >
                 Remove
@@ -393,7 +416,7 @@ export default function AdminCorpusPage() {
                     type="file"
                     accept="application/pdf"
                     className="hidden"
-                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                    onChange={(e) => selectFile(e.target.files?.[0] ?? null)}
                   />
                 </label>
               </p>
@@ -436,14 +459,19 @@ export default function AdminCorpusPage() {
             <label className="block text-xs font-medium text-gray-600 mb-1">
               Page Count
             </label>
-            <input
-              type="number"
-              value={pageCount}
-              onChange={(e) => setPageCount(e.target.value)}
-              placeholder="Optional"
-              min={1}
-              className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-            />
+            <div className="relative">
+              <input
+                type="number"
+                value={pageCount}
+                readOnly
+                placeholder={countingPages ? 'Counting…' : 'Auto-detected'}
+                min={1}
+                className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm bg-gray-50 text-gray-700"
+              />
+              {countingPages && (
+                <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-gray-400" />
+              )}
+            </div>
           </div>
         </div>
 
