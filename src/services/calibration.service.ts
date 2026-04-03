@@ -14,6 +14,11 @@ export interface CorpusDocument {
   status?: 'PENDING' | 'IN_PROGRESS' | 'NEEDS_REVIEW' | 'COMPLETE';
   bootstrapJobs?: Array<{ id: string; status: string; completedAt?: string; error?: string }>;
   calibrationRuns?: Array<{ id: string; runDate: string; completedAt?: string; summary?: Record<string, unknown> }>;
+  annotationProgress?: {
+    totalZones: number;
+    annotatedZones: number;
+    status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
+  };
 }
 
 export type CorpusDocumentStatus =
