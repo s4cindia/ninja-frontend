@@ -4,10 +4,7 @@ import { Upload, Database, RefreshCw, Loader2, Trash2, Sparkles, Download } from
 import * as pdfjsLib from 'pdfjs-dist';
 import { useAuthStore } from '@/stores/auth.store';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.mjs',
-  import.meta.url,
-).toString();
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
 import {
   getUploadUrl,
   registerCorpusDocument,
