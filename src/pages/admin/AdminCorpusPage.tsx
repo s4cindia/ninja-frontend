@@ -252,7 +252,7 @@ export default function AdminCorpusPage() {
 
   // Three-step upload flow
   const handleUpload = async () => {
-    if (!file || !publisher) return;
+    if (!file) return;
     setUploading(true);
     setUploadError(null);
     setUploadSuccess(null);
@@ -277,7 +277,7 @@ export default function AdminCorpusPage() {
       await registerCorpusDocument({
         filename: file.name,
         s3Path,
-        publisher,
+        publisher: publisher || undefined,
         contentType,
         pageCount: pageCount ? Number(pageCount) : undefined,
       });
@@ -426,14 +426,15 @@ export default function AdminCorpusPage() {
         <div className="grid grid-cols-2 gap-4 mt-4">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
-              Publisher *
+              Publisher
+              <span className="text-gray-400 font-normal ml-1">(auto-detected from PDF if blank)</span>
             </label>
             <input
               type="text"
               list="publisher-options"
               value={publisher}
               onChange={(e) => setPublisher(e.target.value)}
-              placeholder="Select or type a publisher"
+              placeholder="Leave blank to auto-detect from PDF metadata"
               className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
             <datalist id="publisher-options">
@@ -482,7 +483,7 @@ export default function AdminCorpusPage() {
         <div className="mt-4 flex items-center gap-4">
           <button
             onClick={handleUpload}
-            disabled={!file || !publisher || uploading}
+            disabled={!file || uploading}
             className="bg-[#006B6B] text-white px-4 py-2 rounded text-sm font-medium hover:bg-[#005858] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {uploading ? 'Uploading…' : 'Upload & Register'}

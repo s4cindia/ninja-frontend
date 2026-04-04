@@ -72,6 +72,7 @@ export default function ZoneReviewWorkspace({
   const [autoAnnotateResult, setAutoAnnotateResult] = useState<AutoAnnotationResult | null>(null);
   const [aiAnnotating, setAiAnnotating] = useState(false);
   const [aiAnnotateResult, setAiAnnotateResult] = useState<AiAnnotationStatusResponse | null>(null);
+  const [aiProgress, setAiProgress] = useState<AiAnnotationStatusResponse | null>(null);
   const aiPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null);
 
@@ -313,6 +314,7 @@ export default function ZoneReviewWorkspace({
             if (aiPollRef.current) clearInterval(aiPollRef.current);
             aiPollRef.current = null;
             setAiAnnotating(false);
+            setAiProgress(null);
             setAiAnnotateResult(status);
             // Reload zones to show AI annotations
             queryClient.invalidateQueries({ queryKey: ['calibration', 'zones', runId] });
@@ -320,9 +322,12 @@ export default function ZoneReviewWorkspace({
             if (aiPollRef.current) clearInterval(aiPollRef.current);
             aiPollRef.current = null;
             setAiAnnotating(false);
+            setAiProgress(null);
             console.error('AI annotation failed:', status.error);
+          } else {
+            // RUNNING — update progress for display
+            setAiProgress(status);
           }
-          // While RUNNING — keep polling
         } catch {
           if (aiPollRef.current) clearInterval(aiPollRef.current);
           aiPollRef.current = null;
@@ -562,6 +567,34 @@ export default function ZoneReviewWorkspace({
           </div>
         </div>
       </div>
+
+      {/* AI annotation progress banner */}
+      {aiAnnotating && aiProgress && (
+        <div className="px-4 py-2.5 bg-purple-50 border-b border-purple-200 text-sm text-purple-800">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="font-medium inline-flex items-center gap-1.5">
+              <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              {aiProgress.currentPage && aiProgress.totalPages
+                ? `Annotating page ${aiProgress.currentPage} of ${aiProgress.totalPages}`
+                : 'AI Annotation in progress...'}
+            </span>
+            <span className="text-xs text-purple-600">
+              {aiProgress.annotatedZones}/{aiProgress.totalZones} zones
+            </span>
+          </div>
+          {aiProgress.totalPages && aiProgress.totalPages > 0 && (
+            <div className="w-full h-1.5 bg-purple-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-purple-500 rounded-full transition-all duration-300"
+                style={{ width: `${Math.min(100, Math.round(((aiProgress.currentPage ?? 0) / aiProgress.totalPages) * 100))}%` }}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Auto-annotate result banner */}
       {autoAnnotateResult && (

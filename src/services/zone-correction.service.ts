@@ -125,6 +125,8 @@ export interface AiAnnotationStatusResponse {
   error: string | null;
   totalZones: number;
   annotatedZones: number;
+  currentPage?: number | null;
+  totalPages?: number | null;
   highConfCount: number;
   medConfCount: number;
   lowConfCount: number;
