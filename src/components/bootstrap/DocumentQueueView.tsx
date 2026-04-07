@@ -19,7 +19,7 @@ function SkeletonRows() {
     <>
       {Array.from({ length: 5 }, (_, i) => (
         <tr key={i}>
-          {Array.from({ length: 7 }, (_, j) => (
+          {Array.from({ length: 8 }, (_, j) => (
             <td key={j} className="px-6 py-4">
               <div className="h-4 bg-gray-200 rounded animate-pulse" />
             </td>
@@ -45,6 +45,41 @@ function OperatorStatusBadge({ status }: { status: CorpusDocumentStatus }) {
       {config.label}
     </span>
   );
+}
+
+function AiAnnotationBadge({ ai }: { ai?: CorpusDocument['aiAnnotation'] }) {
+  if (!ai) return <span className="text-xs text-gray-400">—</span>;
+
+  if (ai.status === 'RUNNING') {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+        <Loader2 className="w-3 h-3 animate-spin" />
+        Running
+      </span>
+    );
+  }
+
+  if (ai.status === 'COMPLETED') {
+    const total = ai.annotatedZones + ai.skippedZones;
+    return (
+      <span
+        className="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 cursor-default"
+        title={`${ai.confirmedCount} confirmed, ${ai.correctedCount} corrected, ${ai.rejectedCount} rejected, ${ai.skippedZones} skipped`}
+      >
+        AI: {ai.annotatedZones}/{total}
+      </span>
+    );
+  }
+
+  if (ai.status === 'FAILED') {
+    return (
+      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+        AI Failed
+      </span>
+    );
+  }
+
+  return <span className="text-xs text-gray-400">{ai.status}</span>;
 }
 
 function AnnotationStatusBadge({ progress }: { progress?: CorpusDocument['annotationProgress'] }) {
@@ -300,6 +335,7 @@ export default function DocumentQueueView() {
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pages</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Annotation</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AI</th>
                 <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -331,6 +367,9 @@ export default function DocumentQueueView() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <AnnotationStatusBadge progress={doc.annotationProgress} />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <AiAnnotationBadge ai={doc.aiAnnotation} />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end gap-2">

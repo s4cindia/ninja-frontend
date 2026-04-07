@@ -19,6 +19,16 @@ export interface CorpusDocument {
     annotatedZones: number;
     status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
   };
+  aiAnnotation?: {
+    status: string;
+    annotatedZones: number;
+    skippedZones: number;
+    confirmedCount: number;
+    correctedCount: number;
+    rejectedCount: number;
+    model: string | null;
+    completedAt: string | null;
+  };
 }
 
 export type CorpusDocumentStatus =
