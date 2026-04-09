@@ -66,9 +66,11 @@ export default function AnnotationTimesheetPage() {
   ];
 
   const reviewModeBadge = (mode: string | undefined) => {
+    if (mode === 'deep') return 'bg-green-100 text-green-800';
     if (mode === 'sampling') return 'bg-yellow-100 text-yellow-800';
     if (mode === 'unreviewed') return 'bg-gray-100 text-gray-500';
-    return 'bg-green-100 text-green-800';
+    // Unknown / missing — neutral so older reports without reviewMode aren't shown as deeply reviewed
+    return 'bg-gray-100 text-gray-500';
   };
 
   return (
@@ -256,7 +258,7 @@ export default function AnnotationTimesheetPage() {
                     <td className="py-2 pr-3 text-right text-red-600">{p.rejected ?? 0}</td>
                     <td className="py-2">
                       <span className={`px-2 py-0.5 text-xs font-medium rounded ${reviewModeBadge(p.reviewMode)}`}>
-                        {p.reviewMode ?? 'deep'}
+                        {p.reviewMode ?? '--'}
                       </span>
                     </td>
                   </tr>
