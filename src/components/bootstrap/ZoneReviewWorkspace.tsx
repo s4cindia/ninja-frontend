@@ -114,8 +114,13 @@ export default function ZoneReviewWorkspace({
   const autoAnnotateMutation = useAutoAnnotate(runId);
   const comparisonMutation = useRunComparison(runId);
 
-  // Annotation timer
-  const { recordDecision } = useAnnotationTimer(runId);
+  // Annotation timer — tracks per-page effort by syncing currentPage into sessionLog segments
+  const { recordDecision, setCurrentPage: setTimerPage } = useAnnotationTimer(runId);
+
+  // Sync page changes into the timer so per-page timing can be derived from sessionLog
+  useEffect(() => {
+    setTimerPage(currentPage);
+  }, [currentPage, setTimerPage]);
 
   // Correction reason
   const [correctionReason, setCorrectionReason] = useState('');

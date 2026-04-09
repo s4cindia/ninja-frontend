@@ -6,6 +6,8 @@ interface SessionSegment {
   closedAt: string;
   activeMs: number;
   idleMs: number;
+  /** Page number the annotator was looking at during this segment (nullable for backward compat). */
+  pageNumber?: number | null;
 }
 
 interface TimerState {
@@ -17,6 +19,8 @@ interface TimerState {
   zonesConfirmed: number;
   zonesCorrected: number;
   zonesRejected: number;
+  /** Current page the annotator is viewing — captured into each new segment. */
+  currentPage: number | null;
 }
 
 const IDLE_THRESHOLD_MS = 2 * 60 * 1000;
@@ -39,11 +43,13 @@ export function useAnnotationTimer(runId: string) {
     zonesConfirmed: 0,
     zonesCorrected: 0,
     zonesRejected: 0,
+    currentPage: null,
   });
 
   const sessionIdRef = useRef<string | null>(null);
   const segmentStartRef = useRef<number | null>(null);
   const segmentOpenedAtRef = useRef<string | null>(null);
+  const segmentPageRef = useRef<number | null>(null);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isIdle, setIsIdle] = useState(false);
   const isIdleRef = useRef(false);
@@ -52,6 +58,7 @@ export function useAnnotationTimer(runId: string) {
     if (segmentStartRef.current !== null) return;
     segmentStartRef.current = Date.now();
     segmentOpenedAtRef.current = new Date().toISOString();
+    segmentPageRef.current = stateRef.current.currentPage;
   }, []);
 
   const closeSegment = useCallback(() => {
@@ -69,11 +76,30 @@ export function useAnnotationTimer(runId: string) {
       closedAt,
       activeMs: segActiveMs,
       idleMs: Math.max(0, segIdleMs),
+      pageNumber: segmentPageRef.current,
     });
 
     segmentStartRef.current = null;
     segmentOpenedAtRef.current = null;
+    segmentPageRef.current = null;
   }, []);
+
+  /**
+   * Update the current page being viewed. Closes the current timing segment and
+   * opens a new one so per-page effort can be aggregated from sessionLog.
+   */
+  const setCurrentPage = useCallback(
+    (pageNumber: number) => {
+      if (stateRef.current.currentPage === pageNumber) return;
+      const wasOpen = segmentStartRef.current !== null;
+      if (wasOpen) closeSegment();
+      stateRef.current.currentPage = pageNumber;
+      if (wasOpen && !stateRef.current.stopped && !document.hidden && !isIdleRef.current) {
+        startSegment();
+      }
+    },
+    [closeSegment, startSegment],
+  );
 
   const resetIdleTimer = useCallback(() => {
     if (stateRef.current.stopped) return;
@@ -180,6 +206,7 @@ export function useAnnotationTimer(runId: string) {
     idleMs: stateRef.current.idleMs,
     isIdle,
     recordDecision,
+    setCurrentPage,
     stop,
   };
 }

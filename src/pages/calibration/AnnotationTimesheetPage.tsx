@@ -24,7 +24,7 @@ function fmtDate(d: string | null | undefined): string {
   });
 }
 
-type Tab = 'summary' | 'operators' | 'pages' | 'efficiency';
+type Tab = 'summary' | 'operators' | 'pages' | 'zoneTypes' | 'efficiency';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export default function AnnotationTimesheetPage() {
@@ -54,14 +54,22 @@ export default function AnnotationTimesheetPage() {
   const ts = report.timeSummary ?? {};
   const operators: any[] = report.byOperator ?? [];
   const pages: any[] = report.byPage ?? [];
+  const zoneTypes: any[] = report.zoneTypeBreakdown ?? [];
   const efficiency = report.efficiency ?? {};
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'summary', label: 'Time Summary' },
     { key: 'operators', label: 'By Operator' },
     { key: 'pages', label: 'By Page' },
+    { key: 'zoneTypes', label: 'By Zone Type' },
     { key: 'efficiency', label: 'Efficiency' },
   ];
+
+  const reviewModeBadge = (mode: string | undefined) => {
+    if (mode === 'sampling') return 'bg-yellow-100 text-yellow-800';
+    if (mode === 'unreviewed') return 'bg-gray-100 text-gray-500';
+    return 'bg-green-100 text-green-800';
+  };
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 p-6">
@@ -227,7 +235,8 @@ export default function AnnotationTimesheetPage() {
                   <th className="text-right py-2 pr-3">Zones/Min</th>
                   <th className="text-right py-2 pr-3">Confirmed</th>
                   <th className="text-right py-2 pr-3">Corrected</th>
-                  <th className="text-right py-2">Rejected</th>
+                  <th className="text-right py-2 pr-3">Rejected</th>
+                  <th className="text-left py-2">Review Mode</th>
                 </tr>
               </thead>
               <tbody>
@@ -235,15 +244,67 @@ export default function AnnotationTimesheetPage() {
                   <tr key={p.pageNumber ?? i} className="border-b last:border-0 hover:bg-gray-50">
                     <td className="py-2 pr-3">{p.pageNumber}</td>
                     <td className="py-2 pr-3 text-right">{p.zones}</td>
-                    <td className="py-2 pr-3 text-right">{fmtMs(p.timeSpentMs)}</td>
+                    <td className="py-2 pr-3 text-right">
+                      {fmtMs(p.timeSpentMs)}
+                      {p.timingSource === 'derived' && (
+                        <span className="ml-1 text-xs text-gray-400" title="Estimated from total active time">~</span>
+                      )}
+                    </td>
                     <td className="py-2 pr-3 text-right">{p.zonesPerMin?.toFixed(1) ?? '--'}</td>
                     <td className="py-2 pr-3 text-right text-green-600">{p.confirmed ?? 0}</td>
                     <td className="py-2 pr-3 text-right text-yellow-600">{p.corrected ?? 0}</td>
-                    <td className="py-2 text-right text-red-600">{p.rejected ?? 0}</td>
+                    <td className="py-2 pr-3 text-right text-red-600">{p.rejected ?? 0}</td>
+                    <td className="py-2">
+                      <span className={`px-2 py-0.5 text-xs font-medium rounded ${reviewModeBadge(p.reviewMode)}`}>
+                        {p.reviewMode ?? 'deep'}
+                      </span>
+                    </td>
                   </tr>
                 ))}
                 {pages.length === 0 && (
-                  <tr><td colSpan={7} className="py-8 text-center text-gray-400">No page data</td></tr>
+                  <tr><td colSpan={8} className="py-8 text-center text-gray-400">No page data</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {tab === 'zoneTypes' && (
+        <div className="bg-white rounded-lg shadow p-4">
+          <p className="text-xs text-gray-500 mb-3">
+            Correction rate by zone type — high <span className="text-yellow-600 font-medium">Correct%</span> indicates the AI is
+            mislabeling this type frequently and driving annotator workload.
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-xs text-gray-500">
+                  <th className="text-left py-2 pr-3">Zone Type</th>
+                  <th className="text-right py-2 pr-3">Total</th>
+                  <th className="text-right py-2 pr-3">Confirmed</th>
+                  <th className="text-right py-2 pr-3">Corrected</th>
+                  <th className="text-right py-2 pr-3">Rejected</th>
+                  <th className="text-right py-2 pr-3">Confirm %</th>
+                  <th className="text-right py-2 pr-3">Correct %</th>
+                  <th className="text-right py-2">Reject %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {zoneTypes.map((z: any, i: number) => (
+                  <tr key={z.zoneType ?? i} className="border-b last:border-0 hover:bg-gray-50">
+                    <td className="py-2 pr-3 font-mono text-xs">{z.zoneType}</td>
+                    <td className="py-2 pr-3 text-right">{z.total}</td>
+                    <td className="py-2 pr-3 text-right text-green-600">{z.confirmed}</td>
+                    <td className="py-2 pr-3 text-right text-yellow-600">{z.corrected}</td>
+                    <td className="py-2 pr-3 text-right text-red-600">{z.rejected}</td>
+                    <td className="py-2 pr-3 text-right">{z.confirmPct != null ? `${(z.confirmPct * 100).toFixed(1)}%` : '--'}</td>
+                    <td className="py-2 pr-3 text-right">{z.correctPct != null ? `${(z.correctPct * 100).toFixed(1)}%` : '--'}</td>
+                    <td className="py-2 text-right">{z.rejectPct != null ? `${(z.rejectPct * 100).toFixed(1)}%` : '--'}</td>
+                  </tr>
+                ))}
+                {zoneTypes.length === 0 && (
+                  <tr><td colSpan={8} className="py-8 text-center text-gray-400">No zone type data</td></tr>
                 )}
               </tbody>
             </table>
