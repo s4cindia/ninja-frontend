@@ -163,6 +163,15 @@ export function useAnnotationTimer(runId: string) {
     else if (type === 'reject') stateRef.current.zonesRejected++;
   }, []);
 
+  /** Batch-increment counters for bulk operations (e.g., Confirm All Green). */
+  const recordBulkDecision = useCallback((count: number, type: 'confirm' | 'correct' | 'reject') => {
+    if (count <= 0) return;
+    stateRef.current.zonesReviewed += count;
+    if (type === 'confirm') stateRef.current.zonesConfirmed += count;
+    else if (type === 'correct') stateRef.current.zonesCorrected += count;
+    else if (type === 'reject') stateRef.current.zonesRejected += count;
+  }, []);
+
   // Mount / unmount
   useEffect(() => {
     if (!runId) return;
@@ -206,6 +215,7 @@ export function useAnnotationTimer(runId: string) {
     idleMs: stateRef.current.idleMs,
     isIdle,
     recordDecision,
+    recordBulkDecision,
     setCurrentPage,
     stop,
   };

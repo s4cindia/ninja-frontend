@@ -115,7 +115,7 @@ export default function ZoneReviewWorkspace({
   const comparisonMutation = useRunComparison(runId);
 
   // Annotation timer — tracks per-page effort by syncing currentPage into sessionLog segments
-  const { recordDecision, setCurrentPage: setTimerPage } = useAnnotationTimer(runId);
+  const { recordDecision, recordBulkDecision, setCurrentPage: setTimerPage } = useAnnotationTimer(runId);
 
   // Sync page changes into the timer so per-page timing can be derived from sessionLog
   useEffect(() => {
@@ -204,8 +204,14 @@ export default function ZoneReviewWorkspace({
   const handleDismiss = useCallback(() => setSelectedZoneId(null), []);
 
   const handleConfirmAllGreen = useCallback(() => {
-    confirmAllGreen.mutate();
-  }, [confirmAllGreen]);
+    confirmAllGreen.mutate(undefined, {
+      onSuccess: (data) => {
+        if (data?.confirmedCount) {
+          recordBulkDecision(data.confirmedCount, 'confirm');
+        }
+      },
+    });
+  }, [confirmAllGreen, recordBulkDecision]);
 
   // Keyboard shortcuts
   useEffect(() => {
