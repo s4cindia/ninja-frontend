@@ -21,6 +21,7 @@ import type { AiAnnotationStatusResponse } from '@/services/zone-correction.serv
 import { useTaggedPdfUrl } from '@/hooks/useTaggedPdfUrl';
 import { useAnnotationTimer } from '@/hooks/useAnnotationTimer';
 import { api } from '@/services/api';
+import { annotationReportService } from '@/services/annotation-report.service';
 import { PageThumbnailNav } from './PageThumbnailNav';
 import ZonePdfPanel from './ZonePdfPanel';
 import ZoneComparisonDetailBar from './ZoneComparisonDetailBar';
@@ -75,6 +76,8 @@ export default function ZoneReviewWorkspace({
   const [aiProgress, setAiProgress] = useState<AiAnnotationStatusResponse | null>(null);
   const aiPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null);
+  const [completing, setCompleting] = useState(false);
+  const [completeBanner, setCompleteBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Keep page input in sync with currentPage (arrow buttons, thumbnail clicks, etc.)
   useEffect(() => {
@@ -354,6 +357,21 @@ export default function ZoneReviewWorkspace({
     });
   }, [comparisonMutation]);
 
+  const handleMarkComplete = useCallback(async () => {
+    if (!runId) return;
+    if (!window.confirm('Mark annotation as complete and generate analysis report? This will set completedAt on the run.')) return;
+    setCompleting(true);
+    setCompleteBanner(null);
+    try {
+      await annotationReportService.markAnnotationComplete(runId);
+      setCompleteBanner({ type: 'success', message: 'Analysis report generated. View it from the Analysis button.' });
+    } catch (err) {
+      setCompleteBanner({ type: 'error', message: err instanceof Error ? err.message : 'Failed to generate analysis report' });
+    } finally {
+      setCompleting(false);
+    }
+  }, [runId]);
+
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] bg-gray-50">
       {/* Toolbar */}
@@ -462,6 +480,23 @@ export default function ZoneReviewWorkspace({
                 </svg>
               )}
               {comparisonMutation.isPending ? 'Comparing...' : 'Compare'}
+            </button>
+          )}
+
+          {/* Mark Complete (hidden for OPERATOR) */}
+          {!isOperator && runId && (
+            <button
+              onClick={handleMarkComplete}
+              disabled={completing}
+              className="px-3 py-1.5 text-xs font-medium rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+            >
+              {completing && (
+                <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              )}
+              {completing ? 'Generating Analysis...' : 'Mark Complete'}
             </button>
           )}
 
@@ -652,6 +687,33 @@ export default function ZoneReviewWorkspace({
           <button
             onClick={() => setComparisonResult(null)}
             className="text-blue-600 hover:text-blue-800 text-lg leading-none"
+          >
+            &times;
+          </button>
+        </div>
+      )}
+
+      {/* Mark-complete banner */}
+      {completeBanner && (
+        <div className={`flex items-center justify-between px-4 py-2 border-b text-sm ${
+          completeBanner.type === 'success'
+            ? 'bg-green-50 border-green-200 text-green-800'
+            : 'bg-red-50 border-red-200 text-red-800'
+        }`}>
+          <span>
+            {completeBanner.message}
+            {completeBanner.type === 'success' && runId && (
+              <button
+                onClick={() => navigate(`/calibration/runs/${runId}/analysis`)}
+                className="ml-2 text-green-600 underline hover:text-green-800"
+              >
+                View Analysis &rarr;
+              </button>
+            )}
+          </span>
+          <button
+            onClick={() => setCompleteBanner(null)}
+            className={`text-lg leading-none ${completeBanner.type === 'success' ? 'text-green-600 hover:text-green-800' : 'text-red-600 hover:text-red-800'}`}
           >
             &times;
           </button>
