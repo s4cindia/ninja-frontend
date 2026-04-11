@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import DOMPurify from 'dompurify';
 import { annotationReportService } from '@/services/annotation-report.service';
 
 /* Minimal markdown-to-HTML: handles ##, |tables|, **bold**, - bullets, \n */
@@ -154,7 +155,7 @@ export default function AnnotationAnalysisPage() {
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div
             className="prose prose-sm max-w-none [&_table]:w-full [&_table]:border-collapse [&_tr]:border-b [&_tr]:border-gray-100"
-            dangerouslySetInnerHTML={{ __html: renderMarkdown(report.markdown) }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(report.markdown)) }}
           />
           <div className="mt-6 pt-4 border-t border-gray-200 text-xs text-gray-400 flex gap-4">
             <span>Generated: {new Date(report.generatedAt).toLocaleString()}</span>

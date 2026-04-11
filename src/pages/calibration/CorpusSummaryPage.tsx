@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import DOMPurify from 'dompurify';
 import { annotationReportService } from '@/services/annotation-report.service';
 
 /* Minimal markdown-to-HTML */
@@ -137,7 +138,7 @@ export default function CorpusSummaryPage() {
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <div
             className="prose prose-sm max-w-none [&_table]:w-full [&_table]:border-collapse [&_tr]:border-b [&_tr]:border-gray-100"
-            dangerouslySetInnerHTML={{ __html: renderMarkdown(summaryReport.markdown) }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(summaryReport.markdown)) }}
           />
           <div className="mt-6 pt-4 border-t border-gray-200 text-xs text-gray-400 flex gap-4">
             <span>Generated: {new Date(summaryReport.generatedAt).toLocaleString()}</span>

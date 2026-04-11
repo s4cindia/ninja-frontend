@@ -364,13 +364,14 @@ export default function ZoneReviewWorkspace({
     setCompleteBanner(null);
     try {
       await annotationReportService.markAnnotationComplete(runId);
+      queryClient.invalidateQueries({ queryKey: ['calibration', 'runs'] });
       setCompleteBanner({ type: 'success', message: 'Analysis report generated. View it from the Analysis button.' });
     } catch (err) {
       setCompleteBanner({ type: 'error', message: err instanceof Error ? err.message : 'Failed to generate analysis report' });
     } finally {
       setCompleting(false);
     }
-  }, [runId]);
+  }, [runId, queryClient]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] bg-gray-50">
