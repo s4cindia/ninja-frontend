@@ -251,13 +251,21 @@ export default function DocumentQueueView() {
         <p className="mt-1 text-sm text-gray-500">
           Review and annotate documents for ML zone detection training
         </p>
-        <button
-          onClick={handleReset}
-          disabled={resetting}
-          className="mt-2 px-3 py-1.5 text-xs font-medium rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
-        >
-          {resetting ? 'Resetting...' : 'Reset Corpus'}
-        </button>
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            onClick={handleReset}
+            disabled={resetting}
+            className="px-3 py-1.5 text-xs font-medium rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+          >
+            {resetting ? 'Resetting...' : 'Reset Corpus'}
+          </button>
+          <button
+            onClick={() => navigate('/calibration/corpus/summary')}
+            className="px-4 py-1.5 text-xs font-medium rounded bg-purple-600 text-white hover:bg-purple-700 transition-colors"
+          >
+            Corpus Summary
+          </button>
+        </div>
       </div>
 
       {/* Filter bar */}
@@ -429,6 +437,12 @@ export default function DocumentQueueView() {
                                     className="border border-gray-300 text-gray-600 text-xs px-3 py-1 rounded hover:bg-gray-50 transition-colors"
                                   >
                                     Timesheet
+                                  </button>
+                                  <button
+                                    onClick={() => navigate(`/calibration/runs/${doc.calibrationRuns![0].id}/analysis`)}
+                                    className="border border-purple-300 text-purple-600 text-xs px-3 py-1 rounded hover:bg-purple-50 transition-colors"
+                                  >
+                                    Analysis
                                   </button>
                                 </>
                               )}

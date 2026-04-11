@@ -45,4 +45,13 @@ export const annotationReportService = {
     sessionLog?: unknown;
   }) =>
     api.post(`/calibration/runs/${runId}/sessions/${sessionId}/end`, data).then(r => r.data.data),
+
+  markAnnotationComplete: (runId: string) =>
+    api.post(`/calibration/runs/${runId}/complete`).then(r => r.data.data),
+
+  getAnalysis: (runId: string) =>
+    api.get(`/calibration/runs/${runId}/analysis`).then(r => r.data.data),
+
+  getCorpusSummary: () =>
+    api.get('/calibration/corpus/analysis-summary').then(r => r.data.data),
 };

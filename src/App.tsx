@@ -87,6 +87,8 @@ import AnnotationTimesheetPage from '@/pages/calibration/AnnotationTimesheetPage
 import ComparisonReportPage from '@/pages/calibration/ComparisonReportPage';
 import AnnotationGuidePage from '@/pages/calibration/AnnotationGuidePage';
 import AggregateComparisonPage from '@/pages/calibration/AggregateComparisonPage';
+import AnnotationAnalysisPage from '@/pages/calibration/AnnotationAnalysisPage';
+import CorpusSummaryPage from '@/pages/calibration/CorpusSummaryPage';
 import AdminCorpusPage from '@/pages/admin/AdminCorpusPage';
 import AdminUsersPage from '@/pages/admin/AdminUsersPage';
 const queryClient = new QueryClient({
@@ -268,6 +270,8 @@ function AppRoutes() {
           <Route path="/bootstrap/lineage/:runId" element={<OperatorLineagePage />} />
           <Route path="/calibration/runs/:runId/annotation-report" element={<AnnotationReportPage />} />
           <Route path="/calibration/runs/:runId/timesheet" element={<AnnotationTimesheetPage />} />
+          <Route path="/calibration/runs/:runId/analysis" element={<AnnotationAnalysisPage />} />
+          <Route path="/calibration/corpus/summary" element={<CorpusSummaryPage />} />
           <Route path="/calibration/comparison-report/:runId" element={<ComparisonReportPage />} />
           <Route path="/calibration/annotation-guide/:runId" element={<AnnotationGuidePage />} />
           <Route path="/calibration/aggregate-report" element={<AggregateComparisonPage />} />
