@@ -78,6 +78,7 @@ export default function ZoneReviewWorkspace({
   const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null);
   const [completing, setCompleting] = useState(false);
   const [completeBanner, setCompleteBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [analysisGenerated, setAnalysisGenerated] = useState(false);
 
   // Keep page input in sync with currentPage (arrow buttons, thumbnail clicks, etc.)
   useEffect(() => {
@@ -174,6 +175,19 @@ export default function ZoneReviewWorkspace({
     }
     return map;
   }, [zones]);
+
+  // Count unique pages with at least one operator-verified zone
+  const pagesReviewed = useMemo(() => {
+    const reviewed = new Set<number>();
+    for (const zone of zones) {
+      if (zone.operatorVerified) reviewed.add(zone.pageNumber);
+    }
+    return reviewed.size;
+  }, [zones]);
+
+  // Mark Complete enabled: always for ≤150-page titles; ≥150 pages reviewed for larger titles
+  const MIN_PAGES_THRESHOLD = 150;
+  const canMarkComplete = numPages <= MIN_PAGES_THRESHOLD || pagesReviewed >= MIN_PAGES_THRESHOLD;
 
   // Handlers
   const handleConfirm = useCallback(
@@ -371,7 +385,8 @@ export default function ZoneReviewWorkspace({
     try {
       await annotationReportService.markAnnotationComplete(runId);
       queryClient.invalidateQueries({ queryKey: ['calibration', 'runs'] });
-      setCompleteBanner({ type: 'success', message: 'Analysis report generated. View it from the Analysis button.' });
+      setAnalysisGenerated(true);
+      setCompleteBanner({ type: 'success', message: 'Analysis report generated.' });
     } catch (err) {
       setCompleteBanner({ type: 'error', message: err instanceof Error ? err.message : 'Failed to generate analysis report' });
     } finally {
@@ -490,11 +505,16 @@ export default function ZoneReviewWorkspace({
             </button>
           )}
 
-          {/* Mark Complete (hidden for OPERATOR) */}
-          {!isOperator && runId && (
+          {/* Mark Complete */}
+          {runId && (
             <button
               onClick={handleMarkComplete}
-              disabled={completing}
+              disabled={completing || !canMarkComplete}
+              title={
+                !canMarkComplete
+                  ? `${pagesReviewed} of ${MIN_PAGES_THRESHOLD} pages reviewed — review at least ${MIN_PAGES_THRESHOLD} pages to mark complete`
+                  : undefined
+              }
               className="px-3 py-1.5 text-xs font-medium rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
             >
               {completing && (
@@ -504,6 +524,16 @@ export default function ZoneReviewWorkspace({
                 </svg>
               )}
               {completing ? 'Generating Analysis...' : 'Mark Complete'}
+            </button>
+          )}
+
+          {/* Analysis link — appears after Mark Complete succeeds */}
+          {runId && analysisGenerated && (
+            <button
+              onClick={() => navigate(`/calibration/runs/${runId}/analysis`)}
+              className="px-3 py-1.5 text-xs font-medium rounded border border-purple-300 text-purple-700 bg-purple-50 hover:bg-purple-100"
+            >
+              View Analysis
             </button>
           )}
 
