@@ -19,7 +19,7 @@ function SkeletonRows() {
     <>
       {Array.from({ length: 5 }, (_, i) => (
         <tr key={i}>
-          {Array.from({ length: 8 }, (_, j) => (
+          {Array.from({ length: 9 }, (_, j) => (
             <td key={j} className="px-6 py-4">
               <div className="h-4 bg-gray-200 rounded animate-pulse" />
             </td>
@@ -82,10 +82,26 @@ function AiAnnotationBadge({ ai }: { ai?: CorpusDocument['aiAnnotation'] }) {
   return <span className="text-xs text-gray-400">{ai.status}</span>;
 }
 
-function AnnotationStatusBadge({ progress }: { progress?: CorpusDocument['annotationProgress'] }) {
+function AnnotationStatusBadge({
+  progress,
+  ai,
+}: {
+  progress?: CorpusDocument['annotationProgress'];
+  ai?: CorpusDocument['aiAnnotation'];
+}) {
   if (!progress) return <span className="text-xs text-gray-400">—</span>;
 
   const { totalZones, annotatedZones, status } = progress;
+
+  // Human-verified = Confirm + Correct + Reject. All three are deliberate
+  // human decisions and all flip operatorVerified=true on the backend.
+  const humanVerified = ai
+    ? Math.min(
+        annotatedZones,
+        (ai.confirmedCount ?? 0) + (ai.correctedCount ?? 0) + (ai.rejectedCount ?? 0),
+      )
+    : 0;
+  const autoOnly = Math.max(0, annotatedZones - humanVerified);
 
   if (status === 'COMPLETED') {
     return (
@@ -96,20 +112,30 @@ function AnnotationStatusBadge({ progress }: { progress?: CorpusDocument['annota
   }
 
   if (status === 'IN_PROGRESS') {
-    const pct = totalZones > 0 ? Math.min(100, Math.round((annotatedZones / totalZones) * 100)) : 0;
+    const autoPct = totalZones > 0 ? Math.min(100, (autoOnly / totalZones) * 100) : 0;
+    const humanPct =
+      totalZones > 0 ? Math.min(100 - autoPct, (humanVerified / totalZones) * 100) : 0;
+    const tooltip = `${humanVerified} human-verified, ${autoOnly} auto-only, of ${totalZones} total zones`;
     return (
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5" title={tooltip}>
         <div
-          className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden"
+          className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden flex"
           role="progressbar"
-          aria-valuenow={pct}
+          aria-valuenow={annotatedZones}
           aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label={`Annotation progress: ${annotatedZones} of ${totalZones} zones`}
+          aria-valuemax={totalZones}
+          aria-label={`Annotation progress: ${humanVerified} human-verified and ${autoOnly} auto-annotated of ${totalZones} zones`}
         >
-          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }} />
+          <div className="h-full bg-blue-500" style={{ width: `${autoPct}%` }} />
+          <div className="h-full bg-green-500" style={{ width: `${humanPct}%` }} />
         </div>
-        <span className="text-xs text-blue-700 font-medium">{annotatedZones}/{totalZones}</span>
+        <span className="text-xs font-medium">
+          <span className="text-green-700">{humanVerified}</span>
+          <span className="text-gray-400">/</span>
+          <span className="text-blue-700">{annotatedZones}</span>
+          <span className="text-gray-400">/</span>
+          <span className="text-gray-600">{totalZones}</span>
+        </span>
       </div>
     );
   }
@@ -341,8 +367,9 @@ export default function DocumentQueueView() {
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Publisher</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Content Type</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pages</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Annotation</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Extraction</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Annotation Status</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Annotation Progress</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AI</th>
                 <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
@@ -368,13 +395,13 @@ export default function DocumentQueueView() {
                         {doc.pageCount ?? '—'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <DocumentStatusBadge status={doc.status ?? 'PENDING'} />
-                          <OperatorStatusBadge status={opStatus} />
-                        </div>
+                        <OperatorStatusBadge status={opStatus} />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <AnnotationStatusBadge progress={doc.annotationProgress} />
+                        <DocumentStatusBadge status={doc.status ?? 'PENDING'} />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <AnnotationStatusBadge progress={doc.annotationProgress} ai={doc.aiAnnotation} />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <AiAnnotationBadge ai={doc.aiAnnotation} />
