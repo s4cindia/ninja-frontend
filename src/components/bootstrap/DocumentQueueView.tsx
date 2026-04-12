@@ -121,7 +121,7 @@ function AnnotationStatusBadge({
         <div
           className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden flex"
           role="progressbar"
-          aria-valuenow={annotatedZones}
+          aria-valuenow={Math.max(0, Math.min(annotatedZones, totalZones))}
           aria-valuemin={0}
           aria-valuemax={totalZones}
           aria-label={`Annotation progress: ${humanVerified} human-verified and ${autoOnly} auto-annotated of ${totalZones} zones`}
