@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import DOMPurify from 'dompurify';
@@ -113,6 +113,13 @@ export default function AnnotationAnalysisPage() {
   const isNotFound =
     (error as { response?: { status?: number } })?.response?.status === 404;
 
+  // Sanitize once and reuse for both on-screen rendering and Word export so
+  // we never emit unsanitized HTML from the markdown renderer.
+  const sanitizedReportHtml = useMemo(
+    () => (data?.report.markdown ? DOMPurify.sanitize(renderMarkdown(data.report.markdown)) : ''),
+    [data?.report.markdown],
+  );
+
   const handleRegenerate = async () => {
     if (!runId || !window.confirm('Regenerate the analysis report? This will overwrite the existing report.')) return;
     setRegenerating(true);
@@ -126,7 +133,7 @@ export default function AnnotationAnalysisPage() {
 
   const handleExportWord = () => {
     if (!data?.report.markdown) return;
-    const html = renderMarkdown(data.report.markdown);
+    const html = sanitizedReportHtml;
     const wordDoc = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
       xmlns:w="urn:schemas-microsoft-com:office:word"
       xmlns="http://www.w3.org/TR/REC-html40">
@@ -239,7 +246,7 @@ export default function AnnotationAnalysisPage() {
         <div className="bg-white rounded-lg border border-gray-200 p-6" ref={reportRef}>
           <div
             className="prose prose-sm max-w-none [&_table]:w-full [&_table]:border-collapse [&_tr]:border-b [&_tr]:border-gray-100"
-            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(report.markdown)) }}
+            dangerouslySetInnerHTML={{ __html: sanitizedReportHtml }}
           />
           <div className="mt-6 pt-4 border-t border-gray-200 text-xs text-gray-400 flex gap-4">
             <span>Generated: {new Date(report.generatedAt).toLocaleString()}</span>

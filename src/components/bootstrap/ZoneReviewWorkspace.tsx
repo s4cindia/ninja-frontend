@@ -110,6 +110,11 @@ export default function ZoneReviewWorkspace({
   const { data: zonesData } = useCalibrationZones(runId, filterParam);
   const zones: CalibrationZone[] = useMemo(() => zonesData?.zones ?? [], [zonesData]);
 
+  // Unfiltered zones — used for Mark Complete eligibility so that switching
+  // bucket tabs does not undercount how many pages have been reviewed.
+  const { data: allZonesData } = useCalibrationZones(runId);
+  const allZones: CalibrationZone[] = useMemo(() => allZonesData?.zones ?? [], [allZonesData]);
+
   // Zone mutations
   const confirmZone = useConfirmZone(runId);
   const correctZone = useCorrectZone(runId);
@@ -176,18 +181,21 @@ export default function ZoneReviewWorkspace({
     return map;
   }, [zones]);
 
-  // Count unique pages with at least one operator-verified zone
+  // Count unique pages with at least one operator-verified zone.
+  // Use `allZones` (unfiltered) so that switching bucket tabs does not undercount.
   const pagesReviewed = useMemo(() => {
     const reviewed = new Set<number>();
-    for (const zone of zones) {
+    for (const zone of allZones) {
       if (zone.operatorVerified) reviewed.add(zone.pageNumber);
     }
     return reviewed.size;
-  }, [zones]);
+  }, [allZones]);
 
-  // Mark Complete enabled: always for ≤150-page titles; ≥150 pages reviewed for larger titles
+  // Mark Complete enabled: always for ≤150-page titles; ≥150 pages reviewed for larger titles.
+  // `numPages` is 0 until the PDF loads — treat unknown page count as "not yet ready".
   const MIN_PAGES_THRESHOLD = 150;
-  const canMarkComplete = numPages <= MIN_PAGES_THRESHOLD || pagesReviewed >= MIN_PAGES_THRESHOLD;
+  const canMarkComplete =
+    numPages > 0 && (numPages <= MIN_PAGES_THRESHOLD || pagesReviewed >= MIN_PAGES_THRESHOLD);
 
   // Handlers
   const handleConfirm = useCallback(
