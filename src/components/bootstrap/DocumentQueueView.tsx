@@ -115,7 +115,7 @@ function AnnotationStatusBadge({
     const autoPct = totalZones > 0 ? Math.min(100, (autoOnly / totalZones) * 100) : 0;
     const humanPct =
       totalZones > 0 ? Math.min(100 - autoPct, (humanVerified / totalZones) * 100) : 0;
-    const tooltip = `${humanVerified} human-verified, ${autoOnly} auto-only, of ${totalZones} total zones`;
+    const tooltip = `${humanVerified} human-verified, ${autoOnly} AI-annotated (awaiting review), of ${totalZones} total zones`;
     return (
       <div className="flex items-center gap-1.5" title={tooltip}>
         <div
@@ -126,13 +126,13 @@ function AnnotationStatusBadge({
           aria-valuemax={totalZones}
           aria-label={`Annotation progress: ${humanVerified} human-verified and ${autoOnly} auto-annotated of ${totalZones} zones`}
         >
-          <div className="h-full bg-blue-500" style={{ width: `${autoPct}%` }} />
-          <div className="h-full bg-green-500" style={{ width: `${humanPct}%` }} />
+          <div className="h-full bg-amber-500" style={{ width: `${autoPct}%` }} />
+          <div className="h-full bg-emerald-600" style={{ width: `${humanPct}%` }} />
         </div>
         <span className="text-xs font-medium">
-          <span className="text-green-700">{humanVerified}</span>
+          <span className="text-emerald-700">{humanVerified}</span>
           <span className="text-gray-400">/</span>
-          <span className="text-blue-700">{annotatedZones}</span>
+          <span className="text-amber-600">{annotatedZones}</span>
           <span className="text-gray-400">/</span>
           <span className="text-gray-600">{totalZones}</span>
         </span>
@@ -354,6 +354,27 @@ export default function DocumentQueueView() {
           <p className="mt-1 text-xs text-gray-400">
             Documents will appear here once the corpus is loaded by the Ninja team.
           </p>
+        </div>
+      )}
+
+      {/* Annotation Progress legend */}
+      {(isLoading || filtered.length > 0) && (
+        <div className="flex items-center gap-4 mb-2 text-xs text-gray-600">
+          <span className="font-medium text-gray-500 uppercase tracking-wide">
+            Annotation Progress Legend:
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block w-3 h-3 rounded-sm bg-amber-500" aria-hidden="true" />
+            AI-annotated, awaiting human review
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block w-3 h-3 rounded-sm bg-emerald-600" aria-hidden="true" />
+            Human-verified (confirmed, corrected, or rejected)
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block w-3 h-3 rounded-sm bg-gray-200" aria-hidden="true" />
+            Not yet annotated
+          </span>
         </div>
       )}
 
