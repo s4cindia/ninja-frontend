@@ -124,7 +124,7 @@ function AnnotationStatusBadge({
           aria-valuenow={Math.max(0, Math.min(annotatedZones, totalZones))}
           aria-valuemin={0}
           aria-valuemax={totalZones}
-          aria-label={`Annotation progress: ${humanVerified} human-verified and ${autoOnly} auto-annotated of ${totalZones} zones`}
+          aria-label={`Annotation progress: ${humanVerified} human-verified and ${autoOnly} AI-annotated (awaiting review) of ${totalZones} zones`}
         >
           <div className="h-full bg-amber-500" style={{ width: `${autoPct}%` }} />
           <div className="h-full bg-emerald-600" style={{ width: `${humanPct}%` }} />
