@@ -125,17 +125,25 @@ export function MarkCompleteModal({
   const [issues, setIssues] = useState<RunIssueDraft[]>([]);
   const pagesReviewedRef = useRef<HTMLInputElement | null>(null);
   const errorRef = useRef<HTMLDivElement | null>(null);
+  const wasOpenRef = useRef(false);
+  // Capture defaultPagesReviewed in a ref so the reset-on-open effect can
+  // read the latest value without re-running when it changes mid-session.
+  const defaultPagesReviewedRef = useRef(defaultPagesReviewed);
+  useEffect(() => {
+    defaultPagesReviewedRef.current = defaultPagesReviewed;
+  }, [defaultPagesReviewed]);
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  // Reset form whenever the modal transitions from closed → open so stale
-  // state from a previous open (issues, notes, error, or a defaultPagesReviewed
-  // prop that changed while the modal was closed) does not leak through.
-  // Also focuses the pages-reviewed input so keyboard users land inside the
-  // modal instead of on the backdrop.
+  // Reset form ONLY on the closed → open transition so stale state from a
+  // previous open (issues, notes, error) does not leak through. Crucially we
+  // do NOT reset when defaultPagesReviewed changes mid-session — a background
+  // React Query refetch updating that prop must not wipe out a user who is
+  // mid-way through adding issues.
   useEffect(() => {
-    if (isOpen) {
-      setPagesReviewed(defaultPagesReviewed);
+    if (isOpen && !wasOpenRef.current) {
+      wasOpenRef.current = true;
+      setPagesReviewed(defaultPagesReviewedRef.current);
       setIssues([]);
       setNotes('');
       setError(null);
@@ -143,8 +151,11 @@ export function MarkCompleteModal({
       const id = window.setTimeout(() => pagesReviewedRef.current?.focus(), 0);
       return () => window.clearTimeout(id);
     }
+    if (!isOpen && wasOpenRef.current) {
+      wasOpenRef.current = false;
+    }
     return undefined;
-  }, [isOpen, defaultPagesReviewed]);
+  }, [isOpen]);
 
   // Escape-to-close — attached to window because divs do not receive keydown
   // events unless they are focusable.
