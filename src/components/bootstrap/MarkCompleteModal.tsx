@@ -7,7 +7,7 @@
  * zone content divergence, etc.) and feed the corpus-level lineage rollup.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Plus, X, Trash2 } from 'lucide-react';
 
@@ -26,6 +26,18 @@ export interface RunIssueInput {
   pagesAffected?: number;
   description: string;
   blocking: boolean;
+}
+
+// Local-only stable id so that removing an issue from the middle of the list
+// does not shift React's key mapping onto the wrong DOM nodes.
+interface RunIssueDraft extends RunIssueInput {
+  _key: string;
+}
+
+let __issueKeyCounter = 0;
+function nextIssueKey(): string {
+  __issueKeyCounter += 1;
+  return `issue-${__issueKeyCounter}`;
 }
 
 export interface MarkCompleteRequest {
@@ -89,8 +101,13 @@ const CATEGORY_OPTIONS: Array<{ value: RunIssueCategory; label: string; hint: st
   },
 ];
 
-function emptyIssue(): RunIssueInput {
-  return { category: 'PAGE_ALIGNMENT_MISMATCH', description: '', blocking: false };
+function emptyIssue(): RunIssueDraft {
+  return {
+    _key: nextIssueKey(),
+    category: 'PAGE_ALIGNMENT_MISMATCH',
+    description: '',
+    blocking: false,
+  };
 }
 
 export function MarkCompleteModal({
@@ -105,20 +122,27 @@ export function MarkCompleteModal({
   isSubmitting,
 }: MarkCompleteModalProps) {
   const [pagesReviewed, setPagesReviewed] = useState<number>(defaultPagesReviewed);
-  const [issues, setIssues] = useState<RunIssueInput[]>([]);
+  const [issues, setIssues] = useState<RunIssueDraft[]>([]);
+  const pagesReviewedRef = useRef<HTMLInputElement | null>(null);
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   // Reset form whenever the modal transitions from closed → open so stale
   // state from a previous open (issues, notes, error, or a defaultPagesReviewed
   // prop that changed while the modal was closed) does not leak through.
+  // Also focuses the pages-reviewed input so keyboard users land inside the
+  // modal instead of on the backdrop.
   useEffect(() => {
     if (isOpen) {
       setPagesReviewed(defaultPagesReviewed);
       setIssues([]);
       setNotes('');
       setError(null);
+      // Defer focus until after the element mounts.
+      const id = window.setTimeout(() => pagesReviewedRef.current?.focus(), 0);
+      return () => window.clearTimeout(id);
     }
+    return undefined;
   }, [isOpen, defaultPagesReviewed]);
 
   // Escape-to-close — attached to window because divs do not receive keydown
@@ -152,8 +176,8 @@ export function MarkCompleteModal({
   };
 
   const validate = (): string | null => {
-    if (!Number.isFinite(pagesReviewed) || pagesReviewed < 1) {
-      return 'Pages reviewed must be at least 1.';
+    if (!Number.isInteger(pagesReviewed) || pagesReviewed < 1) {
+      return 'Pages reviewed must be a whole number ≥ 1.';
     }
     if (totalPages > 0 && pagesReviewed > totalPages) {
       return `Pages reviewed cannot exceed total pages (${totalPages}).`;
@@ -163,11 +187,10 @@ export function MarkCompleteModal({
       if (issue.category === 'OTHER' && !issue.description.trim()) {
         return `Issue ${i + 1}: description is required for "Other".`;
       }
-      if (
-        issue.pagesAffected !== undefined &&
-        (!Number.isFinite(issue.pagesAffected) || issue.pagesAffected < 0)
-      ) {
-        return `Issue ${i + 1}: pages affected must be 0 or more.`;
+      if (issue.pagesAffected !== undefined) {
+        if (!Number.isInteger(issue.pagesAffected) || issue.pagesAffected < 0) {
+          return `Issue ${i + 1}: pages affected must be a whole number ≥ 0.`;
+        }
       }
     }
     return null;
@@ -238,9 +261,11 @@ export function MarkCompleteModal({
             <div>
               <div className="text-xs text-gray-500 uppercase">Pages reviewed</div>
               <input
+                ref={pagesReviewedRef}
                 type="number"
                 min={1}
                 max={totalPages || undefined}
+                step={1}
                 value={Number.isFinite(pagesReviewed) ? pagesReviewed : ''}
                 onChange={(e) => {
                   clearError();
@@ -300,7 +325,7 @@ export function MarkCompleteModal({
                 const descriptionRequired = issue.category === 'OTHER';
                 return (
                   <div
-                    key={idx}
+                    key={issue._key}
                     className="border border-gray-200 rounded-md p-3 bg-white relative"
                   >
                     <button
@@ -344,15 +369,22 @@ export function MarkCompleteModal({
                         <input
                           type="number"
                           min={0}
+                          step={1}
                           value={issue.pagesAffected ?? ''}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            if (raw === '') {
+                              handleUpdateIssue(idx, { pagesAffected: undefined });
+                              return;
+                            }
+                            const parsed = Number(raw);
                             handleUpdateIssue(idx, {
-                              pagesAffected:
-                                e.target.value === '' ? undefined : Number(e.target.value),
-                            })
-                          }
+                              pagesAffected: Number.isFinite(parsed) ? parsed : undefined,
+                            });
+                          }}
                           placeholder="—"
                           className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          aria-label={`Pages affected by issue ${idx + 1}`}
                         />
                       </div>
 
