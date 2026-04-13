@@ -7,7 +7,7 @@
  * zone content divergence, etc.) and feed the corpus-level lineage rollup.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Plus, X, Trash2 } from 'lucide-react';
 
@@ -109,13 +109,47 @@ export function MarkCompleteModal({
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  // Reset form whenever the modal transitions from closed → open so stale
+  // state from a previous open (issues, notes, error, or a defaultPagesReviewed
+  // prop that changed while the modal was closed) does not leak through.
+  useEffect(() => {
+    if (isOpen) {
+      setPagesReviewed(defaultPagesReviewed);
+      setIssues([]);
+      setNotes('');
+      setError(null);
+    }
+  }, [isOpen, defaultPagesReviewed]);
+
+  // Escape-to-close — attached to window because divs do not receive keydown
+  // events unless they are focusable.
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isSubmitting) onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [isOpen, isSubmitting, onClose]);
+
   if (!isOpen) return null;
 
-  const handleAddIssue = () => setIssues((prev) => [...prev, emptyIssue()]);
-  const handleRemoveIssue = (idx: number) =>
+  const clearError = () => {
+    if (error) setError(null);
+  };
+
+  const handleAddIssue = () => {
+    clearError();
+    setIssues((prev) => [...prev, emptyIssue()]);
+  };
+  const handleRemoveIssue = (idx: number) => {
+    clearError();
     setIssues((prev) => prev.filter((_, i) => i !== idx));
-  const handleUpdateIssue = (idx: number, patch: Partial<RunIssueInput>) =>
+  };
+  const handleUpdateIssue = (idx: number, patch: Partial<RunIssueInput>) => {
+    clearError();
     setIssues((prev) => prev.map((issue, i) => (i === idx ? { ...issue, ...patch } : issue)));
+  };
 
   const validate = (): string | null => {
     if (!Number.isFinite(pagesReviewed) || pagesReviewed < 1) {
@@ -156,7 +190,13 @@ export function MarkCompleteModal({
       })),
       notes: notes.trim() || undefined,
     };
-    await onSubmit(payload);
+    try {
+      await onSubmit(payload);
+    } catch (err) {
+      // Surface submit failures inside the modal — the parent's banner is
+      // hidden behind the backdrop so the user would otherwise see nothing.
+      setError(err instanceof Error ? err.message : 'Failed to generate analysis report.');
+    }
   };
 
   return (
@@ -164,9 +204,6 @@ export function MarkCompleteModal({
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
       onClick={(e) => {
         if (e.target === e.currentTarget && !isSubmitting) onClose();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape' && !isSubmitting) onClose();
       }}
       role="dialog"
       aria-modal="true"
@@ -204,8 +241,17 @@ export function MarkCompleteModal({
                 type="number"
                 min={1}
                 max={totalPages || undefined}
-                value={pagesReviewed}
-                onChange={(e) => setPagesReviewed(Number(e.target.value))}
+                value={Number.isFinite(pagesReviewed) ? pagesReviewed : ''}
+                onChange={(e) => {
+                  clearError();
+                  const raw = e.target.value;
+                  if (raw === '') {
+                    setPagesReviewed(NaN);
+                    return;
+                  }
+                  const parsed = Number(raw);
+                  setPagesReviewed(Number.isFinite(parsed) ? parsed : NaN);
+                }}
                 className="mt-1 w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
                 aria-label="Pages reviewed"
               />
@@ -356,7 +402,10 @@ export function MarkCompleteModal({
             <textarea
               rows={3}
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              onChange={(e) => {
+                clearError();
+                setNotes(e.target.value);
+              }}
               placeholder="Anything else worth capturing alongside the analysis report..."
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
               maxLength={2000}

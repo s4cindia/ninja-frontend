@@ -404,10 +404,14 @@ export default function ZoneReviewWorkspace({
         setCompleteBanner({ type: 'success', message: 'Analysis report generated.' });
         setMarkCompleteModalOpen(false);
       } catch (err) {
+        // Surface the failure in the parent banner as well (visible after the
+        // modal closes via cancel/next open), but rethrow so the modal can
+        // display the error inline while it is still on screen.
         setCompleteBanner({
           type: 'error',
           message: err instanceof Error ? err.message : 'Failed to generate analysis report',
         });
+        throw err;
       } finally {
         setCompleting(false);
       }
