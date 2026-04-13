@@ -208,8 +208,8 @@ export function MarkCompleteModal({
     return null;
   };
 
-  const handleSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     const validationError = validate();
     if (validationError) {
       setError(validationError);
