@@ -46,8 +46,28 @@ export const annotationReportService = {
   }) =>
     api.post(`/calibration/runs/${runId}/sessions/${sessionId}/end`, data).then(r => r.data.data),
 
-  markAnnotationComplete: (runId: string) =>
-    api.post(`/calibration/runs/${runId}/complete`).then(r => r.data.data),
+  markAnnotationComplete: (
+    runId: string,
+    payload?: {
+      pagesReviewed: number;
+      issues: Array<{
+        category:
+          | 'PAGE_ALIGNMENT_MISMATCH'
+          | 'INSUFFICIENT_JOINT_COVERAGE'
+          | 'LIMITED_ZONE_COVERAGE'
+          | 'UNEQUAL_EXTRACTOR_COVERAGE'
+          | 'SINGLE_EXTRACTOR_ONLY'
+          | 'ZONE_CONTENT_DIVERGENCE'
+          | 'COMPLETED_WITH_REDUCED_SCOPE'
+          | 'OTHER';
+        pagesAffected?: number;
+        description: string;
+        blocking: boolean;
+      }>;
+      notes?: string;
+    },
+  ) =>
+    api.post(`/calibration/runs/${runId}/complete`, payload).then(r => r.data.data),
 
   getAnalysis: (runId: string) =>
     api.get(`/calibration/runs/${runId}/analysis`).then(r => r.data.data),
