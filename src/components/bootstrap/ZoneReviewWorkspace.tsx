@@ -27,6 +27,7 @@ import ZonePdfPanel from './ZonePdfPanel';
 import ZoneComparisonDetailBar from './ZoneComparisonDetailBar';
 import ZoneOverlay from './ZoneOverlay';
 import ZoneListSidebar from './ZoneListSidebar';
+import { MarkCompleteModal, type MarkCompleteRequest } from './MarkCompleteModal';
 import { useZoneNumberMap } from '@/hooks/useZoneNumberMap';
 import { TableStructureEditor } from '../quickfix/TableStructureEditor';
 import type { TableSection } from '@/types/zone.types';
@@ -79,6 +80,7 @@ export default function ZoneReviewWorkspace({
   const [completing, setCompleting] = useState(false);
   const [completeBanner, setCompleteBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [analysisGenerated, setAnalysisGenerated] = useState(false);
+  const [markCompleteModalOpen, setMarkCompleteModalOpen] = useState(false);
 
   // Keep page input in sync with currentPage (arrow buttons, thumbnail clicks, etc.)
   useEffect(() => {
@@ -385,22 +387,37 @@ export default function ZoneReviewWorkspace({
     });
   }, [comparisonMutation]);
 
-  const handleMarkComplete = useCallback(async () => {
+  const handleMarkComplete = useCallback(() => {
     if (!runId) return;
-    if (!window.confirm('Mark annotation as complete and generate analysis report? This will set completedAt on the run.')) return;
-    setCompleting(true);
-    setCompleteBanner(null);
-    try {
-      await annotationReportService.markAnnotationComplete(runId);
-      queryClient.invalidateQueries({ queryKey: ['calibration', 'runs'] });
-      setAnalysisGenerated(true);
-      setCompleteBanner({ type: 'success', message: 'Analysis report generated.' });
-    } catch (err) {
-      setCompleteBanner({ type: 'error', message: err instanceof Error ? err.message : 'Failed to generate analysis report' });
-    } finally {
-      setCompleting(false);
-    }
-  }, [runId, queryClient]);
+    setMarkCompleteModalOpen(true);
+  }, [runId]);
+
+  const handleSubmitMarkComplete = useCallback(
+    async (payload: MarkCompleteRequest) => {
+      if (!runId) return;
+      setCompleting(true);
+      setCompleteBanner(null);
+      try {
+        await annotationReportService.markAnnotationComplete(runId, payload);
+        queryClient.invalidateQueries({ queryKey: ['calibration', 'runs'] });
+        setAnalysisGenerated(true);
+        setCompleteBanner({ type: 'success', message: 'Analysis report generated.' });
+        setMarkCompleteModalOpen(false);
+      } catch (err) {
+        // Surface the failure in the parent banner as well (visible after the
+        // modal closes via cancel/next open), but rethrow so the modal can
+        // display the error inline while it is still on screen.
+        setCompleteBanner({
+          type: 'error',
+          message: err instanceof Error ? err.message : 'Failed to generate analysis report',
+        });
+        throw err;
+      } finally {
+        setCompleting(false);
+      }
+    },
+    [runId, queryClient],
+  );
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] bg-gray-50">
@@ -890,6 +907,19 @@ export default function ZoneReviewWorkspace({
           onClose={() => setTableEditorZone(null)}
         />
       )}
+
+      {/* Mark Complete modal */}
+      <MarkCompleteModal
+        isOpen={markCompleteModalOpen}
+        onClose={() => setMarkCompleteModalOpen(false)}
+        onSubmit={handleSubmitMarkComplete}
+        documentName={docId}
+        totalPages={numPages}
+        defaultPagesReviewed={pagesReviewed}
+        zonesReviewed={allZones.filter((z) => z.operatorVerified).length}
+        totalZones={allZones.length}
+        isSubmitting={completing}
+      />
     </div>
   );
 }
