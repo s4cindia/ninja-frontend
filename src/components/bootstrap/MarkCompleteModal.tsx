@@ -124,6 +124,7 @@ export function MarkCompleteModal({
   const [pagesReviewed, setPagesReviewed] = useState<number>(defaultPagesReviewed);
   const [issues, setIssues] = useState<RunIssueDraft[]>([]);
   const pagesReviewedRef = useRef<HTMLInputElement | null>(null);
+  const errorRef = useRef<HTMLDivElement | null>(null);
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -196,10 +197,16 @@ export function MarkCompleteModal({
     return null;
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     const validationError = validate();
     if (validationError) {
       setError(validationError);
+      // Bring the error into view — the body is scrollable and a long
+      // issues list can push the error below the fold.
+      requestAnimationFrame(() => {
+        errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
       return;
     }
     setError(null);
@@ -219,6 +226,9 @@ export function MarkCompleteModal({
       // Surface submit failures inside the modal — the parent's banner is
       // hidden behind the backdrop so the user would otherwise see nothing.
       setError(err instanceof Error ? err.message : 'Failed to generate analysis report.');
+      requestAnimationFrame(() => {
+        errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
     }
   };
 
@@ -232,7 +242,11 @@ export function MarkCompleteModal({
       aria-modal="true"
       aria-labelledby="mark-complete-title"
     >
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] flex flex-col">
+      <form
+        className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] flex flex-col"
+        onSubmit={handleSubmit}
+        noValidate
+      >
         {/* Header */}
         <div className="flex items-start justify-between px-6 py-4 border-b border-gray-200">
           <div>
@@ -277,6 +291,9 @@ export function MarkCompleteModal({
                   const parsed = Number(raw);
                   setPagesReviewed(Number.isFinite(parsed) ? parsed : NaN);
                 }}
+                // Prevent the scroll-wheel from silently mutating the value
+                // while the user is scrolling the modal body.
+                onWheel={(e) => (e.target as HTMLInputElement).blur()}
                 className="mt-1 w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
                 aria-label="Pages reviewed"
               />
@@ -382,6 +399,7 @@ export function MarkCompleteModal({
                               pagesAffected: Number.isFinite(parsed) ? parsed : undefined,
                             });
                           }}
+                          onWheel={(e) => (e.target as HTMLInputElement).blur()}
                           placeholder="—"
                           className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
                           aria-label={`Pages affected by issue ${idx + 1}`}
@@ -445,7 +463,12 @@ export function MarkCompleteModal({
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded p-2 text-xs text-red-700">
+            <div
+              ref={errorRef}
+              role="alert"
+              aria-live="assertive"
+              className="bg-red-50 border border-red-200 rounded p-2 text-xs text-red-700"
+            >
               {error}
             </div>
           )}
@@ -453,18 +476,14 @@ export function MarkCompleteModal({
 
         {/* Footer */}
         <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
-          <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
+          <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button
-            variant="primary"
-            onClick={handleSubmit}
-            isLoading={isSubmitting}
-          >
+          <Button type="submit" variant="primary" isLoading={isSubmitting}>
             Mark Complete &amp; Generate Report
           </Button>
         </div>
-      </div>
+      </form>
     </div>
   );
 }
