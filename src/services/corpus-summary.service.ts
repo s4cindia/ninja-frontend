@@ -51,11 +51,18 @@ export const corpusSummaryService = {
       rangeFilename(range, 'corpus-lineage-summary', 'csv'),
     ),
 
-  downloadTimesheetCsv: (range: DateRange) =>
+  downloadTimesheetPerOperatorCsv: (range: DateRange) =>
     downloadFile(
-      '/calibration/corpus/timesheet-summary/export/csv',
+      '/calibration/corpus/timesheet-summary/export/per-operator-csv',
       rangeParams(range),
-      rangeFilename(range, 'corpus-timesheet-summary', 'csv'),
+      rangeFilename(range, 'corpus-timesheet-per-operator', 'csv'),
+    ),
+
+  downloadTimesheetPerTitleCsv: (range: DateRange) =>
+    downloadFile(
+      '/calibration/corpus/timesheet-summary/export/per-title-csv',
+      rangeParams(range),
+      rangeFilename(range, 'corpus-timesheet-per-title', 'csv'),
     ),
 
   downloadTimesheetPdf: (range: DateRange) =>

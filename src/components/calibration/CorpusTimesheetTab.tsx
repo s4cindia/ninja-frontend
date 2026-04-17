@@ -18,8 +18,11 @@ interface Props {
 export function CorpusTimesheetTab({ range }: Props) {
   const { data, isLoading, error } = useTimesheetSummary(range);
 
-  const handleExportCsv = () => {
-    void corpusSummaryService.downloadTimesheetCsv(range);
+  const handleExportOperatorCsv = () => {
+    void corpusSummaryService.downloadTimesheetPerOperatorCsv(range);
+  };
+  const handleExportTitleCsv = () => {
+    void corpusSummaryService.downloadTimesheetPerTitleCsv(range);
   };
   const handleExportPdf = () => {
     void corpusSummaryService.downloadTimesheetPdf(range);
@@ -43,12 +46,21 @@ export function CorpusTimesheetTab({ range }: Props) {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={handleExportCsv}
+            onClick={handleExportOperatorCsv}
             disabled={exportsDisabled}
             className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Download className="h-4 w-4" />
-            Export CSV
+            CSV (per operator)
+          </button>
+          <button
+            type="button"
+            onClick={handleExportTitleCsv}
+            disabled={exportsDisabled}
+            className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" />
+            CSV (per title)
           </button>
           <button
             type="button"
