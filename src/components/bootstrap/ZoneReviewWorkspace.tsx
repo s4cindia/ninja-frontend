@@ -398,7 +398,10 @@ export default function ZoneReviewWorkspace({
       setCompleting(true);
       setCompleteBanner(null);
       try {
+        // POST returns 202 immediately; report generates in background.
         await annotationReportService.markAnnotationComplete(runId, payload);
+        // Poll until the backend finishes report generation.
+        await annotationReportService.pollAnalysisUntilDone(runId);
         queryClient.invalidateQueries({ queryKey: ['calibration', 'runs'] });
         setAnalysisGenerated(true);
         setCompleteBanner({ type: 'success', message: 'Analysis report generated.' });
