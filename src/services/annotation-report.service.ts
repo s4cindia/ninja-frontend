@@ -72,6 +72,31 @@ export const annotationReportService = {
   getAnalysis: (runId: string) =>
     api.get(`/calibration/runs/${runId}/analysis`).then(r => r.data.data),
 
+  getAnalysisStatus: (runId: string) =>
+    api.get(`/calibration/runs/${runId}/analysis-status`).then(r => r.data.data),
+
+  /**
+   * Poll GET /analysis-status every `intervalMs` until `status` is
+   * 'COMPLETED' or 'FAILED'. Throws on 'FAILED' or if `maxAttempts`
+   * is exceeded.
+   */
+  pollAnalysisUntilDone: async (
+    runId: string,
+    { intervalMs = 3_000, maxAttempts = 100 } = {},
+  ) => {
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise((r) => setTimeout(r, intervalMs));
+      const status = await api
+        .get(`/calibration/runs/${runId}/analysis-status`)
+        .then((r) => r.data.data);
+      if (status.status === 'COMPLETED') return status;
+      if (status.status === 'FAILED') {
+        throw new Error(status.error || 'Analysis report generation failed');
+      }
+    }
+    throw new Error('Analysis report generation timed out');
+  },
+
   getCorpusSummary: () =>
     api.get('/calibration/corpus/analysis-summary').then(r => r.data.data),
 };
