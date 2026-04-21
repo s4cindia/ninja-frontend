@@ -16,6 +16,8 @@ const ZONE_TYPE_OPTIONS = [
   { value: 'caption', label: 'Caption' },
   { value: 'footnote', label: 'Footnote' },
   { value: 'list-item', label: 'List Item' },
+  { value: 'toci', label: 'TOCI — Table of Contents Item' },
+  { value: 'formula', label: 'Formula' },
   { value: 'header', label: 'Page Header' },
   { value: 'footer', label: 'Page Footer' },
 ];
