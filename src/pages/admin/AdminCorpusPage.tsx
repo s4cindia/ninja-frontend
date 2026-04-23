@@ -129,11 +129,12 @@ function EmptyPagesIndicator({
       </span>
     );
   }
-  const pct = Math.round((emptyPages / totalPages) * 100);
+  const rawPct = (emptyPages / totalPages) * 100;
+  const pct = Math.round(rawPct);
   const tone =
-    pct >= 25
+    rawPct >= 25
       ? 'bg-red-100 text-red-700 hover:bg-red-200'
-      : pct >= 10
+      : rawPct >= 10
       ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
       : 'bg-gray-100 text-gray-600 hover:bg-gray-200';
   return (
@@ -733,6 +734,7 @@ export default function AdminCorpusPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Content Type</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pages</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Run</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Empty Pages</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
