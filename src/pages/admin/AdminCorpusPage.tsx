@@ -3,6 +3,14 @@ import { Navigate, Link } from 'react-router-dom';
 import { Upload, Database, RefreshCw, Loader2, Trash2, Sparkles, Download } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { useAuthStore } from '@/stores/auth.store';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogClose,
+} from '@/components/ui/Dialog';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
 import {
@@ -73,12 +81,124 @@ function RunStatusBadge({ status }: { status: string | undefined }) {
 function SkeletonRow() {
   return (
     <tr>
-      {Array.from({ length: 7 }).map((_, i) => (
+      {Array.from({ length: 8 }).map((_, i) => (
         <td key={i} className="px-4 py-3">
           <div className="h-4 bg-gray-200 rounded animate-pulse" />
         </td>
       ))}
     </tr>
+  );
+}
+
+function compactPageRanges(pages: number[]): string {
+  if (!pages.length) return '';
+  const sorted = [...pages].sort((a, b) => a - b);
+  const ranges: string[] = [];
+  let start = sorted[0];
+  let prev = sorted[0];
+  for (let i = 1; i < sorted.length; i++) {
+    const n = sorted[i];
+    if (n === prev + 1) {
+      prev = n;
+      continue;
+    }
+    ranges.push(start === prev ? `${start}` : `${start}–${prev}`);
+    start = n;
+    prev = n;
+  }
+  ranges.push(start === prev ? `${start}` : `${start}–${prev}`);
+  return ranges.join(', ');
+}
+
+function EmptyPagesIndicator({
+  emptyPages,
+  totalPages,
+  onClick,
+}: {
+  emptyPages: number | undefined;
+  totalPages: number | undefined;
+  onClick: () => void;
+}) {
+  if (emptyPages == null || !totalPages) {
+    return <span className="text-sm text-gray-400">—</span>;
+  }
+  if (emptyPages === 0) {
+    return (
+      <span className="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700">
+        0
+      </span>
+    );
+  }
+  const pct = Math.round((emptyPages / totalPages) * 100);
+  const tone =
+    pct >= 25
+      ? 'bg-red-100 text-red-700 hover:bg-red-200'
+      : pct >= 10
+      ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+      : 'bg-gray-100 text-gray-600 hover:bg-gray-200';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-2 py-0.5 text-xs rounded-full transition-colors ${tone}`}
+      title={`${emptyPages} of ${totalPages} pages have no detected zones (${pct}%) — click for details`}
+    >
+      {emptyPages} ({pct}%)
+    </button>
+  );
+}
+
+function EmptyPagesModal({
+  doc,
+  onClose,
+}: {
+  doc: CorpusDocument | null;
+  onClose: () => void;
+}) {
+  const summary = doc?.calibrationRuns?.[0]?.summary;
+  const emptyPages = summary?.emptyPages;
+  const emptyPageCount = summary?.emptyPageCount ?? emptyPages?.length ?? 0;
+  const totalPages = doc?.pageCount;
+  const pct =
+    totalPages && totalPages > 0
+      ? Math.round((emptyPageCount / totalPages) * 100)
+      : 0;
+
+  return (
+    <Dialog open={doc !== null} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl p-6">
+        <DialogHeader>
+          <DialogTitle>Empty pages — {doc?.filename ?? ''}</DialogTitle>
+          <DialogDescription>
+            {emptyPageCount} of {totalPages ?? '?'} pages ({pct}%) had no zones
+            detected by the calibration run.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogClose />
+        <div className="mt-4">
+          {emptyPages && emptyPages.length > 0 ? (
+            <>
+              <div className="text-xs font-medium text-gray-500 uppercase mb-2">
+                Page numbers
+              </div>
+              <div className="max-h-80 overflow-y-auto rounded border border-gray-200 bg-gray-50 p-3 text-sm font-mono text-gray-800 break-words">
+                {compactPageRanges(emptyPages)}
+              </div>
+              <p className="mt-3 text-xs text-gray-500">
+                Spot-check the PDF at these pages to distinguish legitimately
+                empty content (front matter, blank dividers, image plates) from
+                detection failures that warrant a re-run.
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-gray-500">
+              The backend did not return a page list for this run. Ask the
+              calibration service to include <code>summary.emptyPages</code>.
+            </p>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -111,6 +231,8 @@ export default function AdminCorpusPage() {
   const [bulkAnnotateResult, setBulkAnnotateResult] = useState<string | null>(null);
   const [exportingTraining, setExportingTraining] = useState(false);
   const [exportResult, setExportResult] = useState<string | null>(null);
+  const [emptyPagesModalDoc, setEmptyPagesModalDoc] =
+    useState<CorpusDocument | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -657,6 +779,9 @@ export default function AdminCorpusPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Last Run
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Empty Pages
+                  </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                     Actions
                   </th>
@@ -704,6 +829,16 @@ export default function AdminCorpusPage() {
                       <td className="px-4 py-3">
                         <RunStatusBadge status={lastRun?.status} />
                       </td>
+                      <td className="px-4 py-3">
+                        <EmptyPagesIndicator
+                          emptyPages={
+                            doc.calibrationRuns?.[0]?.summary?.emptyPageCount ??
+                            doc.calibrationRuns?.[0]?.summary?.emptyPages?.length
+                          }
+                          totalPages={doc.pageCount}
+                          onClick={() => setEmptyPagesModalDoc(doc)}
+                        />
+                      </td>
                       <td className="px-4 py-3 text-right space-x-2">
                         {doc.calibrationRuns?.[0]?.id && (
                           <Link
@@ -729,6 +864,10 @@ export default function AdminCorpusPage() {
           </div>
         )}
       </div>
+      <EmptyPagesModal
+        doc={emptyPagesModalDoc}
+        onClose={() => setEmptyPagesModalDoc(null)}
+      />
     </div>
   );
 }

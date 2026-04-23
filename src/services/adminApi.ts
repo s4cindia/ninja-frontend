@@ -23,7 +23,11 @@ export interface CorpusDocument {
   calibrationRuns?: Array<{
     id: string;
     completedAt: string | null;
-    summary: Record<string, unknown> | null;
+    summary: (Record<string, unknown> & {
+      emptyPageCount?: number;
+      emptyPages?: number[];
+      pagesWithZonesCount?: number;
+    }) | null;
   }>;
 }
 
