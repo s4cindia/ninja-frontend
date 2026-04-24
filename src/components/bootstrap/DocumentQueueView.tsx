@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useCorpusDocumentsWithPolling, useUploadTaggedPdf, useTriggerCorpusCalibrationRun } from '@/hooks/useCalibration';
 import { DocumentStatusBadge } from './DocumentStatusBadge';
+import { EmptyPagesModal } from './EmptyPagesModal';
 import { getCorpusDocumentStatus, resetCorpus } from '@/services/calibration.service';
 import type { CorpusDocument, CorpusDocumentStatus } from '@/services/calibration.service';
 
@@ -19,7 +20,7 @@ function SkeletonRows() {
     <>
       {Array.from({ length: 5 }, (_, i) => (
         <tr key={i}>
-          {Array.from({ length: 9 }, (_, j) => (
+          {Array.from({ length: 10 }, (_, j) => (
             <td key={j} className="px-6 py-4">
               <div className="h-4 bg-gray-200 rounded animate-pulse" />
             </td>
@@ -157,6 +158,7 @@ export default function DocumentQueueView() {
   const [resetting, setResetting] = useState(false);
   const navigate = useNavigate();
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const [emptyPagesModalDocId, setEmptyPagesModalDocId] = useState<string | null>(null);
 
   const { data, isLoading, isError, error } = useCorpusDocumentsWithPolling();
   const uploadMutation = useUploadTaggedPdf();
@@ -388,6 +390,7 @@ export default function DocumentQueueView() {
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Publisher</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Content Type</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pages</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Empty Pages</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Extraction</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Annotation Status</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Annotation Progress</th>
@@ -414,6 +417,27 @@ export default function DocumentQueueView() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {doc.pageCount ?? '—'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {(() => {
+                          const summary = doc.calibrationRuns?.[0]?.summary;
+                          const count = summary?.emptyPageCount;
+                          if (count === undefined || count === null) {
+                            return <span className="text-gray-400">—</span>;
+                          }
+                          if (count === 0) {
+                            return <span className="text-gray-500">0</span>;
+                          }
+                          return (
+                            <button
+                              onClick={() => setEmptyPagesModalDocId(doc.id)}
+                              className="text-amber-700 font-medium hover:text-amber-900 hover:underline"
+                              aria-label={`View ${count} empty pages for ${doc.filename}`}
+                            >
+                              {count}
+                            </button>
+                          );
+                        })()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <OperatorStatusBadge status={opStatus} />
@@ -512,6 +536,19 @@ export default function DocumentQueueView() {
           </table>
         </div>
       )}
+      {emptyPagesModalDocId && (() => {
+        const doc = documents.find((d) => d.id === emptyPagesModalDocId);
+        const summary = doc?.calibrationRuns?.[0]?.summary;
+        if (!doc || !summary?.emptyPages) return null;
+        return (
+          <EmptyPagesModal
+            filename={doc.filename}
+            pageCount={doc.pageCount ?? 0}
+            emptyPages={summary.emptyPages}
+            onClose={() => setEmptyPagesModalDocId(null)}
+          />
+        );
+      })()}
     </div>
   );
 }

@@ -13,7 +13,16 @@ export interface CorpusDocument {
   taggedPdfPath?: string;
   status?: 'PENDING' | 'IN_PROGRESS' | 'NEEDS_REVIEW' | 'COMPLETE';
   bootstrapJobs?: Array<{ id: string; status: string; completedAt?: string; error?: string }>;
-  calibrationRuns?: Array<{ id: string; runDate: string; completedAt?: string; summary?: Record<string, unknown> }>;
+  calibrationRuns?: Array<{
+    id: string;
+    runDate: string;
+    completedAt?: string;
+    summary?: Record<string, unknown> & {
+      emptyPages?: number[];
+      emptyPageCount?: number;
+      pagesWithZonesCount?: number;
+    };
+  }>;
   annotationProgress?: {
     totalZones: number;
     annotatedZones: number;
