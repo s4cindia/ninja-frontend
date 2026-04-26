@@ -421,7 +421,7 @@ export default function DocumentQueueView() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         {(() => {
                           const summary = doc.calibrationRuns?.[0]?.summary;
-                          const count = summary?.emptyPageCount;
+                          const count = summary?.emptyPageCount ?? summary?.emptyPages?.length;
                           if (count === undefined || count === null) {
                             return <span className="text-gray-400">—</span>;
                           }

@@ -8,12 +8,15 @@ interface EmptyPagesModalProps {
 }
 
 function formatPageRanges(pages: number[]): string {
-  if (pages.length === 0) return '';
+  const normalized = Array.from(new Set(pages))
+    .filter((p) => Number.isInteger(p) && p > 0)
+    .sort((a, b) => a - b);
+  if (normalized.length === 0) return '';
   const ranges: string[] = [];
-  let start = pages[0];
-  let prev = pages[0];
-  for (let i = 1; i <= pages.length; i++) {
-    const curr = pages[i];
+  let start = normalized[0];
+  let prev = normalized[0];
+  for (let i = 1; i <= normalized.length; i++) {
+    const curr = normalized[i];
     if (curr !== prev + 1) {
       ranges.push(start === prev ? `${start}` : `${start}–${prev}`);
       start = curr;
