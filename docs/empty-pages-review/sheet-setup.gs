@@ -47,6 +47,12 @@ function onOpen() {
 
 function setupSheet() {
   const sheet = SpreadsheetApp.getActiveSheet();
+  if (sheet.getName() === SUMMARY_SHEET_NAME) {
+    SpreadsheetApp.getUi().alert(
+      'Switch to a data sheet (not "Summary") before running setup.'
+    );
+    return;
+  }
   applyHeaderFormatting_(sheet);
   applyValidation_(sheet);
   applyConditionalFormatting_(sheet);
@@ -79,7 +85,9 @@ function applyValidation_(sheet) {
   sheet.getRange(startRow, 1, numRows, 1).setDataValidation(titleRule);
 
   const pageNumberRule = SpreadsheetApp.newDataValidation()
-    .requireNumberGreaterThan(0)
+    .requireFormulaSatisfied(
+      `=AND(ISNUMBER(B${startRow}), B${startRow}=INT(B${startRow}), B${startRow}>0)`
+    )
     .setAllowInvalid(false)
     .setHelpText('Page number — positive integer, 1-indexed')
     .build();
@@ -145,6 +153,11 @@ function applyColumnSizing_(sheet) {
 function expandRangeList() {
   const ui = SpreadsheetApp.getUi();
   const sheet = SpreadsheetApp.getActiveSheet();
+
+  if (sheet.getName() === SUMMARY_SHEET_NAME) {
+    ui.alert('Switch to the data sheet before expanding ranges.');
+    return;
+  }
 
   const titleResp = ui.prompt(
     'Expand range list (1/3)',
@@ -312,9 +325,10 @@ function refreshSummary() {
 }
 
 function getDataSheet_(ss) {
-  const sheets = ss.getSheets();
-  for (const s of sheets) {
+  const active = ss.getActiveSheet();
+  if (active.getName() !== SUMMARY_SHEET_NAME) return active;
+  for (const s of ss.getSheets()) {
     if (s.getName() !== SUMMARY_SHEET_NAME) return s;
   }
-  return ss.getActiveSheet();
+  return active;
 }
