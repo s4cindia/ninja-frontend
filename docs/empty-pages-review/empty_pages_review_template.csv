@@ -1,0 +1,4 @@
+title,page_number,category,page_type,expected_content,notes,annotator,reviewed_at
+Govoni_Lovell,1,legit_empty,cover,,,<annotator>,2026-04-27
+Govoni_Lovell,47,detection_failure,text_normal,"Two-column body text with footnotes","Looks like a normal page; model returned nothing.",<annotator>,2026-04-27
+Acharya,15,unsure,mixed,"Pull-quote sidebar + small table","Not sure if model should detect the pull-quote.",<annotator>,2026-04-27
