@@ -9,6 +9,10 @@ interface ZoneListSidebarProps {
   onZoneClick: (zoneId: string) => void;
   zoneNumberMap?: Map<string, number>;
   hideAiBadges?: boolean;
+  // True while paginated fetches are still streaming in. When the page has zero
+  // zones AND we're still streaming, render a "Loading more…" affordance rather
+  // than "No zones on this page" (which would be a false negative).
+  isStreaming?: boolean;
 }
 
 const BUCKET_COLOR = {
@@ -24,6 +28,7 @@ export default function ZoneListSidebar({
   onZoneClick,
   zoneNumberMap,
   hideAiBadges,
+  isStreaming,
 }: ZoneListSidebarProps) {
   const pageZones = useMemo(
     () => zones.filter((z) => z.pageNumber === currentPage),
@@ -33,7 +38,7 @@ export default function ZoneListSidebar({
   if (pageZones.length === 0) {
     return (
       <div className="w-56 border-l border-gray-200 bg-white flex items-center justify-center text-xs text-gray-400">
-        No zones on this page
+        {isStreaming ? 'Loading zones…' : 'No zones on this page'}
       </div>
     );
   }
