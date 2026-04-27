@@ -5,7 +5,11 @@ import { useAuthStore } from '@/stores/auth.store';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
-import { useCalibrationRun, useCalibrationRuns } from '@/hooks/useCalibration';
+import {
+  useCalibrationRun,
+  useCalibrationRuns,
+  useCorpusDocuments,
+} from '@/hooks/useCalibration';
 import {
   useCalibrationZones,
   useConfirmZone,
@@ -113,6 +117,12 @@ export default function ZoneReviewWorkspace({
   // showing zones for (not the latest run, which may differ from runIdProp).
   const { data: runDetail } = useCalibrationRun(runId);
   const emptyPages = runDetail?.summary?.emptyPages;
+
+  // Filename for the empty-pages popover header. Pulled from the cached corpus
+  // document list (DocumentQueueView populates this cache on the screen the
+  // user typically comes from); when stale or uncached, falls back to fetching.
+  const { data: docsData } = useCorpusDocuments();
+  const docFilename = docsData?.documents?.find((d) => d.id === docId)?.filename;
 
   const filterParam = bucketFilter === 'ALL' ? undefined : { bucket: bucketFilter };
   const {
@@ -622,6 +632,7 @@ export default function ZoneReviewWorkspace({
           </button>
 
           <EmptyPagesChip
+            filename={docFilename}
             emptyPages={emptyPages}
             pageCount={numPages}
             currentPage={currentPage}

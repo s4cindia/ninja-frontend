@@ -3,6 +3,7 @@ import { AlertTriangle, X } from 'lucide-react';
 import { formatPageRanges } from '@/lib/page-ranges';
 
 interface EmptyPagesChipProps {
+  filename?: string;
   emptyPages: number[] | undefined;
   pageCount: number;
   currentPage: number;
@@ -26,6 +27,7 @@ function parseRangeChunks(formatted: string): RangeChunk[] {
 }
 
 export function EmptyPagesChip({
+  filename,
   emptyPages,
   pageCount,
   currentPage,
@@ -34,8 +36,14 @@ export function EmptyPagesChip({
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Normalize once: dedupe, drop non-positive integers, sort ascending.
+  // Everything downstream (count, ranges, next-empty button) reads from here so
+  // the chip's number always matches the popover's range list.
   const sorted = useMemo(
-    () => [...(emptyPages ?? [])].sort((a, b) => a - b),
+    () =>
+      Array.from(new Set(emptyPages ?? []))
+        .filter((p) => Number.isInteger(p) && p > 0)
+        .sort((a, b) => a - b),
     [emptyPages],
   );
 
@@ -97,10 +105,18 @@ export function EmptyPagesChip({
           className="absolute top-full right-0 mt-1 w-72 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-3"
         >
           <div className="flex items-start justify-between mb-2">
-            <div>
+            <div className="min-w-0 flex-1">
               <div className="text-sm font-semibold text-gray-900">
                 Empty Pages
               </div>
+              {filename && (
+                <div
+                  className="text-xs text-gray-500 truncate"
+                  title={filename}
+                >
+                  {filename}
+                </div>
+              )}
               <div className="text-xs text-gray-500">
                 {sorted.length} of {pageCount} have no detected zones ({pct}%)
               </div>
