@@ -1,29 +1,11 @@
 import { X } from 'lucide-react';
+import { formatPageRanges } from '@/lib/page-ranges';
 
 interface EmptyPagesModalProps {
   filename: string;
   pageCount: number;
   emptyPages: number[];
   onClose: () => void;
-}
-
-function formatPageRanges(pages: number[]): string {
-  const normalized = Array.from(new Set(pages))
-    .filter((p) => Number.isInteger(p) && p > 0)
-    .sort((a, b) => a - b);
-  if (normalized.length === 0) return '';
-  const ranges: string[] = [];
-  let start = normalized[0];
-  let prev = normalized[0];
-  for (let i = 1; i <= normalized.length; i++) {
-    const curr = normalized[i];
-    if (curr !== prev + 1) {
-      ranges.push(start === prev ? `${start}` : `${start}–${prev}`);
-      start = curr;
-    }
-    prev = curr;
-  }
-  return ranges.join(', ');
 }
 
 export function EmptyPagesModal({ filename, pageCount, emptyPages, onClose }: EmptyPagesModalProps) {

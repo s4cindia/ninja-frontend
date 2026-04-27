@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getCorpusDocuments,
   startCalibration,
+  getCalibrationRun,
   getCalibrationRuns,
   getCorpusStats,
   uploadTaggedPdf,
@@ -45,6 +46,14 @@ export function useCalibrationRuns(params?: {
   return useQuery({
     queryKey: CALIBRATION_KEYS.runs(params),
     queryFn: () => getCalibrationRuns(params),
+  });
+}
+
+export function useCalibrationRun(runId: string) {
+  return useQuery({
+    queryKey: CALIBRATION_KEYS.run(runId),
+    queryFn: () => getCalibrationRun(runId),
+    enabled: !!runId,
   });
 }
 
