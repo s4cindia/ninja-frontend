@@ -5,7 +5,11 @@ import { useAuthStore } from '@/stores/auth.store';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
-import { useCalibrationRuns } from '@/hooks/useCalibration';
+import {
+  useCalibrationRun,
+  useCalibrationRuns,
+  useCorpusDocuments,
+} from '@/hooks/useCalibration';
 import {
   useCalibrationZones,
   useConfirmZone,
@@ -27,6 +31,7 @@ import ZonePdfPanel from './ZonePdfPanel';
 import ZoneComparisonDetailBar from './ZoneComparisonDetailBar';
 import ZoneOverlay from './ZoneOverlay';
 import ZoneListSidebar from './ZoneListSidebar';
+import { EmptyPagesChip } from './EmptyPagesChip';
 import { MarkCompleteModal, type MarkCompleteRequest } from './MarkCompleteModal';
 import { useZoneNumberMap } from '@/hooks/useZoneNumberMap';
 import { TableStructureEditor } from '../quickfix/TableStructureEditor';
@@ -107,6 +112,17 @@ export default function ZoneReviewWorkspace({
     runIdProp ? undefined : { documentId: docId, limit: 1 },
   );
   const runId = runIdProp || runsData?.runs?.[0]?.id || '';
+
+  // Pull the run's summary specifically so emptyPages reflects the run we're
+  // showing zones for (not the latest run, which may differ from runIdProp).
+  const { data: runDetail } = useCalibrationRun(runId);
+  const emptyPages = runDetail?.summary?.emptyPages;
+
+  // Filename for the empty-pages popover header. Pulled from the cached corpus
+  // document list (DocumentQueueView populates this cache on the screen the
+  // user typically comes from); when stale or uncached, falls back to fetching.
+  const { data: docsData } = useCorpusDocuments();
+  const docFilename = docsData?.documents?.find((d) => d.id === docId)?.filename;
 
   const filterParam = bucketFilter === 'ALL' ? undefined : { bucket: bucketFilter };
   const {
@@ -614,6 +630,17 @@ export default function ZoneReviewWorkspace({
           >
             {showZoneList ? 'Hide List' : 'Show List'}
           </button>
+
+          <EmptyPagesChip
+            filename={docFilename}
+            emptyPages={emptyPages}
+            pageCount={numPages}
+            currentPage={currentPage}
+            onJumpToPage={(page) => {
+              setCurrentPage(page);
+              setSelectedZoneId(null);
+            }}
+          />
 
           {/* Page navigation */}
           <div className="flex items-center gap-1 text-sm text-gray-600">

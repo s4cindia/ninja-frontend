@@ -84,7 +84,11 @@ export interface CalibrationRun {
   greenCount?: number;
   amberCount?: number;
   redCount?: number;
-  summary?: object;
+  summary?: Record<string, unknown> & {
+    emptyPages?: number[];
+    emptyPageCount?: number;
+    pagesWithZonesCount?: number;
+  };
 }
 
 export interface CorpusStats {
