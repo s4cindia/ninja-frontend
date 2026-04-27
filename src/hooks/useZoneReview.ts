@@ -57,15 +57,24 @@ export function useCalibrationZones(
   const hitMaxPages = pagesLoaded >= ZONE_MAX_PAGES && (query.hasNextPage ?? false);
 
   // Auto-drain: keep fetching pages until exhausted or guard hits.
+  // Bail on error so a transient 5xx on a mid-stream fetch doesn't loop
+  // outside React Query's retry budget.
   useEffect(() => {
     if (
       query.hasNextPage &&
       !query.isFetchingNextPage &&
+      !query.isError &&
       pagesLoaded < ZONE_MAX_PAGES
     ) {
       query.fetchNextPage();
     }
-  }, [query.hasNextPage, query.isFetchingNextPage, pagesLoaded, query]);
+  }, [
+    query.hasNextPage,
+    query.isFetchingNextPage,
+    query.isError,
+    pagesLoaded,
+    query,
+  ]);
 
   // Surface guard hits so we notice cursor-loop bugs in staging.
   useEffect(() => {
