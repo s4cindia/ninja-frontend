@@ -109,13 +109,15 @@ export default function ZoneReviewWorkspace({
   const runId = runIdProp || runsData?.runs?.[0]?.id || '';
 
   const filterParam = bucketFilter === 'ALL' ? undefined : { bucket: bucketFilter };
-  const { data: zonesData } = useCalibrationZones(runId, filterParam);
-  const zones: CalibrationZone[] = useMemo(() => zonesData?.zones ?? [], [zonesData]);
+  const {
+    zones,
+    isComplete: zonesComplete,
+    isFetchingMore: zonesFetchingMore,
+  } = useCalibrationZones(runId, filterParam);
 
   // Unfiltered zones — used for Mark Complete eligibility so that switching
   // bucket tabs does not undercount how many pages have been reviewed.
-  const { data: allZonesData } = useCalibrationZones(runId);
-  const allZones: CalibrationZone[] = useMemo(() => allZonesData?.zones ?? [], [allZonesData]);
+  const { zones: allZones } = useCalibrationZones(runId);
 
   // Zone mutations
   const confirmZone = useConfirmZone(runId);
@@ -875,6 +877,7 @@ export default function ZoneReviewWorkspace({
               onZoneClick={setSelectedZoneId}
               zoneNumberMap={zoneNumberMap}
               hideAiBadges={isOperator}
+              isStreaming={!zonesComplete || zonesFetchingMore}
             />
           )}
       </div>
