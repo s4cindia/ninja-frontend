@@ -24,3 +24,29 @@ export function trackEvent(event: string, props: TelemetryProps = {}): void {
   // Tag for grep + future routing.
   console.info('[telemetry]', event, props);
 }
+
+/**
+ * Classify an unknown error into PII-safe primitives suitable for telemetry.
+ * Returns the HTTP status (when available) and the error kind, never the raw
+ * message body — backend error messages can contain document or user details.
+ */
+export function classifyErrorForTelemetry(err: unknown): {
+  errorStatus: number | string;
+  errorKind: string;
+} {
+  if (typeof err === 'object' && err !== null) {
+    if ('response' in err) {
+      const status = (err as { response?: { status?: number } }).response
+        ?.status;
+      return {
+        errorStatus: status ?? 'no-response',
+        errorKind: 'http',
+      };
+    }
+    return {
+      errorStatus: 'no-response',
+      errorKind: err instanceof Error ? err.name : 'unknown',
+    };
+  }
+  return { errorStatus: 'no-response', errorKind: 'unknown' };
+}

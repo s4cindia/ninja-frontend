@@ -13,7 +13,7 @@ import {
   useEmptyPageReview,
   useSaveEmptyPageReview,
 } from '@/hooks/useEmptyPageReviews';
-import { trackEvent } from '@/lib/telemetry';
+import { classifyErrorForTelemetry, trackEvent } from '@/lib/telemetry';
 
 interface EmptyPageReviewSidebarProps {
   runId: string;
@@ -53,7 +53,12 @@ export function EmptyPageReviewSidebar({
   pageNumber,
   filename,
 }: EmptyPageReviewSidebarProps) {
-  const { data: existing, isLoading } = useEmptyPageReview(runId, pageNumber);
+  const {
+    data: existing,
+    isLoading,
+    isError: loadFailed,
+    refetch: refetchReview,
+  } = useEmptyPageReview(runId, pageNumber);
   const saveMutation = useSaveEmptyPageReview(runId);
   const deleteMutation = useDeleteEmptyPageReview(runId);
 
@@ -124,13 +129,19 @@ export function EmptyPageReviewSidebar({
     if (!category || !pageType || !isValid) return;
     setFeedback(null);
     const wasUpdate = !!existing;
+    // Drop expectedContent when category is LEGIT_EMPTY — it's hidden in the UI,
+    // so any value left in state from a prior DETECTION_FAILURE session would be
+    // stale and meaningless on a legit-empty record.
+    const trimmedExpected = expectedContent.trim();
+    const expectedContentForSave =
+      category === 'LEGIT_EMPTY' || !trimmedExpected ? undefined : trimmedExpected;
     try {
       await saveMutation.mutateAsync({
         pageNumber,
         payload: {
           category,
           pageType,
-          expectedContent: expectedContent.trim() || undefined,
+          expectedContent: expectedContentForSave,
           notes: notes.trim() || undefined,
         },
       });
@@ -141,7 +152,7 @@ export function EmptyPageReviewSidebar({
         category,
         pageType,
         wasUpdate,
-        expectedContentLength: expectedContent.trim().length,
+        expectedContentLength: expectedContentForSave?.length ?? 0,
         notesLength: notes.trim().length,
       });
     } catch (err) {
@@ -152,7 +163,7 @@ export function EmptyPageReviewSidebar({
       trackEvent('empty-page-review.save-error', {
         runId,
         pageNumber,
-        message: err instanceof Error ? err.message : 'unknown',
+        ...classifyErrorForTelemetry(err),
       });
     }
   }, [
@@ -183,7 +194,7 @@ export function EmptyPageReviewSidebar({
       trackEvent('empty-page-review.delete-error', {
         runId,
         pageNumber,
-        message: err instanceof Error ? err.message : 'unknown',
+        ...classifyErrorForTelemetry(err),
       });
     }
   };
@@ -235,7 +246,24 @@ export function EmptyPageReviewSidebar({
         )}
       </div>
 
-      {isLoading ? (
+      {loadFailed ? (
+        <div className="flex-1 flex flex-col items-center justify-center px-4 text-center gap-2">
+          <div className="text-xs text-red-700 font-medium">
+            Couldn't load this page's review.
+          </div>
+          <div className="text-[11px] text-gray-500 leading-tight">
+            Editing is disabled to avoid overwriting an existing review by
+            mistake. Retry to load it.
+          </div>
+          <button
+            type="button"
+            onClick={() => refetchReview()}
+            className="mt-1 px-3 py-1.5 text-xs font-medium rounded bg-[#006B6B] text-white hover:bg-[#005858] transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      ) : isLoading ? (
         <div className="flex-1 flex items-center justify-center text-xs text-gray-400">
           <Loader2 className="h-4 w-4 animate-spin mr-1" />
           Loading…
@@ -357,7 +385,7 @@ export function EmptyPageReviewSidebar({
         </div>
       )}
 
-      {!isLoading && (
+      {!isLoading && !loadFailed && (
         <div className="border-t border-gray-200 px-3 py-2 space-y-2 bg-gray-50">
           {existing && (
             <div className="text-[11px] text-gray-500">

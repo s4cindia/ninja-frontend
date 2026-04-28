@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Check, CheckCircle2, Loader2, Wand2, X } from 'lucide-react';
 import { formatPageRanges } from '@/lib/page-ranges';
 import { trackEvent } from '@/lib/telemetry';
 import {
+  EMPTY_PAGE_REVIEW_KEYS,
   useEmptyPageReviews,
-  useSaveEmptyPageReview,
 } from '@/hooks/useEmptyPageReviews';
 import {
   LEGIT_EMPTY_PAGE_TYPES,
+  saveEmptyPageReview,
   type EmptyPageType,
 } from '@/services/empty-page-review.service';
 
@@ -65,7 +67,7 @@ export function EmptyPagesChip({
     [reviewsData],
   );
 
-  const saveMutation = useSaveEmptyPageReview(runId);
+  const queryClient = useQueryClient();
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkPageType, setBulkPageType] = useState<EmptyPageType>('blank');
   const [bulkProgress, setBulkProgress] = useState<{
@@ -126,21 +128,27 @@ export function EmptyPagesChip({
       pageType: bulkPageType,
     });
     let failed = 0;
-    // Sequential to avoid hammering the backend or fighting React Query's
-    // mutation queue. ~74 pages × ~150ms each ≈ 11s for the worst case in
-    // staging today; acceptable for an operator-initiated action.
+    // Sequential to avoid hammering the backend. ~74 pages × ~150ms each ≈ 11s
+    // for the worst case in staging today; acceptable for an operator-initiated
+    // action. Calls the service directly (bypassing useSaveEmptyPageReview)
+    // so we don't re-invalidate the list on every iteration — invalidation
+    // happens once at the end.
     for (let i = 0; i < unreviewedPages.length; i++) {
       const page = unreviewedPages[i];
       try {
-        await saveMutation.mutateAsync({
-          pageNumber: page,
-          payload: { category: 'LEGIT_EMPTY', pageType: bulkPageType },
+        await saveEmptyPageReview(runId, page, {
+          category: 'LEGIT_EMPTY',
+          pageType: bulkPageType,
         });
       } catch {
         failed += 1;
       }
       setBulkProgress({ current: i + 1, total, failed });
     }
+    // Refresh the list and any per-page caches in one shot post-loop.
+    queryClient.invalidateQueries({
+      queryKey: EMPTY_PAGE_REVIEW_KEYS.list(runId),
+    });
     trackEvent('empty-page-review.bulk-complete', {
       runId,
       total,
