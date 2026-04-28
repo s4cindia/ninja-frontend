@@ -32,6 +32,7 @@ import ZoneComparisonDetailBar from './ZoneComparisonDetailBar';
 import ZoneOverlay from './ZoneOverlay';
 import ZoneListSidebar from './ZoneListSidebar';
 import { EmptyPagesChip } from './EmptyPagesChip';
+import { EmptyPageReviewSidebar } from './EmptyPageReviewSidebar';
 import { MarkCompleteModal, type MarkCompleteRequest } from './MarkCompleteModal';
 import { useZoneNumberMap } from '@/hooks/useZoneNumberMap';
 import { TableStructureEditor } from '../quickfix/TableStructureEditor';
@@ -632,6 +633,7 @@ export default function ZoneReviewWorkspace({
           </button>
 
           <EmptyPagesChip
+            runId={runId}
             filename={docFilename}
             emptyPages={emptyPages}
             pageCount={numPages}
@@ -895,18 +897,25 @@ export default function ZoneReviewWorkspace({
           </div>
         </div>
 
-          {/* Zone list sidebar */}
-          {showZoneList && (
-            <ZoneListSidebar
-              zones={zones}
-              currentPage={currentPage}
-              selectedZoneId={selectedZoneId}
-              onZoneClick={setSelectedZoneId}
-              zoneNumberMap={zoneNumberMap}
-              hideAiBadges={isOperator}
-              isStreaming={!zonesComplete || zonesFetchingMore}
-            />
-          )}
+          {/* Right-hand sidebar: zone list for normal pages, empty-page review form for empty pages. */}
+          {showZoneList &&
+            (emptyPages?.includes(currentPage) ? (
+              <EmptyPageReviewSidebar
+                runId={runId}
+                pageNumber={currentPage}
+                filename={docFilename}
+              />
+            ) : (
+              <ZoneListSidebar
+                zones={zones}
+                currentPage={currentPage}
+                selectedZoneId={selectedZoneId}
+                onZoneClick={setSelectedZoneId}
+                zoneNumberMap={zoneNumberMap}
+                hideAiBadges={isOperator}
+                isStreaming={!zonesComplete || zonesFetchingMore}
+              />
+            ))}
       </div>
 
       {/* Bottom detail bar — visible only when zone selected */}
