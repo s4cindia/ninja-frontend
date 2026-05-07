@@ -226,8 +226,8 @@ describe('StatusTrackerTab', () => {
     renderTab();
     // Open the pill drop-down
     fireEvent.click(screen.getByRole('button', { name: /status: in progress/i }));
-    // Select the BLOCKED option from the menu
-    fireEvent.click(screen.getByRole('menuitem', { name: /blocked/i }));
+    // Select the BLOCKED option from the dropdown (plain buttons, not role="menuitem")
+    fireEvent.click(screen.getByRole('button', { name: /^Blocked$/i }));
 
     expect(mutate).toHaveBeenCalledWith(
       {

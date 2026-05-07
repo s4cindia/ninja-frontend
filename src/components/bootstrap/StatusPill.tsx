@@ -12,6 +12,8 @@ interface StatusPillProps {
   isSaving?: boolean;
   disabled?: boolean;
   onChange?: (next: AnnotationStatus) => void;
+  /** Optional callback to clear a manual override (sends statusOverride: null). */
+  onClearOverride?: () => void;
 }
 
 const STATUS_TONE: Record<AnnotationStatus, string> = {
@@ -28,6 +30,7 @@ export function StatusPill({
   isSaving,
   disabled,
   onChange,
+  onClearOverride,
 }: StatusPillProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -61,24 +64,33 @@ export function StatusPill({
   const tone = STATUS_TONE[status];
   const isReadOnly = !onChange || disabled;
 
+  // Tooltip: read-only branch wins over override branch when both are true.
+  // Otherwise: override → mention it; interactive → invite a click; read-only → label only.
+  const tooltip = isReadOnly
+    ? isOverride
+      ? `${STATUS_LABELS[status]} (manual override)`
+      : STATUS_LABELS[status]
+    : isOverride
+      ? `${STATUS_LABELS[status]} (manual override). Click to change.`
+      : `${STATUS_LABELS[status]}. Click to change.`;
+
+  const handleClearOverride = () => {
+    setOpen(false);
+    onClearOverride?.();
+  };
+
   return (
     <div ref={containerRef} className="relative inline-block">
       <button
         type="button"
         onClick={() => !isReadOnly && setOpen((v) => !v)}
         disabled={isReadOnly}
-        title={
-          isOverride
-            ? `${STATUS_LABELS[status]} (manual override). Click to change.`
-            : isReadOnly
-              ? STATUS_LABELS[status]
-              : `${STATUS_LABELS[status]}. Click to change.`
-        }
+        title={tooltip}
         className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full border transition-colors ${tone} ${
           isReadOnly ? 'cursor-default' : 'cursor-pointer'
         }`}
         aria-label={`Status: ${STATUS_LABELS[status]}`}
-        aria-haspopup={!isReadOnly}
+        aria-haspopup={!isReadOnly ? 'listbox' : undefined}
         aria-expanded={open}
       >
         {isSaving ? (
@@ -93,17 +105,17 @@ export function StatusPill({
       </button>
 
       {open && !isReadOnly && (
-        <div
-          role="menu"
-          className="absolute top-full left-0 mt-1 z-30 min-w-[10rem] bg-white border border-gray-200 rounded-md shadow-lg py-1"
-        >
+        // We use a plain dropdown rather than role="menu" / role="menuitem"
+        // because we don't implement the full WAI-ARIA Menu Button keyboard
+        // contract (focus-on-open, arrow-key navigation, etc.). Plain buttons
+        // give correct screen-reader behaviour for our actual implementation.
+        <div className="absolute top-full left-0 mt-1 z-30 min-w-[10rem] bg-white border border-gray-200 rounded-md shadow-lg py-1">
           {ANNOTATION_STATUSES.map((value) => {
             const isCurrent = value === status;
             return (
               <button
                 key={value}
                 type="button"
-                role="menuitem"
                 onClick={() => handleSelect(value)}
                 className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors ${
                   isCurrent ? 'font-semibold text-gray-900' : 'text-gray-700'
@@ -119,6 +131,19 @@ export function StatusPill({
               </button>
             );
           })}
+          {isOverride && onClearOverride && (
+            <>
+              <div className="border-t border-gray-100 my-1" />
+              <button
+                type="button"
+                onClick={handleClearOverride}
+                className="w-full text-left px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-50 transition-colors"
+                title="Remove the manual override and revert to the derived status"
+              >
+                Clear override (use derived status)
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

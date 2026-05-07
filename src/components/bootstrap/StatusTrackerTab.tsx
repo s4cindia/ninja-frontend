@@ -80,7 +80,26 @@ export function StatusTrackerTab() {
   const [filter, setFilter] = useState<StatusFilter>(DEFAULT_FILTER);
   const [sortKey, setSortKey] = useState<SortKey>('serialNumber');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
-  const [pendingDocId, setPendingDocId] = useState<string | null>(null);
+  // Track per-row pending state so overlapping mutations don't clear each
+  // other's spinner/disabled state when one settles.
+  const [pendingDocIds, setPendingDocIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  const markPending = (documentId: string) =>
+    setPendingDocIds((prev) => {
+      const next = new Set(prev);
+      next.add(documentId);
+      return next;
+    });
+
+  const clearPending = (documentId: string) =>
+    setPendingDocIds((prev) => {
+      if (!prev.has(documentId)) return prev;
+      const next = new Set(prev);
+      next.delete(documentId);
+      return next;
+    });
 
   const rows = useMemo(() => data?.rows ?? [], [data]);
 
@@ -131,21 +150,31 @@ export function StatusTrackerTab() {
     documentId: string,
     next: AnnotationStatus,
   ) => {
-    setPendingDocId(documentId);
+    markPending(documentId);
     updateMutation.mutate(
       { documentId, payload: { statusOverride: next } },
       {
-        onSettled: () => setPendingDocId(null),
+        onSettled: () => clearPending(documentId),
+      },
+    );
+  };
+
+  const handleClearOverride = (documentId: string) => {
+    markPending(documentId);
+    updateMutation.mutate(
+      { documentId, payload: { statusOverride: null } },
+      {
+        onSettled: () => clearPending(documentId),
       },
     );
   };
 
   const handleNoteSave = (documentId: string, note: string) => {
-    setPendingDocId(documentId);
+    markPending(documentId);
     updateMutation.mutate(
       { documentId, payload: { statusNote: note } },
       {
-        onSettled: () => setPendingDocId(null),
+        onSettled: () => clearPending(documentId),
       },
     );
   };
@@ -177,10 +206,13 @@ export function StatusTrackerTab() {
         },
         {
           label: 'Last Updated',
-          value: (r: CorpusStatusRow) =>
-            r.lastUpdatedAt
-              ? new Date(r.lastUpdatedAt).toISOString().slice(0, 10)
-              : '',
+          value: (r: CorpusStatusRow) => {
+            if (!r.lastUpdatedAt) return '';
+            const d = new Date(r.lastUpdatedAt);
+            // Guard against invalid date strings — toISOString throws on those.
+            if (Number.isNaN(d.getTime())) return r.lastUpdatedAt;
+            return d.toISOString().slice(0, 10);
+          },
         },
         {
           label: 'Notes',
@@ -388,10 +420,11 @@ export function StatusTrackerTab() {
               <StatusRow
                 key={row.documentId}
                 row={row}
-                isPending={pendingDocId === row.documentId}
+                isPending={pendingDocIds.has(row.documentId)}
                 onStatusChange={(next) =>
                   handleStatusChange(row.documentId, next)
                 }
+                onClearOverride={() => handleClearOverride(row.documentId)}
                 onNoteSave={(note) => handleNoteSave(row.documentId, note)}
               />
             ))}
@@ -452,6 +485,7 @@ interface StatusRowProps {
   row: CorpusStatusRow;
   isPending: boolean;
   onStatusChange: (next: AnnotationStatus) => void;
+  onClearOverride: () => void;
   onNoteSave: (note: string) => void;
 }
 
@@ -459,6 +493,7 @@ function StatusRow({
   row,
   isPending,
   onStatusChange,
+  onClearOverride,
   onNoteSave,
 }: StatusRowProps) {
   const pct =
@@ -484,6 +519,7 @@ function StatusRow({
           isOverride={row.statusOverride !== null}
           isSaving={isPending}
           onChange={onStatusChange}
+          onClearOverride={onClearOverride}
         />
       </td>
       <td className="px-3 py-2 text-xs text-gray-700">

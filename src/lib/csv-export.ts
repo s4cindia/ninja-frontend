@@ -32,10 +32,20 @@ export interface DownloadCsvOptions<TRow> {
  * Quote a single CSV field per RFC 4180:
  * - if the field contains a comma, double-quote, or newline, wrap in double quotes
  * - escape internal double quotes by doubling them
+ *
+ * Also neutralizes leading formula-trigger characters (=, +, -, @, \t, \r) by
+ * prefixing them with a single quote — protects against CSV injection when the
+ * file is opened in Excel or Google Sheets. Mirrors the convention used by
+ * `csvSafeEscape` in src/utils/format.ts.
  */
 function escapeCsvField(value: string | number | boolean | null | undefined): string {
   if (value === null || value === undefined) return '';
-  const str = String(value);
+  let str = String(value);
+  // Formula-trigger neutralization: any value starting with =, +, -, @, tab,
+  // or carriage return could be interpreted as a formula by spreadsheet apps.
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = `'${str}`;
+  }
   const needsQuoting = /[",\r\n]/.test(str);
   if (!needsQuoting) return str;
   return `"${str.replace(/"/g, '""')}"`;

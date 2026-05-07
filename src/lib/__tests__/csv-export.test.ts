@@ -66,4 +66,27 @@ describe('buildCsv', () => {
     });
     expect(csv).toBe('A\r\n');
   });
+
+  it('neutralizes formula-trigger characters to prevent CSV injection', () => {
+    const csv = buildCsv({
+      columns: [
+        { label: 'A', value: (r: { a: string }) => r.a },
+      ],
+      rows: [
+        { a: '=1+1' },           // = formula
+        { a: '+lookup()' },       // + formula
+        { a: '-cmd|/c calc' },    // - formula (the classic CSV injection)
+        { a: '@SUM(A1:A10)' },    // @ formula
+        { a: 'safe value' },      // benign — should not be prefixed
+      ],
+    });
+    expect(csv).toContain("'=1+1");
+    expect(csv).toContain("'+lookup()");
+    // The '-cmd|/c calc' value is escaped — needs quoting for the | being safe but the string still gets the single-quote prefix
+    expect(csv).toContain("'-cmd|/c calc");
+    expect(csv).toContain("'@SUM(A1:A10)");
+    // Benign value stays unmodified
+    expect(csv).toContain('safe value');
+    expect(csv).not.toContain("'safe value");
+  });
 });
