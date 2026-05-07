@@ -12,6 +12,7 @@ import {
 import { CorpusLineageTab } from '@/components/calibration/CorpusLineageTab';
 import { CorpusTimesheetTab } from '@/components/calibration/CorpusTimesheetTab';
 import type { DateRange } from '@/types/corpus-summary.types';
+import { renderMarkdown } from '@/lib/markdown';
 
 type CorpusTab = 'summary' | 'lineage' | 'timesheet' | 'cost';
 
@@ -25,30 +26,6 @@ const TABS: ReadonlyArray<{ id: CorpusTab; label: string }> = [
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 function isIsoDate(s: string | null): s is string {
   return !!s && ISO_DATE_RE.test(s);
-}
-
-/* Minimal markdown-to-HTML */
-function renderMarkdown(md: string): string {
-  return md
-    .split('\n')
-    .map((line) => {
-      if (line.startsWith('#### ')) return `<h4 class="text-sm font-semibold mt-3 mb-1">${line.slice(5)}</h4>`;
-      if (line.startsWith('### ')) return `<h3 class="text-base font-semibold mt-4 mb-2">${line.slice(4)}</h3>`;
-      if (line.startsWith('## ')) return `<h2 class="text-lg font-bold mt-6 mb-2">${line.slice(3)}</h2>`;
-      if (line.startsWith('# ')) return `<h1 class="text-xl font-bold mt-6 mb-3">${line.slice(2)}</h1>`;
-      if (line.startsWith('|')) {
-        const cells = line.split('|').filter(Boolean).map((c) => c.trim());
-        if (cells.every((c) => /^[-:]+$/.test(c))) return '';
-        return `<tr>${cells.map((c) => `<td class="border border-gray-200 px-2 py-1 text-sm">${c}</td>`).join('')}</tr>`;
-      }
-      if (line.trim().startsWith('- ')) {
-        const content = line.trim().slice(2);
-        return `<li class="text-sm text-gray-700 ml-4 list-disc">${content.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')}</li>`;
-      }
-      if (line.trim() === '') return '<br/>';
-      return `<p class="text-sm text-gray-700 mb-1">${line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')}</p>`;
-    })
-    .join('\n');
 }
 
 interface CostTitle {
