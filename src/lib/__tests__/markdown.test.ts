@@ -117,6 +117,55 @@ describe('renderMarkdown', () => {
     expect(html.match(/<p\s/g)?.length).toBe(2);
   });
 
+  it('preserves the last column when a table row has no trailing pipe', () => {
+    const md = [
+      '| Title | Pages | Zones',
+      '|-------|-------|-------',
+      '| Aulakh | 295 | 3045',
+    ].join('\n');
+    const html = renderMarkdown(md);
+    // All three header columns render as <th>
+    expect(html).toContain('>Title</th>');
+    expect(html).toContain('>Pages</th>');
+    expect(html).toContain('>Zones</th>');
+    // All three body cells render too
+    expect(html).toContain('>Aulakh</td>');
+    expect(html).toContain('>295</td>');
+    expect(html).toContain('>3045</td>');
+  });
+
+  it('closes the overflow wrapper div when ending a table block', () => {
+    const md = [
+      '| A | B |',
+      '|---|---|',
+      '| 1 | 2 |',
+      '',
+      'Paragraph after the table.',
+    ].join('\n');
+    const html = renderMarkdown(md);
+    // Wrapper div opens before <table> and closes after </table>
+    const wrapperOpen = html.indexOf('overflow-x-auto');
+    const tableOpen = html.indexOf('<table');
+    const tableClose = html.indexOf('</table>');
+    const wrapperClose = html.indexOf('</div>');
+    const paragraphOpen = html.indexOf('<p');
+    expect(wrapperOpen).toBeGreaterThan(-1);
+    expect(tableOpen).toBeGreaterThan(wrapperOpen);
+    expect(tableClose).toBeGreaterThan(tableOpen);
+    expect(wrapperClose).toBeGreaterThan(tableClose);
+    expect(paragraphOpen).toBeGreaterThan(wrapperClose);
+  });
+
+  it('does not parse bold inside inline code spans', () => {
+    const md = 'A literal `**not bold**` example.';
+    const html = renderMarkdown(md);
+    expect(html).toContain('<code');
+    // The literal **not bold** stays inside the code span
+    expect(html).toContain('>**not bold**</code>');
+    // No <strong> emitted
+    expect(html).not.toContain('<strong>');
+  });
+
   it('handles headings, table, list, paragraphs in sequence cleanly', () => {
     const md = [
       '# Report',
