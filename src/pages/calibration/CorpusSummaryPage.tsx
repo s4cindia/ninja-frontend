@@ -13,14 +13,16 @@ import { CorpusLineageTab } from '@/components/calibration/CorpusLineageTab';
 import { CorpusTimesheetTab } from '@/components/calibration/CorpusTimesheetTab';
 import type { DateRange } from '@/types/corpus-summary.types';
 import { renderMarkdown } from '@/lib/markdown';
+import { StatusTrackerTab } from '@/components/bootstrap/StatusTrackerTab';
 
-type CorpusTab = 'summary' | 'lineage' | 'timesheet' | 'cost';
+type CorpusTab = 'summary' | 'lineage' | 'timesheet' | 'cost' | 'status';
 
 const TABS: ReadonlyArray<{ id: CorpusTab; label: string }> = [
   { id: 'summary', label: 'Summary Report' },
   { id: 'lineage', label: 'Lineage' },
   { id: 'timesheet', label: 'Timesheet' },
   { id: 'cost', label: 'Cost Summary' },
+  { id: 'status', label: 'Status Tracker' },
 ];
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -69,7 +71,11 @@ export default function CorpusSummaryPage() {
   // URL state: ?tab, ?from, ?to. Defaults: summary tab, last 30 days.
   const initialTab: CorpusTab = useMemo(() => {
     const t = searchParams.get('tab');
-    return t === 'lineage' || t === 'timesheet' || t === 'cost' || t === 'summary'
+    return t === 'lineage' ||
+      t === 'timesheet' ||
+      t === 'cost' ||
+      t === 'summary' ||
+      t === 'status'
       ? t
       : 'summary';
   }, [searchParams]);
@@ -185,6 +191,8 @@ export default function CorpusSummaryPage() {
           error={summaryError}
         />
       )}
+
+      {activeTab === 'status' && <StatusTrackerTab />}
     </div>
   );
 }
