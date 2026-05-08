@@ -89,6 +89,7 @@ import AnnotationGuidePage from '@/pages/calibration/AnnotationGuidePage';
 import AggregateComparisonPage from '@/pages/calibration/AggregateComparisonPage';
 import AnnotationAnalysisPage from '@/pages/calibration/AnnotationAnalysisPage';
 import CorpusSummaryPage from '@/pages/calibration/CorpusSummaryPage';
+import AnnotatorGuideHelpPage from '@/pages/help/AnnotatorGuidePage';
 import AdminCorpusPage from '@/pages/admin/AdminCorpusPage';
 import AdminUsersPage from '@/pages/admin/AdminUsersPage';
 const queryClient = new QueryClient({
@@ -275,6 +276,9 @@ function AppRoutes() {
           <Route path="/calibration/comparison-report/:runId" element={<ComparisonReportPage />} />
           <Route path="/calibration/annotation-guide/:runId" element={<AnnotationGuidePage />} />
           <Route path="/calibration/aggregate-report" element={<AggregateComparisonPage />} />
+
+          {/* In-app help */}
+          <Route path="/help/annotator-guide" element={<AnnotatorGuideHelpPage />} />
 
           {/* Admin Console Routes */}
           <Route path="/admin/corpus" element={<AdminCorpusPage />} />

@@ -25,6 +25,7 @@ import {
   Shield,
   Users,
   Database,
+  HelpCircle,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -105,6 +106,12 @@ export function MainLayout() {
         { to: '/admin/corpus', icon: Database, label: 'Corpus Management', activePrefix: '/admin/corpus' },
         { to: '/admin/users', icon: Users, label: 'User Management', activePrefix: '/admin/users' },
         { to: '/bootstrap', icon: Shield, label: 'Bootstrap Console', activePrefix: '/bootstrap' },
+      ],
+    },
+    {
+      title: 'Help',
+      items: [
+        { to: '/help/annotator-guide', icon: HelpCircle, label: "Annotator's Guide" },
       ],
     },
   ];
