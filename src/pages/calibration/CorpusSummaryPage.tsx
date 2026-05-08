@@ -31,19 +31,6 @@ function isIsoDate(s: string | null): s is string {
   return !!s && ISO_DATE_RE.test(s);
 }
 
-function formatDateRangeLabel(range: DateRange): string {
-  // Parse as UTC to keep YYYY-MM-DD strings stable across timezones.
-  const fromDate = new Date(`${range.from}T00:00:00Z`);
-  const toDate = new Date(`${range.to}T00:00:00Z`);
-  const fmt = new Intl.DateTimeFormat('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-  return `${fmt.format(fromDate)} – ${fmt.format(toDate)}`;
-}
-
 interface CostTitle {
   documentName: string;
   runId: string;
@@ -165,12 +152,10 @@ export default function CorpusSummaryPage() {
         fetchAsDataUri('/s4carlisle-logo.jpg'),
         fetchAsDataUri('/ninja-logo.jpg'),
       ]);
-      const dateRangeLabel = formatDateRangeLabel(range);
       const generatedTs = new Date(data.summaryReport.generatedAt).toLocaleString();
       const today = toIsoDate(new Date());
       const wordDoc = buildCorpusSummaryWordDoc({
         sanitizedHtml: sanitizedSummaryHtml,
-        dateRangeLabel,
         generatedTs,
         modelName: data.summaryReport.model,
         s4LogoDataUri,
@@ -181,7 +166,7 @@ export default function CorpusSummaryPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `corpus-summary-${range.from}-to-${range.to}.doc`;
+      a.download = `corpus-summary-${today}.doc`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -205,7 +190,7 @@ export default function CorpusSummaryPage() {
           {activeTab === 'summary' && (
             <button
               onClick={handleExportWord}
-              disabled={exporting || summaryLoading || !data?.summaryReport.markdown}
+              disabled={exporting || summaryLoading || !sanitizedSummaryHtml}
               className="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
             >
               {exporting ? 'Exporting...' : 'Export Word'}

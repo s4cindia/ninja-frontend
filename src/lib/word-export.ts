@@ -13,8 +13,6 @@
 export interface CorpusSummaryWordDocInput {
   /** Already-sanitized HTML for the report body (output of DOMPurify on renderMarkdown) */
   sanitizedHtml: string;
-  /** Human-readable date range, e.g. "April 7 – May 7, 2026" */
-  dateRangeLabel: string;
   /** Pre-formatted generation timestamp string */
   generatedTs: string;
   /** AI model name used to generate the report */
@@ -25,6 +23,19 @@ export interface CorpusSummaryWordDocInput {
   ninjaLogoDataUri: string | null;
   /** Today's date as YYYY-MM-DD for the footer */
   today: string;
+}
+
+/**
+ * Escape user-controlled strings before interpolating into the HTML template.
+ * `sanitizedHtml` is exempt — it has already been through DOMPurify.
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 /**
@@ -45,13 +56,16 @@ export interface CorpusSummaryWordDocInput {
 export function buildCorpusSummaryWordDoc(input: CorpusSummaryWordDocInput): string {
   const {
     sanitizedHtml,
-    dateRangeLabel,
     generatedTs,
     modelName,
     s4LogoDataUri,
     ninjaLogoDataUri,
     today,
   } = input;
+
+  const safeGeneratedTs = escapeHtml(generatedTs);
+  const safeModelName = escapeHtml(modelName);
+  const safeToday = escapeHtml(today);
 
   const s4HeaderCell = s4LogoDataUri
     ? `<img class="header-logo" src="${s4LogoDataUri}" alt="S4Carlisle" />`
@@ -97,12 +111,12 @@ export function buildCorpusSummaryWordDoc(input: CorpusSummaryWordDocInput): str
     </tr></table>
     <div class="title-block">
       <h1>Corpus Summary Report</h1>
-      <p class="meta">${dateRangeLabel} · Generated ${generatedTs} · Model: ${modelName}</p>
+      <p class="meta">Generated ${safeGeneratedTs} · Model: ${safeModelName}</p>
     </div>
     ${sanitizedHtml}
     <div style="mso-element: footer" id="f1">
       <p style="font-size:8pt;color:#9ca3af;text-align:center;">
-        Ninja Accessibility Platform · Page <span style="mso-field-code: PAGE"></span> of <span style="mso-field-code: NUMPAGES"></span> · Generated ${today}
+        Ninja Accessibility Platform · Page <span style="mso-field-code: PAGE"></span> of <span style="mso-field-code: NUMPAGES"></span> · Generated ${safeToday}
       </p>
     </div>
   </div>

@@ -4,7 +4,6 @@ import { buildCorpusSummaryWordDoc } from '../word-export';
 describe('buildCorpusSummaryWordDoc', () => {
   const baseInput = {
     sanitizedHtml: '<h1>Body</h1><p>Hello</p>',
-    dateRangeLabel: 'April 7 – May 7, 2026',
     generatedTs: '5/8/2026, 12:00:00 PM',
     modelName: 'claude-opus-4-7',
     s4LogoDataUri: 'data:image/jpeg;base64,AAA',
@@ -20,12 +19,22 @@ describe('buildCorpusSummaryWordDoc', () => {
     expect(out).toContain('<h1>Corpus Summary Report</h1>');
   });
 
-  it('embeds the sanitized body, date range, generated timestamp, and model', () => {
+  it('embeds the sanitized body, generated timestamp, and model', () => {
     const out = buildCorpusSummaryWordDoc(baseInput);
     expect(out).toContain('<h1>Body</h1><p>Hello</p>');
-    expect(out).toContain('April 7 – May 7, 2026');
     expect(out).toContain('Generated 5/8/2026, 12:00:00 PM');
     expect(out).toContain('Model: claude-opus-4-7');
+  });
+
+  it('escapes HTML metacharacters in metadata to avoid markup injection', () => {
+    const out = buildCorpusSummaryWordDoc({
+      ...baseInput,
+      modelName: 'evil <script>x</script> & "co"',
+      generatedTs: '5/8/2026 <noon>',
+    });
+    expect(out).not.toContain('<script>x</script>');
+    expect(out).toContain('evil &lt;script&gt;x&lt;/script&gt; &amp; &quot;co&quot;');
+    expect(out).toContain('5/8/2026 &lt;noon&gt;');
   });
 
   it('embeds both logo data URIs when provided', () => {
