@@ -67,13 +67,17 @@ export function buildCorpusSummaryWordDoc(input: CorpusSummaryWordDocInput): str
   const safeModelName = escapeHtml(modelName);
   const safeToday = escapeHtml(today);
 
+  // Word's CSS support for class selectors on <img> is unreliable, so logo
+  // dimensions are pinned with inline `width`/`height` attributes (in pixels;
+  // ~1pt = 1.333px). Both logos are scaled to a similar visual height; the
+  // Ninja banner is wider so it gets a larger width budget.
   const s4HeaderCell = s4LogoDataUri
-    ? `<img class="header-logo" src="${s4LogoDataUri}" alt="S4Carlisle" />`
-    : `<span style="font-weight:bold;color:#1a1a1a;">S4Carlisle</span>`;
+    ? `<img src="${s4LogoDataUri}" alt="S4Carlisle" width="120" height="48" style="height:36pt;width:auto;max-width:160pt;" />`
+    : `<span style="font-weight:bold;color:#1a1a1a;font-size:14pt;">S4Carlisle</span>`;
 
   const ninjaHeaderCell = ninjaLogoDataUri
-    ? `<img class="header-logo" src="${ninjaLogoDataUri}" alt="Ninja" />`
-    : `<span style="font-weight:bold;color:#006B6B;">Ninja</span>`;
+    ? `<img src="${ninjaLogoDataUri}" alt="Ninja" width="160" height="48" style="height:36pt;width:auto;max-width:200pt;" />`
+    : `<span style="font-weight:bold;color:#006B6B;font-size:14pt;">Ninja</span>`;
 
   return `<html xmlns:o="urn:schemas-microsoft-com:office:office"
       xmlns:w="urn:schemas-microsoft-com:office:word"
@@ -88,14 +92,17 @@ export function buildCorpusSummaryWordDoc(input: CorpusSummaryWordDocInput): str
     h3 { font-size: 12pt; font-weight: 600; color: #1a1a1a; margin-top: 16pt; margin-bottom: 6pt; }
     h4 { font-size: 11pt; font-weight: 600; color: #1a1a1a; margin-top: 12pt; margin-bottom: 4pt; }
     p { font-size: 11pt; color: #374151; margin-bottom: 4pt; }
-    table { width: 100%; border-collapse: collapse; margin: 12pt 0; }
-    th { border: 1px solid #d1d5db; padding: 6pt 10pt; text-align: left; font-weight: 600; background-color: #f9fafb; color: #374151; font-size: 10pt; }
-    td { border: 1px solid #d1d5db; padding: 6pt 10pt; color: #4b5563; font-size: 10pt; }
+    /* table-layout:fixed forces Word to honor width:100% and distribute columns
+       evenly instead of letting content widths blow past the page margin. */
+    table { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 12pt 0; word-wrap: break-word; }
+    th { border: 1px solid #d1d5db; padding: 4pt 6pt; text-align: left; font-weight: 600; background-color: #f9fafb; color: #374151; font-size: 9pt; word-wrap: break-word; }
+    td { border: 1px solid #d1d5db; padding: 4pt 6pt; color: #4b5563; font-size: 9pt; word-wrap: break-word; }
     li { font-size: 11pt; color: #374151; margin-left: 16pt; margin-bottom: 2pt; }
     hr { border: none; border-top: 1px solid #e5e7eb; margin: 16pt 0; }
-    table.header-row { width: 100%; margin: 0 0 24pt 0; padding-bottom: 12pt; border-bottom: 2px solid #006B6B; }
+    /* Header row uses auto layout (not fixed) so the logo cells size to the
+       images instead of being squeezed to 50/50. */
+    table.header-row { width: 100%; table-layout: auto; margin: 0 0 24pt 0; padding-bottom: 12pt; border-bottom: 2px solid #006B6B; }
     table.header-row td { border: none; padding: 0; vertical-align: middle; }
-    .header-logo { height: 50pt; }
     .title-block { margin-bottom: 24pt; }
     .title-block h1 { margin-top: 0; margin-bottom: 4pt; }
     .title-block .meta { color: #6b7280; font-size: 9pt; margin-bottom: 0; }
