@@ -23,7 +23,7 @@ The platform got several updates in early May 2026 that affect daily work:
 
 ## 1. The workflow at a glance
 
-```
+```text
   Upload PDF                                Click "Mark Complete"
   ──────────►  Run calibration  ──►  Annotate zones page-by-page  ──────────►  Status: COMPLETE
                                           ▲                                    on Status Tracker
@@ -237,7 +237,7 @@ A: Whoever corrected the most zones (where `operatorVerified = true` and `verifi
 
 ## Reference: status decision tree
 
-```
+```text
                                   Title work
                                       │
                           ┌───────────┴───────────┐
