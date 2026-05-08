@@ -202,4 +202,76 @@ describe('renderMarkdown', () => {
       expect(indices[i]).toBeGreaterThan(indices[i - 1]);
     }
   });
+
+  describe('fenced code blocks', () => {
+    it('wraps a ```text fence in <pre><code> and preserves whitespace', () => {
+      const md = ['Before.', '', '```text', '  step one', '  step two', '```', '', 'After.'].join('\n');
+      const html = renderMarkdown(md);
+      expect(html).toContain('<pre');
+      expect(html).toContain('<code');
+      expect(html).toContain('  step one');
+      expect(html).toContain('  step two');
+      expect(html).toContain('</code></pre>');
+      // Surrounding paragraphs still render
+      expect(html).toContain('>Before.</p>');
+      expect(html).toContain('>After.</p>');
+    });
+
+    it('escapes < > & inside a fenced block so they cannot inject HTML', () => {
+      const md = ['```', '<script>alert(1)</script> & "x"', '```'].join('\n');
+      const html = renderMarkdown(md);
+      expect(html).not.toContain('<script>alert(1)</script>');
+      expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt; &amp; "x"');
+    });
+
+    it('does not parse markdown rules inside a fence', () => {
+      const md = ['```', '# Not a heading', '- not a list item', '| not | a | table |', '```'].join('\n');
+      const html = renderMarkdown(md);
+      // Heading/list/table tags should not appear from the fenced lines.
+      expect(html).not.toContain('<h1');
+      expect(html).not.toContain('<ul');
+      expect(html).not.toContain('<table');
+      // The literal text appears inside the code block.
+      expect(html).toContain('# Not a heading');
+      expect(html).toContain('- not a list item');
+      expect(html).toContain('| not | a | table |');
+    });
+
+    it('closes a preceding list before opening a fence', () => {
+      const md = ['- item one', '- item two', '```', 'fenced', '```'].join('\n');
+      const html = renderMarkdown(md);
+      const listClose = html.indexOf('</ul>');
+      const preOpen = html.indexOf('<pre');
+      // Guard against false-pass: indexOf returns -1 when the substring is
+      // missing, and -1 < 0 would silently satisfy a naive less-than check.
+      expect(listClose).toBeGreaterThan(-1);
+      expect(preOpen).toBeGreaterThan(-1);
+      expect(listClose).toBeLessThan(preOpen);
+    });
+
+    it('closes a preceding table before opening a fence', () => {
+      const md = [
+        '| Col |',
+        '|-----|',
+        '| Row |',
+        '```',
+        'fenced',
+        '```',
+      ].join('\n');
+      const html = renderMarkdown(md);
+      const tableClose = html.indexOf('</table>');
+      const preOpen = html.indexOf('<pre');
+      expect(tableClose).toBeGreaterThan(-1);
+      expect(preOpen).toBeGreaterThan(-1);
+      expect(tableClose).toBeLessThan(preOpen);
+    });
+
+    it('still closes an unterminated fence at end of input', () => {
+      const md = ['```', 'never closes'].join('\n');
+      const html = renderMarkdown(md);
+      // Defensive close keeps the output well-formed even if the fence
+      // is missing — the alternative would leak <pre><code> across the page.
+      expect(html).toContain('</code></pre>');
+    });
+  });
 });
