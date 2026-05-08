@@ -2,7 +2,7 @@
 
 This guide is the operational reference for annotators working on the Ninja calibration platform. It covers the day-to-day mechanics: how to close out a title, what each status on the tracker means, when to use a manual override, and how to read the corpus-level reports.
 
-> **Last updated:** 2026-05-09. Skim "What changed recently" first if you've been away for more than a week.
+> **Last updated:** May 2026 (covers everything through backend PR `#355` and frontend PRs `#251`–`#260`). Skim "What changed recently" first if you've been away for more than a week.
 
 ---
 
@@ -48,7 +48,7 @@ Click **Mark Complete** in the Zone Review toolbar when you've finished reviewin
 The Mark Complete modal has three sections:
 
 1. **Pages reviewed** (required, integer ≥ 1).  
-   This defaults to the total page count, which is correct for most titles. Only change it if you genuinely reviewed fewer pages — e.g., the back-half of the book is reference material the spec says to skip.
+   The modal pre-fills this with the count of pages where you actually corrected at least one zone — *not* the document's total page count. **You almost always need to raise this number** to reflect every page you reviewed, including pages where you implicitly accepted every AI decision (and so didn't touch any zone). For most titles, the right value is the document's total page count minus any pages categorized as Empty Pages or genuinely out-of-scope. Only leave it lower than that if you really did stop part-way through.
 
 2. **Issues encountered** (optional, repeatable).  
    Pick a category from the dropdown for any structural problem you ran into (page-alignment mismatch, single-extractor coverage, content divergence, etc.). The category list mirrors the patterns the calibration team rolls up into the corpus lineage report. **Mark an issue as "Blocking" only if the title cannot be considered done because of it.** Use the description field to add specific page numbers or workarounds.
@@ -123,20 +123,20 @@ Override the derived status when the derivation is genuinely wrong for an *opera
 
 ### How to set one
 
-1. Click the status pill on the title's row in the Status Tracker.
-2. Pick the new status from the dropdown.
-3. Type a short status note (max 500 chars). The note is required when overriding to `Blocked` and recommended for everything else.
-4. Click **Save**.
+The override and the note are saved as two separate actions — there is no combined form with a Save button:
 
-The row updates immediately (optimistically) and refetches in the background. The override stays in place across refreshes and is visible in the CSV export.
+1. **Set the status.** Click the status pill on the title's row in the Status Tracker and pick a new status from the dropdown. It saves immediately (optimistically); a small spinner on the row shows while the request is in flight.
+2. **Add a note (recommended for every override, required for `Blocked`).** Click into the **Notes** cell on the same row, type a short explanation (max 500 chars), and either click outside the cell or press **Ctrl+Enter** to save. The note saves the moment the cell loses focus.
+
+The override and any note stay in place across refreshes and are visible in the CSV export.
 
 ### How to clear one
 
-Same flow — click the pill, then choose **Clear override**. The status reverts to whatever the derivation produces (usually Complete now that Mark Complete drives the count).
+Click the status pill on the row and pick **Clear override** from the dropdown. The status reverts to whatever the derivation produces (usually Complete now that Mark Complete drives the count). Clearing the override does not erase the note — clear the Notes cell separately if it's no longer relevant.
 
 ### Note about pre-May 2026 overrides
 
-Many existing overrides were set as workarounds when the Status Tracker derivation was wrong. The fix that shipped on 2026-05-09 means most of those overrides can now be cleared safely — the derived value will be correct. Walk down the list and clear any override on a title where the underlying Mark Complete data is current. **Leave overrides in place for genuinely blocked titles.**
+Many existing overrides were set as workarounds when the Status Tracker derivation was wrong. Once backend PR `#355` is deployed to your environment, most of those overrides can be cleared safely — the derived value will be correct. Walk down the list and clear any override on a title where the underlying Mark Complete data is current. **Leave overrides in place for genuinely blocked titles.** If you're unsure whether the fix is live, check the Status Tracker for any title you know is finished — if it shows `Complete` without an override, the fix is live.
 
 ---
 
@@ -183,7 +183,7 @@ The `.doc` is fully self-contained — logos are embedded as base64 data URIs, s
 
 ### Known caveats
 
-- **Hard refresh first if you just had a deploy.** The Export Word button uses the JavaScript bundle the browser has cached. If you exported five minutes ago and the styling looked off, the deploy that fixed it landed in the meantime — `Ctrl+Shift+R` to pull the new bundle, then re-export.
+- **Hard refresh first if you just had a deploy.** The Export Word button uses the JavaScript bundle the browser has cached. If you exported five minutes ago and the styling looked off, the deploy that fixed it landed in the meantime — `Ctrl+Shift+R` (Windows/Linux) or `Cmd+Shift+R` (macOS) to pull the new bundle, then re-export.
 - The export uses the *currently displayed* report. If you regenerated the report 10 seconds ago and clicked Export Word, you'll get the new content.
 
 ---
@@ -225,7 +225,7 @@ A: Someone Mark-Completed it with too high a page count, or applied a manual ove
 A: Hours come from `AnnotationSession.activeMs`, which is only logged while you have a Zone Review tab actively open and interacting. Background tabs and idle sessions don't count.
 
 **Q: The Word export looks broken (logo overflowing, table off the page).**  
-A: Hard refresh the browser (`Ctrl+Shift+R`) to pick up the latest bundle, then re-export. The 2026-05-08 fix tightened the logo sizing and made tables wrap properly. If it's still wrong after a hard refresh, file a bug with a screenshot and the downloaded `.doc`.
+A: Hard refresh the browser (`Ctrl+Shift+R` (Windows/Linux) or `Cmd+Shift+R` (macOS)) to pick up the latest bundle, then re-export. The 2026-05-08 fix tightened the logo sizing and made tables wrap properly. If it's still wrong after a hard refresh, file a bug with a screenshot and the downloaded `.doc`.
 
 **Q: My override won't save — the dropdown closes but the row doesn't change.**  
 A: Open the browser DevTools network tab and watch for a failed `PUT /admin/corpus/documents/.../status`. Most likely a 401 (your session expired — refresh the page and log in again) or a 403 (you don't have admin-corpus scope — talk to the calibration lead). The optimistic UI rolls back on failure but the error toast may have been dismissed.
