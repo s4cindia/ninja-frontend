@@ -45,6 +45,22 @@ describe('buildCorpusSummaryWordDoc', () => {
     expect(out).toContain('alt="Ninja"');
   });
 
+  it('pins logo dimensions inline so Word respects the size cap', () => {
+    const out = buildCorpusSummaryWordDoc(baseInput);
+    // Word ignores class selectors on <img>; verify each logo carries inline
+    // height + max-width so the banner-shaped Ninja logo cannot blow past the
+    // page margin.
+    expect(out).toMatch(/alt="S4Carlisle"[^>]*style="[^"]*height:36pt[^"]*max-width:160pt/);
+    expect(out).toMatch(/alt="Ninja"[^>]*style="[^"]*height:36pt[^"]*max-width:200pt/);
+  });
+
+  it('uses fixed table-layout so wide content tables stay within page margins', () => {
+    const out = buildCorpusSummaryWordDoc(baseInput);
+    expect(out).toContain('table-layout: fixed');
+    // The header row must keep auto layout so logo cells size to content.
+    expect(out).toMatch(/table\.header-row\s*{[^}]*table-layout:\s*auto/);
+  });
+
   it('falls back to text labels when a logo data URI is null', () => {
     const out = buildCorpusSummaryWordDoc({
       ...baseInput,
