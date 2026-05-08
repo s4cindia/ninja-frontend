@@ -237,11 +237,33 @@ describe('renderMarkdown', () => {
       expect(html).toContain('| not | a | table |');
     });
 
-    it('closes preceding lists/tables before opening a fence', () => {
+    it('closes a preceding list before opening a fence', () => {
       const md = ['- item one', '- item two', '```', 'fenced', '```'].join('\n');
       const html = renderMarkdown(md);
-      // </ul> appears before <pre>
-      expect(html.indexOf('</ul>')).toBeLessThan(html.indexOf('<pre'));
+      const listClose = html.indexOf('</ul>');
+      const preOpen = html.indexOf('<pre');
+      // Guard against false-pass: indexOf returns -1 when the substring is
+      // missing, and -1 < 0 would silently satisfy a naive less-than check.
+      expect(listClose).toBeGreaterThan(-1);
+      expect(preOpen).toBeGreaterThan(-1);
+      expect(listClose).toBeLessThan(preOpen);
+    });
+
+    it('closes a preceding table before opening a fence', () => {
+      const md = [
+        '| Col |',
+        '|-----|',
+        '| Row |',
+        '```',
+        'fenced',
+        '```',
+      ].join('\n');
+      const html = renderMarkdown(md);
+      const tableClose = html.indexOf('</table>');
+      const preOpen = html.indexOf('<pre');
+      expect(tableClose).toBeGreaterThan(-1);
+      expect(preOpen).toBeGreaterThan(-1);
+      expect(tableClose).toBeLessThan(preOpen);
     });
 
     it('still closes an unterminated fence at end of input', () => {
