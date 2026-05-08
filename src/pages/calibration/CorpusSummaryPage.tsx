@@ -13,6 +13,7 @@ import { CorpusLineageTab } from '@/components/calibration/CorpusLineageTab';
 import { CorpusTimesheetTab } from '@/components/calibration/CorpusTimesheetTab';
 import type { DateRange } from '@/types/corpus-summary.types';
 import { renderMarkdown } from '@/lib/markdown';
+import { buildCorpusSummaryWordDoc, fetchAsDataUri } from '@/lib/word-export';
 import { StatusTrackerTab } from '@/components/bootstrap/StatusTrackerTab';
 
 type CorpusTab = 'summary' | 'lineage' | 'timesheet' | 'cost' | 'status';
@@ -28,6 +29,19 @@ const TABS: ReadonlyArray<{ id: CorpusTab; label: string }> = [
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 function isIsoDate(s: string | null): s is string {
   return !!s && ISO_DATE_RE.test(s);
+}
+
+function formatDateRangeLabel(range: DateRange): string {
+  // Parse as UTC to keep YYYY-MM-DD strings stable across timezones.
+  const fromDate = new Date(`${range.from}T00:00:00Z`);
+  const toDate = new Date(`${range.to}T00:00:00Z`);
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+  return `${fmt.format(fromDate)} – ${fmt.format(toDate)}`;
 }
 
 interface CostTitle {
@@ -114,6 +128,7 @@ export default function CorpusSummaryPage() {
   );
 
   const [refreshing, setRefreshing] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const {
     data,
@@ -123,6 +138,14 @@ export default function CorpusSummaryPage() {
     queryKey: ['corpus-summary'],
     queryFn: () => annotationReportService.getCorpusSummary(),
   });
+
+  const sanitizedSummaryHtml = useMemo(
+    () =>
+      data?.summaryReport.markdown
+        ? DOMPurify.sanitize(renderMarkdown(data.summaryReport.markdown))
+        : '',
+    [data?.summaryReport.markdown],
+  );
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -134,6 +157,42 @@ export default function CorpusSummaryPage() {
     }
   };
 
+  const handleExportWord = async () => {
+    if (!data?.summaryReport.markdown || !sanitizedSummaryHtml) return;
+    setExporting(true);
+    try {
+      const [s4LogoDataUri, ninjaLogoDataUri] = await Promise.all([
+        fetchAsDataUri('/s4carlisle-logo.jpg'),
+        fetchAsDataUri('/ninja-logo.jpg'),
+      ]);
+      const dateRangeLabel = formatDateRangeLabel(range);
+      const generatedTs = new Date(data.summaryReport.generatedAt).toLocaleString();
+      const today = toIsoDate(new Date());
+      const wordDoc = buildCorpusSummaryWordDoc({
+        sanitizedHtml: sanitizedSummaryHtml,
+        dateRangeLabel,
+        generatedTs,
+        modelName: data.summaryReport.model,
+        s4LogoDataUri,
+        ninjaLogoDataUri,
+        today,
+      });
+      const blob = new Blob(['﻿' + wordDoc], { type: 'application/msword' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `corpus-summary-${range.from}-to-${range.to}.doc`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch (err) {
+      console.warn('Word export failed', err);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto p-6">
       <Link to="/bootstrap" className="text-sm text-gray-500 hover:text-gray-700 mb-4 inline-block">
@@ -142,13 +201,24 @@ export default function CorpusSummaryPage() {
 
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold text-gray-900">Corpus Summary</h1>
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-        >
-          {refreshing ? 'Refreshing...' : 'Refresh'}
-        </button>
+        <div className="flex items-center gap-2">
+          {activeTab === 'summary' && (
+            <button
+              onClick={handleExportWord}
+              disabled={exporting || summaryLoading || !data?.summaryReport.markdown}
+              className="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {exporting ? 'Exporting...' : 'Export Word'}
+            </button>
+          )}
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          >
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
       </div>
 
       <div className="mb-4">
@@ -175,6 +245,7 @@ export default function CorpusSummaryPage() {
       {activeTab === 'summary' && (
         <SummaryTabBody
           data={data}
+          sanitizedHtml={sanitizedSummaryHtml}
           isLoading={summaryLoading}
           error={summaryError}
         />
@@ -203,7 +274,11 @@ interface CostSummaryBodyProps {
   error: Error | unknown;
 }
 
-function SummaryTabBody({ data, isLoading, error }: CostSummaryBodyProps) {
+interface SummaryTabBodyProps extends CostSummaryBodyProps {
+  sanitizedHtml: string;
+}
+
+function SummaryTabBody({ data, sanitizedHtml, isLoading, error }: SummaryTabBodyProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -225,9 +300,7 @@ function SummaryTabBody({ data, isLoading, error }: CostSummaryBodyProps) {
     <div className="bg-white rounded-lg border border-gray-200 p-6">
       <div
         className="prose prose-sm max-w-none [&_table]:w-full [&_table]:border-collapse [&_tr]:border-b [&_tr]:border-gray-100"
-        dangerouslySetInnerHTML={{
-          __html: DOMPurify.sanitize(renderMarkdown(summaryReport.markdown)),
-        }}
+        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
       />
       <div className="mt-6 pt-4 border-t border-gray-200 text-xs text-gray-400 flex gap-4">
         <span>Generated: {new Date(summaryReport.generatedAt).toLocaleString()}</span>
