@@ -957,7 +957,14 @@ export default function ZoneReviewWorkspace({
         onSubmit={handleSubmitMarkComplete}
         documentName={docId}
         totalPages={numPages}
-        defaultPagesReviewed={pagesReviewed}
+        // Default to the document's total page count: Mark Complete now drives
+        // the Status Tracker derivation, so "I reviewed everything" should be
+        // a single click. Annotators adjust down only on the rare title where
+        // they genuinely stopped part-way. (Previously defaulted to
+        // `pagesReviewed`, the count of pages with at least one corrected
+        // zone, which under-counted any page where the annotator implicitly
+        // accepted every AI decision.)
+        defaultPagesReviewed={numPages}
         zonesReviewed={allZones.filter((z) => z.operatorVerified).length}
         totalZones={allZones.length}
         isSubmitting={completing}
