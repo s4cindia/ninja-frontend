@@ -48,7 +48,7 @@ Click **Mark Complete** in the Zone Review toolbar when you've finished reviewin
 The Mark Complete modal has three sections:
 
 1. **Pages reviewed** (required, integer ≥ 1).  
-   The modal pre-fills this with the count of pages where you actually corrected at least one zone — *not* the document's total page count. **You almost always need to raise this number** to reflect every page you reviewed, including pages where you implicitly accepted every AI decision (and so didn't touch any zone). For most titles, the right value is the document's total page count minus any pages categorized as Empty Pages or genuinely out-of-scope. Only leave it lower than that if you really did stop part-way through.
+   The modal pre-fills this with the document's total page count, which is the right value for the common case where you reviewed every page — including pages where you implicitly accepted every AI decision and didn't touch any zone. **Only adjust it downward if you genuinely stopped part-way through** (e.g., you reviewed pages 1–120 of a 295-page title and need to log progress before handing off). Leaving the default in place is correct for "I'm done with this title."
 
 2. **Issues encountered** (optional, repeatable).  
    Pick a category from the dropdown for any structural problem you ran into (page-alignment mismatch, single-extractor coverage, content divergence, etc.). The category list mirrors the patterns the calibration team rolls up into the corpus lineage report. **Mark an issue as "Blocking" only if the title cannot be considered done because of it.** Use the description field to add specific page numbers or workarounds.
@@ -206,7 +206,7 @@ For each page, pick a category:
 - **Front matter / back matter** — title page, dedication, colophon, index page that doesn't need annotation.
 - **Other** — anything else; add a short note.
 
-The categorization is saved per-page and rolls up into the lineage report. Empty pages **do not** count toward the page total for completion — they are excluded from the `pageCount` denominator the Status Tracker uses, so they will not block a title from showing "Complete."
+The categorization is saved per-page and rolls up into the lineage report. Empty pages are still part of the document's `pageCount`, so the Mark Complete default of "total page count" includes them. That's intentional — categorizing a page as Empty is a form of reviewing it (you confirmed there's no content to annotate). The Status Tracker uses the same `pageCount`, so a title where every page is either zone-annotated or categorized empty will show as Complete on Mark Complete with the default value.
 
 ---
 
