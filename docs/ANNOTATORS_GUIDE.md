@@ -206,7 +206,7 @@ For each page, pick a category:
 - **Front matter / back matter** — title page, dedication, colophon, index page that doesn't need annotation.
 - **Other** — anything else; add a short note.
 
-The categorization is saved per-page and rolls up into the lineage report. Empty pages **do not** count toward the page total for completion — they are excluded from the `pageCount` denominator the Status Tracker uses, so they will not block a title from showing "Complete."
+The categorization is saved per-page and rolls up into the lineage report. Empty pages are still part of the document's `pageCount`, so the Mark Complete default of "total page count" includes them. That's intentional — categorizing a page as Empty is a form of reviewing it (you confirmed there's no content to annotate). The Status Tracker uses the same `pageCount`, so a title where every page is either zone-annotated or categorized empty will show as Complete on Mark Complete with the default value.
 
 ---
 
