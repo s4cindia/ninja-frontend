@@ -29,6 +29,8 @@ export interface AcrCriterionReview {
   updatedAt: string;
 }
 
+import type { PublisherMetadata } from './acr.types';
+
 export interface AcrJob {
   id: string;
   jobId: string;
@@ -42,6 +44,8 @@ export interface AcrJob {
   updatedAt: string;
   approvedBy?: string;
   approvedAt?: string;
+  /** Present when generated against a publisher-pinned edition (e.g. PRH UK). */
+  publisherMetadata?: PublisherMetadata;
 }
 
 export interface AcrReportSummary {
