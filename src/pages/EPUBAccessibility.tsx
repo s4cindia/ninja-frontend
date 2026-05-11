@@ -142,6 +142,7 @@ export const EPUBAccessibility: React.FC = () => {
         accessibilityScore: data.accessibilityScore ?? 72,
         issuesSummary: data.issuesSummary || calculatedSummary,
         issues: apiIssues,
+        summaryBySource: data.summaryBySource,
         publisherProfile: data.publisherProfile ?? null,
         stats: fixTypeStats ? { byFixType: fixTypeStats } : undefined,
       };
@@ -226,6 +227,7 @@ export const EPUBAccessibility: React.FC = () => {
         accessibilityScore: data.accessibilityScore ?? summary.accessibilityScore ?? 72,
         issuesSummary: data.issuesSummary || calculatedSummary,
         issues: apiIssues.length > 0 ? apiIssues : (isDemoJob ? generateDemoIssues(issuesSummary) : []),
+        summaryBySource: data.summaryBySource,
         publisherProfile: data.publisherProfile ?? null,
         stats: fixTypeStats ? { byFixType: fixTypeStats } : undefined,
       };
