@@ -60,10 +60,12 @@ export function PublisherProfileBadge({ profile }: PublisherProfileBadgeProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Close on outside click / Escape so the popover behaves like a menu.
+  // Close on outside tap / Escape so the popover behaves like a menu.
+  // `pointerdown` covers mouse, touch, and pen — `mousedown` would miss
+  // outside-tap dismiss on touch devices.
   useEffect(() => {
     if (!isOpen) return;
-    const handleClick = (e: MouseEvent) => {
+    const handlePointerDown = (e: PointerEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
@@ -71,10 +73,10 @@ export function PublisherProfileBadge({ profile }: PublisherProfileBadgeProps) {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setIsOpen(false);
     };
-    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('pointerdown', handlePointerDown);
     document.addEventListener('keydown', handleKey);
     return () => {
-      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('pointerdown', handlePointerDown);
       document.removeEventListener('keydown', handleKey);
     };
   }, [isOpen]);
