@@ -13,8 +13,8 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs';
 import { QuickRating } from '../feedback';
-import { SourceBadge, SummaryBySource, ViewInContextButton, RemediationGuidance, ScoreTooltip, calculateScoreBreakdown } from '../audit';
-import type { SummaryBySourceData } from '../audit';
+import { SourceBadge, SummaryBySource, ViewInContextButton, RemediationGuidance, ScoreTooltip, PublisherProfileBadge, calculateScoreBreakdown } from '../audit';
+import type { SummaryBySourceData, PublisherProfile } from '../audit';
 import { cn } from '@/utils/cn';
 import { getWcagUrl, getWcagTooltip, formatWcagLabel } from '@/utils/wcag';
 
@@ -49,6 +49,7 @@ interface AuditResult {
   };
   issues: AuditIssue[];
   summaryBySource?: SummaryBySourceData;
+  publisherProfile?: PublisherProfile | null;
   stats?: {
     byFixType?: {
       auto: number;
@@ -332,12 +333,15 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
 
   return (
     <div className="space-y-6">
+      {result.publisherProfile && (
+        <PublisherProfileBadge profile={result.publisherProfile} />
+      )}
       <Card>
         <CardHeader>
           <CardTitle>Issues by Source</CardTitle>
         </CardHeader>
         <CardContent>
-          <SummaryBySource 
+          <SummaryBySource
             summaryBySource={summaryBySource} 
             onSourceClick={handleSourceClick}
           />
