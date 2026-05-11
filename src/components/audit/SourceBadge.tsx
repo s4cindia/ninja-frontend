@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from '@/utils/cn';
 
-export type IssueSource = 'epubcheck' | 'ace' | 'js-auditor';
+export type IssueSource = 'epubcheck' | 'ace' | 'js-auditor' | 'prh-uk';
 
 interface SourceBadgeProps {
   source: IssueSource | string;
@@ -20,6 +20,12 @@ const SOURCE_CONFIG: Record<string, { label: string; colors: string }> = {
   'js-auditor': {
     label: 'JS Auditor',
     colors: 'bg-green-100 text-green-800',
+  },
+  // Distinct teal so PRH UK issues are recognisable at a glance among the
+  // generic source badges (blue/purple/green).
+  'prh-uk': {
+    label: 'PRH UK',
+    colors: 'bg-teal-100 text-teal-800',
   },
   manual: {
     label: 'Manual',
