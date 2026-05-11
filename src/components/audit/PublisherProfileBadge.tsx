@@ -60,11 +60,23 @@ export function PublisherProfileBadge({ profile }: PublisherProfileBadgeProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
+  const shouldRender =
+    !!profile && profile.publisher === 'PRH-UK' && profile.confidence !== 'low';
+
+  // If the badge stops rendering (e.g. the audit refetches with a profile that
+  // has dropped below our threshold) while the popover was open, snap state
+  // back to closed so the popover doesn't re-appear "open" if the badge
+  // becomes visible again later.
+  useEffect(() => {
+    if (!shouldRender && isOpen) setIsOpen(false);
+  }, [shouldRender, isOpen]);
+
   // Close on outside tap / Escape so the popover behaves like a menu.
   // `pointerdown` covers mouse, touch, and pen — `mousedown` would miss
-  // outside-tap dismiss on touch devices.
+  // outside-tap dismiss on touch devices. Skip the listeners entirely when
+  // the badge isn't being rendered.
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !shouldRender) return;
     const handlePointerDown = (e: PointerEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
@@ -79,9 +91,9 @@ export function PublisherProfileBadge({ profile }: PublisherProfileBadgeProps) {
       document.removeEventListener('pointerdown', handlePointerDown);
       document.removeEventListener('keydown', handleKey);
     };
-  }, [isOpen]);
+  }, [isOpen, shouldRender]);
 
-  if (!profile || profile.publisher !== 'PRH-UK' || profile.confidence === 'low') {
+  if (!shouldRender || !profile) {
     return null;
   }
 

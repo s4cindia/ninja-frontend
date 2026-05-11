@@ -94,4 +94,24 @@ describe('PublisherProfileBadge', () => {
     await userEvent.click(screen.getByRole('button', { name: /PRH UK/i }));
     expect(screen.getByRole('dialog')).toHaveTextContent(/No signals reported/i);
   });
+
+  it('snaps the popover closed if the profile drops below the render threshold while open', async () => {
+    const { rerender } = render(<PublisherProfileBadge profile={makeProfile()} />);
+    await userEvent.click(screen.getByRole('button', { name: /PRH UK/i }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    // Audit refetch returns a low-confidence profile — badge should hide.
+    rerender(<PublisherProfileBadge profile={makeProfile({ confidence: 'low' })} />);
+    expect(screen.queryByRole('button', { name: /PRH UK/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    // Refetch returns a high-confidence profile again — badge reappears
+    // closed, not silently still-open from before.
+    rerender(<PublisherProfileBadge profile={makeProfile()} />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /PRH UK/i })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+  });
 });
