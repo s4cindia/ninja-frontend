@@ -19,7 +19,8 @@ import { cn } from '@/utils/cn';
 import { getWcagUrl, getWcagTooltip, formatWcagLabel } from '@/utils/wcag';
 
 type Severity = 'critical' | 'serious' | 'moderate' | 'minor';
-type IssueSource = 'js-auditor' | 'ace' | 'epubcheck' | 'manual';
+type IssueSource = 'js-auditor' | 'ace' | 'epubcheck' | 'manual' | 'prh-uk';
+type FilterableSource = 'js-auditor' | 'ace' | 'epubcheck' | 'prh-uk';
 
 interface AuditIssue {
   id: string;
@@ -278,29 +279,31 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
     if (result?.summaryBySource) {
       return result.summaryBySource;
     }
-    const sources: Array<'epubcheck' | 'ace' | 'js-auditor'> = ['epubcheck', 'ace', 'js-auditor'];
+    const sources: FilterableSource[] = ['epubcheck', 'ace', 'js-auditor', 'prh-uk'];
     const summary: SummaryBySourceData = {};
-    
+
     for (const source of sources) {
       const sourceIssues = issues.filter(i => i.source === source);
+      // js-auditor always renders (even when empty) per existing UX; the
+      // others (incl. PRH UK) only render when the source produced issues.
       if (sourceIssues.length > 0 || source === 'js-auditor') {
         // Compute autoFixable per-source (not global stats)
         const autoFixable = sourceIssues.filter(isAutoFixable).length;
-        
+
         summary[source] = {
           critical: sourceIssues.filter(i => i.severity === 'critical').length,
           serious: sourceIssues.filter(i => i.severity === 'serious').length,
           moderate: sourceIssues.filter(i => i.severity === 'moderate').length,
           minor: sourceIssues.filter(i => i.severity === 'minor').length,
           total: sourceIssues.length,
-          ...(source === 'js-auditor' ? { autoFixable } : {}),
+          ...(source === 'js-auditor' || source === 'prh-uk' ? { autoFixable } : {}),
         };
       }
     }
     return summary;
   }, [result?.summaryBySource, issues]);
 
-  const [sourceFilter, setSourceFilter] = useState<'epubcheck' | 'ace' | 'js-auditor' | null>(null);
+  const [sourceFilter, setSourceFilter] = useState<FilterableSource | null>(null);
 
   const filteredIssues = useMemo(() => {
     let filtered = issues;
@@ -321,7 +324,7 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
     }
   }, [issues, activeTab, sourceFilter]);
 
-  const handleSourceClick = (source: 'epubcheck' | 'ace' | 'js-auditor') => {
+  const handleSourceClick = (source: FilterableSource) => {
     setSourceFilter(prev => prev === source ? null : source);
   };
 

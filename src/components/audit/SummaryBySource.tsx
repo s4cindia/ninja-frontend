@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileCode, Eye, Wrench } from 'lucide-react';
+import { FileCode, Eye, Wrench, Building2 } from 'lucide-react';
 import { Card, CardContent } from '../ui/Card';
 import { cn } from '@/utils/cn';
 
@@ -14,19 +14,22 @@ export interface SourceSummary {
   fixable?: number; // Combined auto + quickfix count
 }
 
+export type SourceKey = 'epubcheck' | 'ace' | 'js-auditor' | 'prh-uk';
+
 export interface SummaryBySourceData {
   epubcheck?: SourceSummary;
   ace?: SourceSummary;
   'js-auditor'?: SourceSummary;
+  'prh-uk'?: SourceSummary;
 }
 
 interface SummaryBySourceProps {
   summaryBySource: SummaryBySourceData;
-  onSourceClick?: (source: 'epubcheck' | 'ace' | 'js-auditor') => void;
+  onSourceClick?: (source: SourceKey) => void;
 }
 
 interface SourceCardProps {
-  source: 'epubcheck' | 'ace' | 'js-auditor';
+  source: SourceKey;
   title: string;
   subtitle: string;
   data: SourceSummary;
@@ -150,6 +153,17 @@ const SOURCE_CONFIG = {
       border: 'border-green-200',
     },
   },
+  'prh-uk': {
+    title: 'PRH UK',
+    subtitle: 'Publisher-specific Checks',
+    icon: <Building2 className="h-5 w-5" />,
+    theme: {
+      bg: 'bg-teal-50',
+      accent: 'text-teal-600',
+      text: 'text-teal-900',
+      border: 'border-teal-200',
+    },
+  },
 };
 
 const EMPTY_SUMMARY: SourceSummary = {
@@ -164,10 +178,20 @@ export const SummaryBySource: React.FC<SummaryBySourceProps> = ({
   summaryBySource,
   onSourceClick,
 }) => {
-  const sources: Array<'epubcheck' | 'ace' | 'js-auditor'> = ['epubcheck', 'ace', 'js-auditor'];
+  // PRH UK is publisher-specific — only render the card when the backend
+  // actually reported issues for it, so non-PRH audits don't pick up an
+  // empty 4th card cluttering the grid.
+  const hasPrhIssues = (summaryBySource['prh-uk']?.total ?? 0) > 0;
+  const sources: SourceKey[] = hasPrhIssues
+    ? ['epubcheck', 'ace', 'js-auditor', 'prh-uk']
+    : ['epubcheck', 'ace', 'js-auditor'];
+  const gridCols =
+    sources.length === 4
+      ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
+      : 'grid-cols-1 sm:grid-cols-3';
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div className={cn('grid gap-4', gridCols)}>
       {sources.map((source) => {
         const config = SOURCE_CONFIG[source];
         const data = summaryBySource[source] || EMPTY_SUMMARY;
