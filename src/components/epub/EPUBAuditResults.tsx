@@ -13,7 +13,7 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs';
 import { QuickRating } from '../feedback';
-import { SourceBadge, SummaryBySource, ViewInContextButton, RemediationGuidance, ScoreTooltip, PublisherProfileBadge, BoilerplateSuggestion, isBoilerplateCode, calculateScoreBreakdown } from '../audit';
+import { SourceBadge, SummaryBySource, ViewInContextButton, RemediationGuidance, ScoreTooltip, PublisherProfileBadge, BoilerplateSuggestion, isBoilerplateCode, GroupedIssueRow, groupIssues, calculateScoreBreakdown } from '../audit';
 import type { SummaryBySourceData, PublisherProfile } from '../audit';
 import { cn } from '@/utils/cn';
 import { getWcagUrl, getWcagTooltip, formatWcagLabel } from '@/utils/wcag';
@@ -504,9 +504,23 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {filteredIssues.map((issue) => (
-                    <IssueCard key={issue.id} issue={issue} jobId={jobId} />
-                  ))}
+                  {groupIssues(filteredIssues).map((entry) =>
+                    entry.kind === 'group' ? (
+                      <GroupedIssueRow
+                        key={`group-${entry.code}`}
+                        entry={entry}
+                        renderIssue={(issue) => (
+                          <IssueCard issue={issue} jobId={jobId} />
+                        )}
+                      />
+                    ) : (
+                      <IssueCard
+                        key={entry.issue.id}
+                        issue={entry.issue}
+                        jobId={jobId}
+                      />
+                    ),
+                  )}
                 </div>
               )}
             </TabsContent>
