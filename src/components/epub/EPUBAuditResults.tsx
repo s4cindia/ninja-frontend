@@ -13,7 +13,7 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs';
 import { QuickRating } from '../feedback';
-import { SourceBadge, SummaryBySource, ViewInContextButton, RemediationGuidance, ScoreTooltip, PublisherProfileBadge, calculateScoreBreakdown } from '../audit';
+import { SourceBadge, SummaryBySource, ViewInContextButton, RemediationGuidance, ScoreTooltip, PublisherProfileBadge, BoilerplateSuggestion, isBoilerplateCode, calculateScoreBreakdown } from '../audit';
 import type { SummaryBySourceData, PublisherProfile } from '../audit';
 import { cn } from '@/utils/cn';
 import { getWcagUrl, getWcagTooltip, formatWcagLabel } from '@/utils/wcag';
@@ -612,9 +612,13 @@ const IssueCard: React.FC<{ issue: AuditIssue; jobId: string }> = ({ issue, jobI
           )}
           
           {issue.suggestion && (
-            <p className="text-xs text-gray-600 mt-2 p-2 bg-white/50 rounded">
-              <span className="font-medium">Suggestion:</span> {issue.suggestion}
-            </p>
+            isBoilerplateCode(issue.code) ? (
+              <BoilerplateSuggestion code={issue.code} text={issue.suggestion} />
+            ) : (
+              <p className="text-xs text-gray-600 mt-2 p-2 bg-white/50 rounded">
+                <span className="font-medium">Suggestion:</span> {issue.suggestion}
+              </p>
+            )
           )}
 
           {!autoFix && (

@@ -7,6 +7,8 @@ export { ViewInContextButton } from './ViewInContextButton';
 export { RemediationGuidance } from './RemediationGuidance';
 export { ScoreTooltip } from './ScoreTooltip';
 export { PublisherProfileBadge } from './PublisherProfileBadge';
+export { BoilerplateSuggestion } from './BoilerplateSuggestion';
+export { isBoilerplateCode } from './boilerplate-codes';
 export type {
   PublisherProfile,
   PublisherProfileSignal,
