@@ -13,6 +13,7 @@ import { NACriteriaSection } from '@/components/acr/NACriteriaSection';
 import { VersionTimelineSidebar } from '@/components/acr/VersionTimelineSidebar';
 import { VersionCompareModal } from '@/components/acr/VersionCompareModal';
 import { ExportDialog } from '@/components/acr/ExportDialog';
+import { CertificationSection } from '@/components/acr/CertificationSection';
 import { cn } from '@/utils/cn';
 import type { AcrCriterionReview } from '@/types/acr-report.types';
 import type { VerificationHistoryEntry } from '@/types/verification.types';
@@ -564,6 +565,11 @@ export function AcrReportReviewPage() {
           items={verificationItems}
           verifiedCount={verifiedCount}
         />
+
+        {/* Publisher Certification (PRH UK and other publisher-pinned editions) */}
+        {acrJob.publisherMetadata && (
+          <CertificationSection metadata={acrJob.publisherMetadata} />
+        )}
 
         {/* Executive Summary */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">

@@ -1,4 +1,23 @@
-export type AcrEditionCode = 'VPAT2.5-508' | 'VPAT2.5-WCAG' | 'VPAT2.5-EU' | 'VPAT2.5-INT';
+export type AcrEditionCode =
+  | 'VPAT2.5-508'
+  | 'VPAT2.5-WCAG'
+  | 'VPAT2.5-EU'
+  | 'VPAT2.5-INT'
+  | 'VPAT2.5-PRH-UK';
+
+/**
+ * Publisher-specific certification metadata returned by the backend when a
+ * VPAT is generated against a publisher-pinned edition (today: PRH UK).
+ * Rendered as the Certification block at the top of the ACR report.
+ */
+export interface PublisherMetadata {
+  certifiedBy: string;
+  certifierCredential: string;
+  credentialUrl: string;
+  conformsTo: string;
+  accessibilitySummaryUrl: string;
+  tdmReservationNote?: string;
+}
 
 export interface AcrEdition {
   id: string;
@@ -72,6 +91,8 @@ export interface AcrDocument {
   createdAt: string;
   updatedAt: string;
   status: 'draft' | 'review' | 'final';
+  /** Set when the VPAT is generated against a publisher-pinned edition. */
+  publisherMetadata?: PublisherMetadata;
 }
 
 export interface CredibilityValidation {

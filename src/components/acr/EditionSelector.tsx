@@ -17,6 +17,7 @@ const EDITION_TOOLTIPS: Record<AcrEditionCode, string> = {
   'VPAT2.5-WCAG': 'General accessibility reporting',
   'VPAT2.5-EU': 'For European Accessibility Act compliance',
   'VPAT2.5-INT': 'Satisfies US, EU, and WCAG requirements in one document',
+  'VPAT2.5-PRH-UK': 'Tailored to PRH UK delivery (WCAG 2.2 AA + EPUB Accessibility 1.1)',
 };
 
 const EDITION_LABELS: Record<AcrEditionCode, { title: string; subtitle: string }> = {
@@ -24,6 +25,7 @@ const EDITION_LABELS: Record<AcrEditionCode, { title: string; subtitle: string }
   'VPAT2.5-WCAG': { title: 'WCAG 2.1', subtitle: 'General Accessibility' },
   'VPAT2.5-EU': { title: 'EN 301 549', subtitle: 'European Standard' },
   'VPAT2.5-INT': { title: 'International', subtitle: 'Comprehensive' },
+  'VPAT2.5-PRH-UK': { title: 'PRH UK Edition', subtitle: 'Penguin Random House UK' },
 };
 
 const DEFAULT_CRITERIA_COUNTS: Record<AcrEditionCode, number> = {
@@ -31,6 +33,11 @@ const DEFAULT_CRITERIA_COUNTS: Record<AcrEditionCode, number> = {
   'VPAT2.5-WCAG': 50,
   'VPAT2.5-EU': 52,
   'VPAT2.5-INT': 78,
+  // PRH UK uses the same WCAG 2.2 AA criteria set scoped to PRH-specific
+  // deliverables, plus a small handful of EPUB Accessibility 1.1 criteria.
+  // Backend ships the authoritative count via `edition.criteriaCount` — this
+  // is only a safety-net for the FE label.
+  'VPAT2.5-PRH-UK': 56,
 };
 
 type CriteriaStatus = 'not_started' | 'in_progress' | 'complete';
@@ -42,9 +49,20 @@ interface CriteriaProgress {
 }
 
 function getCriteriaCountForEdition(edition: AcrEdition): number {
+  // Backend value wins when available — the FE heuristic below is only used
+  // for editions where the API didn't supply a count.
+  if (typeof edition.criteriaCount === 'number' && edition.criteriaCount > 0) {
+    return edition.criteriaCount;
+  }
+
   const code = (edition.code || '').toLowerCase();
   const name = (edition.name || '').toLowerCase();
-  
+
+  // PRH UK is publisher-pinned but still WCAG-derived; check before the
+  // generic WCAG branch so the publisher-specific count wins.
+  if (code.includes('prh') || name.includes('prh')) {
+    return DEFAULT_CRITERIA_COUNTS['VPAT2.5-PRH-UK'];
+  }
   if (code.includes('508') || name.includes('508')) {
     return 39;
   }
