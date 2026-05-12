@@ -15,7 +15,7 @@
  * legal text that must be pasted as-is.
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Check, ClipboardCopy } from 'lucide-react';
 
 interface BoilerplateSuggestionProps {
@@ -27,12 +27,31 @@ interface BoilerplateSuggestionProps {
 
 export function BoilerplateSuggestion({ code, text }: BoilerplateSuggestionProps) {
   const [copied, setCopied] = useState(false);
+  // Tracked in a ref so rapid re-clicks cancel the prior reset timer (otherwise
+  // overlapping 2s timeouts would flip "Copied" back to "Copy" too early), and
+  // so an unmount during the window doesn't leak the timer or set state on a
+  // dead component.
+  const resetTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (resetTimerRef.current !== null) {
+        window.clearTimeout(resetTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
+      if (resetTimerRef.current !== null) {
+        window.clearTimeout(resetTimerRef.current);
+      }
+      resetTimerRef.current = window.setTimeout(() => {
+        setCopied(false);
+        resetTimerRef.current = null;
+      }, 2000);
     } catch {
       // Clipboard API can reject in non-secure contexts or when permissions
       // are blocked. Surface a brief failure state so the operator knows the

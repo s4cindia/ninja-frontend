@@ -91,4 +91,23 @@ describe('BoilerplateSuggestion', () => {
     // "Copied" — otherwise the operator gets a silent false success.
     await waitFor(() => expect(button).toHaveTextContent(/^Copy$/));
   });
+
+  it('rapid re-clicks restart the 2-second window instead of compounding overlapping timers', async () => {
+    render(<BoilerplateSuggestion code="PRH-COPY-EEA-LINE-MISSING" text="x" />);
+    const button = screen.getByRole('button', { name: /Copy suggested text/i });
+
+    // First click → Copied, then almost-immediately a second click. Without
+    // the reset-timer fix the first click's 2s timeout would still fire after
+    // the second click, flipping the button back to "Copy" too early.
+    await userEvent.click(button);
+    await waitFor(() => expect(button).toHaveTextContent(/Copied/));
+    await new Promise((r) => setTimeout(r, 1500));
+    await userEvent.click(button);
+    await waitFor(() => expect(button).toHaveTextContent(/Copied/));
+
+    // 1.0s after the second click — the first click's now-cancelled timer
+    // would have fired by here. The button must still be "Copied".
+    await new Promise((r) => setTimeout(r, 1000));
+    expect(button).toHaveTextContent(/Copied/);
+  });
 });
