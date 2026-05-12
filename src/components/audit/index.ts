@@ -12,6 +12,8 @@ export { isBoilerplateCode } from './boilerplate-codes';
 export { GroupedIssueRow } from './GroupedIssueRow';
 export { groupIssues } from './group-issues';
 export type { GroupableIssue, GroupEntry, FlatEntry, IssueEntry, FileBucket } from './group-issues';
+export { HeuristicMarker } from './HeuristicMarker';
+export { isHeuristicCode } from './heuristic-codes';
 export type {
   PublisherProfile,
   PublisherProfileSignal,
