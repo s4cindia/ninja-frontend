@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { Edit2, ExternalLink, Save, ShieldCheck, X } from 'lucide-react';
+import { Edit2, Save, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { useUpdateReportMetadata } from '@/hooks/useAcrReport';
 import type { AcrJob } from '@/types/acr-report.types';
-import type { PublisherMetadata } from '@/types/acr.types';
 
 interface ReportMetadataSectionProps {
   acrJob: AcrJob;
@@ -40,10 +39,6 @@ export function ReportMetadataSection({ acrJob }: ReportMetadataSectionProps) {
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-      {acrJob.publisherMetadata && (
-        <CertificationSection metadata={acrJob.publisherMetadata} />
-      )}
-
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-900">Executive Summary</h2>
         {!isEditing && (
@@ -114,79 +109,6 @@ export function ReportMetadataSection({ acrJob }: ReportMetadataSectionProps) {
           </p>
         </div>
       </div>
-    </div>
-  );
-}
-
-/**
- * Renders the publisher-specific Certification block at the top of the ACR
- * report when the VPAT was generated against a publisher-pinned edition
- * (today: PRH UK). Hidden entirely for the standard editions.
- */
-function CertificationSection({ metadata }: { metadata: PublisherMetadata }) {
-  const [showTdmNote, setShowTdmNote] = useState(false);
-  return (
-    <div className="mb-6 pb-6 border-b border-gray-200">
-      <div className="flex items-center gap-2 mb-3">
-        <ShieldCheck className="h-5 w-5 text-teal-600" aria-hidden="true" />
-        <h2 className="text-lg font-semibold text-gray-900">Certification</h2>
-      </div>
-      <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-        <div>
-          <dt className="text-gray-600">Certified by</dt>
-          <dd className="font-medium text-gray-900">{metadata.certifiedBy}</dd>
-        </div>
-        <div>
-          <dt className="text-gray-600">Credential</dt>
-          <dd className="font-medium text-gray-900">
-            <a
-              href={metadata.credentialUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-800 hover:underline"
-            >
-              {metadata.certifierCredential}
-              <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-            </a>
-          </dd>
-        </div>
-        <div className="md:col-span-2">
-          <dt className="text-gray-600">Conforms to</dt>
-          <dd className="font-medium text-gray-900">{metadata.conformsTo}</dd>
-        </div>
-        <div className="md:col-span-2">
-          <dt className="text-gray-600">Accessibility statement</dt>
-          <dd className="font-medium">
-            <a
-              href={metadata.accessibilitySummaryUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-800 hover:underline break-all"
-            >
-              {metadata.accessibilitySummaryUrl}
-              <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            </a>
-          </dd>
-        </div>
-      </dl>
-
-      {metadata.tdmReservationNote && (
-        <div className="mt-4">
-          <button
-            type="button"
-            onClick={() => setShowTdmNote((v) => !v)}
-            aria-expanded={showTdmNote}
-            className="text-xs font-medium text-gray-600 hover:text-gray-900 underline-offset-2 hover:underline"
-          >
-            {showTdmNote ? 'Hide' : 'Show'} TDM-reservation note
-          </button>
-          {showTdmNote && (
-            <p className="mt-2 text-xs text-gray-700 whitespace-pre-wrap bg-gray-50 border border-gray-200 rounded p-3">
-              {metadata.tdmReservationNote}
-            </p>
-          )}
-        </div>
-      )}
     </div>
   );
 }
