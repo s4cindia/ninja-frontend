@@ -9,6 +9,9 @@ export { ScoreTooltip } from './ScoreTooltip';
 export { PublisherProfileBadge } from './PublisherProfileBadge';
 export { BoilerplateSuggestion } from './BoilerplateSuggestion';
 export { isBoilerplateCode } from './boilerplate-codes';
+export { GroupedIssueRow } from './GroupedIssueRow';
+export { groupIssues } from './group-issues';
+export type { GroupableIssue, GroupEntry, FlatEntry, IssueEntry, FileBucket } from './group-issues';
 export type {
   PublisherProfile,
   PublisherProfileSignal,
