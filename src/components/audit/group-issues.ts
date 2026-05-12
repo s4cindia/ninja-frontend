@@ -96,43 +96,53 @@ function pickGroupSeverity(issues: GroupableIssue[]): GroupableIssue['severity']
 /**
  * Transform a flat issue list into a mix of flat and grouped entries.
  *
- * Order is preserved by first appearance: an entry's position in the output
- * is determined by where its first matching issue appeared in the input.
- * This keeps the UI stable as new issues stream in.
+ * Ordering rules:
+ *   - Flat entries preserve their original position in the input array, so
+ *     interleaved non-grouped codes (e.g. `A1, B1, A2`) come out in the same
+ *     `A1, B1, A2` order. This matters because the backend orders issues by
+ *     traversal sequence; reordering them by code would shuffle unrelated
+ *     findings and make the UI jumpy as new issues stream in.
+ *   - Each grouped code emits exactly one entry, placed at the position of
+ *     its first occurrence in the input. Subsequent occurrences of that
+ *     code are absorbed into the group (not re-emitted).
  */
 export function groupIssues<T extends GroupableIssue>(issues: T[]): IssueEntry<T>[] {
-  // First pass: bucket every issue by code so we can decide grouping per-code
-  // off the full count, not the position-by-position view.
+  // First pass: bucket by code so the grouping decision uses full counts.
   const byCode = new Map<string, T[]>();
-  const codeOrder: string[] = [];
   for (const issue of issues) {
     const list = byCode.get(issue.code);
     if (list) {
       list.push(issue);
     } else {
       byCode.set(issue.code, [issue]);
-      codeOrder.push(issue.code);
     }
   }
 
-  // Second pass: emit entries in first-seen code order, choosing group vs
-  // flat based on the per-code count.
+  const groupedCode = new Map<string, boolean>();
+  for (const [code, codeIssues] of byCode) {
+    groupedCode.set(code, shouldGroupCode(code, codeIssues.length));
+  }
+
+  // Second pass: walk the original input. For grouped codes, emit a single
+  // group entry the first time we see the code. For flat codes, emit each
+  // issue in place — preserving original interleaving with other flat codes.
   const entries: IssueEntry<T>[] = [];
-  for (const code of codeOrder) {
-    const codeIssues = byCode.get(code)!;
-    if (shouldGroupCode(code, codeIssues.length)) {
+  const emittedGroups = new Set<string>();
+  for (const issue of issues) {
+    if (groupedCode.get(issue.code)) {
+      if (emittedGroups.has(issue.code)) continue;
+      emittedGroups.add(issue.code);
+      const codeIssues = byCode.get(issue.code)!;
       entries.push({
         kind: 'group',
-        code,
+        code: issue.code,
         count: codeIssues.length,
         files: bucketByFile(codeIssues),
         severity: pickGroupSeverity(codeIssues),
         issues: codeIssues,
       });
     } else {
-      for (const issue of codeIssues) {
-        entries.push({ kind: 'flat', issue });
-      }
+      entries.push({ kind: 'flat', issue });
     }
   }
   return entries;

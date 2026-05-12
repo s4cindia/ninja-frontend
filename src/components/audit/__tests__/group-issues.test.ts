@@ -138,6 +138,45 @@ describe('groupIssues — severity & ordering', () => {
     ]);
   });
 
+  it('preserves the original input order of interleaved flat codes', () => {
+    // Interleaved non-grouped codes (e.g. `A1, B1, A2, C1, B2`) must come out
+    // in the same order — backend orders issues by traversal sequence and
+    // re-ordering by code would shuffle unrelated findings.
+    const issues = [
+      issue({ id: 'a1', code: 'EPUB-IMG-001' }),
+      issue({ id: 'b1', code: 'EPUB-STRUCT-002' }),
+      issue({ id: 'a2', code: 'EPUB-IMG-001' }),
+      issue({ id: 'c1', code: 'EPUB-CHK-001', source: 'epubcheck' }),
+      issue({ id: 'b2', code: 'EPUB-STRUCT-002' }),
+    ];
+    const result = groupIssues(issues);
+    expect(result).toHaveLength(5);
+    expect(result.every((e) => e.kind === 'flat')).toBe(true);
+    expect(result.map((e) => (e.kind === 'flat' ? e.issue.id : ''))).toEqual([
+      'a1',
+      'b1',
+      'a2',
+      'c1',
+      'b2',
+    ]);
+  });
+
+  it('emits a grouped code at the position of its first occurrence, even when interleaved', () => {
+    const issues = [
+      issue({ id: 'x1', code: 'EPUB-IMG-001' }),
+      issue({ id: 'g1', code: 'PRH-MARKUP-DEPRECATED-TAG', source: 'prh-uk' }),
+      issue({ id: 'x2', code: 'EPUB-IMG-001' }),
+      issue({ id: 'g2', code: 'PRH-MARKUP-DEPRECATED-TAG', source: 'prh-uk' }),
+      issue({ id: 'x3', code: 'EPUB-IMG-001' }),
+    ];
+    const result = groupIssues(issues);
+    expect(result).toHaveLength(4);
+    expect(result[0]).toMatchObject({ kind: 'flat', issue: { id: 'x1' } });
+    expect(result[1]).toMatchObject({ kind: 'group', code: 'PRH-MARKUP-DEPRECATED-TAG', count: 2 });
+    expect(result[2]).toMatchObject({ kind: 'flat', issue: { id: 'x2' } });
+    expect(result[3]).toMatchObject({ kind: 'flat', issue: { id: 'x3' } });
+  });
+
   it('returns an empty array for an empty input without throwing', () => {
     expect(groupIssues([])).toEqual([]);
   });
