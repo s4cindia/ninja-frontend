@@ -13,7 +13,7 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs';
 import { QuickRating } from '../feedback';
-import { SourceBadge, SummaryBySource, ViewInContextButton, RemediationGuidance, ScoreTooltip, PublisherProfileBadge, BoilerplateSuggestion, isBoilerplateCode, GroupedIssueRow, groupIssues, calculateScoreBreakdown } from '../audit';
+import { SourceBadge, SummaryBySource, ViewInContextButton, RemediationGuidance, ScoreTooltip, PublisherProfileBadge, BoilerplateSuggestion, isBoilerplateCode, GroupedIssueRow, groupIssues, HeuristicMarker, isHeuristicCode, calculateScoreBreakdown } from '../audit';
 import type { SummaryBySourceData, PublisherProfile } from '../audit';
 import { cn } from '@/utils/cn';
 import { getWcagUrl, getWcagTooltip, formatWcagLabel } from '@/utils/wcag';
@@ -584,6 +584,7 @@ const IssueCard: React.FC<{ issue: AuditIssue; jobId: string }> = ({ issue, jobI
             <Badge variant={config.variant} size="sm">
               {issue.severity}
             </Badge>
+            {isHeuristicCode(issue.code) && <HeuristicMarker />}
             <SourceBadge source={issue.source} />
             {autoFix ? (
               <Badge variant="success" size="sm">
