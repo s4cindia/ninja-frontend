@@ -116,6 +116,29 @@ describe('GroupedIssueRow', () => {
     ).toBeInTheDocument();
   });
 
+  it('renders the heuristic marker on the group header for FP-prone PRH codes', () => {
+    const heuristicIssues = Array.from({ length: 12 }, (_, i) =>
+      issue({
+        id: `h${i}`,
+        code: 'PRH-HASHTAG-NOT-CAMEL-CASE',
+        severity: 'minor',
+        location: `OEBPS/Text/c${(i % 3) + 1}.xhtml`,
+      }),
+    );
+    renderGroup(heuristicIssues);
+    // The marker is inside the header (still collapsed) — high-volume
+    // heuristic groups must show the FP cue without making the operator
+    // drill in.
+    expect(screen.getByLabelText(/Heuristic finding/i)).toBeInTheDocument();
+  });
+
+  it('does NOT render the heuristic marker on definitive (non-heuristic) group headers', () => {
+    // PRH-MARKUP-DEPRECATED-TAG is grouped by default but not a heuristic —
+    // it must not pick up the FP cue.
+    renderGroup(issues);
+    expect(screen.queryByLabelText(/Heuristic finding/i)).not.toBeInTheDocument();
+  });
+
   it('does not call renderIssue until a file sub-row is expanded', async () => {
     const renderIssue = vi.fn().mockReturnValue(null);
     const [entry] = groupIssues(issues);

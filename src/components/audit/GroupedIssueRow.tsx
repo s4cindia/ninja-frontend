@@ -28,6 +28,8 @@ import {
 import { cn } from '@/utils/cn';
 import { Badge } from '../ui/Badge';
 import type { GroupEntry, GroupableIssue } from './group-issues';
+import { isHeuristicCode } from './heuristic-codes';
+import { HeuristicMarker } from './HeuristicMarker';
 
 interface GroupedIssueRowProps<T extends GroupableIssue> {
   entry: GroupEntry<T>;
@@ -100,6 +102,10 @@ export function GroupedIssueRow<T extends GroupableIssue>({
           <Badge variant={sev.variant} size="sm">
             {entry.severity}
           </Badge>
+          {/* Heuristic marker also lives on the group header so the FP cue is
+              visible on grouped high-volume rows — otherwise operators only
+              see it after drilling down to individual issues. */}
+          {isHeuristicCode(entry.code) && <HeuristicMarker />}
         </span>
       </button>
 
