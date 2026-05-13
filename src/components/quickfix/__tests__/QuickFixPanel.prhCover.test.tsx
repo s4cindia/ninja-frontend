@@ -122,6 +122,75 @@ describe('QuickFixPanel — PRH-COVER-ALT-EMPTY branch', () => {
     expect(alert).toHaveTextContent(/Alt text is required/i);
   });
 
+  it('resets the cover form state when the panel is reused for a different PRH issue', async () => {
+    postMock.mockResolvedValue({ data: { data: { results: [] } } });
+    const { rerender } = render(
+      <QuickFixPanel
+        issue={{ ...issue, id: 'iss-cover-a' }}
+        jobId="job-1"
+        bookTitle="Book A"
+        onApplyFix={vi.fn()}
+      />,
+    );
+    const altInputA = screen.getByLabelText(/Alt text/i) as HTMLTextAreaElement;
+    expect(altInputA.value).toBe('Cover for Book A');
+
+    // Pretend the operator edited it before swapping issues — the new issue
+    // must NOT inherit the previous text.
+    await userEvent.clear(altInputA);
+    await userEvent.type(altInputA, 'leftover');
+    expect((screen.getByLabelText(/Alt text/i) as HTMLTextAreaElement).value).toBe(
+      'leftover',
+    );
+
+    rerender(
+      <QuickFixPanel
+        issue={{ ...issue, id: 'iss-cover-b', imagePath: 'EPUB/images/cover-b.jpg' }}
+        jobId="job-1"
+        bookTitle="Book B"
+        onApplyFix={vi.fn()}
+      />,
+    );
+
+    await waitFor(() =>
+      expect((screen.getByLabelText(/Alt text/i) as HTMLTextAreaElement).value).toBe(
+        'Cover for Book B',
+      ),
+    );
+    expect((screen.getByLabelText(/Cover image path/i) as HTMLInputElement).value).toBe(
+      'EPUB/images/cover-b.jpg',
+    );
+  });
+
+  it('invokes the onMarkFixed callback (instead of POSTing mark-fixed directly) when provided', async () => {
+    postMock.mockResolvedValue({ data: { data: { results: [] } } });
+    const onMarkFixed = vi.fn().mockResolvedValue(undefined);
+    render(
+      <QuickFixPanel
+        issue={issue}
+        jobId="job-1"
+        bookTitle="Test Book"
+        onApplyFix={vi.fn()}
+        onMarkFixed={onMarkFixed}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /Apply Cover Alt Text/i }));
+    await waitFor(() => expect(onMarkFixed).toHaveBeenCalled());
+    expect(onMarkFixed).toHaveBeenCalledWith(
+      'iss-cover-1',
+      expect.stringContaining('Cover alt text added'),
+    );
+
+    // The apply-fix call still goes through, but the direct mark-fixed POST
+    // must NOT fire when the caller supplied a callback — duplicating the
+    // bookkeeping would invite race conditions.
+    const markFixedCalls = postMock.mock.calls.filter(
+      ([url]) => typeof url === 'string' && url.includes('/mark-fixed'),
+    );
+    expect(markFixedCalls).toHaveLength(0);
+  });
+
   it('clears the apiError state when the operator edits the alt-text field', async () => {
     postMock.mockRejectedValueOnce({
       response: { data: { error: { message: 'whatever' } } },

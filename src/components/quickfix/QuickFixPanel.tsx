@@ -123,6 +123,26 @@ export function QuickFixPanel({
   const [coverImageSrc, setCoverImageSrc] = useState('');
   const [coverApiError, setCoverApiError] = useState<string | null>(null);
 
+  // Reset PRH form state when the panel is reused for a different issue.
+  // Done during render rather than in an effect so the reset lands before
+  // the re-keyed PrhCoverAltTemplate mounts — running it as a useEffect
+  // would mean the template's own mount-time pre-fill effect (which reads
+  // `altText` from props) sees the stale value from the previous issue and
+  // skips the pre-fill.
+  //
+  // React supports this pattern explicitly: setState during render is
+  // bailed out of when the previous state matches, and otherwise triggers
+  // a single additional render synchronously in the same commit.
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  const prhLastIssueIdRef = useRef(issue.id);
+  if (isPrhCoverIssue && prhLastIssueIdRef.current !== issue.id) {
+    prhLastIssueIdRef.current = issue.id;
+    setCoverAltText('');
+    setCoverImageSrc('');
+    setCoverApiError(null);
+    setToast(null);
+  }
+
   const isImageAltIssue = IMAGE_ALT_ISSUE_CODES.some(
     code => issue.code.toUpperCase().replace(/_/g, '-') === code
   );
@@ -265,12 +285,24 @@ export function QuickFixPanel({
         },
       });
       setToast({ type: 'success', message: 'Cover alt text applied — re-audit to verify.' });
-      try {
-        await api.post(`/epub/job/${jobId}/task/${issue.id}/mark-fixed`, {
-          notes: `Cover alt text added: "${altTrimmed.slice(0, 80)}${altTrimmed.length > 80 ? '…' : ''}"`,
-        });
-      } catch (markErr) {
-        console.warn('mark-fixed failed (may auto-complete on BE):', markErr);
+      const markNote = `Cover alt text added: "${altTrimmed.slice(0, 80)}${altTrimmed.length > 80 ? '…' : ''}"`;
+      // Honor the onMarkFixed contract when the caller supplied one — keeps
+      // this branch consistent with the other apply flows (handleApplyFix,
+      // handleApplyBackendFix) and lets parents override the bookkeeping.
+      if (onMarkFixed) {
+        try {
+          await onMarkFixed(issue.id, markNote);
+        } catch (markErr) {
+          console.warn('onMarkFixed callback failed:', markErr);
+        }
+      } else {
+        try {
+          await api.post(`/epub/job/${jobId}/task/${issue.id}/mark-fixed`, {
+            notes: markNote,
+          });
+        } catch (markErr) {
+          console.warn('mark-fixed failed (may auto-complete on BE):', markErr);
+        }
       }
       onFixApplied?.();
       closeTimeoutRef.current = setTimeout(() => onClose?.(), 1500);
@@ -458,6 +490,10 @@ export function QuickFixPanel({
           </div>
 
           <PrhCoverAltTemplate
+            // Force a fresh template instance when the panel is re-used for
+            // a new issue so the template's own once-on-mount pre-fill effect
+            // runs against the new issue's bookTitle / extracted image src.
+            key={issue.id}
             issue={issue}
             bookTitle={bookTitle}
             altText={coverAltText}

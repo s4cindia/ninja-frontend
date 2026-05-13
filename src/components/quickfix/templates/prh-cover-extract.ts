@@ -25,7 +25,11 @@ export interface CoverIssue {
  * the issue payload but legacy issues may omit context fields.
  */
 export function extractCoverImageSrc(issue: CoverIssue): string {
-  if (issue.imagePath) return issue.imagePath.trim();
+  // Trim first, then check — a whitespace-only field is no better than
+  // an absent one, and short-circuiting on it would skip the later
+  // fallback sources.
+  const imagePath = issue.imagePath?.trim();
+  if (imagePath) return imagePath;
 
   if (issue.context) {
     try {
@@ -33,8 +37,10 @@ export function extractCoverImageSrc(issue: CoverIssue): string {
         images?: Array<{ fullPath?: string; src?: string }>;
       };
       const first = parsed.images?.[0];
-      if (first?.fullPath) return first.fullPath.trim();
-      if (first?.src) return first.src.trim();
+      const fullPath = first?.fullPath?.trim();
+      if (fullPath) return fullPath;
+      const src = first?.src?.trim();
+      if (src) return src;
     } catch {
       // Context wasn't JSON — fall through to the regex extraction.
     }
@@ -44,5 +50,6 @@ export function extractCoverImageSrc(issue: CoverIssue): string {
     .filter((s): s is string => typeof s === 'string')
     .join('\n');
   const match = haystack.match(/src=["']([^"']+)["']/);
-  return match ? match[1].trim() : '';
+  const matched = match?.[1]?.trim();
+  return matched ?? '';
 }
