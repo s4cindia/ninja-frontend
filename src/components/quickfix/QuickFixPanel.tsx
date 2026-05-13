@@ -16,6 +16,37 @@ import { QuickFixRadioGroup } from './QuickFixRadioGroup';
 import { QuickFixTextInput } from './QuickFixTextInput';
 import { QuickFixColorPicker } from './QuickFixColorPicker';
 import { ImageAltTemplate } from './templates/ImageAltTemplate';
+import { PrhCoverAltTemplate } from './templates/PrhCoverAltTemplate';
+
+const PRH_COVER_ALT_CODE = 'PRH-COVER-ALT-EMPTY';
+
+/**
+ * Pulls the human-readable error message out of an axios-style error so the
+ * caller can surface it directly in the dialog. Falls back to `null` when the
+ * error doesn't carry a recognisable shape, letting the caller emit its own
+ * fallback copy.
+ */
+function extractApiErrorMessage(err: unknown): string | null {
+  if (!err || typeof err !== 'object') return null;
+  const e = err as {
+    response?: {
+      data?: { error?: { message?: string } | string; message?: string };
+    };
+    message?: string;
+  };
+  const data = e.response?.data;
+  if (data && typeof data === 'object') {
+    const errField = (data as { error?: { message?: string } | string }).error;
+    if (errField && typeof errField === 'object' && typeof errField.message === 'string') {
+      return errField.message;
+    }
+    if (typeof errField === 'string') return errField;
+    const topMessage = (data as { message?: string }).message;
+    if (typeof topMessage === 'string') return topMessage;
+  }
+  if (typeof e.message === 'string' && e.message) return e.message;
+  return null;
+}
 
 const IMAGE_ALT_ISSUE_CODES = [
   'EPUB-IMG-001', 'IMG-001', 'IMG-ALT', 'IMG-ALT-MISSING', 'IMG-ALT-EMPTY',
@@ -35,8 +66,15 @@ interface QuickFixPanelProps {
     context?: string;
     snippet?: string;
     lineNumber?: number;
+    imagePath?: string;
   };
   jobId?: string;
+  /**
+   * EPUB title used to pre-fill alt-text for PRH-COVER-ALT-EMPTY as
+   * "Cover for {bookTitle}". Optional — when absent the operator types
+   * the alt text from scratch.
+   */
+  bookTitle?: string;
   onApplyFix: (fix: QuickFix) => Promise<void>;
   onFixApplied?: () => void;
   onMarkFixed?: (taskId: string, notes?: string) => Promise<void>;
@@ -53,6 +91,7 @@ type ToastState = {
 export function QuickFixPanel({
   issue,
   jobId,
+  bookTitle,
   onApplyFix,
   onFixApplied,
   onMarkFixed,
@@ -75,7 +114,15 @@ export function QuickFixPanel({
   const [toast, setToast] = useState<ToastState>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [imageAltValid, setImageAltValid] = useState(false);
-  
+
+  // PRH-COVER-ALT-EMPTY state — kept separate from the generic template path
+  // because the backend takes a fixed `imageAlts` payload rather than the
+  // FileChange[] format other quick fixes use.
+  const isPrhCoverIssue = issue.code === PRH_COVER_ALT_CODE;
+  const [coverAltText, setCoverAltText] = useState('');
+  const [coverImageSrc, setCoverImageSrc] = useState('');
+  const [coverApiError, setCoverApiError] = useState<string | null>(null);
+
   const isImageAltIssue = IMAGE_ALT_ISSUE_CODES.some(
     code => issue.code.toUpperCase().replace(/_/g, '-') === code
   );
@@ -183,6 +230,59 @@ export function QuickFixPanel({
       return null;
     }
   }, [template, inputValues, context, showPreview]);
+
+  const handleApplyPrhCover = async () => {
+    if (!jobId) {
+      setCoverApiError('Missing job ID — cannot submit fix.');
+      return;
+    }
+    // Surface client-side validation immediately so the operator doesn't burn
+    // a round-trip for an obvious empty-field case. The BE validates the same
+    // rules but its 400 message is still authoritative when it fires.
+    const altTrimmed = coverAltText.trim();
+    const srcTrimmed = coverImageSrc.trim();
+    if (!srcTrimmed) {
+      setCoverApiError('Cover image path is required.');
+      return;
+    }
+    if (!altTrimmed) {
+      setCoverApiError('Alt text is required.');
+      return;
+    }
+
+    setIsApplying(true);
+    setCoverApiError(null);
+    setToast(null);
+
+    try {
+      // Calling api.post directly (rather than the applyQuickFix service
+      // wrapper) so the axios error survives — the BE returns a 400 with a
+      // per-field message that the operator needs to see in-dialog.
+      await api.post(`/epub/job/${jobId}/apply-fix`, {
+        fixCode: PRH_COVER_ALT_CODE,
+        options: {
+          imageAlts: [{ imageSrc: srcTrimmed, altText: altTrimmed }],
+        },
+      });
+      setToast({ type: 'success', message: 'Cover alt text applied — re-audit to verify.' });
+      try {
+        await api.post(`/epub/job/${jobId}/task/${issue.id}/mark-fixed`, {
+          notes: `Cover alt text added: "${altTrimmed.slice(0, 80)}${altTrimmed.length > 80 ? '…' : ''}"`,
+        });
+      } catch (markErr) {
+        console.warn('mark-fixed failed (may auto-complete on BE):', markErr);
+      }
+      onFixApplied?.();
+      closeTimeoutRef.current = setTimeout(() => onClose?.(), 1500);
+    } catch (err) {
+      // Backend returns 400 with a field-specific message — pull it out so
+      // the operator can correct in place. Falls back to a generic message.
+      const apiMsg = extractApiErrorMessage(err);
+      setCoverApiError(apiMsg ?? 'Failed to apply cover alt-text fix.');
+    } finally {
+      setIsApplying(false);
+    }
+  };
 
   const handleInputChange = useCallback((inputId: string, value: unknown) => {
     setInputValues(prev => ({ ...prev, [inputId]: value }));
@@ -321,6 +421,102 @@ export function QuickFixPanel({
         return null;
     }
   };
+
+  // Dedicated render branch for PRH-COVER-ALT-EMPTY. Short-circuits the
+  // template / backend-fix / manual branches below because the BE accepts a
+  // specific `imageAlts` payload that doesn't map to the generic template
+  // input system.
+  if (isPrhCoverIssue) {
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+        <div className="flex items-center gap-3 p-4 border-b border-gray-200">
+          <div className="p-2 bg-teal-100 rounded-lg">
+            <Wrench className="h-5 w-5 text-teal-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-gray-900">Add cover image alt text</h3>
+            <p className="text-sm text-gray-500 truncate">
+              PRH UK requires descriptive alt on the cover image.
+            </p>
+          </div>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-1 text-gray-400 hover:text-gray-600 rounded"
+              aria-label="Close panel"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+
+        <div className="p-4 space-y-4">
+          <div className="p-3 bg-gray-50 rounded-lg">
+            <p className="text-sm text-gray-700">
+              <span className="font-medium">Issue:</span> {issue.message}
+            </p>
+          </div>
+
+          <PrhCoverAltTemplate
+            issue={issue}
+            bookTitle={bookTitle}
+            altText={coverAltText}
+            onAltTextChange={(v) => {
+              setCoverAltText(v);
+              if (coverApiError) setCoverApiError(null);
+            }}
+            imageSrc={coverImageSrc}
+            onImageSrcChange={(v) => {
+              setCoverImageSrc(v);
+              if (coverApiError) setCoverApiError(null);
+            }}
+            apiError={coverApiError}
+            isApplying={isApplying}
+          />
+
+          {toast?.type === 'success' && (
+            <div
+              className="flex items-center gap-2 p-3 rounded-lg bg-green-50 text-green-700"
+              role="alert"
+            >
+              <CheckCircle className="h-5 w-5 flex-shrink-0" />
+              <span className="text-sm">{toast.message}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 p-4 border-t border-gray-200 bg-gray-50">
+          <button
+            onClick={handleApplyPrhCover}
+            disabled={isApplying || !jobId}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors',
+              'bg-primary-600 text-white hover:bg-primary-700',
+              'disabled:opacity-50 disabled:cursor-not-allowed'
+            )}
+          >
+            {isApplying ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Play className="h-4 w-4" />
+            )}
+            {isApplying ? 'Applying...' : 'Apply Cover Alt Text'}
+          </button>
+
+          {onSkip && (
+            <button
+              onClick={onSkip}
+              disabled={isApplying}
+              className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors disabled:opacity-50"
+            >
+              <SkipForward className="h-4 w-4" />
+              Skip
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (isLoadingData) {
     return (
