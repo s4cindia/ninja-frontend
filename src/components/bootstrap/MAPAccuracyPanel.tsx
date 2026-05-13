@@ -1,5 +1,6 @@
 import { useMAPHistory } from '../../hooks/useMetrics';
 import type { ClassAPResult } from '../../services/metrics.service';
+import { pickBestInWindow, RECENT_RUN_WINDOW } from './mapAccuracySelection';
 
 const ZONE_TYPE_LABELS: Record<string, string> = {
   paragraph: 'Body Text',
@@ -49,7 +50,8 @@ function StatusPill({ row }: { row: ClassAPResult }) {
 
 export default function MAPAccuracyPanel() {
   const { data: history, isLoading, isError } = useMAPHistory();
-  const latest = history?.[history.length - 1];
+  const best = pickBestInWindow(history);
+  const windowSlice = history ? history.slice(-RECENT_RUN_WINDOW) : [];
 
   if (isLoading) {
     return (
@@ -80,16 +82,20 @@ export default function MAPAccuracyPanel() {
     );
   }
 
-  const overallPct = latest ? (latest.overallMAP * 100).toFixed(1) : null;
-  const headlineColour = latest
-    ? latest.overallMAP >= 0.75
+  const overallPct = best ? (best.overallMAP * 100).toFixed(1) : null;
+  const headlineColour = best
+    ? best.overallMAP >= 0.75
       ? 'text-green-600'
-      : latest.overallMAP >= 0.6
+      : best.overallMAP >= 0.6
         ? 'text-amber-600'
         : 'text-red-600'
     : '';
 
-  const hasInsufficientData = latest?.perClass.some((c) => c.insufficientData);
+  const hasInsufficientData = best?.perClass.some((c) => c.insufficientData);
+  const subtitle =
+    windowSlice.length > 1
+      ? `mAP@0.5 — best of last ${windowSlice.length} runs`
+      : 'mAP@0.5 — mean Average Precision';
 
   return (
     <div>
@@ -99,9 +105,7 @@ export default function MAPAccuracyPanel() {
           <h3 className="text-base font-semibold text-gray-800">
             Zone Detection Accuracy
           </h3>
-          <p className="text-xs text-gray-500 mt-0.5">
-            mAP@0.5 — mean Average Precision
-          </p>
+          <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>
         </div>
         <span className={`text-3xl font-bold ${headlineColour}`} data-testid="overall-map">
           {overallPct ? `${overallPct}%` : '—'}
@@ -120,7 +124,7 @@ export default function MAPAccuracyPanel() {
           </tr>
         </thead>
         <tbody>
-          {latest?.perClass.map((row) => (
+          {best?.perClass.map((row) => (
             <tr key={row.zoneType} className="border-b border-gray-100">
               <td className="py-2 text-gray-700">
                 {ZONE_TYPE_LABELS[row.zoneType] ?? row.zoneType}

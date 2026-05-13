@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import MAPAccuracyPanel from '../MAPAccuracyPanel';
+import { pickBestInWindow } from '../mapAccuracySelection';
 import type { MAPSnapshot } from '@/services/metrics.service';
 
 function makeSnapshot(overrides: Partial<MAPSnapshot> = {}): MAPSnapshot {
@@ -101,5 +102,85 @@ describe('MAPAccuracyPanel', () => {
     });
     render(<MAPAccuracyPanel />);
     expect(screen.getByText('Heading')).toBeInTheDocument();
+  });
+
+  describe('best-of-window selection', () => {
+    it('picks the BEST run within the window, not the latest', () => {
+      // History ordered completedAt-asc; latest run has worse mAP than a
+      // recent prior one. C1 phase-gate logic picks the best — panel must
+      // mirror that.
+      mockUseMAPHistory.mockReturnValue({
+        data: [
+          makeSnapshot({ runId: 'oldest', overallMAP: 0.50 }),
+          makeSnapshot({ runId: 'best',   overallMAP: 0.80 }),
+          makeSnapshot({ runId: 'latest', overallMAP: 0.36 }),
+        ],
+        isLoading: false,
+      });
+      render(<MAPAccuracyPanel />);
+      expect(screen.getByTestId('overall-map').textContent).toBe('80.0%');
+    });
+
+    it('subtitle shows window size when history has multiple runs', () => {
+      mockUseMAPHistory.mockReturnValue({
+        data: [
+          makeSnapshot({ overallMAP: 0.50 }),
+          makeSnapshot({ overallMAP: 0.80 }),
+        ],
+        isLoading: false,
+      });
+      render(<MAPAccuracyPanel />);
+      expect(screen.getByText(/best of last 2 runs/)).toBeInTheDocument();
+    });
+  });
+});
+
+describe('pickBestInWindow', () => {
+  function snap(runId: string, overallMAP: number): MAPSnapshot {
+    return {
+      runId,
+      runDate: '2026-03-01T00:00:00Z',
+      overallMAP,
+      perClass: [],
+    };
+  }
+
+  it('returns undefined for empty/undefined history', () => {
+    expect(pickBestInWindow(undefined)).toBeUndefined();
+    expect(pickBestInWindow([])).toBeUndefined();
+  });
+
+  it('returns the single snapshot when only one exists', () => {
+    const only = snap('only', 0.42);
+    expect(pickBestInWindow([only])).toBe(only);
+  });
+
+  it('returns the snapshot with the highest overallMAP', () => {
+    const best = snap('b', 0.80);
+    const result = pickBestInWindow([
+      snap('a', 0.50),
+      best,
+      snap('c', 0.65),
+    ]);
+    expect(result?.runId).toBe('b');
+  });
+
+  it('restricts to the last N entries when history exceeds the window', () => {
+    // The very first run is the best in absolute terms, but it's outside
+    // the window — pickBestInWindow should ignore it.
+    const history: MAPSnapshot[] = [
+      snap('ancient', 0.95), // outside window
+      ...Array.from({ length: 14 }, (_, i) => snap(`recent-${i}`, 0.40 + i * 0.01)),
+    ];
+    const result = pickBestInWindow(history, 14);
+    expect(result?.runId).toBe('recent-13'); // last entry, mAP=0.53 — best within the window
+    expect(result?.runId).not.toBe('ancient');
+  });
+
+  it('uses the default window of 14', () => {
+    const ancient = snap('ancient', 0.99);
+    const window = Array.from({ length: 14 }, (_, i) => snap(`r${i}`, 0.30));
+    const result = pickBestInWindow([ancient, ...window]);
+    expect(result?.overallMAP).toBe(0.30); // ancient is outside default window
   });
 });
