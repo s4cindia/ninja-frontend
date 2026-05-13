@@ -1435,12 +1435,21 @@ export function getBackendFixInfo(issueCode: string): BackendFixInfo | undefined
   return BACKEND_HANDLED_FIX_CODES[normalized];
 }
 
+// PRH-COVER-ALT-EMPTY is handled by a dedicated branch in QuickFixPanel —
+// it has no FE template (the backend does the actual EPUB edit) and isn't
+// in BACKEND_HANDLED_FIX_CODES (those render a no-input "click apply" UI,
+// whereas PRH-COVER-ALT-EMPTY needs the operator to supply alt text).
+// Register it here so RemediationTaskCard treats the code as quick-fixable
+// and renders QuickFixPanel; the panel's own dispatch then takes over.
+const PANEL_HANDLED_FIX_CODES = new Set<string>(['PRH-COVER-ALT-EMPTY']);
+
 export function hasQuickFixTemplate(issueCode: string): boolean {
   if (!issueCode) return false;
   if (getQuickFixTemplate(issueCode) !== undefined) {
     return true;
   }
-  return isBackendHandledFixCode(issueCode);
+  if (isBackendHandledFixCode(issueCode)) return true;
+  return PANEL_HANDLED_FIX_CODES.has(normalizeBackendFixCode(issueCode));
 }
 
 export function registerQuickFixTemplate(template: QuickFixTemplate): void {
