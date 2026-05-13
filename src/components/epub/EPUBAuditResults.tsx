@@ -4,10 +4,15 @@ import { useQuery } from '@tanstack/react-query';
 import {
   AlertCircle, AlertTriangle, Info, CheckCircle,
   Wrench, Hand, FileDown, ClipboardList, ExternalLink, FileCheck, FileSpreadsheet,
-  HelpCircle, ChevronDown, ChevronUp, Zap, User
+  HelpCircle, ChevronDown, ChevronUp, Zap, User, Image as ImageIcon, Loader2
 } from 'lucide-react';
 import { api } from '@/services/api';
 import { generateCSV, downloadCSV, formatDate } from '@/utils/csvExport';
+import {
+  buildAiAltTextExportCsv,
+  buildAiAltTextExportFilename,
+} from '@/lib/ai-alt-text-export';
+import { altTextService } from '@/services/alt-text.service';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -133,16 +138,58 @@ interface ActionButtonsProps {
   isDownloading?: boolean;
 }
 
-function ActionButtons({ 
-  jobId, 
+function ActionButtons({
+  jobId,
   issues,
   fileName,
-  onCreateRemediationPlan, 
-  onDownloadReport, 
-  isCreatingPlan = false, 
-  isDownloading = false 
+  onCreateRemediationPlan,
+  onDownloadReport,
+  isCreatingPlan = false,
+  isDownloading = false
 }: ActionButtonsProps) {
   const navigate = useNavigate();
+  const [isExportingAi, setIsExportingAi] = useState(false);
+  const [aiExportMessage, setAiExportMessage] = useState<
+    { kind: 'success' | 'error' | 'empty'; text: string } | null
+  >(null);
+
+  const handleExportAiAltText = async () => {
+    if (!jobId) return;
+    setIsExportingAi(true);
+    setAiExportMessage(null);
+    try {
+      // The review queue already carries the raw AI output (shortAlt /
+      // extendedAlt — never mutated) AND the operator-final approvedAlt
+      // on each record, so we don't need a new BE endpoint. We just need
+      // to repackage the data into the CSV format PRH will read.
+      const queue = await altTextService.getReviewQueue(jobId);
+      if (queue.items.length === 0) {
+        setAiExportMessage({
+          kind: 'empty',
+          text: 'No AI alt-text records found for this job — nothing to export.',
+        });
+        return;
+      }
+      const csv = buildAiAltTextExportCsv(queue.items);
+      const filename = buildAiAltTextExportFilename(fileName);
+      downloadCSV(csv, filename);
+      setAiExportMessage({
+        kind: 'success',
+        text: `Exported ${queue.items.length} AI alt-text record${queue.items.length === 1 ? '' : 's'} to ${filename}.`,
+      });
+    } catch (err) {
+      console.error('AI alt-text export failed:', err);
+      setAiExportMessage({
+        kind: 'error',
+        text:
+          err instanceof Error
+            ? `Failed to export AI alt-text: ${err.message}`
+            : 'Failed to export AI alt-text.',
+      });
+    } finally {
+      setIsExportingAi(false);
+    }
+  };
 
   const handleDownloadIssuesCSV = () => {
     const columns = [
@@ -222,13 +269,40 @@ function ActionButtons({
           </>
         )}
       </Button>
-      <Button 
-        variant="outline" 
+      <Button
+        variant="outline"
         onClick={handleDownloadIssuesCSV}
       >
         <FileSpreadsheet className="h-4 w-4 mr-2" />
         Download Issues CSV
       </Button>
+      <Button
+        variant="outline"
+        onClick={handleExportAiAltText}
+        disabled={isExportingAi || !jobId}
+        title="Download a CSV of raw AI image alt text alongside any human-reviewed versions — required as a separate deliverable by the PRH UK trial."
+      >
+        {isExportingAi ? (
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden="true" />
+        ) : (
+          <ImageIcon className="h-4 w-4 mr-2" aria-hidden="true" />
+        )}
+        {isExportingAi ? 'Exporting…' : 'Export AI Alt-Text'}
+      </Button>
+      {aiExportMessage && (
+        <p
+          role={aiExportMessage.kind === 'error' ? 'alert' : 'status'}
+          aria-live="polite"
+          className={cn(
+            'basis-full text-xs mt-1',
+            aiExportMessage.kind === 'success' && 'text-green-700',
+            aiExportMessage.kind === 'empty' && 'text-gray-600',
+            aiExportMessage.kind === 'error' && 'text-red-700',
+          )}
+        >
+          {aiExportMessage.text}
+        </p>
+      )}
     </div>
   );
 }
