@@ -142,8 +142,14 @@ export interface PerTitleEntry {
   zonesPerHour: number;
   costInr: number;
   issuesCount: number;
-  /** ISO timestamp */
-  completedAt: string;
+  /**
+   * ISO timestamp of when the run was marked complete, or null when the run
+   * has annotation activity in the range but hasn't been completed yet.
+   * Nullable because the timesheet now filters on session activity date, not
+   * run-completion date — see CorpusTimesheetTab and the backend
+   * timesheet-summary handler.
+   */
+  completedAt: string | null;
 }
 
 export interface PerZoneTypeTiming {
