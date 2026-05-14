@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Upload, FileText, CheckCircle, AlertCircle, Loader2, X, Circle } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, Loader2, X, Circle, ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Progress } from '../ui/Progress';
 import { Alert } from '../ui/Alert';
@@ -65,12 +65,23 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [workflowEnabled, setWorkflowEnabled] = useState<boolean>(false);
+  const [completedResult, setCompletedResult] = useState<AuditSummary | null>(null);
+  const [completedJobData, setCompletedJobData] = useState<JobData | null>(null);
+  const [aiStatus, setAiStatus] = useState<'running' | 'complete' | 'error' | null>(null);
+  const [aiSuggestionCount, setAiSuggestionCount] = useState(0);
+  const [aiTokenStats, setAiTokenStats] = useState<{
+    gemini: { totalTokens: number; estimatedCostUsd: number };
+    claude: { totalTokens: number; estimatedCostUsd: number };
+    totalTokens: number;
+    totalCostUsd: number;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileNameRef = useRef<string>('');
   const fileTypeRef = useRef<DocumentFileType>('epub');
   const workflowIdRef = useRef<string | undefined>(undefined);
   const uploadStartRef = useRef<Date | null>(null);
   const uploadEndRef = useRef<Date | null>(null);
+  const aiPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handleJobComplete = useCallback((jobData: JobData) => {
     setState('complete');
@@ -97,8 +108,10 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
       // Use workflowId from upload response (stored in ref), not from job output
       workflowId: workflowIdRef.current,
     };
-    onUploadComplete?.(result);
-  }, [onUploadComplete]);
+    // Save completed data — user clicks "View Full Results" to navigate
+    setCompletedResult(result);
+    setCompletedJobData(jobData);
+  }, []);
 
   const handleJobError = useCallback((errorMsg: string) => {
     setState('error');
@@ -141,6 +154,35 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
 
     fetchWorkflowConfig();
   }, []);
+
+  // Poll AI analysis status after audit job completes (PDF only)
+  useEffect(() => {
+    if (state !== 'complete' || !completedResult?.jobId || fileTypeRef.current !== 'pdf') return;
+
+    setAiStatus('running');
+
+    const poll = async () => {
+      try {
+        const res = await api.get(`/pdf/${completedResult.jobId}/ai-analysis`);
+        const d = res.data.data;
+        // 'pending' = job done but AI not started yet; keep polling
+        if (d.status === 'complete') {
+          setAiStatus('complete');
+          setAiSuggestionCount(d.analyzed ?? 0);
+          if (d.stats) setAiTokenStats(d.stats);
+          if (aiPollRef.current) { clearInterval(aiPollRef.current); aiPollRef.current = null; }
+        } else if (d.status === 'error') {
+          setAiStatus('error');
+          if (aiPollRef.current) { clearInterval(aiPollRef.current); aiPollRef.current = null; }
+        }
+        // 'pending' and 'processing' → leave interval running
+      } catch { /* ignore transient errors */ }
+    };
+
+    poll();
+    aiPollRef.current = setInterval(poll, 3000);
+    return () => { if (aiPollRef.current) { clearInterval(aiPollRef.current); aiPollRef.current = null; } };
+  }, [state, completedResult?.jobId]);
 
   const validateFile = useCallback((file: File): string | null => {
     const fileType = detectFileType(file);
@@ -459,25 +501,25 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
                         Page {currentPage.toLocaleString()} of {totalPages.toLocaleString()}
                       </p>
                     ) : (
-                      <div className="text-left mx-auto max-w-xs space-y-1">
+                      <div className="text-left mx-auto max-w-xs space-y-1.5">
                         {VALIDATOR_LABELS.map((label) => {
                           const done = doneNames.has(label);
                           const stat = validatorProgress?.find(v => v.label === label);
                           const isNext = !done && (validatorProgress ?? []).length === VALIDATOR_LABELS.indexOf(label);
                           return (
-                            <div key={label} className="flex items-center gap-2 text-xs">
+                            <div key={label} className="flex items-center gap-2 text-sm">
                               {done ? (
-                                <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                                <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
                               ) : isNext ? (
-                                <Loader2 className="h-3.5 w-3.5 text-primary-500 animate-spin shrink-0" />
+                                <Loader2 className="h-4 w-4 text-primary-500 animate-spin shrink-0" />
                               ) : (
-                                <Circle className="h-3.5 w-3.5 text-gray-300 shrink-0" />
+                                <Circle className="h-4 w-4 text-gray-300 shrink-0" />
                               )}
-                              <span className={done ? 'text-gray-700' : 'text-gray-400'}>
+                              <span className={done ? 'text-gray-800 font-medium' : isNext ? 'text-primary-700 font-medium' : 'text-gray-400'}>
                                 {label}
                                 {done && stat && (
-                                  <span className={stat.issuesFound > 0 ? 'text-amber-600' : 'text-green-600'}>
-                                    {' — '}{stat.issuesFound} {stat.issuesFound === 1 ? 'issue' : 'issues'}
+                                  <span className={`ml-1 font-normal text-xs ${stat.issuesFound > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                                    — {stat.issuesFound} {stat.issuesFound === 1 ? 'issue' : 'issues'}
                                   </span>
                                 )}
                               </span>
@@ -503,13 +545,26 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
               const auditStart = jobData?.startedAt ? new Date(jobData.startedAt) : null;
               const auditEnd   = jobData?.completedAt ? new Date(jobData.completedAt) : null;
               const totalPages = jobData?.input?.totalPages as number | undefined;
+              const autoTagProg = jobData?.input?.autoTagProgress as { startedAt?: string; completedAt?: string; status?: string; elementCounts?: Record<string, number> } | undefined;
+              const hasAutoTag = !!autoTagProg;
+              const autoTagEnd = autoTagProg?.completedAt ? new Date(autoTagProg.completedAt) : null;
               const extractionDone = (totalPages ? progress >= 88 : false) || vp.length > 0 || auditEnd !== null;
               const extractionEnd  = vp.length > 0 ? new Date(vp[0].startedAt) : (extractionDone ? auditEnd : null);
+              const extractionStart = hasAutoTag ? autoTagEnd : auditStart;
               const VLABELS = ['Structure & Tags', 'Alt Text', 'Color Contrast', 'Tables'];
               const rows: TR[] = [
                 { label: 'Upload',    start: uploadStartRef.current, end: uploadEndRef.current, status: uploadEndRef.current ? 'done' : 'running' },
                 { label: 'Queue',     start: uploadEndRef.current,   end: auditStart,            status: auditStart ? 'done' : uploadEndRef.current ? 'running' : 'pending' },
-                { label: 'Extraction', start: auditStart,            end: extractionEnd,          status: extractionDone ? 'done' : auditStart ? 'running' : 'pending' },
+                ...(hasAutoTag ? [{
+                  label: 'Adobe AutoTag',
+                  start: autoTagProg?.startedAt ? new Date(autoTagProg.startedAt) : auditStart,
+                  end: autoTagEnd,
+                  status: (autoTagProg?.status === 'complete' || autoTagProg?.status === 'failed') ? 'done' as const : auditStart ? 'running' as const : 'pending' as const,
+                  detail: autoTagProg?.status === 'complete' && autoTagProg.elementCounts
+                    ? `${autoTagProg.elementCounts.figures ?? 0}F · ${autoTagProg.elementCounts.tables ?? 0}T · ${autoTagProg.elementCounts.headings ?? 0}H`
+                    : autoTagProg?.status === 'failed' ? 'failed' : undefined,
+                }] : []),
+                { label: 'Extraction', start: extractionStart,       end: extractionEnd,          status: extractionDone ? 'done' : (hasAutoTag ? autoTagEnd : auditStart) ? 'running' : 'pending' },
                 ...VLABELS.map((lbl, idx) => {
                   const done = vp.find(v => v.label === lbl);
                   if (done) return { label: lbl, start: new Date(done.startedAt), end: new Date(done.completedAt), status: 'done' as const, detail: `${done.issuesFound} issue${done.issuesFound !== 1 ? 's' : ''}` };
@@ -519,36 +574,47 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
                 }),
               ];
               return (
-                <div className="mt-2 border border-gray-100 rounded-md overflow-hidden text-left text-xs">
-                  <div className="bg-gray-50 px-3 py-1 font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-100 text-[10px]">
+                <div className="mt-3 border border-gray-200 rounded-lg overflow-hidden text-left">
+                  <div className="bg-gray-100 px-4 py-2 font-semibold text-gray-500 uppercase tracking-wider text-xs border-b border-gray-200">
                     Timing
                   </div>
-                  <table className="w-full">
+                  <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-100 text-gray-400">
-                        <th className="px-3 py-1 text-left font-medium">Phase</th>
-                        <th className="px-3 py-1 text-left font-medium">Started</th>
-                        <th className="px-3 py-1 text-left font-medium">Ended</th>
-                        <th className="px-3 py-1 text-left font-medium">Duration</th>
+                      <tr className="border-b border-gray-200 bg-gray-50 text-gray-500">
+                        <th className="px-4 py-2 text-left font-semibold">Phase</th>
+                        <th className="px-4 py-2 text-left font-semibold">Started</th>
+                        <th className="px-4 py-2 text-left font-semibold">Ended</th>
+                        <th className="px-4 py-2 text-left font-semibold">Duration</th>
                       </tr>
                     </thead>
                     <tbody>
                       {rows.map(row => (
-                        <tr key={row.label} className="border-b border-gray-50 last:border-0">
-                          <td className="px-3 py-1 font-medium text-gray-700">
-                            {row.label}
-                            {row.detail && <span className="ml-1 font-normal text-gray-400">· {row.detail}</span>}
+                        <tr key={row.label} className={`border-b border-gray-100 last:border-0 ${row.status === 'running' ? 'bg-primary-50' : ''}`}>
+                          <td className="px-4 py-2 font-medium text-gray-800">
+                            <div className="flex items-center gap-2">
+                              {row.status === 'done' && <span className="inline-block w-2 h-2 rounded-full bg-green-500 shrink-0" />}
+                              {row.status === 'running' && <span className="inline-block w-2 h-2 rounded-full bg-primary-500 animate-pulse shrink-0" />}
+                              {row.status === 'pending' && <span className="inline-block w-2 h-2 rounded-full bg-gray-300 shrink-0" />}
+                              <span className={row.status === 'pending' ? 'text-gray-400' : 'text-gray-800'}>
+                                {row.label}
+                              </span>
+                              {row.detail && <span className="font-normal text-gray-400 text-xs">· {row.detail}</span>}
+                            </div>
                           </td>
-                          <td className="px-3 py-1 font-mono text-gray-500">{fmtTime(row.start)}</td>
-                          <td className="px-3 py-1 font-mono text-gray-500">
-                            {row.status === 'running' ? <span className="text-primary-500 not-italic">running…</span> : row.status === 'pending' ? <span className="text-gray-300">—</span> : fmtTime(row.end)}
+                          <td className="px-4 py-2 font-mono text-gray-600 text-xs">{fmtTime(row.start)}</td>
+                          <td className="px-4 py-2 font-mono text-xs">
+                            {row.status === 'running'
+                              ? <span className="text-primary-600 font-medium">running…</span>
+                              : row.status === 'pending'
+                                ? <span className="text-gray-300">—</span>
+                                : <span className="text-gray-600">{fmtTime(row.end)}</span>}
                           </td>
-                          <td className="px-3 py-1 font-mono">
+                          <td className="px-4 py-2 font-mono text-xs">
                             {row.status === 'pending'
                               ? <span className="text-gray-300">—</span>
                               : row.status === 'running'
-                                ? <span className="text-primary-500">{fmtDur(row.start)}</span>
-                                : <span className="text-gray-600">{fmtDur(row.start, row.end)}</span>}
+                                ? <span className="text-primary-600 font-semibold">{fmtDur(row.start)}</span>
+                                : <span className="text-gray-700 font-medium">{fmtDur(row.start, row.end)}</span>}
                           </td>
                         </tr>
                       ))}
@@ -560,15 +626,161 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
           </div>
         )}
 
-        {state === 'complete' && (
-          <div className="space-y-4">
-            <CheckCircle className="h-12 w-12 mx-auto text-green-600" />
-            <p className="font-medium text-gray-900">Audit Complete!</p>
-            <p className="text-sm text-gray-500">
-              Your document has been analyzed. View the results below.
-            </p>
-          </div>
-        )}
+        {state === 'complete' && completedResult && completedJobData && (() => {
+          const output = (completedJobData.output || {}) as Record<string, unknown>;
+          const auditReport = output.auditReport as Record<string, unknown> | undefined;
+          const issues = (auditReport?.issues as unknown[]) ?? [];
+          const totalIssues = issues.length;
+          const autoTagStatus = output.autoTagStatus as string | undefined;
+          const elementCounts = output.autoTagElementCounts as Record<string, number> | null | undefined;
+          const isPdf = fileTypeRef.current === 'pdf';
+          // Button is gated: for PDFs, wait for AI analysis to finish (or error)
+          const canProceed = !isPdf || aiStatus === 'complete' || aiStatus === 'error';
+
+          // Build timing rows from completed job data
+          type TR = { label: string; start: Date | null; end: Date | null; detail?: string };
+          const vp = (completedJobData.input?.validatorProgress ?? []) as Array<{ label: string; issuesFound: number; startedAt: string; completedAt: string }>;
+          const auditStart = completedJobData.startedAt ? new Date(completedJobData.startedAt) : null;
+          const autoTagProg = completedJobData.input?.autoTagProgress as { startedAt?: string; completedAt?: string; status?: string; elementCounts?: Record<string, number> } | undefined;
+          const hasAutoTag = !!autoTagProg;
+          const autoTagEnd = autoTagProg?.completedAt ? new Date(autoTagProg.completedAt) : null;
+          const extractionEnd = vp.length > 0 ? new Date(vp[0].startedAt) : (completedJobData.completedAt ? new Date(completedJobData.completedAt) : null);
+          const extractionStart = hasAutoTag ? autoTagEnd : auditStart;
+          const timingRows: TR[] = [
+            { label: 'Upload', start: uploadStartRef.current, end: uploadEndRef.current },
+            { label: 'Queue', start: uploadEndRef.current, end: auditStart },
+            ...(hasAutoTag ? [{
+              label: 'Adobe AutoTag',
+              start: autoTagProg?.startedAt ? new Date(autoTagProg.startedAt) : auditStart,
+              end: autoTagEnd,
+              detail: autoTagProg?.elementCounts
+                ? `${autoTagProg.elementCounts.figures ?? 0}F · ${autoTagProg.elementCounts.tables ?? 0}T · ${autoTagProg.elementCounts.headings ?? 0}H`
+                : undefined,
+            }] : []),
+            { label: 'Extraction', start: extractionStart, end: extractionEnd },
+            ...vp.map(v => ({
+              label: v.label,
+              start: new Date(v.startedAt),
+              end: new Date(v.completedAt),
+              detail: `${v.issuesFound} issue${v.issuesFound !== 1 ? 's' : ''}`,
+            })),
+          ];
+
+          return (
+            <div className="space-y-4">
+              <CheckCircle className="h-12 w-12 mx-auto text-green-600" />
+              <p className="font-semibold text-lg text-gray-900">Audit Complete</p>
+              <div className="text-left border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm">
+                {/* Summary header */}
+                <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 space-y-1.5">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                    <span className="font-semibold text-gray-800">{totalIssues.toLocaleString()} issues found</span>
+                    {autoTagStatus === 'complete' && (
+                      <span className="text-green-700 flex items-center gap-1">
+                        <CheckCircle className="h-3.5 w-3.5" />
+                        Auto-tagged by Adobe
+                        {elementCounts && (
+                          <span className="font-normal text-green-600 text-xs">
+                            ({elementCounts.figures ?? 0} figs · {elementCounts.tables ?? 0} tables · {elementCounts.headings ?? 0} headings)
+                          </span>
+                        )}
+                      </span>
+                    )}
+                    {isPdf && aiStatus === 'running' && (
+                      <span className="text-purple-600 flex items-center gap-1">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        AI analysis running…
+                      </span>
+                    )}
+                    {isPdf && aiStatus === 'complete' && (
+                      <span className="text-purple-700 flex items-center gap-1">
+                        <Sparkles className="h-3.5 w-3.5" />
+                        AI analysis complete — {aiSuggestionCount} suggestion{aiSuggestionCount !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {isPdf && aiStatus === 'error' && (
+                      <span className="text-amber-600 flex items-center gap-1">
+                        <AlertCircle className="h-3.5 w-3.5" />
+                        AI analysis unavailable
+                      </span>
+                    )}
+                  </div>
+                  {/* AI token stats strip */}
+                  {isPdf && aiTokenStats && (
+                    <div className="flex flex-wrap items-center gap-3 pt-1.5 text-xs text-slate-600 border-t border-gray-200 mt-1">
+                      <span className="font-medium text-slate-700">AI Token Usage:</span>
+                      {aiTokenStats.gemini.totalTokens > 0 && (
+                        <span>Gemini: <span className="font-mono font-medium">{aiTokenStats.gemini.totalTokens.toLocaleString()}</span> tokens (${aiTokenStats.gemini.estimatedCostUsd.toFixed(4)})</span>
+                      )}
+                      {aiTokenStats.claude.totalTokens > 0 && (
+                        <span>Claude: <span className="font-mono font-medium">{aiTokenStats.claude.totalTokens.toLocaleString()}</span> tokens (${aiTokenStats.claude.estimatedCostUsd.toFixed(4)})</span>
+                      )}
+                      <span className="ml-auto font-medium">
+                        Total: <span className="font-mono">{aiTokenStats.totalTokens.toLocaleString()}</span> tokens · <span className="font-mono">${aiTokenStats.totalCostUsd.toFixed(4)}</span>
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {/* Timing table */}
+                {uploadStartRef.current && timingRows.length > 0 && (
+                  <div className="border-b border-gray-200">
+                    <div className="bg-gray-100 px-4 py-2 font-semibold text-gray-500 uppercase tracking-wider text-xs border-b border-gray-200">
+                      Timing
+                    </div>
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200 bg-gray-50 text-gray-500">
+                          <th className="px-4 py-2 text-left font-semibold">Phase</th>
+                          <th className="px-4 py-2 text-left font-semibold">Started</th>
+                          <th className="px-4 py-2 text-left font-semibold">Ended</th>
+                          <th className="px-4 py-2 text-left font-semibold">Duration</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {timingRows.map(row => (
+                          <tr key={row.label} className="border-b border-gray-100 last:border-0">
+                            <td className="px-4 py-2 font-medium text-gray-800">
+                              <div className="flex items-center gap-2">
+                                <span className="inline-block w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                                <span className="text-gray-800">{row.label}</span>
+                                {row.detail && <span className="font-normal text-gray-400 text-xs">· {row.detail}</span>}
+                              </div>
+                            </td>
+                            <td className="px-4 py-2 font-mono text-gray-600 text-xs">{fmtTime(row.start)}</td>
+                            <td className="px-4 py-2 font-mono text-gray-600 text-xs">{fmtTime(row.end)}</td>
+                            <td className="px-4 py-2 font-mono text-xs">
+                              <span className="text-gray-700 font-medium">{fmtDur(row.start, row.end)}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {/* Actions */}
+                <div className="px-4 py-3 flex justify-end">
+                  <Button
+                    onClick={() => onUploadComplete?.(completedResult)}
+                    className="flex items-center gap-2"
+                    disabled={!canProceed}
+                  >
+                    {!canProceed ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Waiting for AI Analysis…
+                      </>
+                    ) : (
+                      <>
+                        View Full Results
+                        <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {state === 'error' && (
           <div className="space-y-4">

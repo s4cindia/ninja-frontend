@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { Zap, CheckCircle, AlertTriangle, FileText, ExternalLink, ChevronDown, ChevronUp, HelpCircle, Wrench, User, Sparkles, Info, Loader2 } from 'lucide-react';
+import { Zap, CheckCircle, AlertTriangle, FileText, ExternalLink, ChevronDown, ChevronUp, HelpCircle, Wrench, User, Sparkles, Info, Loader2, ShieldAlert } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/utils/cn';
 import { Tooltip } from '../ui/Tooltip';
@@ -19,6 +19,7 @@ export interface AiAnalysis {
   model: string;
   applyMode: 'apply-to-pdf' | 'guidance-only' | 'auto-resolve';
   status: 'pending' | 'approved' | 'rejected' | 'applied';
+  requiresManualReview?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -61,6 +62,7 @@ interface IssueCardProps {
   pageLabels?: string[];
   aiSuggestion?: AiAnalysis;
   onAiSuggestionChange?: (updated: AiAnalysis) => void;
+  issueNumber?: number;
 }
 
 export function IssueCard({
@@ -73,9 +75,11 @@ export function IssueCard({
   pageLabels,
   aiSuggestion,
   onAiSuggestionChange,
+  issueNumber,
 }: IssueCardProps) {
   const isPdf = isPdfIssue(issue);
   const [explanationOpen, setExplanationOpen] = useState(false);
+  const [editedValue, setEditedValue] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const updateStatusMutation = useMutation({
@@ -100,13 +104,15 @@ export function IssueCard({
   const applyMutation = useMutation({
     mutationFn: async () => {
       if (!jobId || !aiSuggestion) throw new Error('Missing jobId or suggestion');
+      const body = editedValue !== null ? { value: editedValue } : undefined;
       const res = await api.post<{ data: AiAnalysis }>(
-        `/pdf/${jobId}/ai-analysis/${aiSuggestion.issueId}/apply`
+        `/pdf/${jobId}/ai-analysis/${aiSuggestion.issueId}/apply`,
+        body
       );
       return res.data.data;
     },
-    onSuccess: (updated) => {
-      onAiSuggestionChange?.(updated);
+    onSuccess: () => {
+      onAiSuggestionChange?.({ ...aiSuggestion!, status: 'applied' });
       queryClient.invalidateQueries({ queryKey: ['ai-analysis', jobId] });
       toast.success('Fix applied to PDF');
     },
@@ -216,6 +222,7 @@ export function IssueCard({
 
   return (
     <div
+      id={`issue-card-${issue.id}`}
       className={cn(
         'border rounded-lg p-4 transition-colors',
         getSeverityStyles(),
@@ -237,6 +244,9 @@ export function IssueCard({
           <div className="flex items-center gap-2 flex-wrap mb-1">
             {isPdf && (
               <FileText className="h-4 w-4 text-red-600 flex-shrink-0" aria-label="PDF issue" />
+            )}
+            {issueNumber !== undefined && (
+              <span className="font-mono text-xs text-gray-400 tabular-nums">#{issueNumber}</span>
             )}
             <span className="font-medium text-gray-900">
               {issueCode}
@@ -320,7 +330,17 @@ export function IssueCard({
           className="mt-3 border-t border-current/10 pt-3"
           onClick={(e) => e.stopPropagation()}
         >
-          {aiSuggestion.applyMode === 'auto-resolve' ? (
+          {aiSuggestion.requiresManualReview ? (
+            <div className="flex items-start gap-2 p-2 bg-amber-50 rounded border border-amber-200 text-xs">
+              <ShieldAlert size={13} className="text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <span className="font-medium text-amber-800">Manual Review Required</span>
+                <p className="text-amber-700 mt-0.5 leading-relaxed">
+                  {aiSuggestion.guidance || 'This issue requires a subject matter expert to review and remediate.'}
+                </p>
+              </div>
+            </div>
+          ) : aiSuggestion.applyMode === 'auto-resolve' ? (
             <div className="flex items-start gap-2 p-2 bg-green-50 rounded border border-green-200 text-xs">
               <CheckCircle size={13} className="text-green-600 flex-shrink-0 mt-0.5" />
               <div>
@@ -384,9 +404,19 @@ export function IssueCard({
                   </div>
                 )}
               </div>
-              <p className="text-purple-700 leading-relaxed font-mono break-all">
-                {aiSuggestion.value || aiSuggestion.guidance}
-              </p>
+              {(aiSuggestion.suggestionType === 'alt-text' || aiSuggestion.suggestionType === 'alt-text-improvement') ? (
+                <textarea
+                  className="w-full text-purple-700 font-mono text-xs leading-relaxed bg-purple-50 border border-purple-200 rounded p-1.5 resize-y focus:outline-none focus:ring-1 focus:ring-purple-400"
+                  rows={3}
+                  value={editedValue ?? aiSuggestion.value ?? aiSuggestion.guidance ?? ''}
+                  onChange={(e) => setEditedValue(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <p className="text-purple-700 leading-relaxed font-mono break-all">
+                  {aiSuggestion.value || aiSuggestion.guidance}
+                </p>
+              )}
               {aiSuggestion.rationale && (
                 <p className="text-purple-500 mt-1 italic">{aiSuggestion.rationale}</p>
               )}
@@ -395,8 +425,8 @@ export function IssueCard({
         </div>
       )}
 
-      {/* Explanation panel — only shown when jobId is provided */}
-      {jobId && (
+      {/* Explanation panel — only shown when jobId is provided and no AI suggestion */}
+      {jobId && !aiSuggestion && (
         <div className="mt-2 border-t border-current/10 pt-2">
           <button
             type="button"

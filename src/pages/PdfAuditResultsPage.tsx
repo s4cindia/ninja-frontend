@@ -23,7 +23,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FileText, Loader2, Download, Share2, RotateCw, Filter, X, ChevronDown, ListChecks } from 'lucide-react';
+import { FileText, Loader2, Download, Share2, RotateCw, Filter, X, ChevronDown, ListChecks, Maximize2, Minimize2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
@@ -31,10 +31,11 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { MatterhornSummary } from '@/components/pdf/MatterhornSummary';
+import { PacReportModal } from '@/components/pdf/PacReportModal';
 import { PdfPageNavigator } from '@/components/pdf/PdfPageNavigator';
 import { PdfPreviewPanel } from '@/components/pdf/PdfPreviewPanel';
-import { ScanLevelBanner } from '@/components/pdf/ScanLevelBanner';
-import { IssueCard } from '@/components/remediation/IssueCard';
+import { PdfStatsCards } from '@/components/pdf/PdfStatsCards';
+import { IssueCard, AiAnalysis } from '@/components/remediation/IssueCard';
 import { api } from '@/services/api';
 
 /**
@@ -140,6 +141,32 @@ export const PdfAuditResultsPage: React.FC = () => {
   const [isDownloading] = useState(false);
   const [isReScanning, setIsReScanning] = useState(false);
   const [currentScanLevel, setCurrentScanLevel] = useState<ScanLevel>('basic');
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // AI analysis state
+  const [aiSuggestions, setAiSuggestions] = useState<Map<string, AiAnalysis>>(new Map());
+  const [isAnalyzingAi, setIsAnalyzingAi] = useState(false);
+  const [aiProgress, setAiProgress] = useState<{ analyzed: number; total: number } | null>(null);
+  const [aiStats, setAiStats] = useState<{
+    gemini: { totalTokens: number; estimatedCostUsd: number };
+    claude: { totalTokens: number; estimatedCostUsd: number };
+    totalTokens: number;
+    totalCostUsd: number;
+  } | null>(null);
+  const aiPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Auto-tag status state
+  const [autoTagInfo, setAutoTagInfo] = useState<{
+    status?: string;
+    hasTaggingReport?: boolean;
+    hasWordExport?: boolean;
+    elementCounts?: Record<string, number> | null;
+    adobeFlags?: Array<{ elementType?: string; page?: number; confidence?: string; reviewComment?: string }>;
+    postRemediationStatus?: 'pending' | 'complete' | 'failed';
+    postRemediationAudit?: { runAt: string; resolved: number; remaining: number; regressions: number; resolutionRate: number };
+  } | null>(null);
+  const [isRetryingAutoTag, setIsRetryingAutoTag] = useState(false);
+  const [showPacReport, setShowPacReport] = useState(false);
 
   // Fetch audit result
   const fetchAuditResult = useCallback(async () => {
@@ -233,6 +260,25 @@ export const PdfAuditResultsPage: React.FC = () => {
       }
       map.get(page)!.push(issue);
     });
+    return map;
+  }, [auditResult]);
+
+  // Compute global sequential issue numbers — stable across filter changes
+  // Order: page ascending → severity weight descending → original array index
+  const issueNumberMap = useMemo(() => {
+    if (!auditResult || !auditResult.issues) return new Map<string, number>();
+    const SEVERITY_WEIGHT: Record<string, number> = { critical: 4, serious: 3, moderate: 2, minor: 1 };
+    const sorted = auditResult.issues
+      .map((issue, originalIndex) => ({ issue, originalIndex }))
+      .sort((a, b) => {
+        const pageDiff = (a.issue.pageNumber ?? 0) - (b.issue.pageNumber ?? 0);
+        if (pageDiff !== 0) return pageDiff;
+        const weightDiff = (SEVERITY_WEIGHT[b.issue.severity] ?? 0) - (SEVERITY_WEIGHT[a.issue.severity] ?? 0);
+        if (weightDiff !== 0) return weightDiff;
+        return a.originalIndex - b.originalIndex;
+      });
+    const map = new Map<string, number>();
+    sorted.forEach(({ issue }, idx) => map.set(issue.id, idx + 1));
     return map;
   }, [auditResult]);
 
@@ -350,12 +396,17 @@ export const PdfAuditResultsPage: React.FC = () => {
     setCurrentPage(page);
   }, []);
 
+  const scrollToIssueCard = useCallback((issueId: string) => {
+    document.getElementById(`issue-card-${issueId}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, []);
+
   const handleIssueSelect = useCallback((issue: PdfAuditIssue) => {
     setSelectedIssueId(issue.id);
     if (issue.pageNumber && issue.pageNumber !== currentPage) {
       setCurrentPage(issue.pageNumber);
     }
-  }, [currentPage]);
+    scrollToIssueCard(issue.id);
+  }, [currentPage, scrollToIssueCard]);
 
   const handlePageClick = useCallback((pageNumber: number) => {
     setCurrentPage(pageNumber);
@@ -366,6 +417,18 @@ export const PdfAuditResultsPage: React.FC = () => {
     }
   }, [issuesByPage]);
 
+  const handleViewAutoTagReport = useCallback(async () => {
+    if (!jobId) return;
+    try {
+      const res = await api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/report`, { responseType: 'blob' });
+      const url = URL.createObjectURL(res.data as Blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch {
+      toast.error('Failed to open report');
+    }
+  }, [jobId]);
+
   const handleMatterhornCheckpointClick = useCallback((checkpointId: string) => {
     // Filter to show issues for this checkpoint
     setFilters((prev) => ({
@@ -374,6 +437,102 @@ export const PdfAuditResultsPage: React.FC = () => {
     }));
     setShowFilters(true);
   }, []);
+
+  // Fetch AI suggestions and update state
+  const fetchAiSuggestions = useCallback(async () => {
+    if (!jobId) return;
+    try {
+      const res = await api.get<{
+        data: {
+          suggestions: AiAnalysis[];
+          analyzed: number;
+          total: number;
+          status: string;
+          stats?: {
+            gemini: { totalTokens: number; estimatedCostUsd: number };
+            claude: { totalTokens: number; estimatedCostUsd: number };
+            totalTokens: number;
+            totalCostUsd: number;
+          } | null;
+        };
+      }>(`/pdf/${encodeURIComponent(jobId)}/ai-analysis`);
+      const { suggestions, analyzed, total, status, stats } = res.data.data;
+      const map = new Map<string, AiAnalysis>();
+      suggestions.forEach((s) => map.set(s.issueId, s));
+      // DEBUG: log to help diagnose ID matching
+      if (suggestions.length > 0) {
+        console.log('[AI Debug] map size:', map.size, 'status:', status);
+        console.log('[AI Debug] sample issueIds:', suggestions.slice(0, 5).map(s => s.issueId));
+      }
+      if (isMountedRef.current) {
+        setAiSuggestions(map);
+        setAiProgress({ analyzed, total });
+        if (stats) setAiStats(stats);
+        if (status === 'complete') {
+          setIsAnalyzingAi(false);
+          if (aiPollingRef.current) {
+            clearInterval(aiPollingRef.current);
+            aiPollingRef.current = null;
+          }
+        } else if (status === 'processing' && !aiPollingRef.current) {
+          // AI analysis is running in the background (triggered automatically by worker) — start polling
+          setIsAnalyzingAi(true);
+          aiPollingRef.current = setInterval(fetchAiSuggestions, 3000);
+        }
+      }
+    } catch {
+      // Non-fatal — silently ignore fetch errors during polling
+    }
+  }, [jobId]);
+
+  // Load existing AI suggestions on mount (in case analysis was already run)
+  useEffect(() => {
+    if (jobId && auditResult) {
+      fetchAiSuggestions();
+    }
+  }, [jobId, auditResult, fetchAiSuggestions]);
+
+  // Cleanup AI polling interval on unmount
+  useEffect(() => {
+    return () => {
+      if (aiPollingRef.current) clearInterval(aiPollingRef.current);
+    };
+  }, []);
+
+  // Fetch auto-tag status after audit result loads
+  useEffect(() => {
+    if (!jobId || !auditResult) return;
+    api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`)
+      .then(res => {
+        if (isMountedRef.current) setAutoTagInfo(res.data.data);
+      })
+      .catch(() => {});
+  }, [jobId, auditResult]);
+
+  const handleRetryAutoTag = async () => {
+    if (!jobId || isRetryingAutoTag) return;
+    setIsRetryingAutoTag(true);
+    try {
+      await api.post(`/pdf/${encodeURIComponent(jobId)}/auto-tag`);
+      setAutoTagInfo(prev => ({ ...prev, status: 'processing' }));
+      toast.success('Auto-tagging started — this may take a minute');
+      // Poll status every 5s until complete
+      const poll = setInterval(async () => {
+        try {
+          const res = await api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`);
+          const info = res.data.data;
+          if (isMountedRef.current) setAutoTagInfo(info);
+          if (info?.status === 'complete' || info?.status === 'failed') {
+            clearInterval(poll);
+            setIsRetryingAutoTag(false);
+          }
+        } catch { clearInterval(poll); setIsRetryingAutoTag(false); }
+      }, 5000);
+    } catch (err) {
+      setIsRetryingAutoTag(false);
+      toast.error(err instanceof Error ? err.message : 'Failed to start auto-tag');
+    }
+  };
 
   const handleDownloadReport = (_format: 'pdf' | 'docx' | 'json' = 'json') => {
     if (!auditResult || !jobId) return;
@@ -390,6 +549,30 @@ export const PdfAuditResultsPage: React.FC = () => {
 
   const handleReRunAudit = () => {
     navigate('/pdf');
+  };
+
+  const [isDownloadingRemediated, setIsDownloadingRemediated] = useState(false);
+  const handleDownloadRemediatedPdf = async () => {
+    if (!jobId || !auditResult) return;
+    setIsDownloadingRemediated(true);
+    try {
+      const response = await api.get(`/pdf/${encodeURIComponent(jobId)}/remediation/download`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(response.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = auditResult.fileName.replace(/\.pdf$/i, '_remediated.pdf');
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast.success('Download started');
+    } catch {
+      toast.error('Remediated PDF not available — apply at least one AI fix first');
+    } finally {
+      setIsDownloadingRemediated(false);
+    }
   };
 
   const handleShareResults = async () => {
@@ -652,6 +835,19 @@ export const PdfAuditResultsPage: React.FC = () => {
               <Download className="h-4 w-4 mr-1" />
               Download Report
             </Button>
+            {Array.from(aiSuggestions.values()).some(s => s.status === 'applied') && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadRemediatedPdf}
+                disabled={isDownloadingRemediated}
+              >
+                {isDownloadingRemediated
+                  ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Downloading…</>
+                  : <><Download className="h-4 w-4 mr-1" />Download AI-Fixed PDF</>
+                }
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={handleShareResults}>
               <Share2 className="h-4 w-4 mr-1" />
               Share
@@ -664,13 +860,40 @@ export const PdfAuditResultsPage: React.FC = () => {
               variant="outline"
               size="sm"
               onClick={() => navigate(`/acr/workflow?jobId=${jobId}&jobType=PDF_ACCESSIBILITY`)}
+              disabled={autoTagInfo?.postRemediationStatus === 'pending'}
+              title={autoTagInfo?.postRemediationStatus === 'pending' ? 'Validating fixes — please wait…' : undefined}
+            >
+              {autoTagInfo?.postRemediationStatus === 'pending'
+                ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Validating…</>
+                : <><FileText className="h-4 w-4 mr-1" />Generate ACR</>
+              }
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowPacReport(true)}
             >
               <FileText className="h-4 w-4 mr-1" />
-              Generate ACR
+              PAC Report
             </Button>
           </div>
+
         </div>
       </div>
+
+      <PdfStatsCards
+        autoTagInfo={autoTagInfo}
+        auditResult={auditResult}
+        aiSuggestions={aiSuggestions}
+        aiStats={aiStats}
+        matterhornIssueCount={matterhornIssueCount}
+        isAnalyzingAi={isAnalyzingAi}
+        aiProgress={aiProgress}
+        onViewAutoTagReport={handleViewAutoTagReport}
+        onRetryAutoTag={handleRetryAutoTag}
+        isRetryingAutoTag={isRetryingAutoTag}
+        jobId={jobId!}
+      />
 
       {/* Matterhorn Summary */}
       <div className="px-6 py-4 bg-white border-b border-gray-200">
@@ -719,19 +942,26 @@ export const PdfAuditResultsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Scan Level Banner - offer deeper analysis if not already comprehensive */}
-      {currentScanLevel !== 'comprehensive' && auditResult && (
-        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-          <ScanLevelBanner
-            currentScanLevel={currentScanLevel}
-            onReScan={handleReScan}
-            isScanning={isReScanning}
-          />
-        </div>
-      )}
 
       {/* Three-column layout */}
-      <div className="flex h-[calc(100vh-320px)]">
+      <div className={isFullscreen ? 'fixed inset-0 z-50 flex flex-col bg-white' : 'flex h-[calc(100vh-320px)]'}>
+        {/* Fullscreen toolbar */}
+        {isFullscreen && (
+          <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-white shrink-0">
+            <span className="text-sm font-medium text-gray-700">
+              {auditResult.fileName} — {auditResult.issues.length} issues
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsFullscreen(false)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+            >
+              <Minimize2 className="h-4 w-4" />
+              Exit full screen
+            </button>
+          </div>
+        )}
+        <div className={isFullscreen ? 'flex flex-1 overflow-hidden' : 'flex h-full w-full'}>
         {/* Left: Page Navigator */}
         <div className="w-64 border-r border-gray-200 bg-white overflow-hidden">
           <PdfPageNavigator
@@ -754,6 +984,7 @@ export const PdfAuditResultsPage: React.FC = () => {
             selectedIssueId={selectedIssueId}
             onPageChange={handlePageChange}
             onIssueSelect={handleIssueSelect}
+            issueNumberMap={issueNumberMap}
           />
         </div>
 
@@ -765,6 +996,15 @@ export const PdfAuditResultsPage: React.FC = () => {
               <h2 className="text-lg font-semibold text-gray-900">
                 Issues ({filteredIssues.length})
               </h2>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  title={isFullscreen ? 'Exit full screen' : 'Full screen'}
+                  onClick={() => setIsFullscreen((v) => !v)}
+                  className="p-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
+                >
+                  {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                </button>
               <Button
                 variant="outline"
                 size="sm"
@@ -779,6 +1019,7 @@ export const PdfAuditResultsPage: React.FC = () => {
                   )}
                 />
               </Button>
+              </div>
             </div>
 
             {/* Matterhorn Toggle */}
@@ -921,20 +1162,46 @@ export const PdfAuditResultsPage: React.FC = () => {
                 )}
               </div>
             ) : (
-              filteredIssues.map((issue) => (
-                <IssueCard
-                  key={issue.id}
-                  issue={issue}
-                  jobId={jobId}
-                  onPageClick={handlePageClick}
-                  showMatterhorn={true}
-                  pageLabels={auditResult.metadata?.pageLabels}
-                />
-              ))
+              <>
+                {/* DEBUG: one-time log when aiSuggestions has data */}
+                {aiSuggestions.size > 0 && filteredIssues.length > 0 && (() => {
+                  console.log('[AI Debug] map size:', aiSuggestions.size);
+                  console.log('[AI Debug] issue ids (first 5):', filteredIssues.slice(0, 5).map(i => i.id));
+                  console.log('[AI Debug] map lookup result (first 5):', filteredIssues.slice(0, 5).map(i => aiSuggestions.get(i.id)?.suggestionType ?? 'MISS'));
+                  return null;
+                })()}
+                {filteredIssues.map((issue) => (
+                  <IssueCard
+                    key={issue.id}
+                    issue={issue}
+                    jobId={jobId}
+                    onPageClick={handlePageClick}
+                    showMatterhorn={true}
+                    pageLabels={auditResult.metadata?.pageLabels}
+                    aiSuggestion={aiSuggestions.get(issue.id)}
+                    issueNumber={issueNumberMap.get(issue.id)}
+                    onClick={() => handleIssueSelect(issue)}
+                    onAiSuggestionChange={(updated) => {
+                      setAiSuggestions((prev) => {
+                        const next = new Map(prev);
+                        next.set(updated.issueId, updated);
+                        return next;
+                      });
+                    }}
+                  />
+                ))}
+              </>
             )}
           </div>
         </div>
+        </div> {/* inner flex row */}
       </div>
+
+      <PacReportModal
+        isOpen={showPacReport}
+        onClose={() => setShowPacReport(false)}
+        jobId={jobId!}
+      />
     </div>
   );
 };
