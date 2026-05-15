@@ -427,6 +427,16 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
     setSourceFilter(prev => prev === source ? null : source);
   };
 
+  // Remove dismissed issues from the render list when the operator hides
+  // them — doing it here keeps counts and the empty-state check accurate.
+  const visibleIssues = useMemo(() => {
+    if (showDismissed) return filteredIssues;
+    return filteredIssues.filter((issue) => {
+      const dk = `${issue.code}::${issue.location ?? ''}`;
+      return !dismissalsByKey.has(dk);
+    });
+  }, [filteredIssues, showDismissed, dismissalsByKey]);
+
   const scoreBreakdown = useMemo(() => calculateScoreBreakdown(issuesSummary), [issuesSummary]);
   
   const displayScore = scoreBreakdown.finalScore;
@@ -593,7 +603,7 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <CardTitle>Issues ({filteredIssues.length})</CardTitle>
+              <CardTitle>Issues ({visibleIssues.length})</CardTitle>
               {dismissalsData && dismissalsData.length > 0 && (
                 <button
                   type="button"
@@ -630,14 +640,14 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
             </TabsList>
 
             <TabsContent value={activeTab}>
-              {filteredIssues.length === 0 ? (
+              {visibleIssues.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <CheckCircle className="h-12 w-12 mx-auto text-green-500 mb-2" />
-                  <p>No issues found in this category</p>
+                  <p>{filteredIssues.length > 0 ? 'All issues in this category are dismissed.' : 'No issues found in this category'}</p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {groupIssues(filteredIssues).map((entry) =>
+                  {groupIssues(visibleIssues).map((entry) =>
                     entry.kind === 'group' ? (
                       <GroupedIssueRow
                         key={`group-${entry.code}`}
@@ -645,14 +655,13 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
                         renderIssue={(issue) => {
                           const dk = `${issue.code}::${issue.location ?? ''}`;
                           const dismissal = dismissalsByKey.get(dk);
-                          if (!showDismissed && dismissal) return null;
                           return (
                             <IssueCard
                               issue={issue}
                               jobId={jobId}
                               dismissal={dismissal}
                               onDismiss={() => setDismissDialogIssue({ code: issue.code, location: issue.location ?? '', message: issue.message })}
-                              onReenable={() => deleteDismissal.mutate(dismissal!.id)}
+                              onReenable={dismissal ? () => deleteDismissal.mutate(dismissal.id) : undefined}
                             />
                           );
                         }}
@@ -661,7 +670,6 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
                         const issue = entry.issue;
                         const dk = `${issue.code}::${issue.location ?? ''}`;
                         const dismissal = dismissalsByKey.get(dk);
-                        if (!showDismissed && dismissal) return null;
                         return (
                           <IssueCard
                             key={issue.id}
@@ -669,7 +677,7 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
                             jobId={jobId}
                             dismissal={dismissal}
                             onDismiss={() => setDismissDialogIssue({ code: issue.code, location: issue.location ?? '', message: issue.message })}
-                            onReenable={() => deleteDismissal.mutate(dismissal!.id)}
+                            onReenable={dismissal ? () => deleteDismissal.mutate(dismissal.id) : undefined}
                           />
                         );
                       })(),

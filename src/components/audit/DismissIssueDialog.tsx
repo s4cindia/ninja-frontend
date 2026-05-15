@@ -89,10 +89,11 @@ export function DismissIssueDialog({
             block re-audits. Dismissals persist until you remove them.
           </p>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
+            <label htmlFor="dismiss-reason" className="block text-xs font-medium text-gray-700 mb-1">
               Reason <span className="text-gray-400 font-normal">(optional)</span>
             </label>
             <textarea
+              id="dismiss-reason"
               ref={textareaRef}
               value={reason}
               onChange={(e) => setReason(e.target.value.slice(0, MAX_REASON))}

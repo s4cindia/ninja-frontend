@@ -22,21 +22,24 @@ export interface CreateDismissalPayload {
 
 export const issueDismissalService = {
   list: async (jobId: string): Promise<IssueDismissal[]> => {
+    const eid = encodeURIComponent(jobId);
     const res = await api.get<{ success: boolean; data: { dismissals: IssueDismissal[] } }>(
-      `/jobs/${jobId}/issues/dismissals`,
+      `/jobs/${eid}/issues/dismissals`,
     );
     return res.data.data.dismissals;
   },
 
   create: async (jobId: string, payload: CreateDismissalPayload): Promise<IssueDismissal> => {
+    const eid = encodeURIComponent(jobId);
     const res = await api.post<{ success: boolean; data: { dismissal: IssueDismissal } }>(
-      `/jobs/${jobId}/issues/dismissals`,
+      `/jobs/${eid}/issues/dismissals`,
       payload,
     );
     return res.data.data.dismissal;
   },
 
   remove: async (jobId: string, dismissalId: string): Promise<void> => {
-    await api.delete(`/jobs/${jobId}/issues/dismissals/${encodeURIComponent(dismissalId)}`);
+    const eid = encodeURIComponent(jobId);
+    await api.delete(`/jobs/${eid}/issues/dismissals/${encodeURIComponent(dismissalId)}`);
   },
 };
