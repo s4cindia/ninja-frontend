@@ -124,7 +124,17 @@ function PerTitleTable({ rows }: { rows: PerTitleEntry[] }) {
               <td className="px-3 py-2 text-right tabular-nums text-gray-600">{inr(r.costInr)}</td>
               <td className="px-3 py-2 text-right tabular-nums text-gray-600">{r.issuesCount}</td>
               <td className="px-3 py-2 text-gray-500 whitespace-nowrap">
-                {new Date(r.completedAt).toLocaleDateString()}
+                {/* `completedAt` is typed nullable ahead of the backend's
+                    activity-date-filter change (Option A). Until that ships
+                    the backend only returns completed runs, so this is
+                    always a date today; the "In progress" branch is the
+                    forward-compatible path for when in-progress runs start
+                    appearing. */}
+                {r.completedAt ? (
+                  new Date(r.completedAt).toLocaleDateString()
+                ) : (
+                  <span className="italic text-gray-400">In progress</span>
+                )}
               </td>
             </tr>
           ))}
