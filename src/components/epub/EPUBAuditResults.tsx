@@ -4,8 +4,11 @@ import { useQuery } from '@tanstack/react-query';
 import {
   AlertCircle, AlertTriangle, Info, CheckCircle,
   Wrench, Hand, FileDown, ClipboardList, ExternalLink, FileCheck, FileSpreadsheet,
-  HelpCircle, ChevronDown, ChevronUp, Zap, User, Image as ImageIcon, Loader2
+  HelpCircle, ChevronDown, ChevronUp, Zap, User, Image as ImageIcon, Loader2, Ban, RotateCcw
 } from 'lucide-react';
+import { useIssueDismissals, useCreateDismissal, useDeleteDismissal } from '@/hooks/useIssueDismissals';
+import { DismissIssueDialog } from '../audit';
+import type { IssueDismissal } from '@/services/issue-dismissal.service';
 import { api } from '@/services/api';
 import { generateCSV, downloadCSV, formatDate } from '@/utils/csvExport';
 import {
@@ -379,6 +382,28 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
 
   const [sourceFilter, setSourceFilter] = useState<FilterableSource | null>(null);
 
+  // ── Dismiss workflow ─────────────────────────────────────────────────
+  const [showDismissed, setShowDismissed] = useState(true);
+  const { data: dismissalsData } = useIssueDismissals(jobId);
+  const createDismissal = useCreateDismissal(jobId ?? '');
+  const deleteDismissal = useDeleteDismissal(jobId ?? '');
+  // Build a lookup: `${code}::${location}` → dismissal (V1 match by
+  // code+location; sufficient because the same rule rarely fires at
+  // exactly the same location with different message text).
+  const dismissalsByKey = useMemo(() => {
+    const map = new Map<string, IssueDismissal>();
+    if (!dismissalsData) return map;
+    for (const d of dismissalsData) {
+      map.set(`${d.code}::${d.location}`, d);
+    }
+    return map;
+  }, [dismissalsData]);
+  const [dismissDialogIssue, setDismissDialogIssue] = useState<{
+    code: string;
+    location: string;
+    message: string;
+  } | null>(null);
+
   const filteredIssues = useMemo(() => {
     let filtered = issues;
     
@@ -543,10 +568,44 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
         </Card>
       </div>
 
+      {/* Dismiss dialog — mounted at the audit-results level so it floats
+          above everything regardless of which IssueCard triggered it. */}
+      <DismissIssueDialog
+        issueCode={dismissDialogIssue?.code ?? ''}
+        isOpen={dismissDialogIssue !== null}
+        isSubmitting={createDismissal.isPending}
+        onClose={() => setDismissDialogIssue(null)}
+        onSubmit={(reason) => {
+          if (!dismissDialogIssue || !jobId) return;
+          createDismissal.mutate(
+            {
+              code: dismissDialogIssue.code,
+              location: dismissDialogIssue.location,
+              message: dismissDialogIssue.message,
+              reason: reason || undefined,
+            },
+            { onSuccess: () => setDismissDialogIssue(null) },
+          );
+        }}
+      />
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Issues ({filteredIssues.length})</CardTitle>
+            <div className="flex items-center gap-3">
+              <CardTitle>Issues ({filteredIssues.length})</CardTitle>
+              {dismissalsData && dismissalsData.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowDismissed((v) => !v)}
+                  className="text-xs text-gray-500 hover:text-gray-700 underline underline-offset-2"
+                >
+                  {showDismissed
+                    ? `Hide ${dismissalsData.length} dismissed`
+                    : `Show ${dismissalsData.length} dismissed`}
+                </button>
+              )}
+            </div>
             <Badge variant="success" size="sm">
               <Wrench className="h-3 w-3 mr-1" />
               {autoFixableCount} Auto-fixable
@@ -583,17 +642,37 @@ export const EPUBAuditResults: React.FC<EPUBAuditResultsProps> = ({
                       <GroupedIssueRow
                         key={`group-${entry.code}`}
                         entry={entry}
-                        renderIssue={(issue) => (
-                          <IssueCard issue={issue} jobId={jobId} />
-                        )}
+                        renderIssue={(issue) => {
+                          const dk = `${issue.code}::${issue.location ?? ''}`;
+                          const dismissal = dismissalsByKey.get(dk);
+                          if (!showDismissed && dismissal) return null;
+                          return (
+                            <IssueCard
+                              issue={issue}
+                              jobId={jobId}
+                              dismissal={dismissal}
+                              onDismiss={() => setDismissDialogIssue({ code: issue.code, location: issue.location ?? '', message: issue.message })}
+                              onReenable={() => deleteDismissal.mutate(dismissal!.id)}
+                            />
+                          );
+                        }}
                       />
-                    ) : (
-                      <IssueCard
-                        key={entry.issue.id}
-                        issue={entry.issue}
-                        jobId={jobId}
-                      />
-                    ),
+                    ) : (() => {
+                        const issue = entry.issue;
+                        const dk = `${issue.code}::${issue.location ?? ''}`;
+                        const dismissal = dismissalsByKey.get(dk);
+                        if (!showDismissed && dismissal) return null;
+                        return (
+                          <IssueCard
+                            key={issue.id}
+                            issue={issue}
+                            jobId={jobId}
+                            dismissal={dismissal}
+                            onDismiss={() => setDismissDialogIssue({ code: issue.code, location: issue.location ?? '', message: issue.message })}
+                            onReenable={() => deleteDismissal.mutate(dismissal!.id)}
+                          />
+                        );
+                      })(),
                   )}
                 </div>
               )}
@@ -626,10 +705,17 @@ interface IssueExplanation {
   estimatedTime: string | null;
 }
 
-const IssueCard: React.FC<{ issue: AuditIssue; jobId: string }> = ({ issue, jobId }) => {
+const IssueCard: React.FC<{
+  issue: AuditIssue;
+  jobId: string;
+  dismissal?: IssueDismissal;
+  onDismiss?: () => void;
+  onReenable?: () => void;
+}> = ({ issue, jobId, dismissal, onDismiss, onReenable }) => {
   const config = SEVERITY_CONFIG[issue.severity];
   const autoFix = isAutoFixable(issue);
   const isQuickFix = QUICK_FIX_CODES.has(issue.code);
+  const isDismissed = !!dismissal;
   const [explanationOpen, setExplanationOpen] = useState(false);
 
   const { data: explanation, isLoading: explanationLoading, isError: explanationError } = useQuery<IssueExplanation>({
@@ -645,7 +731,7 @@ const IssueCard: React.FC<{ issue: AuditIssue; jobId: string }> = ({ issue, jobI
   });
 
   return (
-    <div className={cn('border rounded-lg p-4', config.bgColor, 'border-gray-200')}>
+    <div className={cn('border rounded-lg p-4', config.bgColor, 'border-gray-200', isDismissed && 'opacity-50')}>
       <div className="flex items-start gap-3">
         <div className={cn('mt-0.5', config.color)}>
           {config.icon}
@@ -776,6 +862,36 @@ const IssueCard: React.FC<{ issue: AuditIssue; jobId: string }> = ({ issue, jobI
                   </>
                 ) : null}
               </div>
+            )}
+          </div>
+
+          {/* Dismissed caption */}
+          {isDismissed && (
+            <p className="mt-2 text-xs text-gray-500 italic">
+              Dismissed{dismissal.reason ? `: ${dismissal.reason}` : ''}
+            </p>
+          )}
+
+          {/* Dismiss / re-enable action */}
+          <div className="mt-2 pt-2 border-t border-gray-200 flex items-center gap-2">
+            {isDismissed ? (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onReenable?.(); }}
+                className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Re-enable issue
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onDismiss?.(); }}
+                className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600"
+              >
+                <Ban className="h-3 w-3" />
+                Mark as not an issue
+              </button>
             )}
           </div>
 

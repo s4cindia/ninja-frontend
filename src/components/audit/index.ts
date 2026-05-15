@@ -14,6 +14,7 @@ export { groupIssues } from './group-issues';
 export type { GroupableIssue, GroupEntry, FlatEntry, IssueEntry, FileBucket } from './group-issues';
 export { HeuristicMarker } from './HeuristicMarker';
 export { isHeuristicCode } from './heuristic-codes';
+export { DismissIssueDialog } from './DismissIssueDialog';
 export type {
   PublisherProfile,
   PublisherProfileSignal,
