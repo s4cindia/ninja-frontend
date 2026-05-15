@@ -108,7 +108,7 @@ function PerTitleTable({ rows }: { rows: PerTitleEntry[] }) {
             <th className="px-3 py-2 text-right font-medium text-gray-700">Zones/hr</th>
             <th className="px-3 py-2 text-right font-medium text-gray-700">Cost</th>
             <th className="px-3 py-2 text-right font-medium text-gray-700">Issues</th>
-            <th className="px-3 py-2 text-left font-medium text-gray-700">Run status</th>
+            <th className="px-3 py-2 text-left font-medium text-gray-700">Completed</th>
           </tr>
         </thead>
         <tbody>
@@ -124,8 +124,14 @@ function PerTitleTable({ rows }: { rows: PerTitleEntry[] }) {
               <td className="px-3 py-2 text-right tabular-nums text-gray-600">{inr(r.costInr)}</td>
               <td className="px-3 py-2 text-right tabular-nums text-gray-600">{r.issuesCount}</td>
               <td className="px-3 py-2 text-gray-500 whitespace-nowrap">
+                {/* `completedAt` is typed nullable ahead of the backend's
+                    activity-date-filter change (Option A). Until that ships
+                    the backend only returns completed runs, so this is
+                    always a date today; the "In progress" branch is the
+                    forward-compatible path for when in-progress runs start
+                    appearing. */}
                 {r.completedAt ? (
-                  `Completed ${new Date(r.completedAt).toLocaleDateString()}`
+                  new Date(r.completedAt).toLocaleDateString()
                 ) : (
                   <span className="italic text-gray-400">In progress</span>
                 )}
@@ -229,18 +235,12 @@ export function CorpusTimesheetTab({ range }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between">
+      <div className="flex items-center justify-between">
         <div className="text-sm text-gray-600">
           {data ? (
             <>
-              <div>
-                <span className="font-medium text-gray-900">{data.runsIncluded}</span>{' '}
-                {`${data.runsIncluded === 1 ? 'run' : 'runs'} with annotation activity in ${range.from} → ${range.to}`}
-              </div>
-              <div className="mt-0.5 text-xs text-gray-400">
-                Filtered by session activity date — hours worked in this range, including runs not
-                yet marked complete.
-              </div>
+              <span className="font-medium text-gray-900">{data.runsIncluded}</span> runs included
+              for {range.from} &rarr; {range.to}
             </>
           ) : (
             <>&nbsp;</>
@@ -298,7 +298,7 @@ export function CorpusTimesheetTab({ range }: Props) {
 
       {data && data.runsIncluded === 0 && (
         <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-600">
-          No annotation activity in this date range.
+          No completed runs in this date range.
         </div>
       )}
 
