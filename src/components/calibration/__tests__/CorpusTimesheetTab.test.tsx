@@ -61,36 +61,39 @@ function response(over: Partial<TimesheetSummaryResponse> = {}): TimesheetSummar
   };
 }
 
-describe('CorpusTimesheetTab — nullable completedAt (forward-compat for Option A backend)', () => {
+describe('CorpusTimesheetTab — activity-date filter semantics (BE #400 shipped)', () => {
   beforeEach(() => {
     useTimesheetSummary.mockReset();
   });
 
-  it('renders the run count + date range in the header', () => {
+  it('renders the activity-based count line and semantic caption', () => {
     useTimesheetSummary.mockReturnValue({ data: response(), isLoading: false, error: null });
     render(<CorpusTimesheetTab range={RANGE} />);
-    // The count line uses the original wording until the backend ships
-    // the activity-date-filter change (Option A).
-    expect(screen.getByText(/runs included/i)).toBeInTheDocument();
-    expect(screen.getByText(/2026-05-04/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/runs? with annotation activity in 2026-05-04 . 2026-05-10/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Filtered by session activity date/i)).toBeInTheDocument();
   });
 
-  it('renders the completion date when completedAt is a string', () => {
+  it('singularises "run" for exactly 1, pluralises for N>1', () => {
     useTimesheetSummary.mockReturnValue({
-      data: response({ perTitle: [perTitle({ completedAt: '2026-05-09T10:00:00Z' })] }),
+      data: response({ runsIncluded: 1 }),
       isLoading: false,
       error: null,
     });
-    render(<CorpusTimesheetTab range={RANGE} />);
-    // The cell renders the locale date string; just confirm it's not "In progress"
-    expect(screen.queryByText('In progress')).not.toBeInTheDocument();
+    const { rerender } = render(<CorpusTimesheetTab range={RANGE} />);
+    expect(screen.getByText(/^run with annotation activity in/i)).toBeInTheDocument();
+
+    useTimesheetSummary.mockReturnValue({
+      data: response({ runsIncluded: 3 }),
+      isLoading: false,
+      error: null,
+    });
+    rerender(<CorpusTimesheetTab range={RANGE} />);
+    expect(screen.getByText(/^runs with annotation activity in/i)).toBeInTheDocument();
   });
 
-  it('renders "In progress" for a run whose completedAt is null (BE Option A forward-compat)', () => {
-    // Before the backend ships the activity-date filter, completedAt is
-    // always non-null, so this branch is dead code with the current API.
-    // The type is string | null so the FE is ready for when the backend
-    // starts returning in-progress runs.
+  it('shows "In progress" for a run whose completedAt is null', () => {
     useTimesheetSummary.mockReturnValue({
       data: response({
         perTitle: [perTitle({ runId: 'run-wip', completedAt: null })],
@@ -100,9 +103,10 @@ describe('CorpusTimesheetTab — nullable completedAt (forward-compat for Option
     });
     render(<CorpusTimesheetTab range={RANGE} />);
     expect(screen.getByText('In progress')).toBeInTheDocument();
+    expect(screen.getByText('Run status')).toBeInTheDocument();
   });
 
-  it('shows the empty-state message when no runs are in the range', () => {
+  it('shows activity-based empty-state wording', () => {
     useTimesheetSummary.mockReturnValue({
       data: response({ runsIncluded: 0, perTitle: [] }),
       isLoading: false,
@@ -110,13 +114,17 @@ describe('CorpusTimesheetTab — nullable completedAt (forward-compat for Option
     });
     render(<CorpusTimesheetTab range={RANGE} />);
     expect(
-      screen.getByText('No completed runs in this date range.'),
+      screen.getByText('No annotation activity in this date range.'),
     ).toBeInTheDocument();
   });
 
-  it('renders the "Completed" column header', () => {
-    useTimesheetSummary.mockReturnValue({ data: response(), isLoading: false, error: null });
+  it('renders a completion date when completedAt is present', () => {
+    useTimesheetSummary.mockReturnValue({
+      data: response({ perTitle: [perTitle({ completedAt: '2026-05-09T10:00:00Z' })] }),
+      isLoading: false,
+      error: null,
+    });
     render(<CorpusTimesheetTab range={RANGE} />);
-    expect(screen.getByText('Completed')).toBeInTheDocument();
+    expect(screen.queryByText('In progress')).not.toBeInTheDocument();
   });
 });
