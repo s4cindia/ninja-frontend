@@ -205,6 +205,14 @@ export function MarkCompleteModal({
     if (totalPages > 0 && pagesReviewed > totalPages) {
       return `Pages reviewed cannot exceed total pages (${totalPages}).`;
     }
+    if (Number.isFinite(offPlatformHours)) {
+      if (offPlatformHours < 0) {
+        return 'Off-platform hours must be 0 or greater.';
+      }
+      if (offPlatformHours > 99) {
+        return 'Off-platform hours cannot exceed 99.';
+      }
+    }
     for (let i = 0; i < issues.length; i++) {
       const issue = issues[i];
       if (issue.category === 'OTHER' && !issue.description.trim()) {
