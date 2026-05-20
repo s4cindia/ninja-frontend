@@ -61,8 +61,10 @@ A colleague walking past and accidentally clicking something, or the page auto-r
 
 **Mark Complete is the close-out action for a title.** Without it:
 - The title stays as "In Progress" on the Status Tracker forever.
-- Your hours may not appear in the Timesheet for some reporting periods.
+- The Status Tracker cannot show the correct completion date or cost.
 - Off-platform time (see Part 4) cannot be recorded.
+
+> **Note on Timesheet hours:** Your session hours appear in the Timesheet based on the dates you actually worked — you do NOT need to click Mark Complete for your in-tool hours to show up. However, Mark Complete is still required to record accurate page counts, off-platform time, and to trigger the analysis report.
 
 ### When to click Mark Complete
 
@@ -113,7 +115,7 @@ In the Mark Complete modal, find the **Off-platform hrs** box. Enter a decimal n
 
 | Time worked | What to enter |
 |---|---|
-| 30 minutes | `0.5` |
+| 30 minutes | `0.50` |
 | 1 hour 15 minutes | `1.25` |
 | 4 hours 10 minutes | `4.17` |
 | None | Leave blank |
