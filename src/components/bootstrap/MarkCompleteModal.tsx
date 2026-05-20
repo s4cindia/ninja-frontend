@@ -44,6 +44,15 @@ export interface MarkCompleteRequest {
   pagesReviewed: number;
   issues: RunIssueInput[];
   notes?: string;
+  /**
+   * Hours spent on work related to this title that happened outside the
+   * Ninja workspace (PDF source verification, manual comparison, prep
+   * work, etc.). Stored on the CalibrationRun and surfaced in the
+   * Timesheet as a separate "Off-platform" column so billing teams can
+   * see Ninja hours + off-platform hours side-by-side.
+   * Omit (or pass undefined) when zero.
+   */
+  offPlatformHours?: number;
 }
 
 interface MarkCompleteModalProps {
@@ -122,6 +131,7 @@ export function MarkCompleteModal({
   isSubmitting,
 }: MarkCompleteModalProps) {
   const [pagesReviewed, setPagesReviewed] = useState<number>(defaultPagesReviewed);
+  const [offPlatformHours, setOffPlatformHours] = useState<number>(NaN);
   const [issues, setIssues] = useState<RunIssueDraft[]>([]);
   const pagesReviewedRef = useRef<HTMLInputElement | null>(null);
   const errorRef = useRef<HTMLDivElement | null>(null);
@@ -144,6 +154,7 @@ export function MarkCompleteModal({
     if (isOpen && !wasOpenRef.current) {
       wasOpenRef.current = true;
       setPagesReviewed(defaultPagesReviewedRef.current);
+      setOffPlatformHours(NaN);
       setIssues([]);
       setNotes('');
       setError(null);
@@ -230,6 +241,10 @@ export function MarkCompleteModal({
         blocking: i.blocking,
       })),
       notes: notes.trim() || undefined,
+      offPlatformHours:
+        Number.isFinite(offPlatformHours) && offPlatformHours > 0
+          ? Math.round(offPlatformHours * 100) / 100
+          : undefined,
     };
     try {
       await onSubmit(payload);
@@ -282,7 +297,7 @@ export function MarkCompleteModal({
         {/* Body (scrollable) */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
           {/* Summary */}
-          <div className="grid grid-cols-3 gap-3 bg-gray-50 border border-gray-200 rounded-md p-3 text-sm">
+          <div className="grid grid-cols-2 gap-3 bg-gray-50 border border-gray-200 rounded-md p-3 text-sm sm:grid-cols-4">
             <div>
               <div className="text-xs text-gray-500 uppercase">Pages reviewed</div>
               <input
@@ -318,6 +333,27 @@ export function MarkCompleteModal({
               <div className="mt-1 text-gray-800 font-medium">
                 {zonesReviewed} / {totalZones}
               </div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500 uppercase">Off-platform hrs</div>
+              <input
+                type="number"
+                min={0}
+                max={99}
+                step={0.25}
+                value={Number.isFinite(offPlatformHours) ? offPlatformHours : ''}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === '') { setOffPlatformHours(NaN); return; }
+                  const parsed = Number(raw);
+                  setOffPlatformHours(Number.isFinite(parsed) && parsed >= 0 ? parsed : NaN);
+                }}
+                onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                placeholder="0"
+                className="mt-1 w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                aria-label="Off-platform hours"
+              />
+              <div className="text-xs text-gray-400 mt-0.5">PDF review, prep, etc.</div>
             </div>
           </div>
 

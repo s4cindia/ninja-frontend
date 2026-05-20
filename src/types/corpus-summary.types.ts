@@ -113,6 +113,8 @@ export interface TimesheetTotals {
   wallClockHours: number;
   activeHours: number;
   idleHours: number;
+  /** Sum of operator-reported off-platform hours across all runs in range. */
+  offPlatformHours: number;
   zonesReviewed: number;
   zonesPerHour: number;
   annotatorCostInr: number;
@@ -138,6 +140,8 @@ export interface PerTitleEntry {
   documentName: string;
   pages: number;
   activeHours: number;
+  /** Operator-reported hours worked outside Ninja (PDF review, prep, etc.). */
+  offPlatformHours: number;
   zonesReviewed: number;
   zonesPerHour: number;
   costInr: number;

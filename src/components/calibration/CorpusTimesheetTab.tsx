@@ -34,16 +34,23 @@ function pct100(v: number): string {
 // ── Section: Totals cards ────────────────────────────────────────────
 
 function TotalsCards({ t }: { t: TimesheetTotals }) {
+  const hasOffPlatform = t.offPlatformHours > 0;
   const cards = [
     { label: 'Wall clock', value: `${hrs(t.wallClockHours)} hrs` },
     { label: 'Active', value: `${hrs(t.activeHours)} hrs` },
     { label: 'Idle', value: `${hrs(t.idleHours)} hrs` },
+    // Off-platform is only shown when at least one run has logged it, so
+    // operators who don't use the field don't see an empty card.
+    ...(hasOffPlatform
+      ? [{ label: 'Off-platform', value: `${hrs(t.offPlatformHours)} hrs` }]
+      : []),
     { label: 'Zones reviewed', value: num(t.zonesReviewed) },
     { label: 'Zones / hour', value: t.zonesPerHour.toFixed(1) },
     { label: 'Cost', value: inr(t.annotatorCostInr) },
   ];
+  const cols = hasOffPlatform ? 'lg:grid-cols-7' : 'lg:grid-cols-6';
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+    <div className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${cols}`}>
       {cards.map((c) => (
         <div key={c.label} className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-center">
           <div className="text-lg font-semibold text-gray-900">{c.value}</div>
@@ -96,6 +103,11 @@ function PerOperatorTable({ rows }: { rows: PerOperatorEntry[] }) {
 // ── Section: Per title ───────────────────────────────────────────────
 
 function PerTitleTable({ rows }: { rows: PerTitleEntry[] }) {
+  // Only render the off-platform column when at least one title in the
+  // current range logged off-platform hours — keeps the table clean for
+  // periods where the field hasn't been used yet.
+  const showOffPlatform = rows.some((r) => r.offPlatformHours > 0);
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -104,6 +116,9 @@ function PerTitleTable({ rows }: { rows: PerTitleEntry[] }) {
             <th className="px-3 py-2 text-left font-medium text-gray-700">Document</th>
             <th className="px-3 py-2 text-right font-medium text-gray-700">Pages</th>
             <th className="px-3 py-2 text-right font-medium text-gray-700">Active hrs</th>
+            {showOffPlatform && (
+              <th className="px-3 py-2 text-right font-medium text-gray-700">Off-platform hrs</th>
+            )}
             <th className="px-3 py-2 text-right font-medium text-gray-700">Zones</th>
             <th className="px-3 py-2 text-right font-medium text-gray-700">Zones/hr</th>
             <th className="px-3 py-2 text-right font-medium text-gray-700">Cost</th>
@@ -119,17 +134,16 @@ function PerTitleTable({ rows }: { rows: PerTitleEntry[] }) {
               </td>
               <td className="px-3 py-2 text-right tabular-nums text-gray-600">{r.pages}</td>
               <td className="px-3 py-2 text-right tabular-nums text-gray-600">{hrs(r.activeHours)}</td>
+              {showOffPlatform && (
+                <td className="px-3 py-2 text-right tabular-nums text-gray-600">
+                  {r.offPlatformHours > 0 ? hrs(r.offPlatformHours) : '—'}
+                </td>
+              )}
               <td className="px-3 py-2 text-right tabular-nums text-gray-600">{num(r.zonesReviewed)}</td>
               <td className="px-3 py-2 text-right tabular-nums text-gray-600">{r.zonesPerHour.toFixed(1)}</td>
               <td className="px-3 py-2 text-right tabular-nums text-gray-600">{inr(r.costInr)}</td>
               <td className="px-3 py-2 text-right tabular-nums text-gray-600">{r.issuesCount}</td>
               <td className="px-3 py-2 text-gray-500 whitespace-nowrap">
-                {/* `completedAt` is typed nullable ahead of the backend's
-                    activity-date-filter change (Option A). Until that ships
-                    the backend only returns completed runs, so this is
-                    always a date today; the "In progress" branch is the
-                    forward-compatible path for when in-progress runs start
-                    appearing. */}
                 {r.completedAt ? (
                   new Date(r.completedAt).toLocaleDateString()
                 ) : (
