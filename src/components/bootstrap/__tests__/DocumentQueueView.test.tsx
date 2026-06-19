@@ -129,12 +129,15 @@ describe('DocumentQueueView', () => {
     expect(screen.getByText('Done')).toBeInTheDocument();
   });
 
-  it('shows "Reopen" button for COMPLETE document with a run and calls reopen on click', () => {
+  // A "completed" doc in the queue is one whose latest calibration run has
+  // completedAt set (getCorpusDocumentStatus -> 'COMPLETED'); the backend never
+  // populates doc.status, so Reopen lives in that block, not the renderActions
+  // 'COMPLETE' branch.
+  it('shows "Reopen" button for a completed doc and calls reopen on click', () => {
     mockUseCorpus.mockReturnValue({
       data: {
         documents: [
           makeDoc({
-            status: 'COMPLETE',
             calibrationRuns: [
               {
                 id: 'run-1',

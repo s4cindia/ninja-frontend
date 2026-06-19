@@ -265,28 +265,8 @@ export default function DocumentQueueView() {
             Review
           </button>
         );
-      case 'COMPLETE': {
-        const runId = doc.calibrationRuns?.[0]?.id;
-        return (
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-green-700">Done</span>
-            {runId && (
-              <button
-                onClick={() =>
-                  reopen.mutate(runId, {
-                    onSuccess: () => navigate(`/bootstrap/review/${doc.id}`),
-                  })
-                }
-                disabled={reopen.isPending}
-                aria-label={`Reopen ${doc.filename} for re-annotation`}
-                className="px-3 py-1.5 text-xs font-medium rounded border border-amber-400 text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition-colors"
-              >
-                {reopen.isPending ? 'Reopening...' : 'Reopen'}
-              </button>
-            )}
-          </div>
-        );
-      }
+      case 'COMPLETE':
+        return <span className="text-xs font-medium text-green-700">Done</span>;
       default:
         return null;
     }
@@ -536,6 +516,18 @@ export default function DocumentQueueView() {
                                     className="border border-purple-300 text-purple-600 text-xs px-3 py-1 rounded hover:bg-purple-50 transition-colors"
                                   >
                                     Analysis
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      reopen.mutate(doc.calibrationRuns![0].id, {
+                                        onSuccess: () => navigate(`/bootstrap/review/${doc.id}`),
+                                      })
+                                    }
+                                    disabled={reopen.isPending}
+                                    aria-label={`Reopen ${doc.filename} for re-annotation`}
+                                    className="border border-amber-400 text-amber-700 text-xs px-3 py-1 rounded hover:bg-amber-50 disabled:opacity-50 transition-colors"
+                                  >
+                                    {reopen.isPending ? 'Reopening...' : 'Reopen'}
                                   </button>
                                 </>
                               )}
