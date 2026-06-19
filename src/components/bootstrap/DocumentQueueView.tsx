@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { useCorpusDocumentsWithPolling, useUploadTaggedPdf, useTriggerCorpusCalibrationRun } from '@/hooks/useCalibration';
+import { useCorpusDocumentsWithPolling, useUploadTaggedPdf, useTriggerCorpusCalibrationRun, useReopenAnnotation } from '@/hooks/useCalibration';
 import { DocumentStatusBadge } from './DocumentStatusBadge';
 import { EmptyPagesModal } from './EmptyPagesModal';
 import { getCorpusDocumentStatus, resetCorpus } from '@/services/calibration.service';
@@ -163,6 +163,7 @@ export default function DocumentQueueView() {
   const { data, isLoading, isError, error } = useCorpusDocumentsWithPolling();
   const uploadMutation = useUploadTaggedPdf();
   const triggerMutation = useTriggerCorpusCalibrationRun();
+  const reopen = useReopenAnnotation();
 
   const documents = useMemo(() => data?.documents ?? [], [data]);
 
@@ -264,8 +265,28 @@ export default function DocumentQueueView() {
             Review
           </button>
         );
-      case 'COMPLETE':
-        return <span className="text-xs font-medium text-green-700">Done</span>;
+      case 'COMPLETE': {
+        const runId = doc.calibrationRuns?.[0]?.id;
+        return (
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-green-700">Done</span>
+            {runId && (
+              <button
+                onClick={() =>
+                  reopen.mutate(runId, {
+                    onSuccess: () => navigate(`/bootstrap/review/${doc.id}`),
+                  })
+                }
+                disabled={reopen.isPending}
+                aria-label={`Reopen ${doc.filename} for re-annotation`}
+                className="px-3 py-1.5 text-xs font-medium rounded border border-amber-400 text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition-colors"
+              >
+                {reopen.isPending ? 'Reopening...' : 'Reopen'}
+              </button>
+            )}
+          </div>
+        );
+      }
       default:
         return null;
     }

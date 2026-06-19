@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import DocumentQueueView from '../DocumentQueueView';
 import type { CorpusDocument } from '@/services/calibration.service';
 
+const { reopenMutate } = vi.hoisted(() => ({ reopenMutate: vi.fn() }));
+
 vi.mock('@/hooks/useCalibration', () => ({
   useCorpusDocumentsWithPolling: vi.fn(),
   useUploadTaggedPdf: () => ({
@@ -13,6 +15,10 @@ vi.mock('@/hooks/useCalibration', () => ({
   }),
   useTriggerCorpusCalibrationRun: () => ({
     mutate: vi.fn(),
+    isPending: false,
+  }),
+  useReopenAnnotation: () => ({
+    mutate: reopenMutate,
     isPending: false,
   }),
   CALIBRATION_KEYS: {
@@ -121,6 +127,40 @@ describe('DocumentQueueView', () => {
 
     renderWithRouter();
     expect(screen.getByText('Done')).toBeInTheDocument();
+  });
+
+  it('shows "Reopen" button for COMPLETE document with a run and calls reopen on click', () => {
+    mockUseCorpus.mockReturnValue({
+      data: {
+        documents: [
+          makeDoc({
+            status: 'COMPLETE',
+            calibrationRuns: [
+              {
+                id: 'run-1',
+                runDate: '2026-01-01T00:00:00Z',
+                completedAt: '2026-01-02T00:00:00Z',
+              },
+            ],
+          }),
+        ],
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof mockUseCorpus>);
+
+    renderWithRouter();
+    const reopenBtn = screen.getByRole('button', {
+      name: /reopen test\.pdf for re-annotation/i,
+    });
+    expect(reopenBtn).toBeInTheDocument();
+
+    fireEvent.click(reopenBtn);
+    expect(reopenMutate).toHaveBeenCalledWith(
+      'run-1',
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
   });
 
   it('filters documents by publisher', () => {

@@ -9,6 +9,7 @@ import {
   triggerCorpusCalibrationRun,
 } from '../services/calibration.service';
 import type { CorpusDocument } from '../services/calibration.service';
+import { annotationReportService } from '../services/annotation-report.service';
 
 export const CALIBRATION_KEYS = {
   documents: (params?: object) => ['calibration', 'documents', params] as const,
@@ -80,6 +81,19 @@ export function useTriggerCorpusCalibrationRun() {
   return useMutation({
     mutationFn: (documentId: string) => triggerCorpusCalibrationRun(documentId),
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['calibration', 'documents'] });
+      qc.invalidateQueries({ queryKey: ['calibration', 'runs'] });
+    },
+  });
+}
+
+export function useReopenAnnotation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (runId: string) => annotationReportService.reopenAnnotation(runId),
+    onSuccess: () => {
+      // Reopen flips the doc out of COMPLETE and clears the run's completion
+      // signals, so refresh both the document queue and the runs lists.
       qc.invalidateQueries({ queryKey: ['calibration', 'documents'] });
       qc.invalidateQueries({ queryKey: ['calibration', 'runs'] });
     },

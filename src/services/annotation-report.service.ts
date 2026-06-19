@@ -69,6 +69,11 @@ export const annotationReportService = {
   ) =>
     api.post(`/calibration/runs/${runId}/complete`, payload).then(r => r.data.data),
 
+  reopenAnnotation: (
+    runId: string,
+  ): Promise<{ runId: string; documentId: string; status: string }> =>
+    api.post(`/calibration/runs/${runId}/reopen`).then(r => r.data.data),
+
   getAnalysis: (runId: string) =>
     api.get(`/calibration/runs/${runId}/analysis`).then(r => r.data.data),
 
