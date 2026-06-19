@@ -50,7 +50,6 @@ function makeDoc(overrides: Partial<CorpusDocument> = {}): CorpusDocument {
     language: 'en',
     isScanned: false,
     uploadedAt: '2026-01-01T00:00:00Z',
-    status: 'PENDING',
     ...overrides,
   };
 }
@@ -105,34 +104,9 @@ describe('DocumentQueueView', () => {
     expect(screen.getByText('gamma.pdf')).toBeInTheDocument();
   });
 
-  it('shows "Review" button for NEEDS_REVIEW document', () => {
-    mockUseCorpus.mockReturnValue({
-      data: { documents: [makeDoc({ status: 'NEEDS_REVIEW' })] },
-      isLoading: false,
-      isError: false,
-      error: null,
-    } as unknown as ReturnType<typeof mockUseCorpus>);
-
-    renderWithRouter();
-    expect(screen.getByText('Review')).toBeInTheDocument();
-  });
-
-  it('shows "Done" text for COMPLETE document', () => {
-    mockUseCorpus.mockReturnValue({
-      data: { documents: [makeDoc({ status: 'COMPLETE' })] },
-      isLoading: false,
-      isError: false,
-      error: null,
-    } as unknown as ReturnType<typeof mockUseCorpus>);
-
-    renderWithRouter();
-    expect(screen.getByText('Done')).toBeInTheDocument();
-  });
-
   // A "completed" doc in the queue is one whose latest calibration run has
-  // completedAt set (getCorpusDocumentStatus -> 'COMPLETED'); the backend never
-  // populates doc.status, so Reopen lives in that block, not the renderActions
-  // 'COMPLETE' branch.
+  // completedAt set (getCorpusDocumentStatus -> 'COMPLETED'). That block is the
+  // only place the per-doc actions (Review Zones, Reopen, ...) render.
   it('shows "Reopen" button for a completed doc and calls reopen on click', () => {
     mockUseCorpus.mockReturnValue({
       data: {

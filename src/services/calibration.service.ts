@@ -11,7 +11,6 @@ export interface CorpusDocument {
   isScanned: boolean;
   uploadedAt: string;
   taggedPdfPath?: string;
-  status?: 'PENDING' | 'IN_PROGRESS' | 'NEEDS_REVIEW' | 'COMPLETE';
   bootstrapJobs?: Array<{ id: string; status: string; completedAt?: string; error?: string }>;
   calibrationRuns?: Array<{
     id: string;
