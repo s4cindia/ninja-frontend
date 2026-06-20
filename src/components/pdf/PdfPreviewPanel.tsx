@@ -501,7 +501,7 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
         <div className="px-4 py-2 bg-white border-t border-gray-200">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-xs text-gray-500 shrink-0">
-              Page {currentPage} — {currentPageIssues.length} {currentPageIssues.length === 1 ? 'issue' : 'issues'}:
+              {currentPageIssues.length} {currentPageIssues.length === 1 ? 'issue' : 'issues'} on this page
             </span>
             {categoryBreakdown.map(({ label, count, icon, color, bgColor }) => (
               <span

@@ -109,6 +109,20 @@ export interface PdfAuditIssue {
   matterhornCheckpoint?: string;
   /** Recommended remediation action */
   suggestedFix?: string;
+  /**
+   * Spatial location of the issue on the page, in PDF points (top-left origin).
+   * Optional — only present when the backend audit emits coordinates. The PDF
+   * preview highlights the issue when this is set and skips it otherwise.
+   * Mirrors the backend's optional boundingBox (base-audit.service.ts).
+   */
+  boundingBox?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    pageWidth?: number;
+    pageHeight?: number;
+  };
 }
 
 /**

@@ -195,7 +195,7 @@ export function PdfStatsCards({
       return next;
     });
 
-  const issues = auditResult.issues ?? [];
+  const issues = useMemo(() => auditResult.issues ?? [], [auditResult.issues]);
 
   const derived = useMemo(() => {
     const sugs = Array.from(aiSuggestions.values());

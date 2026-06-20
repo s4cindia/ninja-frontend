@@ -73,9 +73,9 @@ function getIssueCheckpoint(issue: PdfAuditIssue & { category?: string; code?: s
 import { cn } from '@/utils/cn';
 import { validateJobId } from '@/utils/validation';
 import { useCreateRemediationPlan } from '@/hooks/usePdfRemediation';
-import type { PdfAuditResult, PdfAuditIssue, MatterhornSummary as MatterhornSummaryType, PdfMetadata } from '@/types/pdf.types';
+import type { PdfAuditResult, PdfAuditIssue } from '@/types/pdf.types';
 import type { IssueSeverity } from '@/types/accessibility.types';
-import type { ScanLevel, ValidatorType } from '@/types/scan-level.types';
+import type { ScanLevel } from '@/types/scan-level.types';
 
 // Filter state interface
 interface IssueFilters {
@@ -614,97 +614,6 @@ export const PdfAuditResultsPage: React.FC = () => {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create remediation plan';
       toast.error(message);
-    }
-  };
-
-  const handleReScan = async (scanLevel: ScanLevel, customValidators?: ValidatorType[]) => {
-    if (!jobId) return;
-
-    // Capture previous scan level for rollback on error
-    const previousScanLevel = currentScanLevel;
-
-    setIsReScanning(true);
-    setIsPolling(false); // Don't poll - we'll get the result directly from the POST response
-    // Optimistically update scan level immediately
-    setCurrentScanLevel(scanLevel);
-
-    // Declare toastId before try so it can be dismissed in catch
-    let toastId: string | number | undefined;
-
-    try {
-      // Show loading toast
-      toastId = toast.loading(`Running ${scanLevel} scan... This may take a few minutes.`);
-
-      // Call re-scan API - the response will contain the full audit results
-      const response = await api.post(`/pdf/job/${encodeURIComponent(jobId)}/re-scan`, {
-        scanLevel,
-        customValidators,
-      });
-
-      // Extract audit report from response
-      const data = response.data.data || response.data;
-      if (data.auditReport) {
-        // Transform the audit report to match PdfAuditResult structure
-        // Backend returns pageCount and matterhornSummary in metadata, but frontend expects them at root
-        const report = data.auditReport;
-        // Extract metadata with proper typing
-        const reportMetadata = report.metadata as Record<string, unknown> | undefined;
-        const matterhornSummaryData = reportMetadata?.matterhornSummary as MatterhornSummaryType | undefined;
-        const metadataData = reportMetadata as PdfMetadata | undefined;
-
-        // Create default metadata if none available
-        const defaultMetadata: PdfMetadata = {
-          pdfVersion: '1.7',
-          isTagged: false,
-          hasStructureTree: false,
-        };
-
-        // Create default Matterhorn summary if none available
-        const defaultMatterhornSummary: MatterhornSummaryType = {
-          totalCheckpoints: 0,
-          passed: 0,
-          failed: 0,
-          notApplicable: 0,
-          categories: [],
-        };
-
-        const transformedResult: PdfAuditResult = {
-          id: report.jobId || jobId!,
-          jobId: report.jobId || jobId!,
-          fileName: report.fileName,
-          fileSize: auditResult?.fileSize || 0, // Preserve from previous result
-          pageCount: (reportMetadata?.pageCount as number) || auditResult?.pageCount || 0,
-          score: report.score,
-          status: 'completed',
-          createdAt: auditResult?.createdAt || new Date().toISOString(),
-          completedAt: new Date().toISOString(),
-          issues: report.issues || [],
-          matterhornSummary: matterhornSummaryData || auditResult?.matterhornSummary || defaultMatterhornSummary,
-          metadata: metadataData || auditResult?.metadata || defaultMetadata,
-        };
-
-        setAuditResult(transformedResult);
-        setCurrentScanLevel(data.scanLevel || scanLevel);
-        toast.success(`${scanLevel} scan complete! Found ${report.issues?.length || 0} issues.`, { id: toastId });
-        // Only clear isReScanning when we have immediate results
-        setIsReScanning(false);
-      } else {
-        // Fallback to polling if response doesn't contain audit report
-        setIsPolling(true);
-        toast.success(`${scanLevel} scan started. Loading results...`, { id: toastId });
-        // Don't clear isReScanning here - let fetchAuditResult clear it when polling completes
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to start re-scan';
-      // Dismiss the loading toast before showing error
-      if (toastId !== undefined) {
-        toast.dismiss(String(toastId));
-      }
-      toast.error(message);
-      setIsReScanning(false);
-      setIsPolling(false);
-      // Revert scan level to previous value on error
-      setCurrentScanLevel(previousScanLevel);
     }
   };
 
