@@ -238,6 +238,24 @@ export function PdfStatsCards({
     };
   }, [issues, aiSuggestions, matterhornIssueCount]);
 
+  // Download the Word export through the authenticated api client so the bearer
+  // token / interceptors apply (a plain <a href> would 401 in token-auth setups).
+  const handleDownloadWord = async () => {
+    try {
+      const res = await api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/word`, {
+        responseType: 'blob',
+      });
+      const url = URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `auto-tag-${jobId}.docx`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download Word export', err);
+    }
+  };
+
   // ─── Card 1: Auto Tag ────────────────────────────────────────────────────────
 
   const atStatus = autoTagInfo?.status;
@@ -318,13 +336,13 @@ export function PdfStatsCards({
             </button>
           )}
           {autoTagInfo.hasWordExport && (
-            <a
-              href={`${api.defaults.baseURL}/pdf/${encodeURIComponent(jobId)}/auto-tag/word`}
-              download
+            <button
+              type="button"
+              onClick={handleDownloadWord}
               className="text-xs text-blue-600 hover:underline"
             >
               Download Word
-            </a>
+            </button>
           )}
         </div>
       )}

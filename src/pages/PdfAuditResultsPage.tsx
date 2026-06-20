@@ -154,6 +154,7 @@ export const PdfAuditResultsPage: React.FC = () => {
     totalCostUsd: number;
   } | null>(null);
   const aiPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoTagPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Auto-tag status state
   const [autoTagInfo, setAutoTagInfo] = useState<{
@@ -474,8 +475,16 @@ export const PdfAuditResultsPage: React.FC = () => {
             clearInterval(aiPollingRef.current);
             aiPollingRef.current = null;
           }
-        } else if (status === 'processing' && !aiPollingRef.current) {
-          // AI analysis is running in the background (triggered automatically by worker) — start polling
+        } else if (status === 'error' || status === 'failed') {
+          // Terminal failure — stop polling so we don't loop forever
+          setIsAnalyzingAi(false);
+          if (aiPollingRef.current) {
+            clearInterval(aiPollingRef.current);
+            aiPollingRef.current = null;
+          }
+        } else if ((status === 'processing' || status === 'pending') && !aiPollingRef.current) {
+          // AI analysis is queued ('pending') or running ('processing') in the
+          // background — start polling so suggestions appear without a manual refresh.
           setIsAnalyzingAi(true);
           aiPollingRef.current = setInterval(fetchAiSuggestions, 3000);
         }
@@ -492,10 +501,11 @@ export const PdfAuditResultsPage: React.FC = () => {
     }
   }, [jobId, auditResult, fetchAiSuggestions]);
 
-  // Cleanup AI polling interval on unmount
+  // Cleanup polling intervals on unmount
   useEffect(() => {
     return () => {
       if (aiPollingRef.current) clearInterval(aiPollingRef.current);
+      if (autoTagPollRef.current) clearInterval(autoTagPollRef.current);
     };
   }, []);
 
@@ -516,17 +526,28 @@ export const PdfAuditResultsPage: React.FC = () => {
       await api.post(`/pdf/${encodeURIComponent(jobId)}/auto-tag`);
       setAutoTagInfo(prev => ({ ...prev, status: 'processing' }));
       toast.success('Auto-tagging started — this may take a minute');
-      // Poll status every 5s until complete
-      const poll = setInterval(async () => {
+      // Poll status every 5s until complete; track in a ref so it can be cleared
+      // on unmount and so state updates are guarded against late firings.
+      if (autoTagPollRef.current) clearInterval(autoTagPollRef.current);
+      autoTagPollRef.current = setInterval(async () => {
         try {
           const res = await api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`);
           const info = res.data.data;
           if (isMountedRef.current) setAutoTagInfo(info);
           if (info?.status === 'complete' || info?.status === 'failed') {
-            clearInterval(poll);
-            setIsRetryingAutoTag(false);
+            if (autoTagPollRef.current) {
+              clearInterval(autoTagPollRef.current);
+              autoTagPollRef.current = null;
+            }
+            if (isMountedRef.current) setIsRetryingAutoTag(false);
           }
-        } catch { clearInterval(poll); setIsRetryingAutoTag(false); }
+        } catch {
+          if (autoTagPollRef.current) {
+            clearInterval(autoTagPollRef.current);
+            autoTagPollRef.current = null;
+          }
+          if (isMountedRef.current) setIsRetryingAutoTag(false);
+        }
       }, 5000);
     } catch (err) {
       setIsRetryingAutoTag(false);

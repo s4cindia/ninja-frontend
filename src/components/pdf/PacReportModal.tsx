@@ -148,15 +148,20 @@ export function PacReportModal({ isOpen, onClose, jobId }: PacReportModalProps) 
 
   useEffect(() => {
     if (!isOpen || !jobId) return;
+    // Guard against a stale response (close/reopen or jobId change) overwriting
+    // current state once an earlier request resolves late.
+    let cancelled = false;
     setIsLoading(true);
     setError(null);
     getPacReport(jobId)
-      .then(setReport)
+      .then((r) => { if (!cancelled) setReport(r); })
       .catch((err: unknown) => {
+        if (cancelled) return;
         const msg = err instanceof Error ? err.message : 'Failed to load PAC report';
         setError(msg);
       })
-      .finally(() => setIsLoading(false));
+      .finally(() => { if (!cancelled) setIsLoading(false); });
+    return () => { cancelled = true; };
   }, [isOpen, jobId]);
 
   return (

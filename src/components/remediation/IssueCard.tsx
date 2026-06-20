@@ -111,8 +111,8 @@ export function IssueCard({
       );
       return res.data.data;
     },
-    onSuccess: () => {
-      onAiSuggestionChange?.({ ...aiSuggestion!, status: 'applied' });
+    onSuccess: (updated) => {
+      onAiSuggestionChange?.(updated);
       queryClient.invalidateQueries({ queryKey: ['ai-analysis', jobId] });
       toast.success('Fix applied to PDF');
     },
