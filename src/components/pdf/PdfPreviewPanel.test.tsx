@@ -237,6 +237,41 @@ describe('PdfPreviewPanel', () => {
 
       expect(screen.queryByText(/issues on this page/)).not.toBeInTheDocument();
     });
+
+    it('notes when no page issues have location data (cannot be highlighted)', () => {
+      const issues = [
+        createMockIssue('1', 1, 'critical'),
+        createMockIssue('2', 1, 'serious'),
+      ];
+
+      render(<PdfPreviewPanel {...defaultProps} currentPage={1} issues={issues} />);
+
+      // Mock issues carry no boundingBox, so none are locatable on the page.
+      expect(screen.getByText('2 issues on this page')).toBeInTheDocument();
+      expect(screen.getByText('· none can be located')).toBeInTheDocument();
+    });
+
+    it('shows the located count when only some issues have location data', () => {
+      const issues = [
+        { ...createMockIssue('1', 1, 'critical'), boundingBox: { x: 10, y: 10, width: 20, height: 20 } },
+        createMockIssue('2', 1, 'serious'),
+      ];
+
+      render(<PdfPreviewPanel {...defaultProps} currentPage={1} issues={issues} />);
+
+      expect(screen.getByText('· 1 can be located')).toBeInTheDocument();
+    });
+
+    it('shows no locatability note when every issue has location data', () => {
+      const issues = [
+        { ...createMockIssue('1', 1, 'critical'), boundingBox: { x: 10, y: 10, width: 20, height: 20 } },
+      ];
+
+      render(<PdfPreviewPanel {...defaultProps} currentPage={1} issues={issues} />);
+
+      expect(screen.getByText('1 issue on this page')).toBeInTheDocument();
+      expect(screen.queryByText(/can be located/)).not.toBeInTheDocument();
+    });
   });
 
   describe('Toolbar Layout', () => {
