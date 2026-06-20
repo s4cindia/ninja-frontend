@@ -351,6 +351,11 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     setProgress(0);
     setError(null);
     setSelectedFile(null);
+    setCompletedResult(null);
+    setCompletedJobData(null);
+    setAiStatus(null);
+    setAiSuggestionCount(0);
+    setAiTokenStats(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }

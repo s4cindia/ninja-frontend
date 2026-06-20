@@ -21,7 +21,7 @@ no way to find that issue in the right panel without clicking through it.
 Each issue gets a single global number (1–N) assigned once at load time by severity → page order.
 Both the circle on the PDF and the issue card in the right panel display that same number always.
 
-```
+```text
 Right panel:          PDF overlay:
 [#1] Critical — ...   ┌─────────────┐
 [#2] Serious  — ...   │  ①  ③       │

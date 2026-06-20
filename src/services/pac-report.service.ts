@@ -56,6 +56,6 @@ export interface PacReport {
 // ─── API call ─────────────────────────────────────────────────────────────────
 
 export async function getPacReport(jobId: string): Promise<PacReport> {
-  const response = await api.get(`/pdf/${jobId}/pac-report`);
+  const response = await api.get(`/pdf/${encodeURIComponent(jobId)}/pac-report`);
   return response.data.data;
 }
