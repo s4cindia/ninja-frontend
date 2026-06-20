@@ -109,6 +109,20 @@ export interface PdfAuditIssue {
   matterhornCheckpoint?: string;
   /** Recommended remediation action */
   suggestedFix?: string;
+  /**
+   * Spatial location of the issue on the page, in PDF points (top-left origin).
+   * Optional — only present when the backend audit emits coordinates. The PDF
+   * preview highlights the issue when this is set and skips it otherwise.
+   * Mirrors the backend's optional boundingBox (base-audit.service.ts).
+   */
+  boundingBox?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    pageWidth?: number;
+    pageHeight?: number;
+  };
 }
 
 /**
@@ -296,6 +310,22 @@ export function isPdfAuditIssue(value: unknown): value is PdfAuditIssue {
   if (obj.elementPath !== undefined && typeof obj.elementPath !== 'string') return false;
   if (obj.matterhornCheckpoint !== undefined && typeof obj.matterhornCheckpoint !== 'string') return false;
   if (obj.suggestedFix !== undefined && typeof obj.suggestedFix !== 'string') return false;
+
+  // Validate boundingBox shape when present (coordinates feed overlay math)
+  if (obj.boundingBox !== undefined) {
+    if (typeof obj.boundingBox !== 'object' || obj.boundingBox === null) return false;
+    const bb = obj.boundingBox as Record<string, unknown>;
+    if (
+      typeof bb.x !== 'number' ||
+      typeof bb.y !== 'number' ||
+      typeof bb.width !== 'number' ||
+      typeof bb.height !== 'number'
+    ) {
+      return false;
+    }
+    if (bb.pageWidth !== undefined && typeof bb.pageWidth !== 'number') return false;
+    if (bb.pageHeight !== undefined && typeof bb.pageHeight !== 'number') return false;
+  }
 
   // Validate wcagCriteria is array of strings when present
   if (obj.wcagCriteria !== undefined) {
