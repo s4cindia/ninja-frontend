@@ -2,7 +2,6 @@ import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useCorpusDocumentsWithPolling, useUploadTaggedPdf, useTriggerCorpusCalibrationRun, useReopenAnnotation } from '@/hooks/useCalibration';
-import { DocumentStatusBadge } from './DocumentStatusBadge';
 import { EmptyPagesModal } from './EmptyPagesModal';
 import { getCorpusDocumentStatus, resetCorpus } from '@/services/calibration.service';
 import type { CorpusDocument, CorpusDocumentStatus } from '@/services/calibration.service';
@@ -20,7 +19,7 @@ function SkeletonRows() {
     <>
       {Array.from({ length: 5 }, (_, i) => (
         <tr key={i}>
-          {Array.from({ length: 10 }, (_, j) => (
+          {Array.from({ length: 9 }, (_, j) => (
             <td key={j} className="px-6 py-4">
               <div className="h-4 bg-gray-200 rounded animate-pulse" />
             </td>
@@ -186,8 +185,14 @@ export default function DocumentQueueView() {
   const stats = useMemo(() => {
     return {
       total: filtered.length,
-      needsReview: filtered.filter((d) => d.status === 'NEEDS_REVIEW').length,
-      complete: filtered.filter((d) => d.status === 'COMPLETE').length,
+      // Extraction finished but zone annotation not yet complete -> awaiting review.
+      needsReview: filtered.filter(
+        (d) =>
+          getCorpusDocumentStatus(d) === 'COMPLETED' &&
+          d.annotationProgress?.status !== 'COMPLETED',
+      ).length,
+      // All zones annotated.
+      complete: filtered.filter((d) => d.annotationProgress?.status === 'COMPLETED').length,
     };
   }, [filtered]);
 
@@ -242,34 +247,6 @@ export default function DocumentQueueView() {
         setTriggeringIds((prev) => ({ ...prev, [docId]: false }));
       },
     });
-  };
-
-  const renderActions = (doc: CorpusDocument) => {
-    switch (doc.status ?? 'PENDING') {
-      case 'PENDING':
-        return null;
-      case 'IN_PROGRESS':
-        return (
-          <span className="inline-flex items-center gap-1.5 text-xs text-amber-700">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-            Processing...
-          </span>
-        );
-      case 'NEEDS_REVIEW':
-        return (
-          <button
-            onClick={() => navigate(`/bootstrap/review/${doc.id}`)}
-            aria-label={`Review ${doc.filename}`}
-            className="px-3 py-1.5 text-xs font-medium rounded bg-teal-600 text-white hover:bg-teal-700 transition-colors"
-          >
-            Review
-          </button>
-        );
-      case 'COMPLETE':
-        return <span className="text-xs font-medium text-green-700">Done</span>;
-      default:
-        return null;
-    }
   };
 
   return (
@@ -393,7 +370,6 @@ export default function DocumentQueueView() {
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pages</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Empty Pages</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Extraction</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Annotation Status</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Annotation Progress</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AI</th>
                 <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -444,9 +420,6 @@ export default function DocumentQueueView() {
                         <OperatorStatusBadge status={opStatus} />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <DocumentStatusBadge status={doc.status ?? 'PENDING'} />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
                         <AnnotationStatusBadge progress={doc.annotationProgress} ai={doc.aiAnnotation} />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -454,7 +427,6 @@ export default function DocumentQueueView() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {renderActions(doc)}
                           <input
                             type="file"
                             accept="application/pdf"
