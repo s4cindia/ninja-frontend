@@ -113,6 +113,9 @@ export function IssueCard({
     },
     onSuccess: (updated) => {
       onAiSuggestionChange?.(updated);
+      // Clear the local edit override so the textarea shows the server-normalized
+      // value (render prefers editedValue over aiSuggestion.value).
+      setEditedValue(null);
       queryClient.invalidateQueries({ queryKey: ['ai-analysis', jobId] });
       toast.success('Fix applied to PDF');
     },
