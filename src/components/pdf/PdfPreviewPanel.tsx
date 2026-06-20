@@ -404,6 +404,7 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
             size="sm"
             onClick={() => setShowHighlights(!showHighlights)}
             aria-label={showHighlights ? 'Hide issue highlights' : 'Show issue highlights'}
+            title="Highlights mark only issues that include location data from the audit."
           >
             {showHighlights ? (
               <>
@@ -503,6 +504,16 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
             <span className="text-xs text-gray-500 shrink-0">
               {currentPageIssues.length} {currentPageIssues.length === 1 ? 'issue' : 'issues'} on this page
             </span>
+            {highlights.length < currentPageIssues.length && (
+              <span
+                className="text-xs text-amber-600 shrink-0"
+                title="Only issues that include location data from the audit can be highlighted on the page."
+              >
+                {highlights.length === 0
+                  ? '· none can be located'
+                  : `· ${highlights.length} can be located`}
+              </span>
+            )}
             {categoryBreakdown.map(({ label, count, icon, color, bgColor }) => (
               <span
                 key={label}
