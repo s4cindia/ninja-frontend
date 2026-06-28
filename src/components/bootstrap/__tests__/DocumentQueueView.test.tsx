@@ -8,7 +8,7 @@ import type { CorpusDocument } from '@/services/calibration.service';
 const { reopenMutate } = vi.hoisted(() => ({ reopenMutate: vi.fn() }));
 
 vi.mock('@/hooks/useCalibration', () => ({
-  useCorpusDocumentsWithPolling: vi.fn(),
+  useCorpusDocumentsInfinite: vi.fn(),
   useUploadTaggedPdf: () => ({
     mutate: vi.fn(),
     isPending: false,
@@ -26,8 +26,26 @@ vi.mock('@/hooks/useCalibration', () => ({
   },
 }));
 
-const { useCorpusDocumentsWithPolling } = await import('@/hooks/useCalibration');
-const mockUseCorpus = vi.mocked(useCorpusDocumentsWithPolling);
+const { useCorpusDocumentsInfinite } = await import('@/hooks/useCalibration');
+const mockUseCorpus = vi.mocked(useCorpusDocumentsInfinite);
+
+// Build the infinite-query result the component expects: a single loaded page of
+// `docs` (or no data), with paging flags overridable per test.
+function infiniteResult(
+  docs: CorpusDocument[] | undefined,
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    data: docs === undefined ? undefined : { pages: [{ documents: docs }] },
+    isLoading: false,
+    isError: false,
+    error: null,
+    hasNextPage: false,
+    fetchNextPage: vi.fn(),
+    isFetchingNextPage: false,
+    ...overrides,
+  } as unknown as ReturnType<typeof mockUseCorpus>;
+}
 
 function renderWithRouter() {
   const queryClient = new QueryClient({
@@ -60,12 +78,7 @@ describe('DocumentQueueView', () => {
   });
 
   it('shows skeleton rows when loading', () => {
-    mockUseCorpus.mockReturnValue({
-      data: undefined,
-      isLoading: true,
-      isError: false,
-      error: null,
-    } as unknown as ReturnType<typeof mockUseCorpus>);
+    mockUseCorpus.mockReturnValue(infiniteResult(undefined, { isLoading: true }));
 
     renderWithRouter();
     const pulseElements = document.querySelectorAll('.animate-pulse');
@@ -73,30 +86,20 @@ describe('DocumentQueueView', () => {
   });
 
   it('shows empty state when no documents', () => {
-    mockUseCorpus.mockReturnValue({
-      data: { documents: [] },
-      isLoading: false,
-      isError: false,
-      error: null,
-    } as unknown as ReturnType<typeof mockUseCorpus>);
+    mockUseCorpus.mockReturnValue(infiniteResult([]));
 
     renderWithRouter();
     expect(screen.getByText('No documents in queue')).toBeInTheDocument();
   });
 
   it('renders document list with 3 documents', () => {
-    mockUseCorpus.mockReturnValue({
-      data: {
-        documents: [
-          makeDoc({ id: '1', filename: 'alpha.pdf' }),
-          makeDoc({ id: '2', filename: 'beta.pdf' }),
-          makeDoc({ id: '3', filename: 'gamma.pdf' }),
-        ],
-      },
-      isLoading: false,
-      isError: false,
-      error: null,
-    } as unknown as ReturnType<typeof mockUseCorpus>);
+    mockUseCorpus.mockReturnValue(
+      infiniteResult([
+        makeDoc({ id: '1', filename: 'alpha.pdf' }),
+        makeDoc({ id: '2', filename: 'beta.pdf' }),
+        makeDoc({ id: '3', filename: 'gamma.pdf' }),
+      ]),
+    );
 
     renderWithRouter();
     expect(screen.getByText('alpha.pdf')).toBeInTheDocument();
@@ -108,24 +111,19 @@ describe('DocumentQueueView', () => {
   // completedAt set (getCorpusDocumentStatus -> 'COMPLETED'). That block is the
   // only place the per-doc actions (Review Zones, Reopen, ...) render.
   it('shows "Reopen" button for a completed doc and calls reopen on click', () => {
-    mockUseCorpus.mockReturnValue({
-      data: {
-        documents: [
-          makeDoc({
-            calibrationRuns: [
-              {
-                id: 'run-1',
-                runDate: '2026-01-01T00:00:00Z',
-                completedAt: '2026-01-02T00:00:00Z',
-              },
-            ],
-          }),
-        ],
-      },
-      isLoading: false,
-      isError: false,
-      error: null,
-    } as unknown as ReturnType<typeof mockUseCorpus>);
+    mockUseCorpus.mockReturnValue(
+      infiniteResult([
+        makeDoc({
+          calibrationRuns: [
+            {
+              id: 'run-1',
+              runDate: '2026-01-01T00:00:00Z',
+              completedAt: '2026-01-02T00:00:00Z',
+            },
+          ],
+        }),
+      ]),
+    );
 
     renderWithRouter();
     const reopenBtn = screen.getByRole('button', {
@@ -141,18 +139,13 @@ describe('DocumentQueueView', () => {
   });
 
   it('filters documents by publisher', () => {
-    mockUseCorpus.mockReturnValue({
-      data: {
-        documents: [
-          makeDoc({ id: '1', filename: 'pub-a.pdf', publisher: 'Publisher A' }),
-          makeDoc({ id: '2', filename: 'pub-b.pdf', publisher: 'Publisher B' }),
-          makeDoc({ id: '3', filename: 'pub-a2.pdf', publisher: 'Publisher A' }),
-        ],
-      },
-      isLoading: false,
-      isError: false,
-      error: null,
-    } as unknown as ReturnType<typeof mockUseCorpus>);
+    mockUseCorpus.mockReturnValue(
+      infiniteResult([
+        makeDoc({ id: '1', filename: 'pub-a.pdf', publisher: 'Publisher A' }),
+        makeDoc({ id: '2', filename: 'pub-b.pdf', publisher: 'Publisher B' }),
+        makeDoc({ id: '3', filename: 'pub-a2.pdf', publisher: 'Publisher A' }),
+      ]),
+    );
 
     renderWithRouter();
     // All 3 visible initially
@@ -168,5 +161,35 @@ describe('DocumentQueueView', () => {
     expect(screen.getByText('pub-a.pdf')).toBeInTheDocument();
     expect(screen.getByText('pub-a2.pdf')).toBeInTheDocument();
     expect(screen.queryByText('pub-b.pdf')).not.toBeInTheDocument();
+  });
+
+  it('shows "Load more" and calls fetchNextPage on click when more pages exist', () => {
+    const fetchNextPage = vi.fn();
+    mockUseCorpus.mockReturnValue(
+      infiniteResult([makeDoc({ id: '1', filename: 'alpha.pdf' })], {
+        hasNextPage: true,
+        fetchNextPage,
+      }),
+    );
+
+    renderWithRouter();
+    const loadMore = screen.getByRole('button', { name: /load more/i });
+    expect(loadMore).toBeInTheDocument();
+
+    fireEvent.click(loadMore);
+    expect(fetchNextPage).toHaveBeenCalled();
+  });
+
+  it('shows the "all loaded" footer and no Load more when there are no more pages', () => {
+    mockUseCorpus.mockReturnValue(
+      infiniteResult([
+        makeDoc({ id: '1', filename: 'alpha.pdf' }),
+        makeDoc({ id: '2', filename: 'beta.pdf' }),
+      ]),
+    );
+
+    renderWithRouter();
+    expect(screen.getByText('All 2 documents loaded')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /load more/i })).not.toBeInTheDocument();
   });
 });

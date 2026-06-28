@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { useCorpusDocumentsWithPolling, useUploadTaggedPdf, useTriggerCorpusCalibrationRun, useReopenAnnotation } from '@/hooks/useCalibration';
+import { useCorpusDocumentsInfinite, useUploadTaggedPdf, useTriggerCorpusCalibrationRun, useReopenAnnotation } from '@/hooks/useCalibration';
 import { EmptyPagesModal } from './EmptyPagesModal';
 import { getCorpusDocumentStatus, resetCorpus } from '@/services/calibration.service';
 import type { CorpusDocument, CorpusDocumentStatus } from '@/services/calibration.service';
@@ -159,12 +159,15 @@ export default function DocumentQueueView() {
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [emptyPagesModalDocId, setEmptyPagesModalDocId] = useState<string | null>(null);
 
-  const { data, isLoading, isError, error } = useCorpusDocumentsWithPolling();
+  const {
+    data, isLoading, isError, error,
+    hasNextPage, fetchNextPage, isFetchingNextPage,
+  } = useCorpusDocumentsInfinite();
   const uploadMutation = useUploadTaggedPdf();
   const triggerMutation = useTriggerCorpusCalibrationRun();
   const reopen = useReopenAnnotation();
 
-  const documents = useMemo(() => data?.documents ?? [], [data]);
+  const documents = useMemo(() => data?.pages.flatMap((p) => p.documents) ?? [], [data]);
 
   const publishers = useMemo(() => {
     const set = new Set<string>();
@@ -520,6 +523,22 @@ export default function DocumentQueueView() {
             </tbody>
           </table>
         </div>
+      )}
+      {hasNextPage && (
+        <div className="flex justify-center py-4">
+          <button
+            onClick={() => fetchNextPage()}
+            disabled={isFetchingNextPage}
+            className="px-4 py-2 text-sm font-medium rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+          >
+            {isFetchingNextPage ? 'Loading…' : 'Load more'}
+          </button>
+        </div>
+      )}
+      {!hasNextPage && documents.length > 0 && (
+        <p className="text-center text-xs text-gray-400 py-3">
+          All {documents.length} documents loaded
+        </p>
       )}
       {emptyPagesModalDocId && (() => {
         const doc = documents.find((d) => d.id === emptyPagesModalDocId);
