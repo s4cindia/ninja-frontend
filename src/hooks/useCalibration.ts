@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getCorpusDocuments,
   startCalibration,
@@ -110,6 +110,37 @@ export function useCorpusDocumentsWithPolling(params?: {
     refetchInterval: (query) => {
       const docs = (query.state.data as { documents: CorpusDocument[] } | undefined)?.documents ?? [];
       const hasActive = docs.some((d: CorpusDocument) => {
+        const latestRun = d.calibrationRuns?.[0];
+        if (latestRun && !latestRun.completedAt) return true;
+        const latestJob = d.bootstrapJobs?.[0];
+        if (latestJob && !['COMPLETED', 'COMPLETE', 'FAILED'].includes(latestJob.status.toUpperCase())) return true;
+        return false;
+      });
+      return hasActive ? 5000 : false;
+    },
+  });
+}
+
+const PAGE_SIZE = 25;
+
+// Cursor-paginated variant of the document queue, for the "Load more" control.
+// Separate from useCorpusDocumentsWithPolling so ZoneReviewWorkspace's
+// useCorpusDocuments stays untouched. Polling refetches all loaded pages.
+export function useCorpusDocumentsInfinite(params?: {
+  publisher?: string;
+  contentType?: string;
+}) {
+  return useInfiniteQuery({
+    queryKey: [...CALIBRATION_KEYS.documents(params), 'infinite'],
+    queryFn: ({ pageParam }) =>
+      getCorpusDocuments({ ...params, limit: PAGE_SIZE, cursor: pageParam }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    refetchInterval: (query) => {
+      const pages =
+        (query.state.data as { pages: { documents: CorpusDocument[] }[] } | undefined)?.pages ?? [];
+      const docs = pages.flatMap((p) => p.documents);
+      const hasActive = docs.some((d) => {
         const latestRun = d.calibrationRuns?.[0];
         if (latestRun && !latestRun.completedAt) return true;
         const latestJob = d.bootstrapJobs?.[0];
