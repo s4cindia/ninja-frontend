@@ -120,6 +120,7 @@ export const startCalibration = async (payload: {
 
 export const getCalibrationRuns = async (params?: {
   documentId?: string;
+  type?: string;
   limit?: number;
   cursor?: string;
   fromDate?: string;
