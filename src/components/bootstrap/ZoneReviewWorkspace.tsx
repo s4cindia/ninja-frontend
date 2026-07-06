@@ -108,9 +108,13 @@ export default function ZoneReviewWorkspace({
   // Right panel URL: togglable between tagged and source
   const rightPanelUrl = rightPanelMode === 'tagged' ? taggedPdfUrl : sourcePdfUrl;
 
-  // Calibration data — fetch latest run if runId not provided
+  // Calibration data — fetch the latest CALIBRATION run if runId not provided.
+  // Filter by type: a doc that was also used in a non-calibration run (e.g. a
+  // PIKE_PDF_SPIKE run from the PDF write-spike) can have a newer run of that
+  // type carrying no operator zones; loading it shows "No zones on this page"
+  // even though the annotator's zones live on the CALIBRATION run.
   const { data: runsData } = useCalibrationRuns(
-    runIdProp ? undefined : { documentId: docId, limit: 1 },
+    runIdProp ? undefined : { documentId: docId, type: 'CALIBRATION', limit: 1 },
   );
   const runId = runIdProp || runsData?.runs?.[0]?.id || '';
 

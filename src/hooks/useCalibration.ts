@@ -42,6 +42,7 @@ export function useStartCalibration() {
 
 export function useCalibrationRuns(params?: {
   documentId?: string;
+  type?: string;
   limit?: number;
 }) {
   return useQuery({
