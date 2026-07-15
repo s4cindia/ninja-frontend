@@ -188,4 +188,44 @@ describe('ZoneOverlay', () => {
     const g = container.querySelector('g');
     expect(g?.getAttribute('style')).toContain('pointer-events: none');
   });
+
+  it('hides rejected zones by default', () => {
+    const { container } = render(
+      <ZoneOverlay
+        {...defaultProps}
+        zones={[makeZone({ id: 'z1', decision: 'REJECTED' })]}
+      />
+    );
+    expect(container.querySelectorAll('g').length).toBe(0);
+  });
+
+  it('shows rejected zones muted, with no number badge, when showRejected is on', () => {
+    const { container } = render(
+      <ZoneOverlay
+        {...defaultProps}
+        zones={[makeZone({ id: 'z1', decision: 'REJECTED' })]}
+        showRejected
+      />
+    );
+    const g = container.querySelector('g');
+    expect(g).toBeInTheDocument();
+    expect(g?.getAttribute('style')).toContain('opacity: 0.4');
+    expect(g?.querySelector('circle')).toBeNull();
+    const rect = g?.querySelector('rect');
+    expect(rect?.getAttribute('stroke')).toBe('#9ca3af');
+    expect(rect?.getAttribute('stroke-dasharray')).toBe('4 3');
+  });
+
+  it('non-rejected zones are unaffected by showRejected', () => {
+    const { container } = render(
+      <ZoneOverlay
+        {...defaultProps}
+        zones={[makeZone({ id: 'z1', reconciliationBucket: 'GREEN' })]}
+        showRejected
+      />
+    );
+    const g = container.querySelector('g');
+    expect(g?.getAttribute('style')).toContain('opacity: 1');
+    expect(g?.querySelector('circle')).not.toBeNull();
+  });
 });

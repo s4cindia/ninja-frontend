@@ -24,6 +24,7 @@ interface ZonePdfPanelProps {
   drawMode?: boolean;
   onDrawComplete?: (boundsPdf: { x: number; y: number; w: number; h: number }) => void;
   onRubberBandSelect?: (zoneIds: string[]) => void;
+  showRejected?: boolean;
 }
 
 const FALLBACK_WIDTH = 600;
@@ -57,6 +58,7 @@ function ZonePdfPanelInner({
   drawMode,
   onDrawComplete,
   onRubberBandSelect,
+  showRejected,
 }: ZonePdfPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isExternalScroll = useRef(false);
@@ -171,6 +173,7 @@ function ZonePdfPanelInner({
                   drawMode={drawMode}
                   onDrawComplete={onDrawComplete}
                   onRubberBandSelect={onRubberBandSelect}
+                  showRejected={showRejected}
                 />
               )}
             </div>
