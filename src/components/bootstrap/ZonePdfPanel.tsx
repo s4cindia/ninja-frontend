@@ -19,6 +19,11 @@ interface ZonePdfPanelProps {
   onDocumentLoad?: (numPages: number) => void;
   label: string;
   zoneNumberMap?: Map<string, number>;
+  selectedIds?: Set<string>;
+  onZoneToggle?: (zoneId: string) => void;
+  drawMode?: boolean;
+  onDrawComplete?: (boundsPdf: { x: number; y: number; w: number; h: number }) => void;
+  onRubberBandSelect?: (zoneIds: string[]) => void;
 }
 
 const FALLBACK_WIDTH = 600;
@@ -47,6 +52,11 @@ function ZonePdfPanelInner({
   onDocumentLoad,
   label,
   zoneNumberMap,
+  selectedIds,
+  onZoneToggle,
+  drawMode,
+  onDrawComplete,
+  onRubberBandSelect,
 }: ZonePdfPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isExternalScroll = useRef(false);
@@ -156,6 +166,11 @@ function ZonePdfPanelInner({
                   onZoneClick={onZoneClick}
                   source={source}
                   zoneNumberMap={zoneNumberMap}
+                  selectedIds={selectedIds}
+                  onZoneToggle={onZoneToggle}
+                  drawMode={drawMode}
+                  onDrawComplete={onDrawComplete}
+                  onRubberBandSelect={onRubberBandSelect}
                 />
               )}
             </div>

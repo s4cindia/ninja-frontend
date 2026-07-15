@@ -11,6 +11,8 @@ import {
   correctZone,
   rejectZone,
   confirmAllGreen,
+  bulkRejectZones,
+  createZone,
   runAutoAnnotation,
   runAiAnnotation,
   runComparison,
@@ -143,6 +145,24 @@ export function useConfirmAllGreen(runId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => confirmAllGreen(runId),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['calibration', 'zones', runId] }),
+  });
+}
+
+export function useBulkRejectZones(runId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: bulkRejectZones,
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['calibration', 'zones', runId] }),
+  });
+}
+
+export function useCreateZone(runId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Parameters<typeof createZone>[1]) => createZone(runId, payload),
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ['calibration', 'zones', runId] }),
   });

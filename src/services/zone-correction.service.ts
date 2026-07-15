@@ -54,6 +54,19 @@ export const confirmAllGreen = async (
 ): Promise<{ confirmedCount: number }> =>
   (await api.post(`/calibration/runs/${encodeURIComponent(runId)}/confirm-all-green`)).data.data;
 
+export const bulkRejectZones = async (
+  payload:
+    | { zoneIds: string[]; correctionReason?: string }
+    | { filter: { calibrationRunId: string; pageNumber?: number; operatorLabel?: string }; correctionReason?: string },
+): Promise<{ rejectedCount: number }> =>
+  (await api.post('/calibration/zones/bulk-reject', payload)).data.data;
+
+export const createZone = async (
+  runId: string,
+  payload: { pageNumber: number; operatorLabel: string; bounds: { x: number; y: number; w: number; h: number }; type?: string },
+): Promise<CalibrationZone> =>
+  (await api.post(`/calibration/runs/${encodeURIComponent(runId)}/zones`, payload)).data.data;
+
 export interface AutoAnnotationResult {
   runId: string;
   patternsApplied: {

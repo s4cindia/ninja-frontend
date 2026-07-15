@@ -1,6 +1,13 @@
-import { memo } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { CalibrationZone } from '../../services/zone-correction.service';
 import { friendlyLabel } from './zone-label-utils';
+
+interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
 
 interface ZoneOverlayProps {
   zones: CalibrationZone[];
@@ -11,6 +18,20 @@ interface ZoneOverlayProps {
   onZoneClick: (zoneId: string) => void;
   source?: 'docling' | 'pdfxt';
   zoneNumberMap?: Map<string, number>;
+  /** Ids currently held in the multi-select set (Shift/Ctrl-click or rubber-band). */
+  selectedIds?: Set<string>;
+  /** Shift/Ctrl-click on a zone toggles it in/out of `selectedIds`. */
+  onZoneToggle?: (zoneId: string) => void;
+  /** When true, zone rects stop intercepting pointer events so a drag anywhere
+   * on the page draws a new box instead of interacting with existing zones. */
+  drawMode?: boolean;
+  /** Fired on mouseup in draw mode with the dragged rectangle already converted
+   * to PDF points (using this overlay's own scaleX/scaleY). Tiny drags (<4px in
+   * either dimension) are ignored and never fire this callback. */
+  onDrawComplete?: (boundsPdf: Rect) => void;
+  /** Fired on mouseup after a non-draw-mode drag over empty space, with the ids
+   * of every zone whose bounds intersect the dragged rectangle. */
+  onRubberBandSelect?: (zoneIds: string[]) => void;
 }
 
 const BUCKET_STYLE = {
@@ -19,6 +40,12 @@ const BUCKET_STYLE = {
   RED: { stroke: '#dc2626', fill: 'rgba(220,38,38,0.08)' },
 };
 
+const MULTI_SELECT_STROKE = '#2563eb';
+const MIN_DRAG_PX = 4;
+
+function rectsIntersect(a: Rect, b: Rect): boolean {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
 
 function ZoneOverlayInner({
   zones,
@@ -29,30 +56,124 @@ function ZoneOverlayInner({
   onZoneClick,
   source,
   zoneNumberMap,
+  selectedIds,
+  onZoneToggle,
+  drawMode,
+  onDrawComplete,
+  onRubberBandSelect,
 }: ZoneOverlayProps) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const dragLatestRef = useRef<Rect | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [liveRect, setLiveRect] = useState<Rect | null>(null);
+
+  const pageZones = zones.filter((z) => z.pageNumber === pageNumber && z.bounds != null) as Array<
+    CalibrationZone & { bounds: NonNullable<CalibrationZone['bounds']> }
+  >;
+
+  const handleBackgroundMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const start = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    dragStartRef.current = start;
+    dragLatestRef.current = { ...start, w: 0, h: 0 };
+    setLiveRect(dragLatestRef.current);
+    setIsDragging(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMove = (e: MouseEvent) => {
+      const svg = svgRef.current;
+      const start = dragStartRef.current;
+      if (!svg || !start) return;
+      const rect = svg.getBoundingClientRect();
+      const curX = e.clientX - rect.left;
+      const curY = e.clientY - rect.top;
+      const next: Rect = {
+        x: Math.min(start.x, curX),
+        y: Math.min(start.y, curY),
+        w: Math.abs(curX - start.x),
+        h: Math.abs(curY - start.y),
+      };
+      dragLatestRef.current = next;
+      setLiveRect(next);
+    };
+
+    const handleUp = () => {
+      const finalRect = dragLatestRef.current;
+      setIsDragging(false);
+      setLiveRect(null);
+      dragStartRef.current = null;
+      dragLatestRef.current = null;
+
+      if (!finalRect || finalRect.w < MIN_DRAG_PX || finalRect.h < MIN_DRAG_PX) return;
+
+      if (drawMode) {
+        onDrawComplete?.({
+          x: finalRect.x / scaleX,
+          y: finalRect.y / scaleY,
+          w: finalRect.w / scaleX,
+          h: finalRect.h / scaleY,
+        });
+      } else if (onRubberBandSelect) {
+        const ids = pageZones
+          .filter((z) => {
+            const zw = Math.abs(z.bounds.w) * scaleX;
+            const zh = Math.abs(z.bounds.h) * scaleY;
+            const zx = (z.bounds.w < 0 ? z.bounds.x + z.bounds.w : z.bounds.x) * scaleX;
+            const zy = (z.bounds.h < 0 ? z.bounds.y + z.bounds.h : z.bounds.y) * scaleY;
+            return rectsIntersect(finalRect, { x: zx, y: zy, w: zw, h: zh });
+          })
+          .map((z) => z.id);
+        if (ids.length > 0) onRubberBandSelect(ids);
+      }
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    };
+    // pageZones is derived fresh each render from `zones`/`pageNumber`; including
+    // the array itself would re-subscribe every render, so its inputs stand in.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDragging, drawMode, onDrawComplete, onRubberBandSelect, zones, pageNumber, scaleX, scaleY]);
+
   if (scaleX <= 0 || scaleY <= 0) {
     return null;
   }
 
   // Filter zones by source if specified
   const displayZones = source
-    ? zones.filter((z) =>
+    ? pageZones.filter((z) =>
         source === 'docling' ? z.doclingLabel != null : z.pdfxtLabel != null,
       )
-    : zones;
+    : pageZones;
 
   return (
     <svg
+      ref={svgRef}
       width="100%"
       height="100%"
       style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
       aria-label="Zone detection overlay"
     >
-      {displayZones
-        .filter((z): z is CalibrationZone & { bounds: NonNullable<CalibrationZone['bounds']> } =>
-          z.pageNumber === pageNumber && z.bounds != null,
-        )
-        .map((zone, index) => {
+      <rect
+        x={0}
+        y={0}
+        width="100%"
+        height="100%"
+        fill="transparent"
+        style={{ pointerEvents: 'all', cursor: drawMode ? 'crosshair' : 'default' }}
+        onMouseDown={handleBackgroundMouseDown}
+      />
+      {displayZones.map((zone, index) => {
           const zoneNumber = zoneNumberMap?.get(zone.id) ?? index + 1;
           const rawW = Math.abs(zone.bounds.w) * scaleX;
           const rawH = Math.abs(zone.bounds.h) * scaleY;
@@ -62,16 +183,21 @@ function ZoneOverlayInner({
           const h = rawH;
 
           const isSelected = zone.id === selectedZoneId;
+          const isMultiSelected = selectedIds?.has(zone.id) ?? false;
           const isVerified = zone.operatorVerified;
           const bucketStyle =
             BUCKET_STYLE[zone.reconciliationBucket as keyof typeof BUCKET_STYLE];
-          const strokeColor = isVerified
-            ? '#0f766e'
-            : bucketStyle?.stroke ?? '#6b7280';
-          const fillColor = isVerified
-            ? 'rgba(15,118,110,0.12)'
-            : bucketStyle?.fill ?? 'rgba(0,0,0,0.05)';
-          const strokeWidth = isSelected ? 3 : 1.5;
+          const strokeColor = isMultiSelected
+            ? MULTI_SELECT_STROKE
+            : isVerified
+              ? '#0f766e'
+              : bucketStyle?.stroke ?? '#6b7280';
+          const fillColor = isMultiSelected
+            ? 'rgba(37,99,235,0.15)'
+            : isVerified
+              ? 'rgba(15,118,110,0.12)'
+              : bucketStyle?.fill ?? 'rgba(0,0,0,0.05)';
+          const strokeWidth = isSelected || isMultiSelected ? 3 : 1.5;
 
           const abbrev = source ? friendlyLabel(zone, source) : '?';
           const badgeText = `#${zoneNumber} ${abbrev}`;
@@ -80,15 +206,27 @@ function ZoneOverlayInner({
           return (
             <g
               key={zone.id}
-              style={{ pointerEvents: 'all', cursor: 'pointer' }}
+              style={{ pointerEvents: drawMode ? 'none' : 'all', cursor: 'pointer' }}
               role="button"
               aria-label={`Zone ${zoneNumber}: ${abbrev}, ${zone.reconciliationBucket}`}
+              aria-pressed={isMultiSelected}
               tabIndex={0}
-              onClick={() => onZoneClick(zone.id)}
+              onClick={(e) => {
+                if ((e.shiftKey || e.ctrlKey || e.metaKey) && onZoneToggle) {
+                  e.stopPropagation();
+                  onZoneToggle(zone.id);
+                } else {
+                  onZoneClick(zone.id);
+                }
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  onZoneClick(zone.id);
+                  if ((e.shiftKey || e.ctrlKey) && onZoneToggle) {
+                    onZoneToggle(zone.id);
+                  } else {
+                    onZoneClick(zone.id);
+                  }
                 }
               }}
             >
@@ -171,6 +309,19 @@ function ZoneOverlayInner({
             </g>
           );
         })}
+      {liveRect && (
+        <rect
+          x={liveRect.x}
+          y={liveRect.y}
+          width={liveRect.w}
+          height={liveRect.h}
+          fill={drawMode ? 'rgba(37,99,235,0.1)' : 'rgba(107,114,128,0.1)'}
+          stroke={drawMode ? MULTI_SELECT_STROKE : '#6b7280'}
+          strokeWidth={1.5}
+          strokeDasharray="4 3"
+          style={{ pointerEvents: 'none' }}
+        />
+      )}
     </svg>
   );
 }

@@ -65,7 +65,7 @@ describe('ZoneOverlay', () => {
         zones={[makeZone({ reconciliationBucket: 'GREEN' })]}
       />
     );
-    const rect = container.querySelector('rect');
+    const rect = container.querySelector('g rect');
     expect(rect?.getAttribute('stroke')).toBe('#16a34a');
   });
 
@@ -76,7 +76,7 @@ describe('ZoneOverlay', () => {
         zones={[makeZone({ reconciliationBucket: 'AMBER' })]}
       />
     );
-    const rect = container.querySelector('rect');
+    const rect = container.querySelector('g rect');
     expect(rect?.getAttribute('stroke')).toBe('#d97706');
   });
 
@@ -87,7 +87,7 @@ describe('ZoneOverlay', () => {
         zones={[makeZone({ reconciliationBucket: 'RED' })]}
       />
     );
-    const rect = container.querySelector('rect');
+    const rect = container.querySelector('g rect');
     expect(rect?.getAttribute('stroke')).toBe('#dc2626');
   });
 
@@ -99,7 +99,7 @@ describe('ZoneOverlay', () => {
         selectedZoneId="z1"
       />
     );
-    const rect = container.querySelector('rect');
+    const rect = container.querySelector('g rect');
     expect(rect?.getAttribute('stroke-width')).toBe('3');
   });
 
@@ -129,5 +129,63 @@ describe('ZoneOverlay', () => {
     const g = container.querySelector('g');
     fireEvent.keyDown(g!, { key: 'Enter' });
     expect(onZoneClick).toHaveBeenCalledWith('z-enter');
+  });
+
+  it('shift-click on a zone calls onZoneToggle instead of onZoneClick', () => {
+    const onZoneClick = vi.fn();
+    const onZoneToggle = vi.fn();
+    const { container } = render(
+      <ZoneOverlay
+        {...defaultProps}
+        zones={[makeZone({ id: 'z-shift' })]}
+        onZoneClick={onZoneClick}
+        onZoneToggle={onZoneToggle}
+      />
+    );
+    const g = container.querySelector('g');
+    fireEvent.click(g!, { shiftKey: true });
+    expect(onZoneToggle).toHaveBeenCalledWith('z-shift');
+    expect(onZoneClick).not.toHaveBeenCalled();
+  });
+
+  it('ctrl-click on a zone calls onZoneToggle instead of onZoneClick', () => {
+    const onZoneClick = vi.fn();
+    const onZoneToggle = vi.fn();
+    const { container } = render(
+      <ZoneOverlay
+        {...defaultProps}
+        zones={[makeZone({ id: 'z-ctrl' })]}
+        onZoneClick={onZoneClick}
+        onZoneToggle={onZoneToggle}
+      />
+    );
+    const g = container.querySelector('g');
+    fireEvent.click(g!, { ctrlKey: true });
+    expect(onZoneToggle).toHaveBeenCalledWith('z-ctrl');
+    expect(onZoneClick).not.toHaveBeenCalled();
+  });
+
+  it('multi-selected zone has blue stroke colour', () => {
+    const { container } = render(
+      <ZoneOverlay
+        {...defaultProps}
+        zones={[makeZone({ id: 'z1', reconciliationBucket: 'GREEN' })]}
+        selectedIds={new Set(['z1'])}
+      />
+    );
+    const rect = container.querySelector('g rect');
+    expect(rect?.getAttribute('stroke')).toBe('#2563eb');
+  });
+
+  it('draw mode disables pointer events on zone groups', () => {
+    const { container } = render(
+      <ZoneOverlay
+        {...defaultProps}
+        zones={[makeZone({ id: 'z1' })]}
+        drawMode
+      />
+    );
+    const g = container.querySelector('g');
+    expect(g?.getAttribute('style')).toContain('pointer-events: none');
   });
 });

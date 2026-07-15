@@ -16,6 +16,8 @@ import {
   useCorrectZone,
   useRejectZone,
   useConfirmAllGreen,
+  useBulkRejectZones,
+  useCreateZone,
   useAutoAnnotate,
   useRunComparison,
 } from '@/hooks/useZoneReview';
@@ -34,6 +36,7 @@ import ZoneListSidebar from './ZoneListSidebar';
 import { EmptyPagesChip } from './EmptyPagesChip';
 import { EmptyPageReviewSidebar } from './EmptyPageReviewSidebar';
 import { MarkCompleteModal, type MarkCompleteRequest } from './MarkCompleteModal';
+import ZoneLabelDropdown from './ZoneLabelDropdown';
 import { useZoneNumberMap } from '@/hooks/useZoneNumberMap';
 import { TableStructureEditor } from '../quickfix/TableStructureEditor';
 import type { TableSection } from '@/types/zone.types';
@@ -42,6 +45,13 @@ import type { CalibrationZone } from '@/services/zone-correction.service';
 pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
 
 type BucketFilter = 'ALL' | 'GREEN' | 'AMBER' | 'RED';
+
+// Best-available raw label for a zone — same fallback precedence used
+// elsewhere (e.g. ZoneComparisonDetailBar's decision dropdown), so "reject
+// all remaining <label>" matches what the operator sees on screen.
+function effectiveZoneLabel(zone: CalibrationZone): string {
+  return zone.operatorLabel ?? zone.pdfxtLabel ?? zone.doclingLabel ?? zone.type;
+}
 
 interface ZoneReviewWorkspaceProps {
   documentId: string;
@@ -87,6 +97,17 @@ export default function ZoneReviewWorkspace({
   const [completeBanner, setCompleteBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [analysisGenerated, setAnalysisGenerated] = useState(false);
   const [markCompleteModalOpen, setMarkCompleteModalOpen] = useState(false);
+
+  // Multi-select (Shift/Ctrl-click or rubber-band) — "Reject selected"
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Draw-box mode — drag a new zone directly onto the page
+  const [drawMode, setDrawMode] = useState(false);
+  const [pendingDraw, setPendingDraw] = useState<{
+    pageNumber: number;
+    bounds: { x: number; y: number; w: number; h: number };
+  } | null>(null);
+  const [drawOperatorLabel, setDrawOperatorLabel] = useState('formula');
+  const [rejectAllLabel, setRejectAllLabel] = useState('formula');
 
   // Keep page input in sync with currentPage (arrow buttons, thumbnail clicks, etc.)
   useEffect(() => {
@@ -145,6 +166,8 @@ export default function ZoneReviewWorkspace({
   const correctZone = useCorrectZone(runId);
   const rejectZone = useRejectZone(runId);
   const confirmAllGreen = useConfirmAllGreen(runId);
+  const bulkRejectZones = useBulkRejectZones(runId);
+  const createZone = useCreateZone(runId);
   const autoAnnotateMutation = useAutoAnnotate(runId);
   const comparisonMutation = useRunComparison(runId);
 
@@ -188,6 +211,16 @@ export default function ZoneReviewWorkspace({
 
   // Selected zone number
   const selectedZoneNumber = selectedZone ? zoneNumberMap.get(selectedZone.id) ?? undefined : undefined;
+
+  // Count of zones on the current page matching `rejectAllLabel` — drives the
+  // "Reject all remaining <label>" button's enabled state and count preview.
+  const rejectAllCount = useMemo(
+    () =>
+      zones.filter(
+        (z) => z.pageNumber === currentPage && effectiveZoneLabel(z) === rejectAllLabel,
+      ).length,
+    [zones, currentPage, rejectAllLabel],
+  );
 
   // Per-page zone counts
   const pageZoneCounts = useMemo(() => {
@@ -263,6 +296,66 @@ export default function ZoneReviewWorkspace({
     });
   }, [confirmAllGreen, recordBulkDecision]);
 
+  const handleZoneToggle = useCallback((zoneId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(zoneId)) next.delete(zoneId);
+      else next.add(zoneId);
+      return next;
+    });
+  }, []);
+
+  const handleRubberBandSelect = useCallback((zoneIds: string[]) => {
+    setSelectedIds(new Set(zoneIds));
+  }, []);
+
+  const handleRejectSelected = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    bulkRejectZones.mutate(
+      { zoneIds: [...selectedIds] },
+      {
+        onSuccess: (data) => {
+          recordBulkDecision(data?.rejectedCount ?? count, 'reject');
+          setSelectedIds(new Set());
+        },
+      },
+    );
+  }, [selectedIds, bulkRejectZones, recordBulkDecision]);
+
+  const handleRejectAllOnPage = useCallback(() => {
+    if (!runId || rejectAllCount === 0) return;
+    const confirmed = window.confirm(
+      `Reject all ${rejectAllCount} ${rejectAllLabel} zone${rejectAllCount === 1 ? '' : 's'} on page ${currentPage}?`,
+    );
+    if (!confirmed) return;
+    bulkRejectZones.mutate(
+      { filter: { calibrationRunId: runId, pageNumber: currentPage, operatorLabel: rejectAllLabel } },
+      {
+        onSuccess: (data) => {
+          if (data?.rejectedCount) recordBulkDecision(data.rejectedCount, 'reject');
+        },
+      },
+    );
+  }, [runId, rejectAllCount, rejectAllLabel, currentPage, bulkRejectZones, recordBulkDecision]);
+
+  const handleDrawComplete = useCallback(
+    (boundsPdf: { x: number; y: number; w: number; h: number }) => {
+      setPendingDraw({ pageNumber: currentPage, bounds: boundsPdf });
+    },
+    [currentPage],
+  );
+
+  const handleConfirmDraw = useCallback(() => {
+    if (!pendingDraw) return;
+    createZone.mutate(
+      { pageNumber: pendingDraw.pageNumber, operatorLabel: drawOperatorLabel, bounds: pendingDraw.bounds },
+      { onSuccess: () => setPendingDraw(null) },
+    );
+  }, [pendingDraw, drawOperatorLabel, createZone]);
+
+  const handleCancelDraw = useCallback(() => setPendingDraw(null), []);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -281,6 +374,8 @@ export default function ZoneReviewWorkspace({
         handleReject(selectedZoneId);
       } else if (e.key === 'Escape') {
         setSelectedZoneId(null);
+        setSelectedIds(new Set());
+        setPendingDraw(null);
       }
     };
     window.addEventListener('keydown', handler);
@@ -290,6 +385,14 @@ export default function ZoneReviewWorkspace({
   // Reset scroll when page changes
   useEffect(() => {
     setSyncedScrollTop(0);
+  }, [currentPage]);
+
+  // Multi-select and any in-progress draw are page-scoped — carrying them
+  // across a page navigation would silently apply to zones the operator
+  // can no longer see.
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setPendingDraw(null);
   }, [currentPage]);
 
   // Measure right panel width — only update on meaningful changes
@@ -507,6 +610,53 @@ export default function ZoneReviewWorkspace({
               </button>
             </>
           )}
+
+          {/* Draw box mode */}
+          <button
+            onClick={() => setDrawMode((v) => !v)}
+            className={`px-3 py-1.5 text-xs font-medium rounded border transition-colors ${
+              drawMode
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+            }`}
+            title="Drag on the page to draw a new zone"
+          >
+            {drawMode ? 'Drawing… (click to stop)' : 'Draw box'}
+          </button>
+
+          {/* Multi-select: Shift/Ctrl-click a zone, or drag over empty space */}
+          {selectedIds.size > 0 && (
+            <>
+              <button
+                onClick={handleRejectSelected}
+                disabled={bulkRejectZones.isPending}
+                className="px-3 py-1.5 text-xs font-medium rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {bulkRejectZones.isPending ? 'Rejecting…' : `Reject selected (${selectedIds.size})`}
+              </button>
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="text-xs text-gray-400 hover:text-gray-600"
+              >
+                Clear
+              </button>
+            </>
+          )}
+
+          {/* Reject all remaining <label> on this page */}
+          <div className="flex items-center gap-1">
+            <div className="w-32">
+              <ZoneLabelDropdown value={rejectAllLabel} onChange={setRejectAllLabel} />
+            </div>
+            <button
+              onClick={handleRejectAllOnPage}
+              disabled={rejectAllCount === 0 || bulkRejectZones.isPending}
+              title={`Reject all ${rejectAllLabel} zones on page ${currentPage}`}
+              className="px-3 py-1.5 text-xs font-medium rounded border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Reject all ({rejectAllCount})
+            </button>
+          </div>
 
           {/* Confirm All Green (hidden for OPERATOR) */}
           {!isOperator && (
@@ -849,6 +999,11 @@ export default function ZoneReviewWorkspace({
           onDocumentLoad={setNumPages}
           label="Docling — Source PDF"
           zoneNumberMap={zoneNumberMap}
+          selectedIds={selectedIds}
+          onZoneToggle={handleZoneToggle}
+          drawMode={drawMode}
+          onDrawComplete={handleDrawComplete}
+          onRubberBandSelect={handleRubberBandSelect}
         />
 
         {/* Right panel: Tagged PDF (default) + pdfxt zones */}
@@ -890,6 +1045,11 @@ export default function ZoneReviewWorkspace({
                     onZoneClick={setSelectedZoneId}
                     width={(rightPanelWidth || 600) - 16}
                     zoneNumberMap={zoneNumberMap}
+                    selectedIds={selectedIds}
+                    onZoneToggle={handleZoneToggle}
+                    drawMode={drawMode}
+                    onDrawComplete={handleDrawComplete}
+                    onRubberBandSelect={handleRubberBandSelect}
                   />
                 </div>
               </div>
@@ -939,6 +1099,47 @@ export default function ZoneReviewWorkspace({
         />
       )}
 
+      {/* New-zone label prompt — shown after a draw-box drag completes */}
+      {pendingDraw && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !createZone.isPending) handleCancelDraw();
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="new-zone-title"
+        >
+          <div className="bg-white rounded-lg shadow-xl w-80 mx-4 p-4">
+            <h3 id="new-zone-title" className="text-sm font-semibold text-gray-900 mb-3">
+              New zone — page {pendingDraw.pageNumber}
+            </h3>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Zone type</label>
+            <ZoneLabelDropdown
+              value={drawOperatorLabel}
+              onChange={setDrawOperatorLabel}
+              disabled={createZone.isPending}
+            />
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={handleCancelDraw}
+                disabled={createZone.isPending}
+                className="px-3 py-1.5 text-xs font-medium rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDraw}
+                disabled={createZone.isPending}
+                className="px-3 py-1.5 text-xs font-medium rounded bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50"
+              >
+                {createZone.isPending ? 'Creating…' : 'Create Zone'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Table editor modal */}
       {tableEditorZone && (
         <TableStructureEditor
@@ -986,6 +1187,11 @@ function RightPanelPdf({
   onZoneClick,
   width,
   zoneNumberMap,
+  selectedIds,
+  onZoneToggle,
+  drawMode,
+  onDrawComplete,
+  onRubberBandSelect,
 }: {
   pdfUrl: string;
   page: number;
@@ -994,6 +1200,11 @@ function RightPanelPdf({
   onZoneClick: (zoneId: string) => void;
   width: number;
   zoneNumberMap?: Map<string, number>;
+  selectedIds?: Set<string>;
+  onZoneToggle?: (zoneId: string) => void;
+  drawMode?: boolean;
+  onDrawComplete?: (boundsPdf: { x: number; y: number; w: number; h: number }) => void;
+  onRubberBandSelect?: (zoneIds: string[]) => void;
 }) {
   const [pageHeight, setPageHeight] = useState(0);
   const [pdfWidth, setPdfWidth] = useState(595);
@@ -1043,6 +1254,11 @@ function RightPanelPdf({
           onZoneClick={onZoneClick}
           source="pdfxt"
           zoneNumberMap={zoneNumberMap}
+          selectedIds={selectedIds}
+          onZoneToggle={onZoneToggle}
+          drawMode={drawMode}
+          onDrawComplete={onDrawComplete}
+          onRubberBandSelect={onRubberBandSelect}
         />
       )}
     </>
