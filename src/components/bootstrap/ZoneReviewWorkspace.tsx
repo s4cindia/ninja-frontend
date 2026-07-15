@@ -108,6 +108,8 @@ export default function ZoneReviewWorkspace({
   } | null>(null);
   const [drawOperatorLabel, setDrawOperatorLabel] = useState('formula');
   const [rejectAllLabel, setRejectAllLabel] = useState('formula');
+  const [showRejected, setShowRejected] = useState(false);
+  const [rejectToast, setRejectToast] = useState<string | null>(null);
 
   // Keep page input in sync with currentPage (arrow buttons, thumbnail clicks, etc.)
   useEffect(() => {
@@ -212,12 +214,16 @@ export default function ZoneReviewWorkspace({
   // Selected zone number
   const selectedZoneNumber = selectedZone ? zoneNumberMap.get(selectedZone.id) ?? undefined : undefined;
 
-  // Count of zones on the current page matching `rejectAllLabel` — drives the
-  // "Reject all remaining <label>" button's enabled state and count preview.
+  // Count of *active* (not already-rejected) zones on the current page matching
+  // `rejectAllLabel` — drives the "Reject all remaining <label>" button's
+  // enabled state and count preview.
   const rejectAllCount = useMemo(
     () =>
       zones.filter(
-        (z) => z.pageNumber === currentPage && effectiveZoneLabel(z) === rejectAllLabel,
+        (z) =>
+          z.pageNumber === currentPage &&
+          effectiveZoneLabel(z) === rejectAllLabel &&
+          z.decision !== 'REJECTED',
       ).length,
     [zones, currentPage, rejectAllLabel],
   );
@@ -309,6 +315,11 @@ export default function ZoneReviewWorkspace({
     setSelectedIds(new Set(zoneIds));
   }, []);
 
+  const showRejectToast = useCallback((n: number) => {
+    setRejectToast(`Rejected ${n} zone${n === 1 ? '' : 's'}`);
+    setTimeout(() => setRejectToast(null), 4000);
+  }, []);
+
   const handleRejectSelected = useCallback(() => {
     if (selectedIds.size === 0) return;
     const count = selectedIds.size;
@@ -316,12 +327,14 @@ export default function ZoneReviewWorkspace({
       { zoneIds: [...selectedIds] },
       {
         onSuccess: (data) => {
-          recordBulkDecision(data?.rejectedCount ?? count, 'reject');
+          const rejectedCount = data?.rejectedCount ?? count;
+          recordBulkDecision(rejectedCount, 'reject');
+          showRejectToast(rejectedCount);
           setSelectedIds(new Set());
         },
       },
     );
-  }, [selectedIds, bulkRejectZones, recordBulkDecision]);
+  }, [selectedIds, bulkRejectZones, recordBulkDecision, showRejectToast]);
 
   const handleRejectAllOnPage = useCallback(() => {
     if (!runId || rejectAllCount === 0) return;
@@ -333,11 +346,14 @@ export default function ZoneReviewWorkspace({
       { filter: { calibrationRunId: runId, pageNumber: currentPage, operatorLabel: rejectAllLabel } },
       {
         onSuccess: (data) => {
-          if (data?.rejectedCount) recordBulkDecision(data.rejectedCount, 'reject');
+          if (data?.rejectedCount) {
+            recordBulkDecision(data.rejectedCount, 'reject');
+            showRejectToast(data.rejectedCount);
+          }
         },
       },
     );
-  }, [runId, rejectAllCount, rejectAllLabel, currentPage, bulkRejectZones, recordBulkDecision]);
+  }, [runId, rejectAllCount, rejectAllLabel, currentPage, bulkRejectZones, recordBulkDecision, showRejectToast]);
 
   const handleDrawComplete = useCallback(
     (boundsPdf: { x: number; y: number; w: number; h: number }) => {
@@ -658,6 +674,19 @@ export default function ZoneReviewWorkspace({
             </button>
           </div>
 
+          {/* Show rejected zones (muted) */}
+          <button
+            onClick={() => setShowRejected((v) => !v)}
+            className={`px-3 py-1.5 text-xs font-medium rounded border transition-colors ${
+              showRejected
+                ? 'bg-gray-700 text-white border-gray-700'
+                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+            }`}
+            title="Toggle visibility of rejected zones"
+          >
+            {showRejected ? 'Hide rejected' : 'Show rejected'}
+          </button>
+
           {/* Confirm All Green (hidden for OPERATOR) */}
           {!isOperator && (
             <button
@@ -943,6 +972,19 @@ export default function ZoneReviewWorkspace({
         </div>
       )}
 
+      {/* Bulk-reject toast */}
+      {rejectToast && (
+        <div className="flex items-center justify-between px-4 py-2 bg-red-50 border-b border-red-200 text-sm text-red-800">
+          <span>{rejectToast}</span>
+          <button
+            onClick={() => setRejectToast(null)}
+            className="text-red-600 hover:text-red-800 text-lg leading-none"
+          >
+            &times;
+          </button>
+        </div>
+      )}
+
       {/* Mark-complete banner */}
       {completeBanner && (
         <div className={`flex items-center justify-between px-4 py-2 border-b text-sm ${
@@ -1004,6 +1046,7 @@ export default function ZoneReviewWorkspace({
           drawMode={drawMode}
           onDrawComplete={handleDrawComplete}
           onRubberBandSelect={handleRubberBandSelect}
+          showRejected={showRejected}
         />
 
         {/* Right panel: Tagged PDF (default) + pdfxt zones */}
@@ -1050,6 +1093,7 @@ export default function ZoneReviewWorkspace({
                     drawMode={drawMode}
                     onDrawComplete={handleDrawComplete}
                     onRubberBandSelect={handleRubberBandSelect}
+                    showRejected={showRejected}
                   />
                 </div>
               </div>
@@ -1192,6 +1236,7 @@ function RightPanelPdf({
   drawMode,
   onDrawComplete,
   onRubberBandSelect,
+  showRejected,
 }: {
   pdfUrl: string;
   page: number;
@@ -1205,6 +1250,7 @@ function RightPanelPdf({
   drawMode?: boolean;
   onDrawComplete?: (boundsPdf: { x: number; y: number; w: number; h: number }) => void;
   onRubberBandSelect?: (zoneIds: string[]) => void;
+  showRejected?: boolean;
 }) {
   const [pageHeight, setPageHeight] = useState(0);
   const [pdfWidth, setPdfWidth] = useState(595);
@@ -1259,6 +1305,7 @@ function RightPanelPdf({
           drawMode={drawMode}
           onDrawComplete={onDrawComplete}
           onRubberBandSelect={onRubberBandSelect}
+          showRejected={showRejected}
         />
       )}
     </>

@@ -32,6 +32,8 @@ interface ZoneOverlayProps {
   /** Fired on mouseup after a non-draw-mode drag over empty space, with the ids
    * of every zone whose bounds intersect the dragged rectangle. */
   onRubberBandSelect?: (zoneIds: string[]) => void;
+  /** When true, rejected zones render muted instead of being hidden. Default off. */
+  showRejected?: boolean;
 }
 
 const BUCKET_STYLE = {
@@ -61,6 +63,7 @@ function ZoneOverlayInner({
   drawMode,
   onDrawComplete,
   onRubberBandSelect,
+  showRejected,
 }: ZoneOverlayProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -68,9 +71,12 @@ function ZoneOverlayInner({
   const [isDragging, setIsDragging] = useState(false);
   const [liveRect, setLiveRect] = useState<Rect | null>(null);
 
-  const pageZones = zones.filter((z) => z.pageNumber === pageNumber && z.bounds != null) as Array<
-    CalibrationZone & { bounds: NonNullable<CalibrationZone['bounds']> }
-  >;
+  const pageZones = zones.filter(
+    (z) =>
+      z.pageNumber === pageNumber &&
+      z.bounds != null &&
+      (showRejected || z.decision !== 'REJECTED'),
+  ) as Array<CalibrationZone & { bounds: NonNullable<CalibrationZone['bounds']> }>;
 
   const handleBackgroundMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -122,6 +128,7 @@ function ZoneOverlayInner({
         });
       } else if (onRubberBandSelect) {
         const ids = pageZones
+          .filter((z) => z.decision !== 'REJECTED')
           .filter((z) => {
             const zw = Math.abs(z.bounds.w) * scaleX;
             const zh = Math.abs(z.bounds.h) * scaleY;
@@ -140,10 +147,10 @@ function ZoneOverlayInner({
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
     };
-    // pageZones is derived fresh each render from `zones`/`pageNumber`; including
-    // the array itself would re-subscribe every render, so its inputs stand in.
+    // pageZones is derived fresh each render from `zones`/`pageNumber`/`showRejected`;
+    // including the array itself would re-subscribe every render, so its inputs stand in.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDragging, drawMode, onDrawComplete, onRubberBandSelect, zones, pageNumber, scaleX, scaleY]);
+  }, [isDragging, drawMode, onDrawComplete, onRubberBandSelect, zones, pageNumber, scaleX, scaleY, showRejected]);
 
   if (scaleX <= 0 || scaleY <= 0) {
     return null;
@@ -185,18 +192,23 @@ function ZoneOverlayInner({
           const isSelected = zone.id === selectedZoneId;
           const isMultiSelected = selectedIds?.has(zone.id) ?? false;
           const isVerified = zone.operatorVerified;
+          const isRejected = zone.decision === 'REJECTED';
           const bucketStyle =
             BUCKET_STYLE[zone.reconciliationBucket as keyof typeof BUCKET_STYLE];
-          const strokeColor = isMultiSelected
-            ? MULTI_SELECT_STROKE
-            : isVerified
-              ? '#0f766e'
-              : bucketStyle?.stroke ?? '#6b7280';
-          const fillColor = isMultiSelected
-            ? 'rgba(37,99,235,0.15)'
-            : isVerified
-              ? 'rgba(15,118,110,0.12)'
-              : bucketStyle?.fill ?? 'rgba(0,0,0,0.05)';
+          const strokeColor = isRejected
+            ? '#9ca3af'
+            : isMultiSelected
+              ? MULTI_SELECT_STROKE
+              : isVerified
+                ? '#0f766e'
+                : bucketStyle?.stroke ?? '#6b7280';
+          const fillColor = isRejected
+            ? 'rgba(156,163,175,0.08)'
+            : isMultiSelected
+              ? 'rgba(37,99,235,0.15)'
+              : isVerified
+                ? 'rgba(15,118,110,0.12)'
+                : bucketStyle?.fill ?? 'rgba(0,0,0,0.05)';
           const strokeWidth = isSelected || isMultiSelected ? 3 : 1.5;
 
           const abbrev = source ? friendlyLabel(zone, source) : '?';
@@ -206,9 +218,13 @@ function ZoneOverlayInner({
           return (
             <g
               key={zone.id}
-              style={{ pointerEvents: drawMode ? 'none' : 'all', cursor: 'pointer' }}
+              style={{
+                pointerEvents: drawMode ? 'none' : 'all',
+                cursor: 'pointer',
+                opacity: isRejected ? 0.4 : 1,
+              }}
               role="button"
-              aria-label={`Zone ${zoneNumber}: ${abbrev}, ${zone.reconciliationBucket}`}
+              aria-label={`Zone ${zoneNumber}: ${abbrev}, ${zone.reconciliationBucket}${isRejected ? ', rejected' : ''}`}
               aria-pressed={isMultiSelected}
               tabIndex={0}
               onClick={(e) => {
@@ -239,31 +255,36 @@ function ZoneOverlayInner({
                 stroke={strokeColor}
                 fill={fillColor}
                 strokeWidth={strokeWidth}
+                strokeDasharray={isRejected ? '4 3' : undefined}
                 rx={2}
               >
-                <title>{`#${zoneNumber} ${abbrev} · ${zone.reconciliationBucket}`}</title>
+                <title>{`#${zoneNumber} ${abbrev} · ${isRejected ? 'REJECTED' : zone.reconciliationBucket}`}</title>
               </rect>
-              {/* Number circle at top-left corner */}
-              <circle
-                cx={x + 10}
-                cy={y + 10}
-                r={9}
-                fill={strokeColor}
-                style={{ pointerEvents: 'none' }}
-              />
-              <text
-                x={x + 10}
-                y={y + 14}
-                fontSize={10}
-                fontWeight={700}
-                fill="white"
-                textAnchor="middle"
-                style={{ pointerEvents: 'none', userSelect: 'none' }}
-              >
-                {zoneNumber}
-              </text>
+              {/* Number circle at top-left corner — omitted for rejected zones */}
+              {!isRejected && (
+                <>
+                  <circle
+                    cx={x + 10}
+                    cy={y + 10}
+                    r={9}
+                    fill={strokeColor}
+                    style={{ pointerEvents: 'none' }}
+                  />
+                  <text
+                    x={x + 10}
+                    y={y + 14}
+                    fontSize={10}
+                    fontWeight={700}
+                    fill="white"
+                    textAnchor="middle"
+                    style={{ pointerEvents: 'none', userSelect: 'none' }}
+                  >
+                    {zoneNumber}
+                  </text>
+                </>
+              )}
               {/* AI confidence dot */}
-              {zone.aiConfidence != null && (
+              {!isRejected && zone.aiConfidence != null && (
                 <circle
                   cx={x + 22}
                   cy={y + 6}

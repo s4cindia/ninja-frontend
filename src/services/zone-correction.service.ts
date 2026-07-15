@@ -13,6 +13,7 @@ export interface CalibrationZone {
   pdfxtLabel?: string;
   operatorVerified: boolean;
   operatorLabel?: string;
+  decision?: 'CONFIRMED' | 'CORRECTED' | 'REJECTED' | null;
   tableStructure?: { thead: unknown; tbody: unknown };
   isArtefact: boolean;
   confidence?: number;
