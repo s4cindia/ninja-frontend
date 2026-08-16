@@ -509,15 +509,36 @@ export const PdfAuditResultsPage: React.FC = () => {
     };
   }, []);
 
+  // Merge a terminal auto-tag outcome into auditResult so the header badge
+  // reflects the latest result. Skipped while status is 'processing' so the
+  // badge keeps showing the previous outcome instead of flickering away
+  // mid-retry (the stats card already shows a dedicated in-progress state).
+  const applyAutoTagStatus = useCallback((info: {
+    status?: string;
+    taggerSource?: string | null;
+    error?: string | null;
+  } | undefined) => {
+    if (!info || info.status === 'processing') return;
+    setAuditResult(prev => prev ? {
+      ...prev,
+      autoTagStatus: (info.status as PdfAuditResult['autoTagStatus']) ?? prev.autoTagStatus,
+      taggerSource: (info.taggerSource as PdfAuditResult['taggerSource']) ?? prev.taggerSource,
+      autoTagError: info.error ?? prev.autoTagError,
+    } : prev);
+  }, []);
+
   // Fetch auto-tag status after audit result loads
   useEffect(() => {
     if (!jobId || !auditResult) return;
     api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`)
       .then(res => {
-        if (isMountedRef.current) setAutoTagInfo(res.data.data);
+        if (!isMountedRef.current) return;
+        const info = res.data.data;
+        setAutoTagInfo(info);
+        applyAutoTagStatus(info);
       })
       .catch(() => {});
-  }, [jobId, auditResult]);
+  }, [jobId, auditResult, applyAutoTagStatus]);
 
   const handleRetryAutoTag = async () => {
     if (!jobId || isRetryingAutoTag) return;
@@ -533,7 +554,10 @@ export const PdfAuditResultsPage: React.FC = () => {
         try {
           const res = await api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`);
           const info = res.data.data;
-          if (isMountedRef.current) setAutoTagInfo(info);
+          if (isMountedRef.current) {
+            setAutoTagInfo(info);
+            applyAutoTagStatus(info);
+          }
           if (info?.status === 'complete' || info?.status === 'failed') {
             if (autoTagPollRef.current) {
               clearInterval(autoTagPollRef.current);
@@ -739,6 +763,9 @@ export const PdfAuditResultsPage: React.FC = () => {
                     {auditResult.autoTagStatus === 'failed' && (
                       <Badge variant="error" className="ml-2" title={auditResult.autoTagError ?? undefined}>
                         Auto-tag failed
+                        {auditResult.autoTagError && (
+                          <span className="sr-only"> — {auditResult.autoTagError}</span>
+                        )}
                       </Badge>
                     )}
                   </p>
