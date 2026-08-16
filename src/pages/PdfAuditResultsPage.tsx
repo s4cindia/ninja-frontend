@@ -731,6 +731,16 @@ export const PdfAuditResultsPage: React.FC = () => {
                         Tagged
                       </Badge>
                     )}
+                    {auditResult.autoTagStatus === 'complete' && auditResult.taggerSource && (
+                      <Badge variant="info" className="ml-2">
+                        Auto-tagged: {auditResult.taggerSource === 'seam-c' ? 'Seam-C (YOLO)' : 'Adobe AutoTag'}
+                      </Badge>
+                    )}
+                    {auditResult.autoTagStatus === 'failed' && (
+                      <Badge variant="error" className="ml-2" title={auditResult.autoTagError ?? undefined}>
+                        Auto-tag failed
+                      </Badge>
+                    )}
                   </p>
                 </div>
               </div>

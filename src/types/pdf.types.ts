@@ -153,6 +153,12 @@ export interface PdfAuditResult {
   matterhornSummary: MatterhornSummary;
   /** Extracted PDF document metadata */
   metadata: PdfMetadata;
+  /** Which auto-tagger ran, if any (only set when autoTagStatus is 'complete') */
+  taggerSource?: 'seam-c' | 'adobe' | null;
+  /** Outcome of the auto-tagging step run before the audit */
+  autoTagStatus?: 'complete' | 'failed' | 'skipped' | null;
+  /** Error message if autoTagStatus is 'failed' */
+  autoTagError?: string | null;
 }
 
 /**
