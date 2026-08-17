@@ -155,6 +155,7 @@ export const PdfAuditResultsPage: React.FC = () => {
   } | null>(null);
   const aiPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoTagPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoTagFetchedJobRef = useRef<string | null>(null);
 
   // Auto-tag status state
   const [autoTagInfo, setAutoTagInfo] = useState<{
@@ -529,7 +530,8 @@ export const PdfAuditResultsPage: React.FC = () => {
 
   // Fetch auto-tag status after audit result loads
   useEffect(() => {
-    if (!jobId || !auditResult) return;
+    if (!jobId || !auditResult || autoTagFetchedJobRef.current === jobId) return;
+    autoTagFetchedJobRef.current = jobId;
     api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`)
       .then(res => {
         if (!isMountedRef.current) return;
@@ -537,7 +539,9 @@ export const PdfAuditResultsPage: React.FC = () => {
         setAutoTagInfo(info);
         applyAutoTagStatus(info);
       })
-      .catch(() => {});
+      .catch(() => {
+        autoTagFetchedJobRef.current = null; // allow retry if the fetch itself failed
+      });
   }, [jobId, auditResult, applyAutoTagStatus]);
 
   const handleRetryAutoTag = async () => {
