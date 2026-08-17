@@ -52,6 +52,7 @@ function isMatterhorn(issue: AugIssue): boolean {
 
 export interface AutoTagInfo {
   status?: string;
+  taggerSource?: 'seam-c' | 'adobe' | null;
   hasTaggingReport?: boolean;
   hasWordExport?: boolean;
   elementCounts?: Record<string, number> | null;
@@ -271,7 +272,9 @@ export function PdfStatsCards({
 
   const autoTagSummary = atStatus === 'complete' ? (
     <>
-      <span className="text-xs font-medium text-green-700">✓ Adobe</span>
+      <span className="text-xs font-medium text-green-700">
+        ✓ {autoTagInfo?.taggerSource === 'seam-c' ? 'Seam-C (YOLO)' : 'Adobe'}
+      </span>
       {elems && (
         <>
           <SummaryMetric n={elems.figures ?? 0} label="Fig" />
@@ -321,7 +324,7 @@ export function PdfStatsCards({
       {atStatus === 'processing' && (
         <div className="flex items-center gap-2 text-xs text-blue-700">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Auto-tagging with Adobe…
+          Auto-tagging…
         </div>
       )}
       {(autoTagInfo?.hasTaggingReport || autoTagInfo?.hasWordExport) && (
