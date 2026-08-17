@@ -38,6 +38,34 @@ const MATTERHORN_PREFIXES = [
   'PDF-LOW-CONTRAST', 'PDF-UNTAGGED', 'PDF-NO-LANGUAGE',
 ];
 
+// ─── Auto-tag element count labels (Adobe's shape + Seam-C's 11 canonical zone types) ─
+
+const ELEMENT_LABELS: Record<string, { short: string; full: string }> = {
+  // Adobe's shape
+  figures: { short: 'Fig', full: 'Figures' },
+  tables: { short: 'Tab', full: 'Tables' },
+  headings: { short: 'Head', full: 'Headings' },
+  paragraphs: { short: 'Para', full: 'Paragraphs' },
+  // Seam-C's 11 canonical zone types
+  paragraph: { short: 'Para', full: 'Paragraphs' },
+  'section-header': { short: 'Head', full: 'Headings' },
+  table: { short: 'Tab', full: 'Tables' },
+  figure: { short: 'Fig', full: 'Figures' },
+  caption: { short: 'Cap', full: 'Captions' },
+  footnote: { short: 'Fn', full: 'Footnotes' },
+  header: { short: 'PgHd', full: 'Page Headers' },
+  footer: { short: 'PgFt', full: 'Page Footers' },
+  'list-item': { short: 'List', full: 'List Items' },
+  toci: { short: 'TOC', full: 'TOC Entries' },
+  formula: { short: 'Form', full: 'Formulas' },
+};
+
+function elementLabel(key: string, variant: 'short' | 'full'): string {
+  const entry = ELEMENT_LABELS[key];
+  if (entry) return entry[variant];
+  return key.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 type AugIssue = PdfAuditIssue & { category?: string; code?: string };
 
 function isMatterhorn(issue: AugIssue): boolean {
@@ -261,6 +289,9 @@ export function PdfStatsCards({
 
   const atStatus = autoTagInfo?.status;
   const elems = autoTagInfo?.elementCounts;
+  const elemEntries = elems
+    ? Object.entries(elems).filter(([, n]) => n > 0).sort(([, a], [, b]) => b - a)
+    : [];
 
   const autoTagIcon = atStatus === 'complete'
     ? <CheckCircle className="h-4 w-4 text-green-600" />
@@ -275,14 +306,9 @@ export function PdfStatsCards({
       <span className="text-xs font-medium text-green-700">
         ✓ {autoTagInfo?.taggerSource === 'seam-c' ? 'Seam-C (YOLO)' : 'Adobe'}
       </span>
-      {elems && (
-        <>
-          <SummaryMetric n={elems.figures ?? 0} label="Fig" />
-          <SummaryMetric n={elems.tables ?? 0} label="Tab" />
-          <SummaryMetric n={elems.headings ?? 0} label="Head" />
-          <SummaryMetric n={elems.paragraphs ?? 0} label="Para" />
-        </>
-      )}
+      {elemEntries.slice(0, 4).map(([key, n]) => (
+        <SummaryMetric key={key} n={n} label={elementLabel(key, 'short')} />
+      ))}
     </>
   ) : atStatus === 'failed' ? (
     <span className="text-xs text-amber-700 font-medium">Auto-tagging failed</span>
@@ -294,12 +320,11 @@ export function PdfStatsCards({
 
   const autoTagDetail = (
     <>
-      {atStatus === 'complete' && elems && (
+      {atStatus === 'complete' && elemEntries.length > 0 && (
         <div className="space-y-1">
-          <DetailRow label="Figures" value={elems.figures ?? 0} />
-          <DetailRow label="Tables" value={elems.tables ?? 0} />
-          <DetailRow label="Headings" value={elems.headings ?? 0} />
-          <DetailRow label="Paragraphs" value={elems.paragraphs ?? 0} />
+          {elemEntries.map(([key, n]) => (
+            <DetailRow key={key} label={elementLabel(key, 'full')} value={n} />
+          ))}
         </div>
       )}
       {autoTagInfo?.adobeFlags && autoTagInfo.adobeFlags.length > 0 && (
