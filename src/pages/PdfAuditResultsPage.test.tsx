@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mocked } from 'vitest';
-import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, cleanup, act } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
@@ -677,6 +677,112 @@ describe('PdfAuditResultsPage', () => {
       await waitFor(() => {
         const scoreElement = screen.getByText('45');
         expect(scoreElement).toHaveClass('text-red-600');
+      });
+    });
+  });
+
+  describe('Auto-tag status sync', () => {
+    const jobId = 'job-123';
+    const auditUrl = `/pdf/job/${jobId}/audit/result`;
+    const statusUrl = `/pdf/${jobId}/auto-tag/status`;
+    const aiUrl = `/pdf/${jobId}/ai-analysis`;
+    const emptyAiResponse = { data: { data: { suggestions: [], analyzed: 0, total: 0, status: 'complete' } } };
+
+    it('fetches auto-tag status exactly once per job (regression: applyAutoTagStatus must not re-trigger its own effect)', async () => {
+      const mockResult = createMockAuditResult();
+
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve(emptyAiResponse);
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      await waitFor(() => {
+        expect(screen.getByText('test-document.pdf')).toBeInTheDocument();
+      });
+
+      // applyAutoTagStatus writes a new auditResult object into state on a
+      // terminal status, and the effect that fetches auto-tag status lists
+      // auditResult as a dependency — without the ref guard this refires
+      // forever. Give any runaway loop room to spin before asserting.
+      await waitFor(() => {
+        expect(mockApi.get.mock.calls.some(([url]) => url === statusUrl)).toBe(true);
+      });
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      const statusCalls = mockApi.get.mock.calls.filter(([url]) => url === statusUrl);
+      expect(statusCalls).toHaveLength(1);
+    });
+
+    it('shows the tagger-source badge once the auto-tag status resolves', async () => {
+      const mockResult = createMockAuditResult();
+
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'seam-c' } } });
+        if (url === aiUrl) return Promise.resolve(emptyAiResponse);
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Auto-tagged: Seam-C \(YOLO\)/)).toBeInTheDocument();
+      });
+    });
+
+    it('retry still polls the status endpoint and updates the header badge on completion', async () => {
+      const mockResult = createMockAuditResult({
+        autoTagStatus: 'failed',
+        autoTagError: 'Adobe API timeout',
+        taggerSource: null,
+      });
+
+      let statusCallCount = 0;
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) {
+          statusCallCount += 1;
+          if (statusCallCount === 1) {
+            return Promise.resolve({ data: { data: { status: 'failed', error: 'Adobe API timeout' } } });
+          }
+          if (statusCallCount === 2) {
+            return Promise.resolve({ data: { data: { status: 'processing' } } });
+          }
+          return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        }
+        if (url === aiUrl) return Promise.resolve(emptyAiResponse);
+        return Promise.resolve({ data: { data: {} } });
+      });
+      mockApi.post.mockResolvedValue({ data: { data: {} } });
+
+      renderWithRouter(jobId);
+
+      await waitFor(() => {
+        expect(screen.getByText('Auto-tag failed')).toBeInTheDocument();
+      });
+
+      const retryButton = await screen.findByRole('button', { name: /^retry$/i });
+
+      vi.useFakeTimers();
+      try {
+        await act(async () => {
+          fireEvent.click(retryButton);
+          // Retry POST kicks off; the poll interval (5s) runs until terminal.
+          await vi.advanceTimersByTimeAsync(5000); // -> 'processing'
+          await vi.advanceTimersByTimeAsync(5000); // -> 'complete'
+        });
+
+        expect(statusCallCount).toBeGreaterThanOrEqual(3);
+      } finally {
+        vi.useRealTimers();
+      }
+
+      await waitFor(() => {
+        expect(screen.getByText(/Auto-tagged: Adobe AutoTag/)).toBeInTheDocument();
       });
     });
   });
