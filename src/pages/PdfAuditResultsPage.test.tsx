@@ -786,4 +786,76 @@ describe('PdfAuditResultsPage', () => {
       });
     });
   });
+
+  describe('Apply All Approved bulk action', () => {
+    const jobId = 'job-123';
+    const auditUrl = `/pdf/job/${jobId}/audit/result`;
+    const statusUrl = `/pdf/${jobId}/auto-tag/status`;
+    const aiUrl = `/pdf/${jobId}/ai-analysis`;
+
+    const mockAiResponse = (suggestions: Array<{ issueId: string; applyMode: string; status: string }>) => ({
+      data: {
+        data: {
+          suggestions: suggestions.map((s, i) => ({
+            id: `sugg-${i}`,
+            jobId,
+            issueId: s.issueId,
+            suggestionType: 'alt-text',
+            value: 'A description',
+            guidance: null,
+            confidence: 0.9,
+            rationale: 'because',
+            model: 'gemini',
+            applyMode: s.applyMode,
+            status: s.status,
+            createdAt: '2024-01-15T10:00:00Z',
+            updatedAt: '2024-01-15T10:00:00Z',
+          })),
+          analyzed: suggestions.length,
+          total: suggestions.length,
+          status: 'complete',
+        },
+      },
+    });
+
+    it('only counts approved, apply-to-pdf suggestions toward the bulk-apply button', async () => {
+      const mockResult = createMockAuditResult();
+
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve(mockAiResponse([
+          { issueId: '1', applyMode: 'apply-to-pdf', status: 'approved' },
+          { issueId: '2', applyMode: 'apply-to-pdf', status: 'approved' },
+          { issueId: '3', applyMode: 'apply-to-pdf', status: 'pending' },
+          { issueId: '4', applyMode: 'guidance-only', status: 'approved' },
+        ]));
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      expect(await screen.findByRole('button', { name: /Apply All Approved \(2\)/ })).toBeInTheDocument();
+    });
+
+    it('hides the bulk-apply button when there are no approved apply-to-pdf suggestions', async () => {
+      const mockResult = createMockAuditResult();
+
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve(mockAiResponse([
+          { issueId: '1', applyMode: 'apply-to-pdf', status: 'pending' },
+        ]));
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      await waitFor(() => {
+        expect(screen.getByText('test-document.pdf')).toBeInTheDocument();
+      });
+      expect(screen.queryByRole('button', { name: /Apply All Approved/ })).not.toBeInTheDocument();
+    });
+  });
 });

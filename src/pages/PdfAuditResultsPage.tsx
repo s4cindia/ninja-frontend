@@ -23,19 +23,21 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FileText, Loader2, Download, Share2, RotateCw, Filter, X, ChevronDown, ListChecks, Maximize2, Minimize2 } from 'lucide-react';
+import { FileText, Loader2, Download, Share2, RotateCw, Filter, X, ChevronDown, ListChecks, Maximize2, Minimize2, Zap } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
+import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { MatterhornSummary } from '@/components/pdf/MatterhornSummary';
 import { PacReportModal } from '@/components/pdf/PacReportModal';
 import { PdfPageNavigator } from '@/components/pdf/PdfPageNavigator';
 import { PdfPreviewPanel } from '@/components/pdf/PdfPreviewPanel';
 import { PdfStatsCards } from '@/components/pdf/PdfStatsCards';
 import { IssueCard, AiAnalysis } from '@/components/remediation/IssueCard';
+import { ApplyAllSuggestionsPanel } from '@/components/remediation/ApplyAllSuggestionsPanel';
 import { api } from '@/services/api';
 
 /**
@@ -169,6 +171,20 @@ export const PdfAuditResultsPage: React.FC = () => {
   } | null>(null);
   const [isRetryingAutoTag, setIsRetryingAutoTag] = useState(false);
   const [showPacReport, setShowPacReport] = useState(false);
+  const [showApplyAllPanel, setShowApplyAllPanel] = useState(false);
+
+  // Counts driving the "Apply All Approved" bulk action — only apply-to-pdf
+  // suggestions are eligible; guidance-only/auto-resolve ones have nothing to apply.
+  const eligibleForApplyAll = useMemo(
+    () => Array.from(aiSuggestions.values())
+      .filter(s => s.applyMode === 'apply-to-pdf' && s.status === 'approved').length,
+    [aiSuggestions]
+  );
+  const pendingEligible = useMemo(
+    () => Array.from(aiSuggestions.values())
+      .filter(s => s.applyMode === 'apply-to-pdf' && s.status === 'pending').length,
+    [aiSuggestions]
+  );
 
   // Fetch audit result
   const fetchAuditResult = useCallback(async () => {
@@ -583,6 +599,42 @@ export const PdfAuditResultsPage: React.FC = () => {
     }
   };
 
+  // Apply-all kicks off an automatic post-fix validation audit server-side.
+  // Reflect that immediately so the existing "Validating…" state (Generate ACR
+  // button, PdfStatsCards post-fix validation card) shows right away, then poll
+  // until the backend reports a terminal outcome.
+  const pollPostRemediationStatus = useCallback(() => {
+    if (!jobId) return;
+    if (autoTagPollRef.current) clearInterval(autoTagPollRef.current);
+    setAutoTagInfo(prev => prev ? { ...prev, postRemediationStatus: 'pending' } : prev);
+    autoTagPollRef.current = setInterval(async () => {
+      try {
+        const res = await api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`);
+        const info = res.data.data;
+        if (isMountedRef.current) setAutoTagInfo(info);
+        if (info?.postRemediationStatus !== 'pending') {
+          if (autoTagPollRef.current) {
+            clearInterval(autoTagPollRef.current);
+            autoTagPollRef.current = null;
+          }
+        }
+      } catch {
+        if (autoTagPollRef.current) {
+          clearInterval(autoTagPollRef.current);
+          autoTagPollRef.current = null;
+        }
+      }
+    }, 5000);
+  }, [jobId]);
+
+  // After a successful bulk apply, refetch suggestions from the server instead
+  // of patching aiSuggestions locally — apply-all's response only carries
+  // aggregate counts, not which issues succeeded.
+  const handleApplyAllSuccess = useCallback(() => {
+    fetchAiSuggestions();
+    pollPostRemediationStatus();
+  }, [fetchAiSuggestions, pollPostRemediationStatus]);
+
   const handleDownloadReport = (_format: 'pdf' | 'docx' | 'json' = 'json') => {
     if (!auditResult || !jobId) return;
     const blob = new Blob([JSON.stringify(auditResult, null, 2)], { type: 'application/json' });
@@ -976,6 +1028,16 @@ export const PdfAuditResultsPage: React.FC = () => {
                 >
                   {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                 </button>
+              {eligibleForApplyAll > 0 && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setShowApplyAllPanel(true)}
+                >
+                  <Zap className="h-4 w-4 mr-1" />
+                  Apply All Approved ({eligibleForApplyAll})
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -1167,6 +1229,18 @@ export const PdfAuditResultsPage: React.FC = () => {
         </div>
         </div> {/* inner flex row */}
       </div>
+
+      <Dialog open={showApplyAllPanel} onOpenChange={setShowApplyAllPanel}>
+        <DialogContent className="max-w-lg">
+          <ApplyAllSuggestionsPanel
+            jobId={jobId!}
+            eligibleCount={eligibleForApplyAll}
+            pendingEligibleCount={pendingEligible}
+            onApplied={handleApplyAllSuccess}
+            onClose={() => setShowApplyAllPanel(false)}
+          />
+        </DialogContent>
+      </Dialog>
 
       <PacReportModal
         isOpen={showPacReport}
