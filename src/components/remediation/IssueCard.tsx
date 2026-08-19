@@ -63,6 +63,9 @@ interface IssueCardProps {
   aiSuggestion?: AiAnalysis;
   onAiSuggestionChange?: (updated: AiAnalysis) => void;
   issueNumber?: number;
+  /** Comparison Study remediation-timer hooks — optional-chained since IssueCard is also used outside that flow. */
+  recordApplied?: (count?: number) => void;
+  recordSuggestionDecision?: (decision: 'accepted' | 'rejected') => void;
 }
 
 export function IssueCard({
@@ -76,6 +79,8 @@ export function IssueCard({
   aiSuggestion,
   onAiSuggestionChange,
   issueNumber,
+  recordApplied,
+  recordSuggestionDecision,
 }: IssueCardProps) {
   const isPdf = isPdfIssue(issue);
   const [explanationOpen, setExplanationOpen] = useState(false);
@@ -93,6 +98,10 @@ export function IssueCard({
     },
     onSuccess: (updated) => {
       onAiSuggestionChange?.(updated);
+      // Check the actual resulting status rather than assume it matches the
+      // requested one — this mutation may be reused for other transitions later.
+      if (updated.status === 'approved') recordSuggestionDecision?.('accepted');
+      else if (updated.status === 'rejected') recordSuggestionDecision?.('rejected');
       queryClient.invalidateQueries({ queryKey: ['ai-analysis', jobId] });
     },
     onError: (err: unknown) => {
@@ -113,6 +122,7 @@ export function IssueCard({
     },
     onSuccess: (updated) => {
       onAiSuggestionChange?.(updated);
+      recordApplied?.();
       // Clear the local edit override so the textarea shows the server-normalized
       // value (render prefers editedValue over aiSuggestion.value).
       setEditedValue(null);

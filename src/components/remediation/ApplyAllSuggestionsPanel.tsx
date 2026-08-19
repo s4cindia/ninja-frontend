@@ -16,7 +16,7 @@ interface ApplyAllSuggestionsPanelProps {
    * the caller should refetch the full suggestion list here rather than have
    * this panel try to reconstruct per-issue state.
    */
-  onApplied: () => void;
+  onApplied: (result: ApplyAllAiSuggestionsResult) => void;
   /** Dismiss the panel — via Cancel before applying, or Done/auto-close after. */
   onClose: () => void;
 }
@@ -137,10 +137,10 @@ export function ApplyAllSuggestionsPanel({
 
   const applyAllMutation = useMutation({
     mutationFn: () => applyAllAiSuggestions(jobId, includePending),
-    onSuccess: () => {
+    onSuccess: (result) => {
       // Aggregate counts only — refetch the real suggestion list rather than
       // guessing which issues succeeded from this response.
-      onApplied();
+      onApplied(result);
     },
   });
 
