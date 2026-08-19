@@ -92,6 +92,10 @@ import CorpusSummaryPage from '@/pages/calibration/CorpusSummaryPage';
 import AnnotatorGuideHelpPage from '@/pages/help/AnnotatorGuidePage';
 import AdminCorpusPage from '@/pages/admin/AdminCorpusPage';
 import AdminUsersPage from '@/pages/admin/AdminUsersPage';
+import ComparisonStudyConsolePage from '@/pages/comparison-study/ComparisonStudyConsolePage';
+import ComparisonTrialWorkspacePage from '@/pages/comparison-study/ComparisonTrialWorkspacePage';
+import ComparisonTrialReportPage from '@/pages/comparison-study/ComparisonTrialReportPage';
+import ComparisonAggregateReportPage from '@/pages/comparison-study/ComparisonAggregateReportPage';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -276,6 +280,12 @@ function AppRoutes() {
           <Route path="/calibration/comparison-report/:runId" element={<ComparisonReportPage />} />
           <Route path="/calibration/annotation-guide/:runId" element={<AnnotationGuidePage />} />
           <Route path="/calibration/aggregate-report" element={<AggregateComparisonPage />} />
+
+          {/* Comparison Study Routes (Ninja vs pdfxt validation) */}
+          <Route path="/comparison-study" element={<ComparisonStudyConsolePage />} />
+          <Route path="/comparison-study/trials/:id" element={<ComparisonTrialWorkspacePage />} />
+          <Route path="/comparison-study/trials/:id/report" element={<ComparisonTrialReportPage />} />
+          <Route path="/comparison-study/aggregate-report" element={<ComparisonAggregateReportPage />} />
 
           {/* In-app help */}
           <Route path="/help/annotator-guide" element={<AnnotatorGuideHelpPage />} />

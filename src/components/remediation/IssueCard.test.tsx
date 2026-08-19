@@ -1,8 +1,11 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, type Mocked } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { IssueCard } from './IssueCard';
+import { IssueCard, type AiAnalysis } from './IssueCard';
+import { api } from '@/services/api';
 import type { PdfAuditIssue } from '@/types/pdf.types';
+
+vi.mock('@/services/api');
 
 function renderWithQuery(ui: React.ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -244,6 +247,89 @@ describe('IssueCard', () => {
 
       expect(screen.getByText('TEST-001')).toBeInTheDocument();
       expect(screen.getByText('Test issue')).toBeInTheDocument();
+    });
+  });
+
+  describe('Comparison Study remediation-timer wiring', () => {
+    const mockApi = api as Mocked<typeof api>;
+    const mockAiSuggestion: AiAnalysis = {
+      id: 'ai-1',
+      jobId: 'job-1',
+      issueId: 'pdf-issue-1',
+      suggestionType: 'alt-text',
+      value: 'A description',
+      guidance: null,
+      confidence: 0.92,
+      rationale: 'because',
+      model: 'gemini',
+      applyMode: 'apply-to-pdf',
+      status: 'pending',
+      createdAt: '2024-01-15T10:00:00Z',
+      updatedAt: '2024-01-15T10:00:00Z',
+    };
+
+    beforeEach(() => {
+      mockApi.post.mockReset();
+      mockApi.patch.mockReset();
+    });
+
+    it('calls recordApplied after a successful Apply', async () => {
+      mockApi.post.mockResolvedValue({ data: { data: { ...mockAiSuggestion, status: 'applied' } } });
+      const recordApplied = vi.fn();
+      renderWithQuery(
+        <IssueCard issue={mockPdfIssue} jobId="job-1" aiSuggestion={mockAiSuggestion} recordApplied={recordApplied} />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+      await waitFor(() => expect(recordApplied).toHaveBeenCalledTimes(1));
+    });
+
+    it('calls recordSuggestionDecision("rejected") after a successful Dismiss', async () => {
+      mockApi.patch.mockResolvedValue({ data: { data: { ...mockAiSuggestion, status: 'rejected' } } });
+      const recordSuggestionDecision = vi.fn();
+      renderWithQuery(
+        <IssueCard
+          issue={mockPdfIssue}
+          jobId="job-1"
+          aiSuggestion={mockAiSuggestion}
+          recordSuggestionDecision={recordSuggestionDecision}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+
+      await waitFor(() => expect(recordSuggestionDecision).toHaveBeenCalledWith('rejected'));
+    });
+
+    it('does not record a decision when the resulting status is neither approved nor rejected', async () => {
+      // Guards the "check the actual status, don't assume" requirement — this
+      // mutation may be reused for other transitions, so a response that isn't
+      // a clean approve/reject must not be misrecorded as either.
+      mockApi.patch.mockResolvedValue({ data: { data: { ...mockAiSuggestion, status: 'pending' } } });
+      const recordSuggestionDecision = vi.fn();
+      renderWithQuery(
+        <IssueCard
+          issue={mockPdfIssue}
+          jobId="job-1"
+          aiSuggestion={mockAiSuggestion}
+          recordSuggestionDecision={recordSuggestionDecision}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+
+      await waitFor(() => expect(mockApi.patch).toHaveBeenCalled());
+      expect(recordSuggestionDecision).not.toHaveBeenCalled();
+    });
+
+    it('does not throw when recorder props are omitted (IssueCard is also used outside Comparison Study)', async () => {
+      mockApi.post.mockResolvedValue({ data: { data: { ...mockAiSuggestion, status: 'applied' } } });
+      renderWithQuery(<IssueCard issue={mockPdfIssue} jobId="job-1" aiSuggestion={mockAiSuggestion} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+      await waitFor(() => expect(mockApi.post).toHaveBeenCalled());
     });
   });
 });

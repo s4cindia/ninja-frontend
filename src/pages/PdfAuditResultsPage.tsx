@@ -22,7 +22,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { FileText, Loader2, Download, Share2, RotateCw, Filter, X, ChevronDown, ListChecks, Maximize2, Minimize2, Zap } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -38,6 +38,8 @@ import { PdfPreviewPanel } from '@/components/pdf/PdfPreviewPanel';
 import { PdfStatsCards } from '@/components/pdf/PdfStatsCards';
 import { IssueCard, AiAnalysis } from '@/components/remediation/IssueCard';
 import { ApplyAllSuggestionsPanel } from '@/components/remediation/ApplyAllSuggestionsPanel';
+import { useRemediationTimer } from '@/hooks/useRemediationTimer';
+import type { ApplyAllAiSuggestionsResult } from '@/services/api/pdfAiAnalysis.service';
 import { api } from '@/services/api';
 
 /**
@@ -124,6 +126,15 @@ const POLLING_INTERVAL_MS = 5000; // Poll every 5 seconds
 export const PdfAuditResultsPage: React.FC = () => {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  // Only present when the operator arrived via a Comparison Study trial —
+  // gates the remediation timer so regular remediation visits don't pay the
+  // idle-listener/session overhead they're not part of.
+  const comparisonTrialId = searchParams.get('comparisonTrialId');
+  const { recordApplied, recordSuggestionDecision, recordBulkApply } = useRemediationTimer(
+    comparisonTrialId ? jobId : undefined
+  );
 
   // Track component mount status to prevent setState on unmounted component
   const isMountedRef = useRef(true);
@@ -630,10 +641,11 @@ export const PdfAuditResultsPage: React.FC = () => {
   // After a successful bulk apply, refetch suggestions from the server instead
   // of patching aiSuggestions locally — apply-all's response only carries
   // aggregate counts, not which issues succeeded.
-  const handleApplyAllSuccess = useCallback(() => {
+  const handleApplyAllSuccess = useCallback((result: ApplyAllAiSuggestionsResult) => {
     fetchAiSuggestions();
     pollPostRemediationStatus();
-  }, [fetchAiSuggestions, pollPostRemediationStatus]);
+    recordBulkApply(result.applied);
+  }, [fetchAiSuggestions, pollPostRemediationStatus, recordBulkApply]);
 
   const handleDownloadReport = (_format: 'pdf' | 'docx' | 'json' = 'json') => {
     if (!auditResult || !jobId) return;
@@ -1214,6 +1226,8 @@ export const PdfAuditResultsPage: React.FC = () => {
                     aiSuggestion={aiSuggestions.get(issue.id)}
                     issueNumber={issueNumberMap.get(issue.id)}
                     onClick={() => handleIssueSelect(issue)}
+                    recordApplied={recordApplied}
+                    recordSuggestionDecision={recordSuggestionDecision}
                     onAiSuggestionChange={(updated) => {
                       setAiSuggestions((prev) => {
                         const next = new Map(prev);
