@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
-import { useComparisonTrial, useLogPdfxtData, useValidateTrial } from '@/hooks/useComparisonStudy';
+import { Dialog, DialogContent } from '@/components/ui/Dialog';
+import { useComparisonTrial, useLogPdfxtData, useValidateTrial, useDeleteTrial } from '@/hooks/useComparisonStudy';
 import { comparisonStudyService } from '@/services/comparisonStudy.service';
 
 const CONTENT_TYPE_LABELS: Record<string, string> = {
@@ -27,12 +28,52 @@ function parseTimeToMs(input: string): number | null {
   return Number.isNaN(n) ? null : Math.round(n * 1000);
 }
 
+function DeleteTrialDialog({
+  onConfirm,
+  onCancel,
+  isPending,
+  error,
+}: {
+  onConfirm: () => void;
+  onCancel: () => void;
+  isPending: boolean;
+  error: string | null;
+}) {
+  return (
+    <div className="p-6">
+      <h3 className="text-lg font-semibold mb-3 text-gray-900">Delete Trial</h3>
+      <p className="text-sm text-gray-600 mb-4">
+        This permanently removes the trial from Comparison Study. The underlying Ninja job and its data are not affected.
+      </p>
+      {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+      <div className="flex gap-3">
+        <button
+          onClick={onConfirm}
+          disabled={isPending}
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+        >
+          {isPending && <Loader2 className="animate-spin h-4 w-4" />}
+          Delete Trial
+        </button>
+        <button
+          onClick={onCancel}
+          disabled={isPending}
+          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 text-sm"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function ComparisonTrialWorkspacePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data: trial, isLoading } = useComparisonTrial(id);
   const logPdfxt = useLogPdfxtData(id!);
   const validateTrial = useValidateTrial(id!);
+  const deleteTrial = useDeleteTrial(id!);
 
   const [pdfxtTime, setPdfxtTime] = useState('');
   const [pdfxtPageCount, setPdfxtPageCount] = useState('');
@@ -40,6 +81,8 @@ export default function ComparisonTrialWorkspacePage() {
   const [pdfxtFile, setPdfxtFile] = useState<File | null>(null);
   const [isUploadingPdfxt, setIsUploadingPdfxt] = useState(false);
   const [pdfxtError, setPdfxtError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   if (isLoading) {
     return <div className="flex justify-center py-16"><Spinner size="lg" /></div>;
@@ -99,9 +142,32 @@ export default function ComparisonTrialWorkspacePage() {
     }
   };
 
+  const handleDeleteTrial = () => {
+    setDeleteError(null);
+    deleteTrial.mutate(undefined, {
+      onSuccess: () => {
+        navigate('/comparison-study');
+      },
+      onError: () => {
+        setDeleteError('Failed to delete trial — please retry.');
+      },
+    });
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 p-6">
-      <Link to="/comparison-study" className="text-sm text-gray-500 hover:text-gray-700">&larr; Back to Comparison Study</Link>
+      <div className="flex items-center justify-between">
+        <Link to="/comparison-study" className="text-sm text-gray-500 hover:text-gray-700">&larr; Back to Comparison Study</Link>
+        <button
+          onClick={() => {
+            setDeleteError(null);
+            setShowDeleteConfirm(true);
+          }}
+          className="text-xs text-red-600 hover:text-red-800 hover:underline"
+        >
+          Delete Trial
+        </button>
+      </div>
 
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-start justify-between gap-4">
@@ -212,6 +278,17 @@ export default function ComparisonTrialWorkspacePage() {
           <p className="text-sm text-red-600 mt-3">Validation failed — please retry.</p>
         )}
       </div>
+
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent className="max-w-md">
+          <DeleteTrialDialog
+            onConfirm={handleDeleteTrial}
+            onCancel={() => setShowDeleteConfirm(false)}
+            isPending={deleteTrial.isPending}
+            error={deleteError}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
