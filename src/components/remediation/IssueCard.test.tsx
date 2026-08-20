@@ -332,4 +332,75 @@ describe('IssueCard', () => {
       await waitFor(() => expect(mockApi.post).toHaveBeenCalled());
     });
   });
+
+  describe('Approve action (issue #295 — Apply All Approved was unreachable)', () => {
+    const mockApi = api as Mocked<typeof api>;
+    const mockAiSuggestion: AiAnalysis = {
+      id: 'ai-1',
+      jobId: 'job-1',
+      issueId: 'pdf-issue-1',
+      suggestionType: 'alt-text',
+      value: 'A description',
+      guidance: null,
+      confidence: 0.92,
+      rationale: 'because',
+      model: 'gemini',
+      applyMode: 'apply-to-pdf',
+      status: 'pending',
+      createdAt: '2024-01-15T10:00:00Z',
+      updatedAt: '2024-01-15T10:00:00Z',
+    };
+
+    beforeEach(() => {
+      mockApi.post.mockReset();
+      mockApi.patch.mockReset();
+    });
+
+    it('shows Approve, Apply, and Dismiss for a pending apply-to-pdf suggestion', () => {
+      renderWithQuery(<IssueCard issue={mockPdfIssue} jobId="job-1" aiSuggestion={mockAiSuggestion} />);
+
+      expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Apply' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
+    });
+
+    it('clicking Approve PATCHes status: approved', async () => {
+      mockApi.patch.mockResolvedValue({ data: { data: { ...mockAiSuggestion, status: 'approved' } } });
+      renderWithQuery(<IssueCard issue={mockPdfIssue} jobId="job-1" aiSuggestion={mockAiSuggestion} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+
+      await waitFor(() => {
+        expect(mockApi.patch).toHaveBeenCalledWith('/pdf/job-1/ai-analysis/pdf-issue-1', { status: 'approved' });
+      });
+    });
+
+    it('records an "accepted" suggestion decision after approving', async () => {
+      mockApi.patch.mockResolvedValue({ data: { data: { ...mockAiSuggestion, status: 'approved' } } });
+      const recordSuggestionDecision = vi.fn();
+      renderWithQuery(
+        <IssueCard
+          issue={mockPdfIssue}
+          jobId="job-1"
+          aiSuggestion={mockAiSuggestion}
+          recordSuggestionDecision={recordSuggestionDecision}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+
+      await waitFor(() => expect(recordSuggestionDecision).toHaveBeenCalledWith('accepted'));
+    });
+
+    it('shows an Approved indicator with Apply/Dismiss still available, and no Approve button, once approved', () => {
+      renderWithQuery(
+        <IssueCard issue={mockPdfIssue} jobId="job-1" aiSuggestion={{ ...mockAiSuggestion, status: 'approved' }} />
+      );
+
+      expect(screen.getByText('Approved')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Apply' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
+    });
+  });
 });

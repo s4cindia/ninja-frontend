@@ -398,6 +398,20 @@ export function IssueCard({
                   <span className="text-gray-500 italic">Dismissed</span>
                 ) : (
                   <div className="flex items-center gap-1.5">
+                    {aiSuggestion.status === 'approved' ? (
+                      <span className="flex items-center gap-1 text-green-700 font-medium">
+                        <CheckCircle size={12} /> Approved
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="px-2 py-0.5 bg-white text-green-700 border border-green-300 rounded hover:bg-green-50 transition-colors disabled:opacity-50"
+                        disabled={!jobId || applyMutation.isPending || updateStatusMutation.isPending}
+                        onClick={() => updateStatusMutation.mutate('approved')}
+                      >
+                        Approve
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="px-2 py-0.5 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors disabled:opacity-50"
