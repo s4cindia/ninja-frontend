@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import ComparisonTrialWorkspacePage from './ComparisonTrialWorkspacePage';
@@ -41,6 +41,7 @@ function renderPage() {
           <Route path="/comparison-study/trials/:id" element={<ComparisonTrialWorkspacePage />} />
           <Route path="/pdf/audit/:jobId" element={<div>Audit page</div>} />
           <Route path="/comparison-study/trials/:id/report" element={<div>Report page</div>} />
+          <Route path="/comparison-study" element={<div>Console page</div>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>
@@ -53,6 +54,7 @@ describe('ComparisonTrialWorkspacePage', () => {
     mockService.logPdfxtData.mockReset();
     mockService.validateTrial.mockReset();
     mockService.getUploadUrl.mockReset();
+    mockService.deleteTrial.mockReset();
     global.fetch = vi.fn();
   });
 
@@ -119,5 +121,64 @@ describe('ComparisonTrialWorkspacePage', () => {
     renderPage();
 
     expect(await screen.findByText('Trial not found.')).toBeInTheDocument();
+  });
+
+  describe('Delete Trial', () => {
+    it('opens a confirmation dialog without calling the delete mutation', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial());
+
+      renderPage();
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Delete Trial' }));
+
+      expect(await screen.findByText(/permanently removes the trial from Comparison Study/)).toBeInTheDocument();
+      expect(mockService.deleteTrial).not.toHaveBeenCalled();
+    });
+
+    it('canceling closes the dialog without calling the delete mutation', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial());
+
+      renderPage();
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Delete Trial' }));
+      await screen.findByText(/permanently removes the trial from Comparison Study/);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      await waitFor(() => {
+        expect(screen.queryByText(/permanently removes the trial from Comparison Study/)).not.toBeInTheDocument();
+      });
+      expect(mockService.deleteTrial).not.toHaveBeenCalled();
+    });
+
+    it('confirming calls the delete mutation and navigates to /comparison-study on success', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial());
+      mockService.deleteTrial.mockResolvedValue({ id: 'trial-1' });
+
+      renderPage();
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Delete Trial' }));
+      const dialog = await screen.findByRole('dialog');
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Delete Trial' }));
+
+      await waitFor(() => {
+        expect(mockService.deleteTrial).toHaveBeenCalledWith('trial-1');
+      });
+      expect(await screen.findByText('Console page')).toBeInTheDocument();
+    });
+
+    it('shows an inline error and keeps the dialog open on failure', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial());
+      mockService.deleteTrial.mockRejectedValue(new Error('500'));
+
+      renderPage();
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Delete Trial' }));
+      const dialog = await screen.findByRole('dialog');
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Delete Trial' }));
+
+      expect(await screen.findByText('Failed to delete trial — please retry.')).toBeInTheDocument();
+      expect(screen.getByText(/permanently removes the trial from Comparison Study/)).toBeInTheDocument();
+    });
   });
 });

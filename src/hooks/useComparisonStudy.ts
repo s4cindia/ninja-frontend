@@ -91,3 +91,13 @@ export function useValidateTrial(id: string) {
     },
   });
 }
+
+export function useDeleteTrial(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => comparisonStudyService.deleteTrial(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: TRIALS_KEY });
+    },
+  });
+}

@@ -60,6 +60,9 @@ export const comparisonStudyService = {
 
   getAggregateReport: (): Promise<AggregateReport> =>
     api.get(`${BASE}/aggregate-report`).then((r) => r.data.data),
+
+  deleteTrial: (id: string): Promise<{ id: string }> =>
+    api.delete(`${BASE}/trials/${encodeURIComponent(id)}`).then((r) => r.data.data),
 };
 
 /**
