@@ -545,6 +545,7 @@ export const PdfAuditResultsPage: React.FC = () => {
     status?: string;
     taggerSource?: string | null;
     error?: string | null;
+    skipReason?: string | null;
   } | undefined) => {
     if (!info || info.status === 'processing') return;
     setAuditResult(prev => prev ? {
@@ -552,6 +553,7 @@ export const PdfAuditResultsPage: React.FC = () => {
       autoTagStatus: (info.status as PdfAuditResult['autoTagStatus']) ?? prev.autoTagStatus,
       taggerSource: (info.taggerSource as PdfAuditResult['taggerSource']) ?? prev.taggerSource,
       autoTagError: info.error ?? prev.autoTagError,
+      autoTagSkipReason: (info.skipReason as PdfAuditResult['autoTagSkipReason']) ?? prev.autoTagSkipReason,
     } : prev);
   }, []);
 
@@ -826,6 +828,11 @@ export const PdfAuditResultsPage: React.FC = () => {
                     {auditResult.autoTagStatus === 'complete' && auditResult.taggerSource && (
                       <Badge variant="info" className="ml-2">
                         Auto-tagged: {auditResult.taggerSource === 'seam-c' ? 'Seam-C (YOLO)' : 'Adobe AutoTag'}
+                      </Badge>
+                    )}
+                    {auditResult.autoTagStatus === 'skipped' && auditResult.autoTagSkipReason === 'already-tagged' && (
+                      <Badge variant="info" className="ml-2">
+                        Already tagged
                       </Badge>
                     )}
                     {auditResult.autoTagStatus === 'failed' && (

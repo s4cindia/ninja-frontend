@@ -159,6 +159,8 @@ export interface PdfAuditResult {
   autoTagStatus?: 'complete' | 'failed' | 'skipped' | null;
   /** Error message if autoTagStatus is 'failed' */
   autoTagError?: string | null;
+  /** Why tagging was skipped, when autoTagStatus is 'skipped' */
+  autoTagSkipReason?: 'already-tagged' | 'no-tagger-configured' | null;
 }
 
 /**

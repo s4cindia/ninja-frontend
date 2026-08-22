@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   ChevronDown, ChevronUp, CheckCircle, AlertTriangle,
-  Loader2, Sparkles, Tag,
+  Loader2, Sparkles, Tag, Info,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { api } from '@/services/api';
@@ -80,6 +80,8 @@ function isMatterhorn(issue: AugIssue): boolean {
 
 export interface AutoTagInfo {
   status?: string;
+  error?: string;
+  skipReason?: 'already-tagged' | 'no-tagger-configured';
   taggerSource?: 'seam-c' | 'adobe' | null;
   hasTaggingReport?: boolean;
   hasWordExport?: boolean;
@@ -299,7 +301,9 @@ export function PdfStatsCards({
       ? <AlertTriangle className="h-4 w-4 text-amber-500" />
       : atStatus === 'processing'
         ? <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
-        : <Tag className="h-4 w-4 text-gray-400" />;
+        : atStatus === 'skipped' && autoTagInfo?.skipReason === 'already-tagged'
+          ? <Info className="h-4 w-4 text-blue-500" />
+          : <Tag className="h-4 w-4 text-gray-400" />;
 
   const autoTagSummary = atStatus === 'complete' ? (
     <>
@@ -314,6 +318,10 @@ export function PdfStatsCards({
     <span className="text-xs text-amber-700 font-medium">Auto-tagging failed</span>
   ) : atStatus === 'processing' ? (
     <span className="text-xs text-blue-700">Auto-tagging in progress…</span>
+  ) : atStatus === 'skipped' && autoTagInfo?.skipReason === 'already-tagged' ? (
+    <span className="text-xs text-gray-600 font-medium">Document already tagged</span>
+  ) : atStatus === 'skipped' && autoTagInfo?.skipReason === 'no-tagger-configured' ? (
+    <span className="text-xs text-gray-400">No tagger available</span>
   ) : (
     <span className="text-xs text-gray-400">No auto-tag data</span>
   );
@@ -345,6 +353,15 @@ export function PdfStatsCards({
             {isRetryingAutoTag ? 'Retrying…' : 'Retry'}
           </button>
         </div>
+      )}
+      {atStatus === 'skipped' && autoTagInfo?.skipReason === 'already-tagged' && (
+        <div className="flex items-center gap-2 text-xs text-gray-600">
+          <Info className="h-3.5 w-3.5 flex-shrink-0" />
+          Document already tagged — audited existing structure
+        </div>
+      )}
+      {atStatus === 'skipped' && autoTagInfo?.skipReason === 'no-tagger-configured' && (
+        <span className="text-xs text-gray-400">No tagger available</span>
       )}
       {atStatus === 'processing' && (
         <div className="flex items-center gap-2 text-xs text-blue-700">
