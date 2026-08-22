@@ -734,6 +734,43 @@ describe('PdfAuditResultsPage', () => {
       });
     });
 
+    it('shows a neutral "Already tagged" badge — not the alarming failed badge — when auto-tag is skipped because the document already had structure', async () => {
+      const mockResult = createMockAuditResult();
+
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'skipped', skipReason: 'already-tagged' } } });
+        if (url === aiUrl) return Promise.resolve(emptyAiResponse);
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      await waitFor(() => {
+        expect(screen.getByText('Already tagged')).toBeInTheDocument();
+      });
+      expect(screen.queryByText('Auto-tag failed')).not.toBeInTheDocument();
+    });
+
+    it('shows no header badge for a no-tagger-configured skip (kept low-key)', async () => {
+      const mockResult = createMockAuditResult();
+
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'skipped', skipReason: 'no-tagger-configured' } } });
+        if (url === aiUrl) return Promise.resolve(emptyAiResponse);
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      await waitFor(() => {
+        expect(screen.getByText('test-document.pdf')).toBeInTheDocument();
+      });
+      expect(screen.queryByText('Auto-tag failed')).not.toBeInTheDocument();
+      expect(screen.queryByText('Already tagged')).not.toBeInTheDocument();
+    });
+
     it('retry still polls the status endpoint and updates the header badge on completion', async () => {
       const mockResult = createMockAuditResult({
         autoTagStatus: 'failed',
