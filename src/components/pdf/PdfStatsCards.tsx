@@ -120,6 +120,8 @@ export interface PdfStatsCardsProps {
   onViewAutoTagReport: () => void;
   onRetryAutoTag: () => void;
   isRetryingAutoTag: boolean;
+  onRerunWithColorContrastFix?: () => void;
+  isRerunningColorContrastFix?: boolean;
   jobId: string;
 }
 
@@ -215,6 +217,8 @@ export function PdfStatsCards({
   onViewAutoTagReport,
   onRetryAutoTag,
   isRetryingAutoTag,
+  onRerunWithColorContrastFix,
+  isRerunningColorContrastFix,
   jobId,
 }: PdfStatsCardsProps) {
   const [expanded, setExpanded] = useState<CardState>(() => readStorage());
@@ -578,6 +582,22 @@ export function PdfStatsCards({
               />
             </div>
           </div>
+        </div>
+      )}
+      {onRerunWithColorContrastFix && (
+        <div className="pt-2 border-t border-gray-200">
+          <button
+            type="button"
+            onClick={onRerunWithColorContrastFix}
+            disabled={isRerunningColorContrastFix}
+            className="text-xs font-medium text-purple-700 hover:text-purple-900 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+          >
+            {isRerunningColorContrastFix ? (
+              <><Loader2 className="h-3 w-3 animate-spin" />Re-running with color-contrast auto-fix…</>
+            ) : (
+              'Re-run AI analysis with color-contrast auto-fix'
+            )}
+          </button>
         </div>
       )}
     </>

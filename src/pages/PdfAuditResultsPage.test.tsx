@@ -895,4 +895,129 @@ describe('PdfAuditResultsPage', () => {
       expect(screen.queryByRole('button', { name: /Apply All Approved/ })).not.toBeInTheDocument();
     });
   });
+
+  describe('Color-contrast re-analysis', () => {
+    const jobId = 'job-123';
+    const auditUrl = `/pdf/job/${jobId}/audit/result`;
+    const statusUrl = `/pdf/${jobId}/auto-tag/status`;
+    const aiUrl = `/pdf/${jobId}/ai-analysis`;
+    const completeAiResponse = {
+      data: {
+        data: {
+          suggestions: [],
+          analyzed: 0,
+          total: 0,
+          status: 'complete',
+          stats: {
+            gemini: { totalTokens: 100, estimatedCostUsd: 0.01 },
+            claude: { totalTokens: 0, estimatedCostUsd: 0 },
+            totalTokens: 100,
+            totalCostUsd: 0.01,
+          },
+        },
+      },
+    };
+
+    function mockCommonGets() {
+      const mockResult = createMockAuditResult();
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve(completeAiResponse);
+        return Promise.resolve({ data: { data: {} } });
+      });
+    }
+
+    beforeEach(() => {
+      // PdfStatsCards persists each card's expand/collapse state to
+      // localStorage — clear it so an earlier test's collapse doesn't hide
+      // the AI Analysis detail section (and this button) here.
+      localStorage.clear();
+    });
+
+    it('POSTs the colorContrastMode override and resumes polling for updated suggestions', async () => {
+      mockCommonGets();
+      mockApi.post.mockResolvedValue({ data: { data: { status: 'processing', total: 5, message: 'started' } } });
+
+      renderWithRouter(jobId);
+
+      const rerunLink = await screen.findByRole('button', { name: 'Re-run AI analysis with color-contrast auto-fix' });
+      const aiCallsBefore = mockApi.get.mock.calls.filter(([url]) => url === aiUrl).length;
+
+      // Engage fake timers BEFORE the click so the setInterval the handler
+      // schedules on success is a fake one — otherwise it becomes a real
+      // background interval that outlives this test and pollutes later ones.
+      vi.useFakeTimers();
+      try {
+        await act(async () => {
+          fireEvent.click(rerunLink);
+          await vi.advanceTimersByTimeAsync(3000);
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+
+      expect(mockApi.post).toHaveBeenCalledWith(aiUrl, { overrides: { colorContrastMode: 'apply-to-pdf' } });
+      const aiCallsAfter = mockApi.get.mock.calls.filter(([url]) => url === aiUrl).length;
+      expect(aiCallsAfter).toBeGreaterThan(aiCallsBefore);
+    });
+
+    it('disables the link while the trigger request is in flight, then hands off to the Analyzing state on success', async () => {
+      mockCommonGets();
+      let resolvePost!: (value: unknown) => void;
+      mockApi.post.mockImplementation(() => new Promise((resolve) => { resolvePost = resolve; }));
+
+      renderWithRouter(jobId);
+
+      const rerunLink = await screen.findByRole('button', { name: 'Re-run AI analysis with color-contrast auto-fix' });
+
+      // Fake timers for the same reason as above — resolving below schedules
+      // a polling setInterval that must not leak into later tests as a real one.
+      vi.useFakeTimers();
+      try {
+        await act(async () => {
+          fireEvent.click(rerunLink);
+        });
+
+        // Can't use waitFor while fake timers are active (its polling relies
+        // on real setTimeout) — act() has already flushed the synchronous
+        // setIsRerunningColorContrastFix(true) update, so assert directly.
+        expect(screen.getByRole('button', { name: /Re-running with color-contrast auto-fix/ })).toBeDisabled();
+
+        await act(async () => {
+          resolvePost({ data: { data: { status: 'processing', total: 5, message: 'started' } } });
+          // Flush the promise chain's remaining microtasks (the .then
+          // continuation after the manually-resolved mock) under fake-timer
+          // control — a bare microtask tick isn't reliably enough here.
+          await vi.advanceTimersByTimeAsync(0);
+        });
+
+        // On success the handler sets isAnalyzingAi(true), which switches the
+        // AI Analysis card to its "Analyzing…" branch — the link legitimately
+        // disappears there rather than re-enabling, per its own render guard.
+        expect(screen.queryByRole('button', { name: /color-contrast auto-fix/ })).not.toBeInTheDocument();
+        expect(screen.getByText(/Analyzing/)).toBeInTheDocument();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('re-enables the link and does not crash if the trigger request fails', async () => {
+      mockCommonGets();
+      mockApi.post.mockRejectedValue(new Error('500'));
+
+      renderWithRouter(jobId);
+
+      const rerunLink = await screen.findByRole('button', { name: 'Re-run AI analysis with color-contrast auto-fix' });
+      await act(async () => {
+        fireEvent.click(rerunLink);
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole('button', { name: 'Re-run AI analysis with color-contrast auto-fix' })
+        ).not.toBeDisabled();
+      });
+    });
+  });
 });
