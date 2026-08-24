@@ -68,6 +68,87 @@ describe('PdfStatsCards — Auto Tag card status display', () => {
   });
 });
 
+describe('PdfStatsCards — strip-and-retag empty-shell indicator', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('a genuinely well-tagged skip (no completeness data) looks exactly as before — no regression', () => {
+    renderCard({ status: 'skipped', skipReason: 'already-tagged' });
+
+    expect(screen.getByText('Document already tagged — audited existing structure')).toBeInTheDocument();
+    expect(screen.queryByText(/Existing structure incomplete/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/none carry real content types/)).not.toBeInTheDocument();
+  });
+
+  it('a well-tagged skip with completeness data confirming it is NOT an empty shell still looks normal', () => {
+    renderCard({
+      status: 'skipped',
+      skipReason: 'already-tagged',
+      structureTreeCompleteness: { totalElements: 40, semanticElements: 12, isEmptyShell: false },
+    });
+
+    expect(screen.getByText('Document already tagged — audited existing structure')).toBeInTheDocument();
+    expect(screen.queryByText(/Existing structure incomplete/)).not.toBeInTheDocument();
+  });
+
+  it('an unresolved empty-shell skip shows the amber warning with the element count, not the calm blue message', () => {
+    renderCard({
+      status: 'skipped',
+      skipReason: 'already-tagged',
+      structureTreeCompleteness: { totalElements: 40, semanticElements: 0, isEmptyShell: true },
+    });
+
+    // Detail section (with the element count) is visible by default — expanded.
+    expect(screen.getByText(/Existing structure has 40 element\(s\) but none carry real content types/)).toBeInTheDocument();
+    expect(screen.queryByText('Document already tagged — audited existing structure')).not.toBeInTheDocument();
+
+    collapseAutoTagCard();
+    expect(screen.getByText('Existing structure incomplete')).toBeInTheDocument();
+  });
+
+  it('appends the retag-attempted-but-failed note only for failed-retag-error, not failed-strip-bailed', () => {
+    const { unmount } = renderCard({
+      status: 'skipped',
+      skipReason: 'already-tagged',
+      structureTreeCompleteness: { totalElements: 10, semanticElements: 0, isEmptyShell: true },
+      retagOutcome: 'failed-strip-bailed',
+    });
+    expect(screen.queryByText(/Automatic re-tagging was attempted but failed/)).not.toBeInTheDocument();
+    unmount();
+
+    renderCard({
+      status: 'skipped',
+      skipReason: 'already-tagged',
+      structureTreeCompleteness: { totalElements: 10, semanticElements: 0, isEmptyShell: true },
+      retagOutcome: 'failed-retag-error',
+    });
+    expect(screen.getByText(/Automatic re-tagging was attempted but failed/)).toBeInTheDocument();
+  });
+
+  it('a successful retag shows the normal green complete state plus "(retagged)" and the strip-and-retag note', () => {
+    renderCard({
+      status: 'complete',
+      taggerSource: 'seam-c',
+      elementCounts: { figure: 3 },
+      retagOutcome: 'success',
+    });
+
+    // Detail section (with the strip-and-retag note) is visible by default — expanded.
+    expect(screen.getByText(/stripped and re-tagged from scratch/)).toBeInTheDocument();
+
+    collapseAutoTagCard();
+    expect(screen.getByText(/Seam-C \(YOLO\)\s*\(retagged\)/)).toBeInTheDocument();
+  });
+
+  it('a normal first-time complete tag (no retagOutcome) shows no "(retagged)" suffix or strip note', () => {
+    renderCard({ status: 'complete', taggerSource: 'seam-c', elementCounts: { figure: 3 } });
+
+    expect(screen.queryByText(/retagged/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/stripped and re-tagged from scratch/)).not.toBeInTheDocument();
+  });
+});
+
 describe('PdfStatsCards — AI Analysis card color-contrast re-analysis link', () => {
   const emptyAiStats = {
     gemini: { totalTokens: 0, estimatedCostUsd: 0 },

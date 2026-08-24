@@ -100,6 +100,12 @@ export interface AutoTagInfo {
     regressions: number;
     resolutionRate: number;
   };
+  structureTreeCompleteness?: {
+    totalElements: number;
+    semanticElements: number;
+    isEmptyShell: boolean;
+  } | null;
+  retagOutcome?: 'success' | 'failed-strip-bailed' | 'failed-retag-error' | null;
 }
 
 export interface AiStatsData {
@@ -294,6 +300,9 @@ export function PdfStatsCards({
   // ─── Card 1: Auto Tag ────────────────────────────────────────────────────────
 
   const atStatus = autoTagInfo?.status;
+  const isEmptyShellSkip = atStatus === 'skipped'
+    && autoTagInfo?.skipReason === 'already-tagged'
+    && autoTagInfo?.structureTreeCompleteness?.isEmptyShell === true;
   const elems = autoTagInfo?.elementCounts;
   const elemEntries = elems
     ? Object.entries(elems).filter(([, n]) => n > 0).sort(([, a], [, b]) => b - a)
@@ -305,14 +314,17 @@ export function PdfStatsCards({
       ? <AlertTriangle className="h-4 w-4 text-amber-500" />
       : atStatus === 'processing'
         ? <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
-        : atStatus === 'skipped' && autoTagInfo?.skipReason === 'already-tagged'
-          ? <Info className="h-4 w-4 text-blue-500" />
-          : <Tag className="h-4 w-4 text-gray-400" />;
+        : isEmptyShellSkip
+          ? <AlertTriangle className="h-4 w-4 text-amber-500" />
+          : atStatus === 'skipped' && autoTagInfo?.skipReason === 'already-tagged'
+            ? <Info className="h-4 w-4 text-blue-500" />
+            : <Tag className="h-4 w-4 text-gray-400" />;
 
   const autoTagSummary = atStatus === 'complete' ? (
     <>
       <span className="text-xs font-medium text-green-700">
         ✓ {autoTagInfo?.taggerSource === 'seam-c' ? 'Seam-C (YOLO)' : 'Adobe'}
+        {autoTagInfo?.retagOutcome === 'success' && ' (retagged)'}
       </span>
       {elemEntries.slice(0, 4).map(([key, n]) => (
         <SummaryMetric key={key} n={n} label={elementLabel(key, 'short')} />
@@ -322,6 +334,8 @@ export function PdfStatsCards({
     <span className="text-xs text-amber-700 font-medium">Auto-tagging failed</span>
   ) : atStatus === 'processing' ? (
     <span className="text-xs text-blue-700">Auto-tagging in progress…</span>
+  ) : isEmptyShellSkip ? (
+    <span className="text-xs text-amber-700 font-medium">Existing structure incomplete</span>
   ) : atStatus === 'skipped' && autoTagInfo?.skipReason === 'already-tagged' ? (
     <span className="text-xs text-gray-600 font-medium">Document already tagged</span>
   ) : atStatus === 'skipped' && autoTagInfo?.skipReason === 'no-tagger-configured' ? (
@@ -337,6 +351,12 @@ export function PdfStatsCards({
           {elemEntries.map(([key, n]) => (
             <DetailRow key={key} label={elementLabel(key, 'full')} value={n} />
           ))}
+        </div>
+      )}
+      {autoTagInfo?.retagOutcome === 'success' && (
+        <div className="flex items-center gap-2 text-xs text-blue-700 bg-blue-50 rounded px-3 py-2">
+          <Sparkles className="h-3.5 w-3.5 flex-shrink-0" />
+          The existing structure was an empty shell (tagged, but with no real content types) — it was stripped and re-tagged from scratch.
         </div>
       )}
       {autoTagInfo?.adobeFlags && autoTagInfo.adobeFlags.length > 0 && (
@@ -358,7 +378,14 @@ export function PdfStatsCards({
           </button>
         </div>
       )}
-      {atStatus === 'skipped' && autoTagInfo?.skipReason === 'already-tagged' && (
+      {isEmptyShellSkip && (
+        <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 rounded px-3 py-2">
+          <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+          Existing structure has {autoTagInfo?.structureTreeCompleteness?.totalElements ?? 0} element(s) but none carry real content types (Figure/Paragraph/Heading/Table) — fixes like alt-text may fail to apply.
+          {autoTagInfo?.retagOutcome === 'failed-retag-error' && ' Automatic re-tagging was attempted but failed.'}
+        </div>
+      )}
+      {atStatus === 'skipped' && autoTagInfo?.skipReason === 'already-tagged' && !isEmptyShellSkip && (
         <div className="flex items-center gap-2 text-xs text-gray-600">
           <Info className="h-3.5 w-3.5 flex-shrink-0" />
           Document already tagged — audited existing structure
