@@ -39,6 +39,7 @@ import { PdfStatsCards } from '@/components/pdf/PdfStatsCards';
 import { IssueCard, AiAnalysis } from '@/components/remediation/IssueCard';
 import { ApplyAllSuggestionsPanel } from '@/components/remediation/ApplyAllSuggestionsPanel';
 import { useRemediationTimer } from '@/hooks/useRemediationTimer';
+import { triggerAiAnalysis } from '@/services/api/pdfAiAnalysis.service';
 import type { ApplyAllAiSuggestionsResult } from '@/services/api/pdfAiAnalysis.service';
 import { api } from '@/services/api';
 
@@ -160,6 +161,7 @@ export const PdfAuditResultsPage: React.FC = () => {
   const [aiSuggestions, setAiSuggestions] = useState<Map<string, AiAnalysis>>(new Map());
   const [isAnalyzingAi, setIsAnalyzingAi] = useState(false);
   const [aiProgress, setAiProgress] = useState<{ analyzed: number; total: number } | null>(null);
+  const [isRerunningColorContrastFix, setIsRerunningColorContrastFix] = useState(false);
   const [aiStats, setAiStats] = useState<{
     gemini: { totalTokens: number; estimatedCostUsd: number };
     claude: { totalTokens: number; estimatedCostUsd: number };
@@ -521,6 +523,23 @@ export const PdfAuditResultsPage: React.FC = () => {
       // Non-fatal — silently ignore fetch errors during polling
     }
   }, [jobId]);
+
+  const handleRerunWithColorContrastFix = useCallback(async () => {
+    if (!jobId) return;
+    setIsRerunningColorContrastFix(true);
+    try {
+      await triggerAiAnalysis(jobId, { colorContrastMode: 'apply-to-pdf' });
+      toast.success('Re-running AI analysis with color-contrast auto-fix…');
+      setIsAnalyzingAi(true);
+      if (!aiPollingRef.current) {
+        aiPollingRef.current = setInterval(fetchAiSuggestions, 3000);
+      }
+    } catch {
+      toast.error('Failed to start AI re-analysis');
+    } finally {
+      setIsRerunningColorContrastFix(false);
+    }
+  }, [jobId, fetchAiSuggestions]);
 
   // Load existing AI suggestions on mount (in case analysis was already run)
   useEffect(() => {
@@ -934,6 +953,8 @@ export const PdfAuditResultsPage: React.FC = () => {
         onViewAutoTagReport={handleViewAutoTagReport}
         onRetryAutoTag={handleRetryAutoTag}
         isRetryingAutoTag={isRetryingAutoTag}
+        onRerunWithColorContrastFix={handleRerunWithColorContrastFix}
+        isRerunningColorContrastFix={isRerunningColorContrastFix}
         jobId={jobId!}
       />
 
