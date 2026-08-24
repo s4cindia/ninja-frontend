@@ -207,6 +207,8 @@ export const PdfAuditResultsPage: React.FC = () => {
     adobeFlags?: Array<{ elementType?: string; page?: number; confidence?: string; reviewComment?: string }>;
     postRemediationStatus?: 'pending' | 'complete' | 'failed';
     postRemediationAudit?: { runAt: string; resolved: number; remaining: number; regressions: number; resolutionRate: number };
+    structureTreeCompleteness?: { totalElements: number; semanticElements: number; isEmptyShell: boolean } | null;
+    retagOutcome?: 'success' | 'failed-strip-bailed' | 'failed-retag-error' | null;
   } | null>(null);
   const [isRetryingAutoTag, setIsRetryingAutoTag] = useState(false);
   const [showPacReport, setShowPacReport] = useState(false);
