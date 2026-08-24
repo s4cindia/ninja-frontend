@@ -75,6 +75,28 @@ function getIssueCheckpoint(issue: PdfAuditIssue & { category?: string; code?: s
   if (match) return match[1];
   return undefined;
 }
+
+const CATEGORY_LABELS: Record<string, string> = {
+  structure: 'Structure',
+  metadata: 'Metadata',
+  language: 'Language',
+  headings: 'Headings',
+  'reading-order': 'Reading Order',
+  lists: 'Lists',
+  tables: 'Tables',
+  'alt-text': 'Alt Text',
+  contrast: 'Contrast',
+  links: 'Links',
+  forms: 'Forms',
+  bookmarks: 'Bookmarks',
+  formula: 'Formula',
+};
+const CATEGORY_ORDER = Object.keys(CATEGORY_LABELS);
+const TABLE_SUBCATEGORIES = new Set(['table-structure', 'table-headers', 'table-summary', 'layout-table']);
+function normalizeCategory(category: string | undefined): string | undefined {
+  if (!category) return undefined;
+  return TABLE_SUBCATEGORIES.has(category) ? 'tables' : category;
+}
 import { cn } from '@/utils/cn';
 import { validateJobId } from '@/utils/validation';
 import { useCreateRemediationPlan } from '@/hooks/usePdfRemediation';
@@ -87,6 +109,8 @@ interface IssueFilters {
   severity: IssueSeverity | 'all';
   wcagCriterion: string | 'all';
   matterhornCategory: string | 'all';
+  categories: Set<string>;
+  aiAction: 'all' | 'fixable' | 'guidance-only' | 'applied' | 'rejected';
   pageNumber: number | 'all';
   searchText: string;
   showMatterhornOnly: boolean;
@@ -96,6 +120,8 @@ const initialFilters: IssueFilters = {
   severity: 'all',
   wcagCriterion: 'all',
   matterhornCategory: 'all',
+  categories: new Set<string>(),
+  aiAction: 'all',
   pageNumber: 'all',
   searchText: '',
   showMatterhornOnly: false,
@@ -339,6 +365,34 @@ export const PdfAuditResultsPage: React.FC = () => {
       });
     }
 
+    // Filter by category (multi-select)
+    if (filters.categories.size > 0) {
+      issues = issues.filter((issue) => {
+        const category = normalizeCategory((issue as PdfAuditIssue & { category?: string }).category);
+        return category ? filters.categories.has(category) : false;
+      });
+    }
+
+    // Filter by AI action
+    if (filters.aiAction !== 'all') {
+      issues = issues.filter((issue) => {
+        const suggestion = aiSuggestions.get(issue.id);
+        switch (filters.aiAction) {
+          case 'fixable':
+            return suggestion?.applyMode === 'apply-to-pdf' &&
+              (suggestion.status === 'pending' || suggestion.status === 'approved');
+          case 'guidance-only':
+            return suggestion?.applyMode === 'guidance-only';
+          case 'applied':
+            return suggestion?.status === 'applied';
+          case 'rejected':
+            return suggestion?.status === 'rejected';
+          default:
+            return true;
+        }
+      });
+    }
+
     // Filter by page number
     if (filters.pageNumber !== 'all') {
       issues = issues.filter((issue) => issue.pageNumber === filters.pageNumber);
@@ -375,7 +429,7 @@ export const PdfAuditResultsPage: React.FC = () => {
     }
 
     return issues;
-  }, [auditResult, filters]);
+  }, [auditResult, filters, aiSuggestions]);
 
   // Count Matterhorn-related issues
   // Includes issues with explicit MATTERHORN codes and related codes that map to Matterhorn checkpoints
@@ -413,13 +467,15 @@ export const PdfAuditResultsPage: React.FC = () => {
     return Array.from(criteria).sort();
   }, [auditResult]);
 
-  // Get unique Matterhorn categories
-  const uniqueMatterhornCategories = useMemo(() => {
-    if (!auditResult || !auditResult.matterhornSummary?.categories) return [];
-    return auditResult.matterhornSummary.categories.map((cat) => ({
-      id: cat.id,
-      name: cat.name,
-    }));
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    if (!auditResult?.issues) return counts;
+    for (const issue of auditResult.issues) {
+      const category = normalizeCategory((issue as PdfAuditIssue & { category?: string }).category);
+      if (!category) continue;
+      counts.set(category, (counts.get(category) ?? 0) + 1);
+    }
+    return counts;
   }, [auditResult]);
 
   // Handlers
@@ -755,6 +811,8 @@ export const PdfAuditResultsPage: React.FC = () => {
     filters.severity !== 'all' ||
     filters.wcagCriterion !== 'all' ||
     filters.matterhornCategory !== 'all' ||
+    filters.categories.size > 0 ||
+    filters.aiAction !== 'all' ||
     filters.pageNumber !== 'all' ||
     filters.searchText.trim() !== '';
 
@@ -1122,6 +1180,90 @@ export const PdfAuditResultsPage: React.FC = () => {
               </button>
             </div>
 
+            {/* Category filter chips */}
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <span className="text-sm text-gray-600 mr-1">Category:</span>
+              {CATEGORY_ORDER.map((cat) => {
+                const count = categoryCounts.get(cat) ?? 0;
+                if (count === 0) return null;
+                const selected = filters.categories.has(cat);
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() =>
+                      setFilters((prev) => {
+                        const next = new Set(prev.categories);
+                        if (next.has(cat)) next.delete(cat);
+                        else next.add(cat);
+                        return { ...prev, categories: next };
+                      })
+                    }
+                    className={cn(
+                      'px-2.5 py-1 text-xs font-medium rounded-full border transition-colors',
+                      selected
+                        ? 'bg-primary-100 text-primary-700 border-primary-300'
+                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                    )}
+                  >
+                    {CATEGORY_LABELS[cat] ?? cat} ({count})
+                  </button>
+                );
+              })}
+              {filters.categories.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setFilters((prev) => ({ ...prev, categories: new Set() }))}
+                  className="text-xs text-gray-500 hover:text-gray-700 underline"
+                >
+                  Clear categories
+                </button>
+              )}
+              {filters.matterhornCategory !== 'all' && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-700 border border-blue-300">
+                  Checkpoint {filters.matterhornCategory}
+                  <button
+                    type="button"
+                    onClick={() => setFilters((prev) => ({ ...prev, matterhornCategory: 'all' }))}
+                    className="hover:text-blue-900"
+                    aria-label={`Clear checkpoint ${filters.matterhornCategory} filter`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+            </div>
+
+            {/* AI action filter */}
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <span className="text-sm text-gray-600 mr-1">AI:</span>
+              {(
+                [
+                  ['all', 'All'],
+                  ['fixable', 'Fixable now'],
+                  ['guidance-only', 'Guidance only'],
+                  ['applied', 'Applied'],
+                  ['rejected', 'Rejected'],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setFilters((prev) => ({ ...prev, aiAction: value }))}
+                  className={cn(
+                    'px-2.5 py-1 text-xs font-medium rounded-full border transition-colors',
+                    filters.aiAction === value
+                      ? value === 'fixable'
+                        ? 'bg-green-100 text-green-800 border-green-300'
+                        : 'bg-primary-100 text-primary-700 border-primary-300'
+                      : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
             {hasActiveFilters && (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-600">Active filters:</span>
@@ -1177,22 +1319,6 @@ export const PdfAuditResultsPage: React.FC = () => {
                   {uniqueWcagCriteria.map((criterion) => (
                     <option key={criterion} value={criterion}>
                       WCAG {criterion}
-                    </option>
-                  ))}
-                </select>
-
-                {/* Matterhorn category filter */}
-                <select
-                  value={filters.matterhornCategory}
-                  onChange={(e) =>
-                    setFilters((prev) => ({ ...prev, matterhornCategory: e.target.value }))
-                  }
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-                >
-                  <option value="all">All Matterhorn Categories</option>
-                  {uniqueMatterhornCategories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.id}: {cat.name}
                     </option>
                   ))}
                 </select>

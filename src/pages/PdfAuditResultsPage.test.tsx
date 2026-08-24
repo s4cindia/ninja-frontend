@@ -1020,4 +1020,187 @@ describe('PdfAuditResultsPage', () => {
       });
     });
   });
+
+  describe('Category and AI action filters', () => {
+    const jobId = 'job-123';
+    const auditUrl = `/pdf/job/${jobId}/audit/result`;
+    const statusUrl = `/pdf/${jobId}/auto-tag/status`;
+    const aiUrl = `/pdf/${jobId}/ai-analysis`;
+
+    type CategorizedIssue = PdfAuditIssue & { category: string };
+
+    const issueA: CategorizedIssue = { ...createMockIssueLike('a', 1, 'structure') };
+    const issueB: CategorizedIssue = { ...createMockIssueLike('b', 2, 'contrast') };
+    const issueC: CategorizedIssue = { ...createMockIssueLike('c', 3, 'table-structure') };
+    const issueD: CategorizedIssue = { ...createMockIssueLike('d', 4, 'contrast') };
+
+    function createMockIssueLike(id: string, pageNumber: number, category: string): CategorizedIssue {
+      return {
+        id,
+        ruleId: `RULE-${id}`,
+        severity: 'moderate',
+        message: `Test issue ${id}`,
+        description: `Test description for issue ${id}`,
+        pageNumber,
+        category,
+      } as CategorizedIssue;
+    }
+
+    function mockAiSuggestion(issueId: string, applyMode: string, status: string) {
+      return {
+        id: `sugg-${issueId}`,
+        jobId,
+        issueId,
+        suggestionType: 'alt-text',
+        value: 'A description',
+        guidance: null,
+        confidence: 0.9,
+        rationale: 'because',
+        model: 'gemini',
+        applyMode,
+        status,
+        createdAt: '2024-01-15T10:00:00Z',
+        updatedAt: '2024-01-15T10:00:00Z',
+      };
+    }
+
+    function setupMocks() {
+      // b: fixable now (apply-to-pdf, pending). c: guidance-only. d: already applied (apply-to-pdf, applied).
+      const mockResult = createMockAuditResult({ issues: [issueA, issueB, issueC, issueD] });
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) {
+          return Promise.resolve({
+            data: {
+              data: {
+                suggestions: [
+                  mockAiSuggestion('b', 'apply-to-pdf', 'pending'),
+                  mockAiSuggestion('c', 'guidance-only', 'pending'),
+                  mockAiSuggestion('d', 'apply-to-pdf', 'applied'),
+                ],
+                analyzed: 3,
+                total: 3,
+                status: 'complete',
+              },
+            },
+          });
+        }
+        return Promise.resolve({ data: { data: {} } });
+      });
+    }
+
+    function visibleIssueIds(): string[] {
+      return screen.getAllByTestId(/^issue-card-/).map((el) => el.getAttribute('data-testid')!.replace('issue-card-', ''));
+    }
+
+    it('renders category chips with live counts, omitting categories with no issues', async () => {
+      setupMocks();
+      renderWithRouter(jobId);
+
+      await screen.findByText('test-document.pdf');
+
+      expect(await screen.findByRole('button', { name: 'Structure (1)' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Contrast (2)' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Tables (1)' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Metadata/ })).not.toBeInTheDocument();
+    });
+
+    it('multi-selects categories as a union, and toggling one off narrows back', async () => {
+      setupMocks();
+      renderWithRouter(jobId);
+      await screen.findByText('test-document.pdf');
+
+      const contrastChip = await screen.findByRole('button', { name: 'Contrast (2)' });
+      fireEvent.click(contrastChip);
+      await waitFor(() => {
+        expect(visibleIssueIds().sort()).toEqual(['b', 'd']);
+      });
+
+      const structureChip = screen.getByRole('button', { name: 'Structure (1)' });
+      fireEvent.click(structureChip);
+      await waitFor(() => {
+        expect(visibleIssueIds().sort()).toEqual(['a', 'b', 'd']);
+      });
+
+      fireEvent.click(contrastChip);
+      await waitFor(() => {
+        expect(visibleIssueIds().sort()).toEqual(['a']);
+      });
+    });
+
+    it('"Fixable now" shows only apply-to-pdf suggestions not yet applied/rejected', async () => {
+      setupMocks();
+      renderWithRouter(jobId);
+      await screen.findByText('test-document.pdf');
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Fixable now' }));
+      await waitFor(() => {
+        expect(visibleIssueIds()).toEqual(['b']);
+      });
+    });
+
+    it('"Applied" and "Guidance only" each isolate the matching suggestions', async () => {
+      setupMocks();
+      renderWithRouter(jobId);
+      await screen.findByText('test-document.pdf');
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Applied' }));
+      await waitFor(() => {
+        expect(visibleIssueIds()).toEqual(['d']);
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Guidance only' }));
+      await waitFor(() => {
+        expect(visibleIssueIds()).toEqual(['c']);
+      });
+    });
+
+    it('combines a category chip and the AI action filter with AND, not OR', async () => {
+      setupMocks();
+      renderWithRouter(jobId);
+      await screen.findByText('test-document.pdf');
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Contrast (2)' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Fixable now' }));
+
+      await waitFor(() => {
+        // Contrast has b (pending) and d (applied) — only b is still fixable.
+        expect(visibleIssueIds()).toEqual(['b']);
+      });
+    });
+
+    it('shows a dismissible checkpoint pill when a Matterhorn checkpoint is clicked, unchanged mechanism', async () => {
+      setupMocks();
+      renderWithRouter(jobId);
+      await screen.findByText('test-document.pdf');
+
+      fireEvent.click(screen.getByText('Click Checkpoint'));
+
+      expect(await screen.findByText('Checkpoint 01')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByLabelText('Clear checkpoint 01 filter'));
+      await waitFor(() => {
+        expect(screen.queryByText('Checkpoint 01')).not.toBeInTheDocument();
+      });
+    });
+
+    it('Clear resets categories and AI action along with the rest of the filters', async () => {
+      setupMocks();
+      renderWithRouter(jobId);
+      await screen.findByText('test-document.pdf');
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Contrast (2)' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Fixable now' }));
+      await waitFor(() => {
+        expect(visibleIssueIds()).toEqual(['b']);
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+
+      await waitFor(() => {
+        expect(visibleIssueIds().sort()).toEqual(['a', 'b', 'c', 'd']);
+      });
+    });
+  });
 });
