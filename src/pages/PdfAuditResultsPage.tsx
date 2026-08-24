@@ -478,6 +478,21 @@ export const PdfAuditResultsPage: React.FC = () => {
     return counts;
   }, [auditResult]);
 
+  // Mirrors the "fixable" definition used in the filteredIssues filter logic
+  // below — keep both in sync if that logic ever changes.
+  const aiActionCounts = useMemo(() => {
+    let fixable = 0, guidanceOnly = 0, applied = 0, rejected = 0;
+    for (const suggestion of aiSuggestions.values()) {
+      if (suggestion.applyMode === 'apply-to-pdf' && (suggestion.status === 'pending' || suggestion.status === 'approved')) {
+        fixable++;
+      }
+      if (suggestion.applyMode === 'guidance-only') guidanceOnly++;
+      if (suggestion.status === 'applied') applied++;
+      if (suggestion.status === 'rejected') rejected++;
+    }
+    return { fixable, guidanceOnly, applied, rejected };
+  }, [aiSuggestions]);
+
   // Handlers
   const handlePageChange = useCallback((page: number) => {
     setCurrentPage(page);
@@ -1126,14 +1141,14 @@ export const PdfAuditResultsPage: React.FC = () => {
                 >
                   {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                 </button>
-              {eligibleForApplyAll > 0 && (
+              {(eligibleForApplyAll + pendingEligible) > 0 && (
                 <Button
                   variant="primary"
                   size="sm"
                   onClick={() => setShowApplyAllPanel(true)}
                 >
                   <Zap className="h-4 w-4 mr-1" />
-                  Apply All Approved ({eligibleForApplyAll})
+                  Apply Fixes ({eligibleForApplyAll + pendingEligible})
                 </Button>
               )}
               <Button
@@ -1239,13 +1254,13 @@ export const PdfAuditResultsPage: React.FC = () => {
               <span className="text-sm text-gray-600 mr-1">AI:</span>
               {(
                 [
-                  ['all', 'All'],
-                  ['fixable', 'Fixable now'],
-                  ['guidance-only', 'Guidance only'],
-                  ['applied', 'Applied'],
-                  ['rejected', 'Rejected'],
+                  ['all', 'All', aiSuggestions.size],
+                  ['fixable', 'Fixable now', aiActionCounts.fixable],
+                  ['guidance-only', 'Guidance only', aiActionCounts.guidanceOnly],
+                  ['applied', 'Applied', aiActionCounts.applied],
+                  ['rejected', 'Rejected', aiActionCounts.rejected],
                 ] as const
-              ).map(([value, label]) => (
+              ).map(([value, label, count]) => (
                 <button
                   key={value}
                   type="button"
@@ -1259,7 +1274,7 @@ export const PdfAuditResultsPage: React.FC = () => {
                       : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
                   )}
                 >
-                  {label}
+                  {label} ({count})
                 </button>
               ))}
             </div>

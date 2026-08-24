@@ -824,7 +824,7 @@ describe('PdfAuditResultsPage', () => {
     });
   });
 
-  describe('Apply All Approved bulk action', () => {
+  describe('Apply Fixes bulk-apply trigger', () => {
     const jobId = 'job-123';
     const auditUrl = `/pdf/job/${jobId}/audit/result`;
     const statusUrl = `/pdf/${jobId}/auto-tag/status`;
@@ -855,7 +855,7 @@ describe('PdfAuditResultsPage', () => {
       },
     });
 
-    it('only counts approved, apply-to-pdf suggestions toward the bulk-apply button', async () => {
+    it('counts both approved and pending apply-to-pdf suggestions toward the bulk-apply button, excluding guidance-only', async () => {
       const mockResult = createMockAuditResult();
 
       mockApi.get.mockImplementation((url: string) => {
@@ -872,10 +872,10 @@ describe('PdfAuditResultsPage', () => {
 
       renderWithRouter(jobId);
 
-      expect(await screen.findByRole('button', { name: /Apply All Approved \(2\)/ })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: /Apply Fixes \(3\)/ })).toBeInTheDocument();
     });
 
-    it('hides the bulk-apply button when there are no approved apply-to-pdf suggestions', async () => {
+    it('shows the bulk-apply button for a freshly-analyzed job where nothing has been individually approved yet (regression: was unreachable)', async () => {
       const mockResult = createMockAuditResult();
 
       mockApi.get.mockImplementation((url: string) => {
@@ -889,10 +889,27 @@ describe('PdfAuditResultsPage', () => {
 
       renderWithRouter(jobId);
 
+      expect(await screen.findByRole('button', { name: /Apply Fixes \(1\)/ })).toBeInTheDocument();
+    });
+
+    it('hides the bulk-apply button when there are no eligible apply-to-pdf suggestions at all', async () => {
+      const mockResult = createMockAuditResult();
+
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve(mockAiResponse([
+          { issueId: '1', applyMode: 'guidance-only', status: 'pending' },
+        ]));
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
       await waitFor(() => {
         expect(screen.getByText('test-document.pdf')).toBeInTheDocument();
       });
-      expect(screen.queryByRole('button', { name: /Apply All Approved/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Apply Fixes/ })).not.toBeInTheDocument();
     });
   });
 
@@ -1106,6 +1123,19 @@ describe('PdfAuditResultsPage', () => {
       expect(screen.queryByRole('button', { name: /^Metadata/ })).not.toBeInTheDocument();
     });
 
+    it('renders live counts on every AI action chip', async () => {
+      setupMocks();
+      renderWithRouter(jobId);
+      await screen.findByText('test-document.pdf');
+
+      // b: apply-to-pdf/pending (fixable). c: guidance-only. d: apply-to-pdf/applied.
+      expect(await screen.findByRole('button', { name: 'All (3)' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Fixable now (1)' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Guidance only (1)' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Applied (1)' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Rejected (0)' })).toBeInTheDocument();
+    });
+
     it('multi-selects categories as a union, and toggling one off narrows back', async () => {
       setupMocks();
       renderWithRouter(jobId);
@@ -1134,7 +1164,7 @@ describe('PdfAuditResultsPage', () => {
       renderWithRouter(jobId);
       await screen.findByText('test-document.pdf');
 
-      fireEvent.click(await screen.findByRole('button', { name: 'Fixable now' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Fixable now (1)' }));
       await waitFor(() => {
         expect(visibleIssueIds()).toEqual(['b']);
       });
@@ -1145,12 +1175,12 @@ describe('PdfAuditResultsPage', () => {
       renderWithRouter(jobId);
       await screen.findByText('test-document.pdf');
 
-      fireEvent.click(await screen.findByRole('button', { name: 'Applied' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Applied (1)' }));
       await waitFor(() => {
         expect(visibleIssueIds()).toEqual(['d']);
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Guidance only' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Guidance only (1)' }));
       await waitFor(() => {
         expect(visibleIssueIds()).toEqual(['c']);
       });
@@ -1162,7 +1192,7 @@ describe('PdfAuditResultsPage', () => {
       await screen.findByText('test-document.pdf');
 
       fireEvent.click(await screen.findByRole('button', { name: 'Contrast (2)' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Fixable now' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Fixable now (1)' }));
 
       await waitFor(() => {
         // Contrast has b (pending) and d (applied) — only b is still fixable.
@@ -1191,7 +1221,7 @@ describe('PdfAuditResultsPage', () => {
       await screen.findByText('test-document.pdf');
 
       fireEvent.click(await screen.findByRole('button', { name: 'Contrast (2)' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Fixable now' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Fixable now (1)' }));
       await waitFor(() => {
         expect(visibleIssueIds()).toEqual(['b']);
       });
