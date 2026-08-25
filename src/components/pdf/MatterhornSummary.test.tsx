@@ -154,4 +154,71 @@ describe('MatterhornSummary', () => {
     expect(screen.getByText('Matterhorn Protocol Compliance')).toBeInTheDocument();
     expect(screen.getAllByText('0%')[0]).toBeInTheDocument();
   });
+
+  describe('weighted compliance (backend PR #479)', () => {
+    it('uses weightedCompliance for the headline percentage when present, instead of the flat passed/total count', () => {
+      // Flat calc would be 7/10 = 70%, same fixture as the top-level tests —
+      // weightedCompliance gives partial credit and should win instead.
+      const weightedSummary: MatterhornSummaryType = { ...mockSummary, weightedCompliance: 88 };
+
+      render(<MatterhornSummary summary={weightedSummary} />);
+
+      expect(screen.getAllByText('88%')[0]).toBeInTheDocument();
+      expect(screen.queryByText('70%')).not.toBeInTheDocument();
+    });
+
+    it('falls back to the flat passed/total calculation for older jobs with no weightedCompliance (no regression)', () => {
+      // mockSummary deliberately has no weightedCompliance field, simulating
+      // a job audited before backend PR #479 shipped.
+      render(<MatterhornSummary summary={mockSummary} />);
+
+      expect(screen.getAllByText('70%')[0]).toBeInTheDocument();
+    });
+
+    it('shows a "% clean" note on a failed checkpoint that is mostly clean (completionRatio >= 50)', () => {
+      const summaryWithRatio: MatterhornSummaryType = {
+        ...mockSummary,
+        categories: mockSummary.categories.map((cat) =>
+          cat.id === '01'
+            ? {
+                ...cat,
+                checkpoints: cat.checkpoints.map((cp) =>
+                  cp.id === '01-002' ? { ...cp, completionRatio: 95 } : cp
+                ),
+              }
+            : cat
+        ),
+      };
+
+      render(<MatterhornSummary summary={summaryWithRatio} />);
+
+      expect(screen.getByText('95% clean')).toBeInTheDocument();
+    });
+
+    it('does not show the "% clean" note when completionRatio is below the 50% threshold', () => {
+      const summaryWithRatio: MatterhornSummaryType = {
+        ...mockSummary,
+        categories: mockSummary.categories.map((cat) =>
+          cat.id === '01'
+            ? {
+                ...cat,
+                checkpoints: cat.checkpoints.map((cp) =>
+                  cp.id === '01-002' ? { ...cp, completionRatio: 12 } : cp
+                ),
+              }
+            : cat
+        ),
+      };
+
+      render(<MatterhornSummary summary={summaryWithRatio} />);
+
+      expect(screen.queryByText(/% clean/)).not.toBeInTheDocument();
+    });
+
+    it('does not show the "% clean" note when completionRatio is absent (older jobs)', () => {
+      render(<MatterhornSummary summary={mockSummary} />);
+
+      expect(screen.queryByText(/% clean/)).not.toBeInTheDocument();
+    });
+  });
 });

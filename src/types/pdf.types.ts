@@ -53,6 +53,8 @@ export interface MatterhornCheckpoint {
   status: MatterhornCheckpointStatus;
   /** Number of issues found for this checkpoint (0 if passed) */
   issueCount: number;
+  /** 0-100: how much of the document is actually clean of this checkpoint's issues (page-density-weighted). Complements `status`, which stays strict (any issue = failed). Undefined on jobs audited before this field existed. */
+  completionRatio?: number;
 }
 
 /**
@@ -83,6 +85,8 @@ export interface MatterhornSummary {
   notApplicable: number;
   /** Grouped checkpoint results by category */
   categories: MatterhornCategory[];
+  /** 0-100: page-density-weighted average compliance across all checkpoints — moves incrementally as issues are fixed, unlike passed/totalCheckpoints which only changes when a whole category hits zero issues. Undefined on jobs audited before this field existed. */
+  weightedCompliance?: number;
 }
 
 /**
