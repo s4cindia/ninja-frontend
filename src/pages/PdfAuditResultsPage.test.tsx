@@ -163,6 +163,7 @@ const renderWithRouter = (jobId: string = 'job-123') => {
       <MemoryRouter initialEntries={[`/pdf/audit/${jobId}`]}>
         <Routes>
           <Route path="/pdf/audit/:jobId" element={<PdfAuditResultsPage />} />
+          <Route path="/pdf" element={<div>Upload page</div>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>
@@ -251,6 +252,17 @@ describe('PdfAuditResultsPage', () => {
       await waitFor(() => {
         expect(screen.getByText(/Network error/)).toBeInTheDocument();
       });
+    });
+
+    it('the error state\'s "Return to Upload" button still navigates to /pdf (regression: shares a renamed handler with the toolbar Re-run Audit button)', async () => {
+      mockApi.get.mockRejectedValueOnce(new Error('Network error'));
+
+      renderWithRouter();
+
+      const returnButton = await screen.findByRole('button', { name: 'Return to Upload' });
+      fireEvent.click(returnButton);
+
+      expect(await screen.findByText('Upload page')).toBeInTheDocument();
     });
   });
 
@@ -1230,6 +1242,95 @@ describe('PdfAuditResultsPage', () => {
 
       await waitFor(() => {
         expect(visibleIssueIds().sort()).toEqual(['a', 'b', 'c', 'd']);
+      });
+    });
+  });
+
+  describe('Re-run Audit (current job)', () => {
+    const jobId = 'job-123';
+    const auditUrl = `/pdf/job/${jobId}/audit/result`;
+    const statusUrl = `/pdf/${jobId}/auto-tag/status`;
+    const aiUrl = `/pdf/${jobId}/ai-analysis`;
+    const reauditUrl = `/pdf/${jobId}/remediation/re-audit-current`;
+    const emptyAiResponse = { data: { data: { suggestions: [], analyzed: 0, total: 0, status: 'complete' } } };
+
+    it('re-runs the audit in place (no navigation away) and refreshes the displayed results — regression: used to just navigate to /pdf', async () => {
+      let auditCallCount = 0;
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) {
+          auditCallCount += 1;
+          const score = auditCallCount === 1 ? 75 : 90;
+          return Promise.resolve({ data: { data: createMockAuditResult({ score }) } });
+        }
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve(emptyAiResponse);
+        return Promise.resolve({ data: { data: {} } });
+      });
+      mockApi.post.mockResolvedValue({ data: { data: {} } });
+
+      renderWithRouter(jobId);
+
+      await screen.findByText('75');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Re-run Audit' }));
+
+      await waitFor(() => {
+        expect(mockApi.post).toHaveBeenCalledWith(reauditUrl);
+      });
+      await waitFor(() => {
+        expect(screen.getByText('90')).toBeInTheDocument();
+      });
+
+      expect(auditCallCount).toBe(2);
+      expect(screen.queryByText('Upload page')).not.toBeInTheDocument();
+    });
+
+    it('shows a disabled "Re-running…" state while the request is in flight, then re-enables', async () => {
+      const mockResult = createMockAuditResult();
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve(emptyAiResponse);
+        return Promise.resolve({ data: { data: {} } });
+      });
+      let resolvePost!: (value: unknown) => void;
+      mockApi.post.mockImplementation(() => new Promise((resolve) => { resolvePost = resolve; }));
+
+      renderWithRouter(jobId);
+
+      const reRunButton = await screen.findByRole('button', { name: 'Re-run Audit' });
+      fireEvent.click(reRunButton);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /Re-running…/ })).toBeDisabled();
+      });
+
+      await act(async () => {
+        resolvePost({ data: { data: {} } });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Re-run Audit' })).not.toBeDisabled();
+      });
+    });
+
+    it('shows an error toast and re-enables the button if the re-audit request fails', async () => {
+      const mockResult = createMockAuditResult();
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve(emptyAiResponse);
+        return Promise.resolve({ data: { data: {} } });
+      });
+      mockApi.post.mockRejectedValue(new Error('500'));
+
+      renderWithRouter(jobId);
+
+      const reRunButton = await screen.findByRole('button', { name: 'Re-run Audit' });
+      fireEvent.click(reRunButton);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Re-run Audit' })).not.toBeDisabled();
       });
     });
   });

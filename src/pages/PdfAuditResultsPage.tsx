@@ -211,6 +211,7 @@ export const PdfAuditResultsPage: React.FC = () => {
     retagOutcome?: 'success' | 'failed-strip-bailed' | 'failed-retag-error' | null;
   } | null>(null);
   const [isRetryingAutoTag, setIsRetryingAutoTag] = useState(false);
+  const [isReRunningAudit, setIsReRunningAudit] = useState(false);
   const [showPacReport, setShowPacReport] = useState(false);
   const [showApplyAllPanel, setShowApplyAllPanel] = useState(false);
 
@@ -704,6 +705,20 @@ export const PdfAuditResultsPage: React.FC = () => {
     }
   };
 
+  const handleReRunAuditForCurrentJob = async () => {
+    if (!jobId || isReRunningAudit) return;
+    setIsReRunningAudit(true);
+    try {
+      await api.post(`/pdf/${encodeURIComponent(jobId)}/remediation/re-audit-current`);
+      toast.success('Audit re-run complete');
+      await fetchAuditResult();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to re-run audit');
+    } finally {
+      setIsReRunningAudit(false);
+    }
+  };
+
   // Apply-all kicks off an automatic post-fix validation audit server-side.
   // Reflect that immediately so the existing "Validating…" state (Generate ACR
   // button, PdfStatsCards post-fix validation card) shows right away, then poll
@@ -754,7 +769,7 @@ export const PdfAuditResultsPage: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  const handleReRunAudit = () => {
+  const handleReturnToUpload = () => {
     navigate('/pdf');
   };
 
@@ -884,7 +899,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         <Alert variant="error" className="mt-6">
           {error || 'Failed to load audit results'}
         </Alert>
-        <Button variant="primary" onClick={handleReRunAudit} className="mt-4">
+        <Button variant="primary" onClick={handleReturnToUpload} className="mt-4">
           Return to Upload
         </Button>
       </div>
@@ -988,9 +1003,11 @@ export const PdfAuditResultsPage: React.FC = () => {
               <Share2 className="h-4 w-4 mr-1" />
               Share
             </Button>
-            <Button variant="outline" size="sm" onClick={handleReRunAudit}>
-              <RotateCw className="h-4 w-4 mr-1" />
-              Re-run Audit
+            <Button variant="outline" size="sm" onClick={handleReRunAuditForCurrentJob} disabled={isReRunningAudit}>
+              {isReRunningAudit
+                ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Re-running…</>
+                : <><RotateCw className="h-4 w-4 mr-1" />Re-run Audit</>
+              }
             </Button>
             <Button
               variant="outline"

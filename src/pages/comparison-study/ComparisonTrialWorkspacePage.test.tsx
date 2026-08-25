@@ -79,6 +79,22 @@ describe('ComparisonTrialWorkspacePage', () => {
     expect(await screen.findByText('Audit page')).toBeInTheDocument();
   });
 
+  it('labels the button "View Ninja Results" once the Ninja job is already COMPLETED, and still navigates to the results page (regression: label used to always say "Start")', async () => {
+    mockService.getTrial.mockResolvedValue(
+      mockTrial({ ninjaJobId: 'job-42', job: { id: 'job-42', status: 'COMPLETED', output: {} } })
+    );
+
+    renderPage();
+
+    const button = await screen.findByRole('button', { name: 'View Ninja Results' });
+    expect(screen.queryByRole('button', { name: 'Start Ninja Remediation' })).not.toBeInTheDocument();
+    expect(button).not.toBeDisabled();
+
+    fireEvent.click(button);
+
+    expect(await screen.findByText('Audit page')).toBeInTheDocument();
+  });
+
   it('disables Run Validation while pdfxt data has not been logged yet', async () => {
     mockService.getTrial.mockResolvedValue(mockTrial({ status: 'registered' }));
 

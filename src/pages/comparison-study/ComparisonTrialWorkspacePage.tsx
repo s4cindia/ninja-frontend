@@ -189,7 +189,7 @@ export default function ComparisonTrialWorkspacePage() {
             title={!trial.ninjaJobId ? 'Ninja audit job has not been created yet' : undefined}
             className="shrink-0 px-4 py-2 text-sm font-medium rounded bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Start Ninja Remediation
+            {trial.job?.status === 'COMPLETED' ? 'View Ninja Results' : 'Start Ninja Remediation'}
           </button>
         </div>
       </div>
