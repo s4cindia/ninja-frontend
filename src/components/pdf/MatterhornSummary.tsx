@@ -80,6 +80,9 @@ const CheckpointItem: React.FC<{
               {checkpoint.issueCount} {checkpoint.issueCount === 1 ? 'issue' : 'issues'}
             </Badge>
           )}
+          {checkpoint.status === 'failed' && checkpoint.completionRatio !== undefined && checkpoint.completionRatio >= 50 && (
+            <span className="text-xs text-gray-500">{checkpoint.completionRatio}% clean</span>
+          )}
         </div>
         <p className="text-sm text-gray-700">{checkpoint.description}</p>
       </div>
@@ -156,9 +159,11 @@ export const MatterhornSummary: React.FC<MatterhornSummaryProps> = ({
     return null;
   }
 
-  const passedPercentage = summary.totalCheckpoints > 0
-    ? Math.round((summary.passed / summary.totalCheckpoints) * 100)
-    : 0;
+  const passedPercentage = summary.weightedCompliance ?? (
+    summary.totalCheckpoints > 0
+      ? Math.round((summary.passed / summary.totalCheckpoints) * 100)
+      : 0
+  );
 
   const totalIssues = summary.categories.reduce(
     (sum, category) => sum + category.checkpoints.reduce((s, c) => s + c.issueCount, 0),
