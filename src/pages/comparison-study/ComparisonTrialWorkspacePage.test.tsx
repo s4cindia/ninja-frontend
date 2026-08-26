@@ -4,11 +4,32 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import ComparisonTrialWorkspacePage from './ComparisonTrialWorkspacePage';
 import { comparisonStudyService } from '@/services/comparisonStudy.service';
+import { useJobPolling } from '@/hooks/useJobPolling';
 import type { ComparisonTrialWithJob } from '@/types/comparisonStudy.types';
 
 vi.mock('@/services/comparisonStudy.service');
+vi.mock('@/hooks/useJobPolling');
+vi.mock('@/components/pdf/PdfJobProgressPanel', () => ({
+  PdfJobProgressPanel: ({ progress }: { progress: number }) => (
+    <div data-testid="progress-panel">progress:{progress}</div>
+  ),
+}));
 
 const mockService = vi.mocked(comparisonStudyService);
+const mockUseJobPolling = vi.mocked(useJobPolling);
+const mockStartPolling = vi.fn();
+
+function stubJobPolling(status: 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | null, progress = 0) {
+  mockUseJobPolling.mockReturnValue({
+    status,
+    data: status ? { id: 'job-42', status, type: 'PDF_ACCESSIBILITY', progress } : null,
+    error: null,
+    isLoading: false,
+    isPolling: status === 'QUEUED' || status === 'PROCESSING',
+    startPolling: mockStartPolling,
+    stopPolling: vi.fn(),
+  });
+}
 
 const mockTrial = (overrides?: Partial<ComparisonTrialWithJob>): ComparisonTrialWithJob => ({
   id: 'trial-1',
@@ -32,9 +53,8 @@ const mockTrial = (overrides?: Partial<ComparisonTrialWithJob>): ComparisonTrial
   ...overrides,
 });
 
-function renderPage() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+function buildTree(queryClient: QueryClient) {
+  return (
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={['/comparison-study/trials/trial-1']}>
         <Routes>
@@ -48,6 +68,15 @@ function renderPage() {
   );
 }
 
+function renderPage() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const result = render(buildTree(queryClient));
+  return {
+    ...result,
+    rerenderPage: () => result.rerender(buildTree(queryClient)),
+  };
+}
+
 describe('ComparisonTrialWorkspacePage', () => {
   beforeEach(() => {
     mockService.getTrial.mockReset();
@@ -55,6 +84,8 @@ describe('ComparisonTrialWorkspacePage', () => {
     mockService.validateTrial.mockReset();
     mockService.getUploadUrl.mockReset();
     mockService.deleteTrial.mockReset();
+    mockStartPolling.mockReset();
+    stubJobPolling(null);
     global.fetch = vi.fn();
   });
 
@@ -195,6 +226,100 @@ describe('ComparisonTrialWorkspacePage', () => {
 
       expect(await screen.findByText('Failed to delete trial — please retry.')).toBeInTheDocument();
       expect(screen.getByText(/permanently removes the trial from Comparison Study/)).toBeInTheDocument();
+    });
+  });
+
+  describe('Ninja job progress panel', () => {
+    it('starts polling the Ninja job once ninjaJobId is set and the job is not yet terminal', async () => {
+      mockService.getTrial.mockResolvedValue(
+        mockTrial({ ninjaJobId: 'job-42', job: { id: 'job-42', status: 'PROCESSING', output: {} } })
+      );
+
+      renderPage();
+
+      await screen.findByRole('button', { name: 'Start Ninja Remediation' });
+      await waitFor(() => {
+        expect(mockStartPolling).toHaveBeenCalledWith('job-42');
+      });
+    });
+
+    it('does not start polling when ninjaJobId is not yet set', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ ninjaJobId: null, job: null }));
+
+      renderPage();
+
+      await screen.findByRole('button', { name: 'Start Ninja Remediation' });
+      expect(mockStartPolling).not.toHaveBeenCalled();
+    });
+
+    it('does not start polling when the Ninja job is already COMPLETED on load', async () => {
+      mockService.getTrial.mockResolvedValue(
+        mockTrial({ ninjaJobId: 'job-42', job: { id: 'job-42', status: 'COMPLETED', output: {} } })
+      );
+
+      renderPage();
+
+      await screen.findByRole('button', { name: 'View Ninja Results' });
+      expect(mockStartPolling).not.toHaveBeenCalled();
+    });
+
+    it('does not start polling when the Ninja job is already FAILED on load', async () => {
+      mockService.getTrial.mockResolvedValue(
+        mockTrial({ ninjaJobId: 'job-42', job: { id: 'job-42', status: 'FAILED', output: {} } })
+      );
+
+      renderPage();
+
+      await screen.findByRole('button', { name: 'Start Ninja Remediation' });
+      expect(mockStartPolling).not.toHaveBeenCalled();
+    });
+
+    it('renders the progress panel while the polled status is QUEUED or PROCESSING', async () => {
+      mockService.getTrial.mockResolvedValue(
+        mockTrial({ ninjaJobId: 'job-42', job: { id: 'job-42', status: 'PROCESSING', output: {} } })
+      );
+      stubJobPolling('PROCESSING', 42);
+
+      renderPage();
+
+      expect(await screen.findByTestId('progress-panel')).toHaveTextContent('progress:42');
+    });
+
+    it('does not render the progress panel when the polled status is null, COMPLETED, or FAILED', async () => {
+      mockService.getTrial.mockResolvedValue(
+        mockTrial({ ninjaJobId: 'job-42', job: { id: 'job-42', status: 'PROCESSING', output: {} } })
+      );
+      stubJobPolling(null);
+
+      renderPage();
+
+      await screen.findByRole('button', { name: 'Start Ninja Remediation' });
+      expect(screen.queryByTestId('progress-panel')).not.toBeInTheDocument();
+    });
+
+    it('refetches the trial once the polled Ninja job status reaches COMPLETED, flipping the button label promptly', async () => {
+      mockService.getTrial
+        .mockResolvedValueOnce(
+          mockTrial({ ninjaJobId: 'job-42', job: { id: 'job-42', status: 'PROCESSING', output: {} } })
+        )
+        .mockResolvedValue(
+          mockTrial({ ninjaJobId: 'job-42', job: { id: 'job-42', status: 'COMPLETED', output: {} } })
+        );
+      stubJobPolling('PROCESSING', 50);
+
+      const { rerenderPage } = renderPage();
+
+      await screen.findByRole('button', { name: 'Start Ninja Remediation' });
+      expect(mockService.getTrial).toHaveBeenCalledTimes(1);
+
+      // Simulate the poll picking up a COMPLETED status on a later tick.
+      stubJobPolling('COMPLETED', 100);
+      rerenderPage();
+
+      await waitFor(() => {
+        expect(mockService.getTrial).toHaveBeenCalledTimes(2);
+      });
+      expect(await screen.findByRole('button', { name: 'View Ninja Results' })).toBeInTheDocument();
     });
   });
 });

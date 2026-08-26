@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Upload, FileText, CheckCircle, AlertCircle, Loader2, X, Circle, ArrowRight, Sparkles } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, Loader2, X, ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Progress } from '../ui/Progress';
 import { Alert } from '../ui/Alert';
@@ -8,6 +8,7 @@ import { api } from '@/services/api';
 import { uploadService } from '@/services/upload.service';
 import { tenantConfigService } from '@/services/tenant-config.service';
 import { useJobPolling, JobData } from '@/hooks/useJobPolling';
+import { PdfJobProgressPanel } from '@/components/pdf/PdfJobProgressPanel';
 import { detectFileType, getAcceptedMimeTypes, DocumentFileType } from '@/utils/fileUtils';
 import type { AuditSummary } from '@/types/audit.types';
 
@@ -487,147 +488,18 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
                 Taking longer than expected — the worker may be busy. Your job will start when capacity is available.
               </p>
             )}
-            {state === 'processing' && (() => {
-              const totalPages = jobData?.input?.totalPages as number | undefined;
-              const validatorProgress = jobData?.input?.validatorProgress as Array<{ label: string; issuesFound: number }> | undefined;
-
-              // Page extraction phase
-              if (totalPages && totalPages > 0) {
-                const currentPage = Math.min(Math.round(((progress - 20) / 68) * totalPages), totalPages);
-                const extractionDone = currentPage >= totalPages;
-
-                const VALIDATOR_LABELS = ['Structure & Tags', 'Alt Text', 'Color Contrast', 'Tables'];
-                const doneNames = new Set((validatorProgress ?? []).map(v => v.label));
-
-                return (
-                  <div className="space-y-2">
-                    {!extractionDone ? (
-                      <p className="text-xs font-mono text-primary-700">
-                        Page {currentPage.toLocaleString()} of {totalPages.toLocaleString()}
-                      </p>
-                    ) : (
-                      <div className="text-left mx-auto max-w-xs space-y-1.5">
-                        {VALIDATOR_LABELS.map((label) => {
-                          const done = doneNames.has(label);
-                          const stat = validatorProgress?.find(v => v.label === label);
-                          const isNext = !done && (validatorProgress ?? []).length === VALIDATOR_LABELS.indexOf(label);
-                          return (
-                            <div key={label} className="flex items-center gap-2 text-sm">
-                              {done ? (
-                                <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
-                              ) : isNext ? (
-                                <Loader2 className="h-4 w-4 text-primary-500 animate-spin shrink-0" />
-                              ) : (
-                                <Circle className="h-4 w-4 text-gray-300 shrink-0" />
-                              )}
-                              <span className={done ? 'text-gray-800 font-medium' : isNext ? 'text-primary-700 font-medium' : 'text-gray-400'}>
-                                {label}
-                                {done && stat && (
-                                  <span className={`ml-1 font-normal text-xs ${stat.issuesFound > 0 ? 'text-amber-600' : 'text-green-600'}`}>
-                                    — {stat.issuesFound} {stat.issuesFound === 1 ? 'issue' : 'issues'}
-                                  </span>
-                                )}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              }
-              return null;
-            })()}
+            <PdfJobProgressPanel
+              jobData={jobData}
+              progress={progress}
+              showUploadRow
+              uploadStart={uploadStartRef.current}
+              uploadEnd={uploadEndRef.current}
+            />
             <p className="text-sm text-gray-500">
               {state === 'uploading' && 'Please wait while your file is being uploaded and audited'}
               {state === 'queued' && 'Your audit is in the queue and will start shortly'}
               {state === 'processing' && 'Analyzing document structure and accessibility features'}
             </p>
-            {/* Timing table — visible once upload has started */}
-            {uploadStartRef.current && (() => {
-              type TR = { label: string; start: Date | null; end: Date | null; detail?: string; status: 'done' | 'running' | 'pending' };
-              const vp = (jobData?.input?.validatorProgress ?? []) as Array<{ label: string; issuesFound: number; startedAt: string; completedAt: string }>;
-              const auditStart = jobData?.startedAt ? new Date(jobData.startedAt) : null;
-              const auditEnd   = jobData?.completedAt ? new Date(jobData.completedAt) : null;
-              const totalPages = jobData?.input?.totalPages as number | undefined;
-              const autoTagProg = jobData?.input?.autoTagProgress as { startedAt?: string; completedAt?: string; status?: string; elementCounts?: Record<string, number> } | undefined;
-              const hasAutoTag = !!autoTagProg;
-              const autoTagEnd = autoTagProg?.completedAt ? new Date(autoTagProg.completedAt) : null;
-              const extractionDone = (totalPages ? progress >= 88 : false) || vp.length > 0 || auditEnd !== null;
-              const extractionEnd  = vp.length > 0 ? new Date(vp[0].startedAt) : (extractionDone ? auditEnd : null);
-              const extractionStart = hasAutoTag ? autoTagEnd : auditStart;
-              const VLABELS = ['Structure & Tags', 'Alt Text', 'Color Contrast', 'Tables'];
-              const rows: TR[] = [
-                { label: 'Upload',    start: uploadStartRef.current, end: uploadEndRef.current, status: uploadEndRef.current ? 'done' : 'running' },
-                { label: 'Queue',     start: uploadEndRef.current,   end: auditStart,            status: auditStart ? 'done' : uploadEndRef.current ? 'running' : 'pending' },
-                ...(hasAutoTag ? [{
-                  label: 'Adobe AutoTag',
-                  start: autoTagProg?.startedAt ? new Date(autoTagProg.startedAt) : auditStart,
-                  end: autoTagEnd,
-                  status: (autoTagProg?.status === 'complete' || autoTagProg?.status === 'failed') ? 'done' as const : auditStart ? 'running' as const : 'pending' as const,
-                  detail: autoTagProg?.status === 'complete' && autoTagProg.elementCounts
-                    ? `${autoTagProg.elementCounts.figures ?? 0}F · ${autoTagProg.elementCounts.tables ?? 0}T · ${autoTagProg.elementCounts.headings ?? 0}H`
-                    : autoTagProg?.status === 'failed' ? 'failed' : undefined,
-                }] : []),
-                { label: 'Extraction', start: extractionStart,       end: extractionEnd,          status: extractionDone ? 'done' : (hasAutoTag ? autoTagEnd : auditStart) ? 'running' : 'pending' },
-                ...VLABELS.map((lbl, idx) => {
-                  const done = vp.find(v => v.label === lbl);
-                  if (done) return { label: lbl, start: new Date(done.startedAt), end: new Date(done.completedAt), status: 'done' as const, detail: `${done.issuesFound} issue${done.issuesFound !== 1 ? 's' : ''}` };
-                  const isRunning = extractionDone && vp.length === idx;
-                  const prevEnd = vp.length > 0 ? new Date(vp[vp.length - 1].completedAt) : (isRunning ? auditStart : null);
-                  return { label: lbl, start: isRunning ? prevEnd : null, end: null, status: isRunning ? 'running' as const : 'pending' as const };
-                }),
-              ];
-              return (
-                <div className="mt-3 border border-gray-200 rounded-lg overflow-hidden text-left">
-                  <div className="bg-gray-100 px-4 py-2 font-semibold text-gray-500 uppercase tracking-wider text-xs border-b border-gray-200">
-                    Timing
-                  </div>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-200 bg-gray-50 text-gray-500">
-                        <th className="px-4 py-2 text-left font-semibold">Phase</th>
-                        <th className="px-4 py-2 text-left font-semibold">Started</th>
-                        <th className="px-4 py-2 text-left font-semibold">Ended</th>
-                        <th className="px-4 py-2 text-left font-semibold">Duration</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map(row => (
-                        <tr key={row.label} className={`border-b border-gray-100 last:border-0 ${row.status === 'running' ? 'bg-primary-50' : ''}`}>
-                          <td className="px-4 py-2 font-medium text-gray-800">
-                            <div className="flex items-center gap-2">
-                              {row.status === 'done' && <span className="inline-block w-2 h-2 rounded-full bg-green-500 shrink-0" />}
-                              {row.status === 'running' && <span className="inline-block w-2 h-2 rounded-full bg-primary-500 animate-pulse shrink-0" />}
-                              {row.status === 'pending' && <span className="inline-block w-2 h-2 rounded-full bg-gray-300 shrink-0" />}
-                              <span className={row.status === 'pending' ? 'text-gray-400' : 'text-gray-800'}>
-                                {row.label}
-                              </span>
-                              {row.detail && <span className="font-normal text-gray-400 text-xs">· {row.detail}</span>}
-                            </div>
-                          </td>
-                          <td className="px-4 py-2 font-mono text-gray-600 text-xs">{fmtTime(row.start)}</td>
-                          <td className="px-4 py-2 font-mono text-xs">
-                            {row.status === 'running'
-                              ? <span className="text-primary-600 font-medium">running…</span>
-                              : row.status === 'pending'
-                                ? <span className="text-gray-300">—</span>
-                                : <span className="text-gray-600">{fmtTime(row.end)}</span>}
-                          </td>
-                          <td className="px-4 py-2 font-mono text-xs">
-                            {row.status === 'pending'
-                              ? <span className="text-gray-300">—</span>
-                              : row.status === 'running'
-                                ? <span className="text-primary-600 font-semibold">{fmtDur(row.start)}</span>
-                                : <span className="text-gray-700 font-medium">{fmtDur(row.start, row.end)}</span>}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              );
-            })()}
           </div>
         )}
 
