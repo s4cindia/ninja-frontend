@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { useComparisonTrial, useLogPdfxtData, useValidateTrial, useDeleteTrial } from '@/hooks/useComparisonStudy';
 import { comparisonStudyService } from '@/services/comparisonStudy.service';
+import { useJobPolling } from '@/hooks/useJobPolling';
+import { PdfJobProgressPanel } from '@/components/pdf/PdfJobProgressPanel';
 
 const CONTENT_TYPE_LABELS: Record<string, string> = {
   'text-dominant': 'Text Dominant',
@@ -70,10 +72,24 @@ function DeleteTrialDialog({
 export default function ComparisonTrialWorkspacePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data: trial, isLoading } = useComparisonTrial(id);
+  const { data: trial, isLoading, refetch: refetchTrial } = useComparisonTrial(id);
   const logPdfxt = useLogPdfxtData(id!);
   const validateTrial = useValidateTrial(id!);
   const deleteTrial = useDeleteTrial(id!);
+
+  const { status: ninjaJobStatus, data: ninjaJobData, startPolling } = useJobPolling({ interval: 2000 });
+
+  useEffect(() => {
+    if (trial?.ninjaJobId && trial?.job?.status && trial.job.status !== 'COMPLETED' && trial.job.status !== 'FAILED') {
+      startPolling(trial.ninjaJobId);
+    }
+  }, [trial?.ninjaJobId, trial?.job?.status, startPolling]);
+
+  useEffect(() => {
+    if (ninjaJobStatus === 'COMPLETED' || ninjaJobStatus === 'FAILED') {
+      refetchTrial();
+    }
+  }, [ninjaJobStatus, refetchTrial]);
 
   const [pdfxtTime, setPdfxtTime] = useState('');
   const [pdfxtPageCount, setPdfxtPageCount] = useState('');
@@ -192,6 +208,11 @@ export default function ComparisonTrialWorkspacePage() {
             {trial.job?.status === 'COMPLETED' ? 'View Ninja Results' : 'Start Ninja Remediation'}
           </button>
         </div>
+        {(ninjaJobStatus === 'QUEUED' || ninjaJobStatus === 'PROCESSING') && (
+          <div className="mt-4">
+            <PdfJobProgressPanel jobData={ninjaJobData} progress={ninjaJobData?.progress ?? 0} />
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-lg shadow p-6">
