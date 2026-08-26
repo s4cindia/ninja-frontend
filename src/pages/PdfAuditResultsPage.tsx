@@ -737,6 +737,9 @@ export const PdfAuditResultsPage: React.FC = () => {
             clearInterval(autoTagPollRef.current);
             autoTagPollRef.current = null;
           }
+          if (isMountedRef.current && info?.postRemediationStatus === 'complete') {
+            fetchAuditResult();
+          }
         }
       } catch {
         if (autoTagPollRef.current) {
@@ -745,7 +748,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         }
       }
     }, 5000);
-  }, [jobId]);
+  }, [jobId, fetchAuditResult]);
 
   // After a successful bulk apply, refetch suggestions from the server instead
   // of patching aiSuggestions locally — apply-all's response only carries

@@ -149,6 +149,36 @@ describe('PdfStatsCards — strip-and-retag empty-shell indicator', () => {
   });
 });
 
+describe('PdfStatsCards — post-fix validation resolution rate', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('shows the backend-computed percentage as-is, without multiplying by 100 again', () => {
+    renderCard({
+      status: 'complete',
+      postRemediationStatus: 'complete',
+      postRemediationAudit: { runAt: '2026-08-26T00:00:00.000Z', resolved: 12, remaining: 1092, regressions: 0, resolutionRate: 1.0869565217391304 },
+    });
+
+    expect(screen.getByText('Post-fix validation · 1% resolved')).toBeInTheDocument();
+    expect(screen.queryByText(/109% resolved/)).not.toBeInTheDocument();
+  });
+
+  it('shows the amber failed banner, not a resolution percentage, when post-fix validation failed', () => {
+    renderCard({ status: 'complete', postRemediationStatus: 'failed' });
+
+    expect(screen.getByText('Post-fix validation failed')).toBeInTheDocument();
+    expect(screen.queryByText(/resolved/)).not.toBeInTheDocument();
+  });
+
+  it('shows the pending "Validating fixes…" banner while post-fix validation is in progress', () => {
+    renderCard({ status: 'complete', postRemediationStatus: 'pending' });
+
+    expect(screen.getByText('Validating fixes…')).toBeInTheDocument();
+  });
+});
+
 describe('PdfStatsCards — AI Analysis card color-contrast re-analysis link', () => {
   const emptyAiStats = {
     gemini: { totalTokens: 0, estimatedCostUsd: 0 },
