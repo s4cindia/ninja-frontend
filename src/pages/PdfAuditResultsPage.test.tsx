@@ -65,6 +65,16 @@ vi.mock('@/components/remediation/IssueCard', () => ({
   ),
 }));
 
+vi.mock('@/components/remediation/ApplyAllSuggestionsPanel', () => ({
+  ApplyAllSuggestionsPanel: ({ onApplied }: {
+    onApplied: (result: { applied: number; failed: number }) => void;
+  }) => (
+    <button onClick={() => onApplied({ applied: 1, failed: 0 })}>
+      Mock Apply All
+    </button>
+  ),
+}));
+
 const mockMatterhornSummary: MatterhornSummary = {
   totalCheckpoints: 31,
   passed: 25,
@@ -922,6 +932,151 @@ describe('PdfAuditResultsPage', () => {
         expect(screen.getByText('test-document.pdf')).toBeInTheDocument();
       });
       expect(screen.queryByRole('button', { name: /Apply Fixes/ })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Post-fix validation completion refreshes the full page', () => {
+    const jobId = 'job-123';
+    const auditUrl = `/pdf/job/${jobId}/audit/result`;
+    const statusUrl = `/pdf/${jobId}/auto-tag/status`;
+    const aiUrl = `/pdf/${jobId}/ai-analysis`;
+    const oneEligibleAiResponse = {
+      data: {
+        data: {
+          suggestions: [{
+            id: 'sugg-1',
+            jobId,
+            issueId: '1',
+            suggestionType: 'alt-text',
+            value: 'A description',
+            guidance: null,
+            confidence: 0.9,
+            rationale: 'because',
+            model: 'gemini',
+            applyMode: 'apply-to-pdf',
+            status: 'pending',
+            createdAt: '2024-01-15T10:00:00Z',
+            updatedAt: '2024-01-15T10:00:00Z',
+          }],
+          analyzed: 1,
+          total: 1,
+          status: 'complete',
+        },
+      },
+    };
+
+    beforeEach(() => {
+      // PdfStatsCards persists each card's expand/collapse state to
+      // localStorage — clear it so the Issues card (Total Issues, the
+      // post-fix validation banner) starts expanded, as it does by default.
+      localStorage.clear();
+    });
+
+    it('re-pulls Total Issues/Score once post-fix validation completes, without needing a manual reload (regression: used to stay frozen)', async () => {
+      const preFixResult = createMockAuditResult({ score: 75, issues: createMockAuditResult().issues });
+      const postFixResult = createMockAuditResult({ score: 90, issues: createMockAuditResult().issues.slice(0, 2) });
+
+      let auditCallCount = 0;
+      let statusCallCount = 0;
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) {
+          auditCallCount += 1;
+          return Promise.resolve({ data: { data: auditCallCount === 1 ? preFixResult : postFixResult } });
+        }
+        if (url === statusUrl) {
+          statusCallCount += 1;
+          if (statusCallCount === 1) {
+            return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+          }
+          return Promise.resolve({
+            data: {
+              data: {
+                status: 'complete',
+                taggerSource: 'adobe',
+                postRemediationStatus: 'complete',
+                postRemediationAudit: { runAt: '2026-08-26T00:00:00.000Z', resolved: 12, remaining: 1092, regressions: 0, resolutionRate: 1.09 },
+              },
+            },
+          });
+        }
+        if (url === aiUrl) return Promise.resolve(oneEligibleAiResponse);
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      expect(await screen.findByText('75')).toBeInTheDocument();
+      const applyFixesButton = await screen.findByRole('button', { name: /Apply Fixes \(1\)/ });
+
+      // The poll interval must be created under fake timers, or advancing
+      // fake time afterward has no effect on it — so switch before the
+      // clicks that start it, matching the "retry" polling test above.
+      vi.useFakeTimers();
+      try {
+        await act(async () => {
+          fireEvent.click(applyFixesButton);
+        });
+        await act(async () => {
+          fireEvent.click(screen.getByRole('button', { name: 'Mock Apply All' }));
+          await vi.advanceTimersByTimeAsync(5000);
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+
+      await waitFor(() => {
+        expect(auditCallCount).toBe(2);
+      });
+      await waitFor(() => {
+        expect(screen.getByText('90')).toBeInTheDocument();
+      });
+      expect(screen.queryByText('75')).not.toBeInTheDocument();
+    });
+
+    it('does not re-pull the audit result when post-fix validation fails, keeping the last known-good numbers', async () => {
+      const preFixResult = createMockAuditResult({ score: 75 });
+
+      let auditCallCount = 0;
+      let statusCallCount = 0;
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) {
+          auditCallCount += 1;
+          return Promise.resolve({ data: { data: preFixResult } });
+        }
+        if (url === statusUrl) {
+          statusCallCount += 1;
+          if (statusCallCount === 1) {
+            return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+          }
+          return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe', postRemediationStatus: 'failed' } } });
+        }
+        if (url === aiUrl) return Promise.resolve(oneEligibleAiResponse);
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      expect(await screen.findByText('75')).toBeInTheDocument();
+      const applyFixesButton = await screen.findByRole('button', { name: /Apply Fixes \(1\)/ });
+
+      vi.useFakeTimers();
+      try {
+        await act(async () => {
+          fireEvent.click(applyFixesButton);
+        });
+        await act(async () => {
+          fireEvent.click(screen.getByRole('button', { name: 'Mock Apply All' }));
+          await vi.advanceTimersByTimeAsync(5000);
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+
+      await waitFor(() => {
+        expect(screen.getByText('Post-fix validation failed')).toBeInTheDocument();
+      });
+      expect(auditCallCount).toBe(1);
+      expect(screen.getByText('75')).toBeInTheDocument();
     });
   });
 

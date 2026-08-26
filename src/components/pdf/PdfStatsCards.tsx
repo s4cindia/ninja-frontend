@@ -479,7 +479,7 @@ export function PdfStatsCards({
         <div className="bg-green-50 rounded-md px-3 py-2 text-xs text-green-800 space-y-1">
           <div className="flex items-center gap-2 font-medium">
             <CheckCircle className="h-3.5 w-3.5 flex-shrink-0" />
-            Post-fix validation · {Math.round(autoTagInfo.postRemediationAudit.resolutionRate * 100)}% resolved
+            Post-fix validation · {Math.round(autoTagInfo.postRemediationAudit.resolutionRate)}% resolved
           </div>
           <div className="flex gap-3 pl-5 text-green-700">
             <span><strong>{autoTagInfo.postRemediationAudit.resolved}</strong> resolved</span>
