@@ -207,6 +207,14 @@ export const PdfAuditResultsPage: React.FC = () => {
     adobeFlags?: Array<{ elementType?: string; page?: number; confidence?: string; reviewComment?: string }>;
     postRemediationStatus?: 'pending' | 'complete' | 'failed';
     postRemediationAudit?: { runAt: string; resolved: number; remaining: number; regressions: number; resolutionRate: number };
+    postRemediationProgress?: {
+      currentPage?: number;
+      totalPages?: number;
+      completedValidators?: number;
+      totalValidators?: number;
+      currentValidator?: string;
+      updatedAt?: string;
+    };
     structureTreeCompleteness?: { totalElements: number; semanticElements: number; isEmptyShell: boolean } | null;
     retagOutcome?: 'success' | 'failed-strip-bailed' | 'failed-retag-error' | null;
   } | null>(null);
@@ -726,7 +734,7 @@ export const PdfAuditResultsPage: React.FC = () => {
   const pollPostRemediationStatus = useCallback(() => {
     if (!jobId) return;
     if (autoTagPollRef.current) clearInterval(autoTagPollRef.current);
-    setAutoTagInfo(prev => prev ? { ...prev, postRemediationStatus: 'pending' } : prev);
+    setAutoTagInfo(prev => prev ? { ...prev, postRemediationStatus: 'pending', postRemediationProgress: undefined } : prev);
     autoTagPollRef.current = setInterval(async () => {
       try {
         const res = await api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`);

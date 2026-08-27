@@ -100,6 +100,14 @@ export interface AutoTagInfo {
     regressions: number;
     resolutionRate: number;
   };
+  postRemediationProgress?: {
+    currentPage?: number;
+    totalPages?: number;
+    completedValidators?: number;
+    totalValidators?: number;
+    currentValidator?: string;
+    updatedAt?: string;
+  };
   structureTreeCompleteness?: {
     totalElements: number;
     semanticElements: number;
@@ -498,12 +506,22 @@ export function PdfStatsCards({
           Post-fix validation failed
         </div>
       )}
-      {autoTagInfo?.postRemediationStatus === 'pending' && (
-        <div className="flex items-center gap-2 text-xs text-blue-700 bg-blue-50 rounded px-3 py-2">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Validating fixes…
-        </div>
-      )}
+      {autoTagInfo?.postRemediationStatus === 'pending' && (() => {
+        const progress = autoTagInfo.postRemediationProgress;
+        const pageText = progress?.currentPage != null && progress?.totalPages != null
+          ? `Page ${progress.currentPage} of ${progress.totalPages}`
+          : null;
+        const validatorText = progress?.currentValidator && progress?.completedValidators != null && progress?.totalValidators != null
+          ? `${progress.currentValidator} (${progress.completedValidators}/${progress.totalValidators})`
+          : null;
+        const detail = [pageText, validatorText].filter(Boolean).join(' · ');
+        return (
+          <div className="flex items-center gap-2 text-xs text-blue-700 bg-blue-50 rounded px-3 py-2">
+            <Loader2 className="h-3.5 w-3.5 animate-spin flex-shrink-0" />
+            {detail ? `Re-validating fixes: ${detail}` : 'Validating fixes…'}
+          </div>
+        );
+      })()}
     </>
   );
 
