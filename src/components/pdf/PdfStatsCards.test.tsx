@@ -177,6 +177,44 @@ describe('PdfStatsCards — post-fix validation resolution rate', () => {
 
     expect(screen.getByText('Validating fixes…')).toBeInTheDocument();
   });
+
+  it('shows page and validator progress together once both are populated', () => {
+    renderCard({
+      status: 'complete',
+      postRemediationStatus: 'pending',
+      postRemediationProgress: {
+        currentPage: 207,
+        totalPages: 414,
+        completedValidators: 4,
+        totalValidators: 8,
+        currentValidator: 'Tables',
+        updatedAt: '2026-08-27T03:34:53.907Z',
+      },
+    });
+
+    expect(screen.getByText('Re-validating fixes: Page 207 of 414 · Tables (4/8)')).toBeInTheDocument();
+    expect(screen.queryByText('Validating fixes…')).not.toBeInTheDocument();
+  });
+
+  it('shows only page progress when validator fields are still at their initial/absent state', () => {
+    renderCard({
+      status: 'complete',
+      postRemediationStatus: 'pending',
+      postRemediationProgress: { currentPage: 12, totalPages: 414 },
+    });
+
+    expect(screen.getByText('Re-validating fixes: Page 12 of 414')).toBeInTheDocument();
+  });
+
+  it('falls back to the plain "Validating fixes…" message when progress is absent', () => {
+    renderCard({
+      status: 'complete',
+      postRemediationStatus: 'pending',
+      postRemediationProgress: {},
+    });
+
+    expect(screen.getByText('Validating fixes…')).toBeInTheDocument();
+  });
 });
 
 describe('PdfStatsCards — AI Analysis card color-contrast re-analysis link', () => {
