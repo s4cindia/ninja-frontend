@@ -8,7 +8,7 @@
  * Matterhorn Coverage Plan — Step 5 (frontend)
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -139,12 +139,23 @@ interface PacReportModalProps {
   isOpen: boolean;
   onClose: () => void;
   jobId: string;
+  /** Called once the report has successfully loaded/generated (fires each open, not just the first). */
+  onGenerated?: () => void;
 }
 
-export function PacReportModal({ isOpen, onClose, jobId }: PacReportModalProps) {
+export function PacReportModal({ isOpen, onClose, jobId, onGenerated }: PacReportModalProps) {
   const [report, setReport] = useState<PacReport | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Read via a ref rather than a dependency, so a parent passing an inline
+  // callback doesn't re-trigger the fetch below on every render. Updated in
+  // a committed effect (not during render) so a discarded render can't leave
+  // the fetch effect below holding a callback from work that never landed.
+  const onGeneratedRef = useRef(onGenerated);
+  useEffect(() => {
+    onGeneratedRef.current = onGenerated;
+  });
 
   useEffect(() => {
     if (!isOpen || !jobId) return;
@@ -154,7 +165,7 @@ export function PacReportModal({ isOpen, onClose, jobId }: PacReportModalProps) 
     setIsLoading(true);
     setError(null);
     getPacReport(jobId)
-      .then((r) => { if (!cancelled) setReport(r); })
+      .then((r) => { if (!cancelled) { setReport(r); onGeneratedRef.current?.(); } })
       .catch((err: unknown) => {
         if (cancelled) return;
         const msg = err instanceof Error ? err.message : 'Failed to load PAC report';
