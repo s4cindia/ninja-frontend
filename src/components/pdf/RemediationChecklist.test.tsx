@@ -97,6 +97,17 @@ describe('RemediationChecklist', () => {
     expect(screen.getByText('3. Apply AI-suggested fixes').closest('div')!.parentElement).toHaveTextContent('Done');
   });
 
+  it('step 3 stays in progress for an approved-but-not-yet-applied fix (regression: must not report done before Apply Fixes runs)', () => {
+    render(
+      <RemediationChecklist
+        {...baseProps}
+        aiAnalysisStatus="complete"
+        aiSuggestions={suggestionsMap([suggestion({ issueId: 'a', applyMode: 'apply-to-pdf', status: 'approved' })])}
+      />
+    );
+    expect(screen.getByText('3. Apply AI-suggested fixes').closest('div')!.parentElement).toHaveTextContent('In progress');
+  });
+
   it('step 4 shows a live remaining count and a disabled confirm button until a note is entered', async () => {
     render(
       <RemediationChecklist
@@ -234,6 +245,18 @@ describe('RemediationChecklist', () => {
       expect(screen.getByRole('button', { name: 'Mark trial complete' })).toBeDisabled();
     });
     expect(screen.getByText('Requires an Admin or Operator role.')).toBeInTheDocument();
+  });
+
+  it('step 7 disables the confirm button for an admin/operator until pdfxt data is logged (mirrors the trial workspace guard)', async () => {
+    mockService.getTrial.mockResolvedValueOnce({ id: 'ct_xyz789', status: 'registered' } as ComparisonTrialWithJob);
+
+    render(<RemediationChecklist {...baseProps} comparisonTrialId="ct_xyz789" userRole="ADMIN" />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Mark trial complete' })).toBeDisabled();
+    });
+    expect(screen.getByText('Log pdfxt data first.')).toBeInTheDocument();
+    expect(mockService.validateTrial).not.toHaveBeenCalled();
   });
 
   it('marks the first incomplete step as "Recommended next"', () => {

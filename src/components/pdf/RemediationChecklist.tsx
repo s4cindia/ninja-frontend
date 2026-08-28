@@ -136,8 +136,15 @@ export function RemediationChecklist({
 
   const suggestions = useMemo(() => Array.from(aiSuggestions.values()), [aiSuggestions]);
 
+  // 'approved' suggestions still need Apply Fixes/Apply All to actually touch
+  // the PDF — the bulk-action eligibility count treats them the same way
+  // (eligibleForApplyAll in PdfAuditResultsPage), so step 3 must too, or it
+  // reports "done" the moment items are approved but before they're applied.
   const pendingFixable = useMemo(
-    () => suggestions.filter(s => s.status === 'pending' && (s.applyMode === 'apply-to-pdf' || s.applyMode === 'auto-resolve')),
+    () => suggestions.filter(s =>
+      (s.applyMode === 'apply-to-pdf' && (s.status === 'pending' || s.status === 'approved')) ||
+      (s.applyMode === 'auto-resolve' && s.status === 'pending')
+    ),
     [suggestions]
   );
   const pendingGuidance = useMemo(
@@ -155,6 +162,10 @@ export function RemediationChecklist({
   const step7Done = trial?.status === 'validated';
 
   const canValidateTrial = userRole === 'ADMIN' || userRole === 'OPERATOR';
+  // Mirrors the guard on ComparisonTrialWorkspacePage's own Validate button —
+  // the backend requires pdfxt data logged first, and 'registered' means it
+  // isn't yet.
+  const needsPdfxtData = trial?.status === 'registered';
 
   const handleAcknowledge = useCallback(async () => {
     const note = noteInput.trim();
@@ -269,13 +280,17 @@ export function RemediationChecklist({
               <Button
                 size="sm"
                 variant="outline"
-                disabled={isLoadingTrial || isValidatingTrial || !canValidateTrial}
+                disabled={isLoadingTrial || isValidatingTrial || !canValidateTrial || needsPdfxtData}
+                title={needsPdfxtData ? 'Log pdfxt data first' : undefined}
                 onClick={handleValidateTrial}
               >
                 {isValidatingTrial ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Mark trial complete'}
               </Button>
               {!canValidateTrial && (
                 <span className="text-xs text-gray-500">Requires an Admin or Operator role.</span>
+              )}
+              {canValidateTrial && needsPdfxtData && (
+                <span className="text-xs text-gray-500">Log pdfxt data first.</span>
               )}
             </div>
           ),
@@ -287,7 +302,7 @@ export function RemediationChecklist({
     aiAnalysisStatus, step2Done, step3Done, step4FullyResolved, step4Acknowledged, guidanceAcknowledgment,
     noteInput, isSubmittingAck, handleAcknowledge, pendingGuidance.length,
     step5Done, postRemediationStatus, step6Done, acrGenerated, pacReportGenerated,
-    step7Applicable, step7Done, isValidatingTrial, isLoadingTrial, canValidateTrial, handleValidateTrial,
+    step7Applicable, step7Done, isValidatingTrial, isLoadingTrial, canValidateTrial, needsPdfxtData, handleValidateTrial,
   ]);
 
   const recommendedNextId = useMemo(

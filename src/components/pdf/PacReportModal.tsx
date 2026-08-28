@@ -149,9 +149,13 @@ export function PacReportModal({ isOpen, onClose, jobId, onGenerated }: PacRepor
   const [error, setError] = useState<string | null>(null);
 
   // Read via a ref rather than a dependency, so a parent passing an inline
-  // callback doesn't re-trigger the fetch below on every render.
+  // callback doesn't re-trigger the fetch below on every render. Updated in
+  // a committed effect (not during render) so a discarded render can't leave
+  // the fetch effect below holding a callback from work that never landed.
   const onGeneratedRef = useRef(onGenerated);
-  onGeneratedRef.current = onGenerated;
+  useEffect(() => {
+    onGeneratedRef.current = onGenerated;
+  });
 
   useEffect(() => {
     if (!isOpen || !jobId) return;
