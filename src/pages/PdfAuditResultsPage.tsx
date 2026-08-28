@@ -36,12 +36,15 @@ import { PacReportModal } from '@/components/pdf/PacReportModal';
 import { PdfPageNavigator } from '@/components/pdf/PdfPageNavigator';
 import { PdfPreviewPanel } from '@/components/pdf/PdfPreviewPanel';
 import { PdfStatsCards } from '@/components/pdf/PdfStatsCards';
+import { RemediationChecklist } from '@/components/pdf/RemediationChecklist';
+import type { GuidanceAcknowledgment } from '@/components/pdf/RemediationChecklist';
 import { IssueCard, AiAnalysis } from '@/components/remediation/IssueCard';
 import { ApplyAllSuggestionsPanel } from '@/components/remediation/ApplyAllSuggestionsPanel';
 import { useRemediationTimer } from '@/hooks/useRemediationTimer';
 import { triggerAiAnalysis } from '@/services/api/pdfAiAnalysis.service';
 import type { ApplyAllAiSuggestionsResult } from '@/services/api/pdfAiAnalysis.service';
 import { api } from '@/services/api';
+import { useAuthStore } from '@/stores/auth.store';
 
 /**
  * Maps backend issue category/code fields to Matterhorn category IDs used in the UI filter.
@@ -162,6 +165,7 @@ export const PdfAuditResultsPage: React.FC = () => {
   const { recordApplied, recordSuggestionDecision, recordBulkApply } = useRemediationTimer(
     comparisonTrialId ? jobId : undefined
   );
+  const currentUser = useAuthStore(state => state.user);
 
   // Track component mount status to prevent setState on unmounted component
   const isMountedRef = useRef(true);
@@ -217,11 +221,20 @@ export const PdfAuditResultsPage: React.FC = () => {
     };
     structureTreeCompleteness?: { totalElements: number; semanticElements: number; isEmptyShell: boolean } | null;
     retagOutcome?: 'success' | 'failed-strip-bailed' | 'failed-retag-error' | null;
+    comparisonTrialId?: string | null;
   } | null>(null);
   const [isRetryingAutoTag, setIsRetryingAutoTag] = useState(false);
   const [isReRunningAudit, setIsReRunningAudit] = useState(false);
   const [showPacReport, setShowPacReport] = useState(false);
   const [showApplyAllPanel, setShowApplyAllPanel] = useState(false);
+
+  // Guided remediation checklist state — aiAnalysisStatus/guidanceAcknowledgment
+  // ride on the existing AI-analysis fetch; jobFlags needs one extra one-time
+  // lookup since acrGenerated/pacReportGenerated only live on job.output.
+  const [aiAnalysisStatus, setAiAnalysisStatus] = useState<string | null>(null);
+  const [guidanceAcknowledgment, setGuidanceAcknowledgment] = useState<GuidanceAcknowledgment | null>(null);
+  const [jobFlags, setJobFlags] = useState<{ acrGenerated: boolean; pacReportGenerated: boolean } | null>(null);
+  const jobFlagsFetchedRef = useRef<string | null>(null);
 
   // Counts driving the "Apply All Approved" bulk action — only apply-to-pdf
   // suggestions are eligible; guidance-only/auto-resolve ones have nothing to apply.
@@ -567,9 +580,10 @@ export const PdfAuditResultsPage: React.FC = () => {
             totalTokens: number;
             totalCostUsd: number;
           } | null;
+          guidanceAcknowledgment?: GuidanceAcknowledgment | null;
         };
       }>(`/pdf/${encodeURIComponent(jobId)}/ai-analysis`);
-      const { suggestions, analyzed, total, status, stats } = res.data.data;
+      const { suggestions, analyzed, total, status, stats, guidanceAcknowledgment: ack } = res.data.data;
       const map = new Map<string, AiAnalysis>();
       suggestions.forEach((s) => map.set(s.issueId, s));
       // DEBUG: log to help diagnose ID matching
@@ -580,6 +594,8 @@ export const PdfAuditResultsPage: React.FC = () => {
       if (isMountedRef.current) {
         setAiSuggestions(map);
         setAiProgress({ analyzed, total });
+        setAiAnalysisStatus(status);
+        setGuidanceAcknowledgment(ack ?? null);
         if (stats) setAiStats(stats);
         if (status === 'complete') {
           setIsAnalyzingAi(false);
@@ -673,6 +689,28 @@ export const PdfAuditResultsPage: React.FC = () => {
         autoTagFetchedJobRef.current = null; // allow retry if the fetch itself failed
       });
   }, [jobId, auditResult, applyAutoTagStatus]);
+
+  // Fetch once whether ACR/PAC have already been generated for this job —
+  // step 6 of the guided remediation checklist. Both flags live on
+  // job.output, which no endpoint this page otherwise calls exposes, so this
+  // is one extra one-time lookup against the existing GET /jobs/:id route
+  // (not a new backend endpoint, just a new call site).
+  useEffect(() => {
+    if (!jobId || !auditResult || jobFlagsFetchedRef.current === jobId) return;
+    jobFlagsFetchedRef.current = jobId;
+    api.get(`/jobs/${encodeURIComponent(jobId)}`)
+      .then(res => {
+        if (!isMountedRef.current) return;
+        const output = (res.data.data?.output ?? {}) as Record<string, unknown>;
+        setJobFlags({
+          acrGenerated: output.acrGenerated === true,
+          pacReportGenerated: output.pacReportGenerated === true,
+        });
+      })
+      .catch(() => {
+        jobFlagsFetchedRef.current = null; // allow retry if the fetch itself failed
+      });
+  }, [jobId, auditResult]);
 
   const handleRetryAutoTag = async () => {
     if (!jobId || isRetryingAutoTag) return;
@@ -1059,6 +1097,19 @@ export const PdfAuditResultsPage: React.FC = () => {
         onRerunWithColorContrastFix={handleRerunWithColorContrastFix}
         isRerunningColorContrastFix={isRerunningColorContrastFix}
         jobId={jobId!}
+      />
+
+      <RemediationChecklist
+        jobId={jobId!}
+        aiAnalysisStatus={aiAnalysisStatus}
+        aiSuggestions={aiSuggestions}
+        guidanceAcknowledgment={guidanceAcknowledgment}
+        onGuidanceAcknowledged={setGuidanceAcknowledgment}
+        postRemediationStatus={autoTagInfo?.postRemediationStatus}
+        acrGenerated={jobFlags?.acrGenerated ?? false}
+        pacReportGenerated={jobFlags?.pacReportGenerated ?? false}
+        comparisonTrialId={autoTagInfo?.comparisonTrialId}
+        userRole={currentUser?.role}
       />
 
       {/* Matterhorn Summary */}
@@ -1459,6 +1510,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         isOpen={showPacReport}
         onClose={() => setShowPacReport(false)}
         jobId={jobId!}
+        onGenerated={() => setJobFlags(prev => ({ acrGenerated: prev?.acrGenerated ?? false, pacReportGenerated: true }))}
       />
     </div>
   );
