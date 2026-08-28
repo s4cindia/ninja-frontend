@@ -147,6 +147,17 @@ export function RemediationChecklist({
     ),
     [suggestions]
   );
+  // Distinguishes "nothing applied yet" from "partway through" — without this,
+  // step 3 reported "in progress" the instant AI Analysis finished, before the
+  // operator had touched anything (pendingFixable is non-empty from the start).
+  const eligibleFixable = useMemo(
+    () => suggestions.filter(s => s.applyMode === 'apply-to-pdf' || s.applyMode === 'auto-resolve'),
+    [suggestions]
+  );
+  const appliedFixableCount = useMemo(
+    () => eligibleFixable.filter(s => s.status === 'applied').length,
+    [eligibleFixable]
+  );
   const pendingGuidance = useMemo(
     () => suggestions.filter(s => s.status === 'pending' && s.applyMode === 'guidance-only'),
     [suggestions]
@@ -154,6 +165,7 @@ export function RemediationChecklist({
 
   const step2Done = aiAnalysisStatus === 'complete';
   const step3Done = step2Done && pendingFixable.length === 0;
+  const step3Started = appliedFixableCount > 0;
   const step4FullyResolved = step2Done && pendingGuidance.length === 0;
   const step4Acknowledged = guidanceAcknowledgment != null;
   const step5Done = postRemediationStatus === 'complete';
@@ -208,7 +220,7 @@ export function RemediationChecklist({
       {
         id: 3,
         label: 'Apply AI-suggested fixes',
-        status: !step2Done ? 'not-started' : step3Done ? 'done' : 'in-progress',
+        status: !step2Done ? 'not-started' : step3Done ? 'done' : step3Started ? 'in-progress' : 'not-started',
       },
       {
         id: 4,
@@ -219,7 +231,7 @@ export function RemediationChecklist({
             ? 'done'
             : step4Acknowledged
               ? 'skipped'
-              : 'in-progress',
+              : 'not-started',
         detail: !step2Done || step4FullyResolved
           ? undefined
           : step4Acknowledged
@@ -299,7 +311,7 @@ export function RemediationChecklist({
 
     return list;
   }, [
-    aiAnalysisStatus, step2Done, step3Done, step4FullyResolved, step4Acknowledged, guidanceAcknowledgment,
+    aiAnalysisStatus, step2Done, step3Done, step3Started, step4FullyResolved, step4Acknowledged, guidanceAcknowledgment,
     noteInput, isSubmittingAck, handleAcknowledge, pendingGuidance.length,
     step5Done, postRemediationStatus, step6Done, acrGenerated, pacReportGenerated,
     step7Applicable, step7Done, isValidatingTrial, isLoadingTrial, canValidateTrial, needsPdfxtData, handleValidateTrial,
