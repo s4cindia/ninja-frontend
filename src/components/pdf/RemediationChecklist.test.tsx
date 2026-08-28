@@ -68,6 +68,31 @@ describe('RemediationChecklist', () => {
     expect(step2Row).toHaveTextContent('In progress');
   });
 
+  it('regression: right after AI Analysis finishes, before anything is applied/acknowledged, steps 3 and 4 read "Not started" — never "In progress" alongside "Recommended next"', () => {
+    render(
+      <RemediationChecklist
+        {...baseProps}
+        aiAnalysisStatus="complete"
+        aiSuggestions={suggestionsMap([
+          suggestion({ issueId: 'a', applyMode: 'apply-to-pdf', status: 'pending' }),
+          suggestion({ issueId: 'b', applyMode: 'guidance-only', status: 'pending' }),
+        ])}
+      />
+    );
+
+    const step3Container = screen.getByText('3. Apply AI-suggested fixes').closest('div')!.parentElement!;
+    expect(step3Container).toHaveTextContent('Not started');
+    expect(step3Container).not.toHaveTextContent('In progress');
+
+    const step4Container = screen.getByText('4. Resolve guidance-only items').closest('div')!.parentElement!;
+    expect(step4Container).toHaveTextContent('Not started');
+    expect(step4Container).not.toHaveTextContent('In progress');
+
+    // Step 3 is next up — "Recommended next" and "In progress" must never
+    // both appear on the same step, since that's a direct contradiction.
+    expect(step3Container).toHaveTextContent('Recommended next');
+  });
+
   it('step 3 is not-started until AI analysis completes, then reflects pending eligible suggestions', () => {
     const { rerender } = render(
       <RemediationChecklist
@@ -78,11 +103,27 @@ describe('RemediationChecklist', () => {
     );
     expect(screen.getByText('3. Apply AI-suggested fixes').closest('div')!.parentElement).toHaveTextContent('Not started');
 
+    // AI Analysis just finished, nothing applied yet — must read "Not started",
+    // not "In progress" (regression: used to flip to "in progress" the instant
+    // suggestions existed, before the operator had touched anything).
     rerender(
       <RemediationChecklist
         {...baseProps}
         aiAnalysisStatus="complete"
         aiSuggestions={suggestionsMap([suggestion({ issueId: 'a', applyMode: 'apply-to-pdf', status: 'pending' })])}
+      />
+    );
+    expect(screen.getByText('3. Apply AI-suggested fixes').closest('div')!.parentElement).toHaveTextContent('Not started');
+
+    // Some (but not all) eligible suggestions applied — now it's genuinely in progress.
+    rerender(
+      <RemediationChecklist
+        {...baseProps}
+        aiAnalysisStatus="complete"
+        aiSuggestions={suggestionsMap([
+          suggestion({ issueId: 'a', applyMode: 'apply-to-pdf', status: 'applied' }),
+          suggestion({ issueId: 'b', applyMode: 'apply-to-pdf', status: 'pending' }),
+        ])}
       />
     );
     expect(screen.getByText('3. Apply AI-suggested fixes').closest('div')!.parentElement).toHaveTextContent('In progress');
@@ -97,7 +138,7 @@ describe('RemediationChecklist', () => {
     expect(screen.getByText('3. Apply AI-suggested fixes').closest('div')!.parentElement).toHaveTextContent('Done');
   });
 
-  it('step 3 stays in progress for an approved-but-not-yet-applied fix (regression: must not report done before Apply Fixes runs)', () => {
+  it('step 3 stays not-started (not done) for an approved-but-not-yet-applied fix (regression: must not report done before Apply Fixes runs)', () => {
     render(
       <RemediationChecklist
         {...baseProps}
@@ -105,7 +146,10 @@ describe('RemediationChecklist', () => {
         aiSuggestions={suggestionsMap([suggestion({ issueId: 'a', applyMode: 'apply-to-pdf', status: 'approved' })])}
       />
     );
-    expect(screen.getByText('3. Apply AI-suggested fixes').closest('div')!.parentElement).toHaveTextContent('In progress');
+    // Approving alone isn't progress — only Apply Fixes actually touching the
+    // PDF counts, so this must not read "Done" (the old bug) or "In progress"
+    // (a later bug: approving ≠ applying, nothing has actually happened yet).
+    expect(screen.getByText('3. Apply AI-suggested fixes').closest('div')!.parentElement).toHaveTextContent('Not started');
   });
 
   it('step 4 shows a live remaining count and a disabled confirm button until a note is entered', async () => {
