@@ -345,6 +345,63 @@ describe('RemediationChecklist', () => {
     expect(screen.getByText(/SME review needed/)).toBeInTheDocument();
   });
 
+  it('regression: a stale acknowledgment (new guidance-only items appeared since, pendingGuidance.length > remainingCount) does NOT read as Acknowledged, and does not anchor step 7', () => {
+    render(
+      <RemediationChecklist
+        {...baseProps}
+        aiAnalysisStatus="complete"
+        // 2 pending guidance-only items now, but the acknowledgment only
+        // covered 1 (remainingCount: 1) — a later AI Analysis re-run
+        // introduced a new one the operator never actually acknowledged.
+        aiSuggestions={suggestionsMap([
+          suggestion({ issueId: 'a', applyMode: 'guidance-only', status: 'pending' }),
+          suggestion({ issueId: 'b', applyMode: 'guidance-only', status: 'pending' }),
+        ])}
+        guidanceAcknowledgment={{
+          note: 'SME review needed',
+          remainingCount: 1,
+          acknowledgedAt: '2026-08-29T00:00:00.000Z',
+          acknowledgedBy: 'user_abc123',
+        }}
+        lastVerifiedAt="2026-08-29T01:00:00.000Z"
+      />
+    );
+
+    const step6Container = screen.getByText('6. Resolve guidance-only items').closest('div')!.parentElement!;
+    expect(step6Container).toHaveTextContent('Not started');
+    expect(step6Container).not.toHaveTextContent('Acknowledged');
+    expect(screen.getByText(/New guidance-only item\(s\) appeared since the last acknowledgment/)).toBeInTheDocument();
+    // The note-input form is available again (not stuck showing only the old note).
+    expect(screen.getByPlaceholderText('2 guidance-only item(s) remain — reason:')).toBeInTheDocument();
+
+    // Step 7 must not be satisfied by the stale acknowledgedAt, even though
+    // lastVerifiedAt is newer than it.
+    expect(screen.getByText('7. Re-audit again to confirm manual fixes').closest('div')!.parentElement).toHaveTextContent('Not started');
+  });
+
+  it('a fresh acknowledgment that covers all currently-pending items (remainingCount matches) still reads as Acknowledged and anchors step 7 normally', () => {
+    render(
+      <RemediationChecklist
+        {...baseProps}
+        aiAnalysisStatus="complete"
+        aiSuggestions={suggestionsMap([
+          suggestion({ issueId: 'a', applyMode: 'guidance-only', status: 'pending' }),
+          suggestion({ issueId: 'b', applyMode: 'guidance-only', status: 'pending' }),
+        ])}
+        guidanceAcknowledgment={{
+          note: 'SME review needed',
+          remainingCount: 2,
+          acknowledgedAt: '2026-08-29T00:00:00.000Z',
+          acknowledgedBy: 'user_abc123',
+        }}
+        lastVerifiedAt="2026-08-29T01:00:00.000Z"
+      />
+    );
+
+    expect(screen.getByText('6. Resolve guidance-only items').closest('div')!.parentElement).toHaveTextContent('Acknowledged');
+    expect(screen.getByText('7. Re-audit again to confirm manual fixes').closest('div')!.parentElement).toHaveTextContent('Done');
+  });
+
   describe('step 7 — re-audit again to confirm manual fixes', () => {
     it('is not-started until guidance is resolved one way or another', () => {
       render(

@@ -216,16 +216,26 @@ export function RemediationChecklist({
 
   // Step 6: guidance-only items.
   const guidanceFullyResolved = step2Done && pendingGuidance.length === 0;
-  const guidanceAcknowledgedFlag = guidanceAcknowledgment != null;
+  // guidanceAcknowledgment never gets cleared server-side, including when a
+  // later AI Analysis re-run introduces NEW pending guidance-only items the
+  // operator never actually acknowledged. remainingCount is a snapshot of
+  // how many were pending AT acknowledgment time — if the live count is now
+  // higher, new items have appeared since, and the acknowledgment no longer
+  // covers all of them, so it must not be trusted for "resolved" (step 6)
+  // or as step 7's confirmation-audit anchor.
+  const guidanceAcknowledgmentStale = guidanceAcknowledgment != null
+    && pendingGuidance.length > guidanceAcknowledgment.remainingCount;
+  const guidanceAcknowledgedFlag = guidanceAcknowledgment != null && !guidanceAcknowledgmentStale;
   const guidanceResolved = guidanceFullyResolved || guidanceAcknowledgedFlag;
 
   // Step 7: a second re-audit, to confirm guidance-only manual work actually
   // landed (nothing else on this page ever re-audits after that work, since
   // it all happens outside Ninja). Anchor to whichever timestamp signal
-  // guidance resolution produced — an acknowledgment, or the latest manual
-  // time log entry.
+  // guidance resolution produced — an acknowledgment (only if still fresh —
+  // see guidanceAcknowledgmentStale above), or the latest manual time log
+  // entry.
   const guidanceResolutionSignal = latestTimestamp(
-    guidanceAcknowledgment?.acknowledgedAt,
+    guidanceAcknowledgedFlag ? guidanceAcknowledgment?.acknowledgedAt : undefined,
     manualRemediationLastLoggedAt
   );
   // Fallback for the case where the operator resolved every guidance item
@@ -362,23 +372,30 @@ export function RemediationChecklist({
               </p>
             )
             : (
-              <div className="flex items-start gap-2">
-                <input
-                  type="text"
-                  value={noteInput}
-                  onChange={(e) => setNoteInput(e.target.value)}
-                  placeholder={`${pendingGuidance.length} guidance-only item(s) remain — reason:`}
-                  className="flex-1 text-xs border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                  disabled={isSubmittingAck}
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={!noteInput.trim() || isSubmittingAck}
-                  onClick={handleAcknowledge}
-                >
-                  {isSubmittingAck ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Acknowledge & skip'}
-                </Button>
+              <div className="space-y-1.5">
+                {guidanceAcknowledgmentStale && (
+                  <p className="text-xs text-amber-700">
+                    New guidance-only item(s) appeared since the last acknowledgment — please review and acknowledge again.
+                  </p>
+                )}
+                <div className="flex items-start gap-2">
+                  <input
+                    type="text"
+                    value={noteInput}
+                    onChange={(e) => setNoteInput(e.target.value)}
+                    placeholder={`${pendingGuidance.length} guidance-only item(s) remain — reason:`}
+                    className="flex-1 text-xs border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    disabled={isSubmittingAck}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!noteInput.trim() || isSubmittingAck}
+                    onClick={handleAcknowledge}
+                  >
+                    {isSubmittingAck ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Acknowledge & skip'}
+                  </Button>
+                </div>
               </div>
             ),
       },
@@ -438,7 +455,7 @@ export function RemediationChecklist({
 
     return list;
   }, [
-    aiAnalysisStatus, step2Done, step3Done, step3Started, guidanceFullyResolved, guidanceAcknowledgedFlag, guidanceAcknowledgment,
+    aiAnalysisStatus, step2Done, step3Done, step3Started, guidanceFullyResolved, guidanceAcknowledgedFlag, guidanceAcknowledgmentStale, guidanceAcknowledgment,
     noteInput, isSubmittingAck, handleAcknowledge, pendingGuidance.length, pendingFixable.length,
     verificationDone, postRemediationStatus, reanalysisDone, reanalysisInProgress,
     guidanceResolved, secondReauditDone, artifactsStepDone, acrGenerated, pacReportGenerated,
