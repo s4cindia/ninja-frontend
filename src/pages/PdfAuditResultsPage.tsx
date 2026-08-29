@@ -218,6 +218,25 @@ export const PdfAuditResultsPage: React.FC = () => {
     analyzedAt?: string;
   } | null>(null);
   const aiPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Guards against an out-of-order poll response: fetchAiSuggestions polls
+  // every 3s via setInterval regardless of whether the PREVIOUS call's
+  // request has resolved yet, so on a slow/busy backend (e.g. a large
+  // document's AI Analysis pass competing for the same DB rows) an older
+  // request can resolve AFTER a newer one and silently overwrite fresher
+  // state — including aiSuggestions — with a stale snapshot. Incremented at
+  // the start of every call to hand out a unique, increasing id.
+  const aiFetchRequestIdRef = useRef(0);
+  // Highest requestId actually applied so far. A response is applied only if
+  // its id is greater than this (monotonic), not if it equals the CURRENT
+  // latest issued id — the latter would reject every response forever once
+  // round-trips routinely exceed the 3s poll interval, since by the time any
+  // response arrives a newer request has always already been issued.
+  const aiFetchAppliedIdRef = useRef(0);
+  // Kept in sync with jobId via an effect below so a response can be checked
+  // against the CURRENTLY active job even if it was produced by a stale
+  // closure (e.g. an interval started before jobId changed, that the
+  // cleanup effect below has since raced to clear).
+  const activeAiJobIdRef = useRef<string | undefined>(undefined);
   const autoTagPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoTagFetchedJobRef = useRef<string | null>(null);
 
@@ -612,6 +631,8 @@ export const PdfAuditResultsPage: React.FC = () => {
   // Fetch AI suggestions and update state
   const fetchAiSuggestions = useCallback(async () => {
     if (!jobId) return;
+    const requestId = ++aiFetchRequestIdRef.current;
+    const requestJobId = jobId;
     try {
       const res = await api.get<{
         data: {
@@ -632,12 +653,17 @@ export const PdfAuditResultsPage: React.FC = () => {
       const { suggestions, analyzed, total, status, stats, guidanceAcknowledgment: ack } = res.data.data;
       const map = new Map<string, AiAnalysis>();
       suggestions.forEach((s) => map.set(s.issueId, s));
-      // DEBUG: log to help diagnose ID matching
-      if (suggestions.length > 0) {
-        console.log('[AI Debug] map size:', map.size, 'status:', status);
-        console.log('[AI Debug] sample issueIds:', suggestions.slice(0, 5).map(s => s.issueId));
-      }
-      if (isMountedRef.current) {
+      // Discard a response that is either stale (an older request resolving
+      // after a newer one already applied — the reported bug where the
+      // checklist briefly showed contradictory step badges) or for a job the
+      // user has since navigated away from (activeAiJobIdRef tracks the
+      // CURRENT jobId, which a stale closure's own `jobId` cannot).
+      if (
+        isMountedRef.current &&
+        requestJobId === activeAiJobIdRef.current &&
+        requestId > aiFetchAppliedIdRef.current
+      ) {
+        aiFetchAppliedIdRef.current = requestId;
         setAiSuggestions(map);
         setAiProgress({ analyzed, total });
         setAiAnalysisStatus(status);
@@ -667,8 +693,10 @@ export const PdfAuditResultsPage: React.FC = () => {
     } catch {
       // Non-fatal — silently ignore fetch errors during polling, but still
       // unblock the button rather than leaving it disabled forever on a
-      // transient failure of the initial load.
-      if (isMountedRef.current) setHasLoadedAiStatus(true);
+      // transient failure of the initial load. Setting this true is
+      // idempotent, so no ordering guard is needed here — only the jobId
+      // check, so a failure for an abandoned job can't affect the current one.
+      if (isMountedRef.current && requestJobId === activeAiJobIdRef.current) setHasLoadedAiStatus(true);
     }
   }, [jobId]);
 
@@ -688,6 +716,21 @@ export const PdfAuditResultsPage: React.FC = () => {
       setIsRerunningAiAnalysis(false);
     }
   }, [jobId, includeColorContrastFix, fetchAiSuggestions]);
+
+  // Keep activeAiJobIdRef in sync with jobId, and stop any AI-analysis
+  // polling interval left over from a previous jobId before it can run
+  // fetchAiSuggestions again with a stale closure. Declared before the
+  // "load on mount" effect below so its cleanup (for the OLD jobId) runs
+  // before that effect re-fires fetchAiSuggestions for the NEW jobId.
+  useEffect(() => {
+    activeAiJobIdRef.current = jobId;
+    return () => {
+      if (aiPollingRef.current) {
+        clearInterval(aiPollingRef.current);
+        aiPollingRef.current = null;
+      }
+    };
+  }, [jobId]);
 
   // Load existing AI suggestions on mount (in case analysis was already run)
   useEffect(() => {
@@ -1592,13 +1635,6 @@ export const PdfAuditResultsPage: React.FC = () => {
               </div>
             ) : (
               <>
-                {/* DEBUG: one-time log when aiSuggestions has data */}
-                {aiSuggestions.size > 0 && filteredIssues.length > 0 && (() => {
-                  console.log('[AI Debug] map size:', aiSuggestions.size);
-                  console.log('[AI Debug] issue ids (first 5):', filteredIssues.slice(0, 5).map(i => i.id));
-                  console.log('[AI Debug] map lookup result (first 5):', filteredIssues.slice(0, 5).map(i => aiSuggestions.get(i.id)?.suggestionType ?? 'MISS'));
-                  return null;
-                })()}
                 {filteredIssues.map((issue) => (
                   <IssueCard
                     key={issue.id}

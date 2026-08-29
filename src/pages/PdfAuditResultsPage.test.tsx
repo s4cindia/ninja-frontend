@@ -1278,6 +1278,197 @@ describe('PdfAuditResultsPage', () => {
       });
       expect(rerunButton).not.toHaveAttribute('title');
     });
+
+    it('regression: an out-of-order (stale) poll response does not overwrite fresher state — reported live as the checklist showing step 3 "In progress" right after step 5\'s loop-back nudge surfaced new pending suggestions nobody had touched yet', async () => {
+      const mockResult = createMockAuditResult();
+      const resolvers: Array<(value: unknown) => void> = [];
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) {
+          return new Promise((resolve) => { resolvers.push(resolve); });
+        }
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+      await screen.findByText('75'); // confirms audit result loaded, initial fetch fired
+
+      vi.useFakeTimers();
+      try {
+        // Drain to a known, stable baseline first: this page can fire more
+        // than one initial /ai-analysis request (e.g. the mount effect
+        // re-triggers when auditResult's object reference changes once the
+        // auto-tag-status fetch merges into it) — how many is a timing
+        // detail of THIS test harness, not something to hardcode. Resolve
+        // everything queued so far with 'processing' (which is what a real
+        // in-progress analysis would report at this point), repeating until
+        // no new request appears, so the interval poll settles into exactly
+        // one steady 3s cycle before the controlled race below begins.
+        let drainedCount = 0;
+        while (resolvers.length > drainedCount) {
+          const toResolve = resolvers.slice(drainedCount);
+          drainedCount = resolvers.length;
+          await act(async () => {
+            toResolve.forEach(resolve => resolve({
+              data: { data: { suggestions: [], analyzed: 0, total: 400, status: 'processing' } },
+            }));
+          });
+        }
+        const baseline = resolvers.length;
+
+        // Two interval ticks — exactly two new requests now, since the poll
+        // has settled to a single steady interval.
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(3000);
+        });
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(3000);
+        });
+        expect(resolvers.length).toBe(baseline + 2);
+        const freshIndex = baseline + 1; // most recently started request
+        const staleIndex = baseline; // started earlier, resolves later below
+
+        // The most recently STARTED request resolves FIRST: fresh, correct
+        // state — 0 applied, 1 new pending suggestion nobody has touched,
+        // analysis complete.
+        await act(async () => {
+          resolvers[freshIndex]({
+            data: {
+              data: {
+                suggestions: [{
+                  id: 'sugg-fresh', jobId, issueId: 'issue-fresh', suggestionType: 'alt-text',
+                  value: 'x', guidance: null, confidence: 0.9, rationale: 'r', model: 'gemini',
+                  applyMode: 'apply-to-pdf', status: 'pending',
+                  createdAt: '2026-08-30T00:00:00Z', updatedAt: '2026-08-30T00:00:00Z',
+                }],
+                analyzed: 1, total: 1, status: 'complete',
+                stats: {
+                  gemini: { totalTokens: 100, estimatedCostUsd: 0.01 },
+                  claude: { totalTokens: 0, estimatedCostUsd: 0 },
+                  totalTokens: 100, totalCostUsd: 0.01, analyzedAt: '2026-08-30T00:00:05Z',
+                },
+              },
+            },
+          });
+        });
+
+        // The earlier-STARTED request finally resolves SECOND (out of order),
+        // with a stale snapshot that (if applied) would wrongly show an
+        // already-applied suggestion — this must be discarded, not allowed
+        // to overwrite the fresher state set above.
+        await act(async () => {
+          resolvers[staleIndex]({
+            data: {
+              data: {
+                suggestions: [{
+                  id: 'sugg-stale', jobId, issueId: 'issue-stale', suggestionType: 'alt-text',
+                  value: 'x', guidance: null, confidence: 0.9, rationale: 'r', model: 'gemini',
+                  applyMode: 'apply-to-pdf', status: 'applied',
+                  createdAt: '2026-08-29T00:00:00Z', updatedAt: '2026-08-29T00:00:00Z',
+                }],
+                analyzed: 1, total: 1, status: 'complete',
+                stats: {
+                  gemini: { totalTokens: 50, estimatedCostUsd: 0.005 },
+                  claude: { totalTokens: 0, estimatedCostUsd: 0 },
+                  totalTokens: 50, totalCostUsd: 0.005, analyzedAt: '2026-08-29T00:00:05Z',
+                },
+              },
+            },
+          });
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+
+      // The fresh (call #3) suggestion must still be what's reflected — not
+      // silently replaced by the stale (call #2) one that resolved later.
+      const step3Container = screen.getByText('3. Apply AI-suggested fixes').closest('div')!.parentElement!;
+      expect(step3Container).toHaveTextContent('Not started');
+      expect(step3Container).not.toHaveTextContent('In progress');
+    });
+
+    it('regression: a response that arrives after a NEWER request has already started still gets applied, instead of being discarded forever — a naive "must equal the single latest issued request" guard rejects every response once round-trips routinely outlast the 3s poll interval, freezing the page on "processing" forever', async () => {
+      const mockResult = createMockAuditResult();
+      const resolvers: Array<(value: unknown) => void> = [];
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) {
+          return new Promise((resolve) => { resolvers.push(resolve); });
+        }
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+      await screen.findByText('75');
+
+      vi.useFakeTimers();
+      try {
+        // Settle to a stable baseline (see the out-of-order test above for
+        // why this drain is needed rather than assuming a fixed call count).
+        let drainedCount = 0;
+        while (resolvers.length > drainedCount) {
+          const toResolve = resolvers.slice(drainedCount);
+          drainedCount = resolvers.length;
+          await act(async () => {
+            toResolve.forEach(resolve => resolve({
+              data: { data: { suggestions: [], analyzed: 0, total: 400, status: 'processing' } },
+            }));
+          });
+        }
+
+        // Two ticks, both left UNRESOLVED: call #1 (left pending) and call #2
+        // fire back to back — proving call #1's round-trip outlasts the 3s
+        // poll interval, since call #2 started before call #1 resolved.
+        const baseline = resolvers.length;
+        await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+        await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+        expect(resolvers.length).toBe(baseline + 2);
+        const call1Index = baseline;
+
+        // Step 2 ("Run AI Analysis") reflects the last-applied status, which
+        // is still 'processing' from the drain above — this is the frozen
+        // state a starved guard would leave the page stuck on forever.
+        const step2Before = screen.getByText('2. Run AI Analysis').closest('div')!.parentElement!;
+        expect(step2Before).toHaveTextContent('In progress');
+
+        // Call #1 finally resolves with 'complete' — but call #2 (a NEWER
+        // request) already started before it did. A guard that only accepts
+        // a response equal to the single latest issued request would reject
+        // this, leaving the page stuck showing 'processing' indefinitely
+        // (since call #2, and every call after it, would face the exact same
+        // problem on a uniformly slow backend). It must be applied instead.
+        await act(async () => {
+          resolvers[call1Index]({
+            data: {
+              data: {
+                suggestions: [{
+                  id: 'sugg-1', jobId, issueId: 'issue-1', suggestionType: 'alt-text',
+                  value: 'x', guidance: null, confidence: 0.9, rationale: 'r', model: 'gemini',
+                  applyMode: 'apply-to-pdf', status: 'pending',
+                  createdAt: '2026-08-30T00:00:00Z', updatedAt: '2026-08-30T00:00:00Z',
+                }],
+                analyzed: 1, total: 1, status: 'complete',
+                stats: {
+                  gemini: { totalTokens: 100, estimatedCostUsd: 0.01 },
+                  claude: { totalTokens: 0, estimatedCostUsd: 0 },
+                  totalTokens: 100, totalCostUsd: 0.01, analyzedAt: '2026-08-30T00:00:05Z',
+                },
+              },
+            },
+          });
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+
+      // Step 2 must now read Done — proving the 'complete' response was
+      // applied, not silently discarded and left frozen on "In progress".
+      const step2After = screen.getByText('2. Run AI Analysis').closest('div')!.parentElement!;
+      expect(step2After).toHaveTextContent('Done');
+      expect(step2After).not.toHaveTextContent('In progress');
+    });
   });
 
   describe('Category and AI action filters', () => {

@@ -236,6 +236,18 @@ describe('RemediationChecklist', () => {
     const step5Container = screen.getByText('5. Re-run AI Analysis (final check)').closest('div')!.parentElement!;
     expect(step5Container).toHaveTextContent('Done');
     expect(step5Container).toHaveTextContent('1 fixable suggestion(s) now available — consider revisiting step 3.');
+
+    // Precise repro of a live bug report: step 5's loop-back nudge just
+    // surfaced a brand-new pending apply-to-pdf suggestion, but the operator
+    // has not clicked Apply Fixes on it yet (status is still 'pending', not
+    // 'applied'). Step 3 must read "Not started" here, not "In progress" —
+    // "In progress" implies real progress has been made on THIS batch, which
+    // hasn't happened. (If this assertion ever fails, it's the same class of
+    // bug PR #309 fixed for the original step2->3 transition, reproduced on
+    // the step5-nudge loop-back path instead.)
+    const step3Container = screen.getByText('3. Apply AI-suggested fixes').closest('div')!.parentElement!;
+    expect(step3Container).toHaveTextContent('Not started');
+    expect(step3Container).not.toHaveTextContent('In progress');
   });
 
   it('step 5 can also progress on a manual-only re-audit, with postRemediationStatus never set at all', () => {
