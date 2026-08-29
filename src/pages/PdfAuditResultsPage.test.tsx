@@ -1469,6 +1469,36 @@ describe('PdfAuditResultsPage', () => {
       });
     });
 
+    it('re-fetches job flags after a manual Re-run Audit succeeds, so the checklist picks up the new lastReauditAt (regression: manual re-audits never touch postRemediationAudit, so this was the only freshness signal available)', async () => {
+      const jobsUrl = `/jobs/${jobId}`;
+      const mockResult = createMockAuditResult();
+      let jobsCallCount = 0;
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve(emptyAiResponse);
+        if (url === jobsUrl) {
+          jobsCallCount += 1;
+          return Promise.resolve({ data: { data: { output: { lastReauditAt: `2026-08-2${jobsCallCount}T00:00:00.000Z` } } } });
+        }
+        return Promise.resolve({ data: { data: {} } });
+      });
+      mockApi.post.mockResolvedValue({ data: { data: {} } });
+
+      renderWithRouter(jobId);
+
+      const reRunButton = await screen.findByRole('button', { name: 'Re-run Audit' });
+      await waitFor(() => {
+        expect(jobsCallCount).toBe(1);
+      });
+
+      fireEvent.click(reRunButton);
+
+      await waitFor(() => {
+        expect(jobsCallCount).toBe(2);
+      });
+    });
+
     it('shows an error toast and re-enables the button if the re-audit request fails', async () => {
       const mockResult = createMockAuditResult();
       mockApi.get.mockImplementation((url: string) => {

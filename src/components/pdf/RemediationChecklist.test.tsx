@@ -262,7 +262,7 @@ describe('RemediationChecklist', () => {
       <RemediationChecklist
         {...baseProps}
         postRemediationStatus="complete"
-        postRemediationAuditRunAt="2026-08-29T00:00:00.000Z"
+        lastVerifiedAt="2026-08-29T00:00:00.000Z"
         aiAnalyzedAt="2026-08-28T00:00:00.000Z"
       />
     );
@@ -274,7 +274,20 @@ describe('RemediationChecklist', () => {
         {...baseProps}
         aiAnalysisStatus="processing"
         postRemediationStatus="complete"
-        postRemediationAuditRunAt="2026-08-29T00:00:00.000Z"
+        lastVerifiedAt="2026-08-29T00:00:00.000Z"
+        aiAnalyzedAt="2026-08-28T00:00:00.000Z"
+      />
+    );
+    expect(screen.getByText('6. Re-run AI Analysis (final check)').closest('div')!.parentElement).toHaveTextContent('In progress');
+
+    // Also in progress while merely queued ('pending'), matching
+    // fetchAiSuggestions' own pending-or-processing definition of "active".
+    rerender(
+      <RemediationChecklist
+        {...baseProps}
+        aiAnalysisStatus="pending"
+        postRemediationStatus="complete"
+        lastVerifiedAt="2026-08-29T00:00:00.000Z"
         aiAnalyzedAt="2026-08-28T00:00:00.000Z"
       />
     );
@@ -288,7 +301,7 @@ describe('RemediationChecklist', () => {
         aiAnalysisStatus="complete"
         aiSuggestions={suggestionsMap([suggestion({ issueId: 'a', applyMode: 'apply-to-pdf', status: 'pending' })])}
         postRemediationStatus="complete"
-        postRemediationAuditRunAt="2026-08-29T00:00:00.000Z"
+        lastVerifiedAt="2026-08-29T00:00:00.000Z"
         aiAnalyzedAt="2026-08-29T00:05:00.000Z"
       />
     );

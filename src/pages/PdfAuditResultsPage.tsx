@@ -150,6 +150,12 @@ const getScoreBgColor = (score: number): string => {
   return 'bg-red-50 border-red-200';
 };
 
+// ISO 8601 timestamps sort lexicographically in chronological order, so this
+// avoids needing to parse dates just to find the most recent one.
+function latestTimestamp(...timestamps: Array<string | null | undefined>): string | undefined {
+  return timestamps.filter((t): t is string => !!t).sort().pop();
+}
+
 // Constants
 const POLLING_INTERVAL_MS = 5000; // Poll every 5 seconds
 
@@ -230,11 +236,11 @@ export const PdfAuditResultsPage: React.FC = () => {
   const [showApplyAllPanel, setShowApplyAllPanel] = useState(false);
 
   // Guided remediation checklist state — aiAnalysisStatus/guidanceAcknowledgment
-  // ride on the existing AI-analysis fetch; jobFlags needs one extra one-time
-  // lookup since acrGenerated/pacReportGenerated only live on job.output.
+  // ride on the existing AI-analysis fetch; jobFlags needs one extra lookup
+  // since acrGenerated/pacReportGenerated/lastReauditAt only live on job.output.
   const [aiAnalysisStatus, setAiAnalysisStatus] = useState<string | null>(null);
   const [guidanceAcknowledgment, setGuidanceAcknowledgment] = useState<GuidanceAcknowledgment | null>(null);
-  const [jobFlags, setJobFlags] = useState<{ acrGenerated: boolean; pacReportGenerated: boolean } | null>(null);
+  const [jobFlags, setJobFlags] = useState<{ acrGenerated: boolean; pacReportGenerated: boolean; lastReauditAt?: string } | null>(null);
   const jobFlagsFetchedRef = useRef<string | null>(null);
 
   // Counts driving the "Apply All Approved" bulk action — only apply-to-pdf
@@ -692,27 +698,35 @@ export const PdfAuditResultsPage: React.FC = () => {
       });
   }, [jobId, auditResult, applyAutoTagStatus]);
 
-  // Fetch once whether ACR/PAC have already been generated for this job —
-  // step 6 of the guided remediation checklist. Both flags live on
-  // job.output, which no endpoint this page otherwise calls exposes, so this
-  // is one extra one-time lookup against the existing GET /jobs/:id route
-  // (not a new backend endpoint, just a new call site).
+  // Whether ACR/PAC have already been generated for this job, plus the
+  // last manual re-audit time — all three live on job.output, which no
+  // endpoint this page otherwise calls exposes, so this is one extra lookup
+  // against the existing GET /jobs/:id route (not a new backend endpoint,
+  // just a new call site). Re-called after a manual re-audit succeeds (see
+  // handleReRunAuditForCurrentJob) so lastReauditAt doesn't go stale — that
+  // manual path never touches postRemediationStatus/postRemediationAudit,
+  // so it's otherwise the only signal that a fresh re-audit just happened.
+  const fetchJobFlags = useCallback(async () => {
+    if (!jobId) return;
+    try {
+      const res = await api.get(`/jobs/${encodeURIComponent(jobId)}`);
+      if (!isMountedRef.current) return;
+      const output = (res.data.data?.output ?? {}) as Record<string, unknown>;
+      setJobFlags({
+        acrGenerated: output.acrGenerated === true,
+        pacReportGenerated: output.pacReportGenerated === true,
+        lastReauditAt: output.lastReauditAt as string | undefined,
+      });
+    } catch {
+      jobFlagsFetchedRef.current = null; // allow retry if the fetch itself failed
+    }
+  }, [jobId]);
+
   useEffect(() => {
     if (!jobId || !auditResult || jobFlagsFetchedRef.current === jobId) return;
     jobFlagsFetchedRef.current = jobId;
-    api.get(`/jobs/${encodeURIComponent(jobId)}`)
-      .then(res => {
-        if (!isMountedRef.current) return;
-        const output = (res.data.data?.output ?? {}) as Record<string, unknown>;
-        setJobFlags({
-          acrGenerated: output.acrGenerated === true,
-          pacReportGenerated: output.pacReportGenerated === true,
-        });
-      })
-      .catch(() => {
-        jobFlagsFetchedRef.current = null; // allow retry if the fetch itself failed
-      });
-  }, [jobId, auditResult]);
+    fetchJobFlags();
+  }, [jobId, auditResult, fetchJobFlags]);
 
   const handleRetryAutoTag = async () => {
     if (!jobId || isRetryingAutoTag) return;
@@ -760,6 +774,7 @@ export const PdfAuditResultsPage: React.FC = () => {
       await api.post(`/pdf/${encodeURIComponent(jobId)}/remediation/re-audit-current`);
       toast.success('Audit re-run complete');
       await fetchAuditResult();
+      await fetchJobFlags();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to re-run audit');
     } finally {
@@ -1108,7 +1123,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         guidanceAcknowledgment={guidanceAcknowledgment}
         onGuidanceAcknowledged={setGuidanceAcknowledgment}
         postRemediationStatus={autoTagInfo?.postRemediationStatus}
-        postRemediationAuditRunAt={autoTagInfo?.postRemediationAudit?.runAt}
+        lastVerifiedAt={latestTimestamp(autoTagInfo?.postRemediationAudit?.runAt, jobFlags?.lastReauditAt)}
         aiAnalyzedAt={aiStats?.analyzedAt}
         acrGenerated={jobFlags?.acrGenerated ?? false}
         pacReportGenerated={jobFlags?.pacReportGenerated ?? false}

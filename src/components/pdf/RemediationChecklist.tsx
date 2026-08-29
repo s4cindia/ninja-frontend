@@ -43,7 +43,7 @@ interface RemediationChecklistProps {
   guidanceAcknowledgment: GuidanceAcknowledgment | null;
   onGuidanceAcknowledged: (ack: GuidanceAcknowledgment) => void;
   postRemediationStatus?: 'pending' | 'complete' | 'failed';
-  postRemediationAuditRunAt?: string | null;
+  lastVerifiedAt?: string | null;
   aiAnalyzedAt?: string | null;
   acrGenerated: boolean;
   pacReportGenerated: boolean;
@@ -117,7 +117,7 @@ export function RemediationChecklist({
   guidanceAcknowledgment,
   onGuidanceAcknowledged,
   postRemediationStatus,
-  postRemediationAuditRunAt,
+  lastVerifiedAt,
   aiAnalyzedAt,
   acrGenerated,
   pacReportGenerated,
@@ -182,9 +182,14 @@ export function RemediationChecklist({
   const step5Done = postRemediationStatus === 'complete';
   // Done once AI Analysis has been re-run at least once since the most
   // recent re-audit — a plain timestamp comparison, not a new poll.
-  const reanalysisDone = step5Done && !!aiAnalyzedAt && !!postRemediationAuditRunAt
-    && new Date(aiAnalyzedAt).getTime() > new Date(postRemediationAuditRunAt).getTime();
-  const reanalysisInProgress = step5Done && aiAnalysisStatus === 'processing';
+  // lastVerifiedAt is the later of the automatic post-fix validation pass
+  // and a manual "Re-run Audit" click, so this doesn't go stale when the
+  // operator uses the manual path instead of/after the automatic one.
+  const reanalysisDone = step5Done && !!aiAnalyzedAt && !!lastVerifiedAt
+    && new Date(aiAnalyzedAt).getTime() > new Date(lastVerifiedAt).getTime();
+  // Treat 'pending' as active too, matching fetchAiSuggestions' own
+  // pending-or-processing definition of "analysis is under way".
+  const reanalysisInProgress = step5Done && (aiAnalysisStatus === 'processing' || aiAnalysisStatus === 'pending');
   const artifactsStepDone = acrGenerated && pacReportGenerated;
   const trialStepApplicable = !!comparisonTrialId;
   const trialStepDone = trial?.status === 'validated';
