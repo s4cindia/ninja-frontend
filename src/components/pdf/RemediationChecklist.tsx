@@ -83,6 +83,11 @@ function isAfter(a: string | null | undefined, b: string | null | undefined): bo
   return new Date(a).getTime() > new Date(b).getTime();
 }
 
+function isAtOrAfter(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  return new Date(a).getTime() >= new Date(b).getTime();
+}
+
 function StatusIcon({ status }: { status: StepStatus }) {
   switch (status) {
     case 'done':
@@ -240,37 +245,26 @@ export function RemediationChecklist({
   );
   // Fallback for the case where the operator resolved every guidance item
   // by hand without ever using acknowledge-and-skip or the manual time
-  // logger — no timestamp signal exists to anchor to. Snapshot lastVerifiedAt
-  // the moment guidance first resolves, and require a *newer* one after that
-  // — i.e. "any re-audit since guidance was finished", the closest honest
-  // approximation available from data this page has. Not perfectly precise
-  // (can't distinguish "re-audited to confirm" from "re-audited for an
-  // unrelated reason"), but reasonable given the signals available.
-  //
-  // The snapshot is `{ verifiedAt } | null`, not a bare `string | null` —
-  // verifiedAt can itself legitimately be null (guidance resolved before any
-  // re-audit ever ran), which must stay distinguishable from "not snapshotted
-  // yet". Collapsing both to '' previously meant isAfter(_, '') — which
-  // rejects a falsy second argument — could never turn true again, so step 7
-  // could get stuck "not started" forever. Also reset whenever guidance
-  // becomes unresolved again (e.g. a later AI Analysis re-run introduces new
-  // guidance-only items), so a stale snapshot from an earlier resolution
-  // cycle can't mark the new one done for free.
-  const [guidanceResolvedSnapshot, setGuidanceResolvedSnapshot] = useState<{ verifiedAt: string | null } | null>(null);
-  useEffect(() => {
-    if (guidanceResolved && guidanceResolvedSnapshot === null) {
-      setGuidanceResolvedSnapshot({ verifiedAt: lastVerifiedAt ?? null });
-    } else if (!guidanceResolved && guidanceResolvedSnapshot !== null) {
-      setGuidanceResolvedSnapshot(null);
-    }
-  }, [guidanceResolved, lastVerifiedAt, guidanceResolvedSnapshot]);
+  // logger — no acknowledgment/manual-log timestamp exists to anchor to.
+  // Verified resolution now goes through ninja-backend PR #500's pruning:
+  // analyzeJob reads job.output.auditReport fresh at the top of every call
+  // (no caching) and prunes stale AiAnalysis rows against that same read
+  // before writing aiAnalysisStats.analyzedAt — so analyzedAt can never
+  // reflect a state older than whatever postRemediationAudit.runAt was at
+  // the moment that analysis pass started. That makes "was the AI Analysis
+  // pass that found pendingGuidance === 0 itself informed by the latest
+  // re-audit" (aiAnalyzedAt at-or-after lastVerifiedAt) the exact signal
+  // for "this zero count reflects the verified post-fix state" — the same
+  // shape as step 5's own reanalysisDone check, just reused here. No
+  // separate "one more re-audit after resolution" is needed: the re-audit
+  // that produced the fresh auditReport IS the confirmation, and requiring
+  // another one afterward would be an unnecessary extra step for the
+  // operator. (Earlier version of this fallback snapshotted lastVerifiedAt
+  // at the moment resolution was first observed and required something
+  // newer — an off-by-one-audit bug once this path became reachable.)
   const secondReauditDone = guidanceResolutionSignal
     ? isAfter(lastVerifiedAt, guidanceResolutionSignal)
-    : guidanceFullyResolved && guidanceResolvedSnapshot !== null && (
-      guidanceResolvedSnapshot.verifiedAt === null
-        ? !!lastVerifiedAt
-        : isAfter(lastVerifiedAt, guidanceResolvedSnapshot.verifiedAt)
-    );
+    : guidanceFullyResolved && isAtOrAfter(aiAnalyzedAt, lastVerifiedAt);
 
   const artifactsStepDone = acrGenerated && pacReportGenerated;
   const trialStepApplicable = !!comparisonTrialId;
