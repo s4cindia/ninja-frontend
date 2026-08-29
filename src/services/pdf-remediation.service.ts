@@ -11,6 +11,7 @@ import type {
   UpdateTaskStatusRequest,
   UpdateTaskStatusResponse,
   AutoRemediationResult,
+  ReauditComparisonResult,
 } from '@/types/pdf-remediation.types';
 
 /**
@@ -103,7 +104,7 @@ async function applyQuickFix(jobId: string, issueId: string, field: string, valu
 /**
  * Re-audit a remediated PDF file
  */
-async function reauditPdf(jobId: string, file: File) {
+async function reauditPdf(jobId: string, file: File): Promise<ReauditComparisonResult> {
   const formData = new FormData();
   formData.append('file', file);
 
@@ -111,7 +112,15 @@ async function reauditPdf(jobId: string, file: File) {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
 
-  return response.data;
+  // Unlike this file's other endpoints (which fall back to response.data for
+  // ones that don't wrap), this one must unwrap unconditionally: the
+  // envelope's own top-level `success` happens to be a field name collision
+  // with ReauditComparisonResult's `success` (a semantically different flag
+  // — "did the comparison itself succeed", not "did the HTTP request
+  // succeed") that a `|| response.data` fallback would silently mask, since
+  // both objects have a `success` key and neither is ever falsy/undefined
+  // in a way that would trigger the fallback.
+  return response.data.data;
 }
 
 export const pdfRemediationService = {
