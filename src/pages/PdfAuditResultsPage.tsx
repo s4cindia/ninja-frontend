@@ -23,12 +23,13 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { FileText, Loader2, Download, Share2, RotateCw, Filter, X, ChevronDown, ListChecks, Maximize2, Minimize2, Zap } from 'lucide-react';
+import { FileText, Loader2, Download, Share2, RotateCw, Filter, X, ChevronDown, ListChecks, Maximize2, Minimize2, Zap, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Checkbox } from '@/components/ui/Checkbox';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { MatterhornSummary } from '@/components/pdf/MatterhornSummary';
@@ -198,7 +199,15 @@ export const PdfAuditResultsPage: React.FC = () => {
   const [aiSuggestions, setAiSuggestions] = useState<Map<string, AiAnalysis>>(new Map());
   const [isAnalyzingAi, setIsAnalyzingAi] = useState(false);
   const [aiProgress, setAiProgress] = useState<{ analyzed: number; total: number } | null>(null);
-  const [isRerunningColorContrastFix, setIsRerunningColorContrastFix] = useState(false);
+  const [isRerunningAiAnalysis, setIsRerunningAiAnalysis] = useState(false);
+  // isAnalyzingAi starts false and only reflects reality once the initial
+  // fetchAiSuggestions() call resolves — without this, Re-run AI Analysis is
+  // clickable during that brief loading window even if analysis is already
+  // running server-side (e.g. the very first pass, still in flight).
+  const [hasLoadedAiStatus, setHasLoadedAiStatus] = useState(false);
+  // Session-only — resets on reload/revisit, never persisted server-side
+  // (an explicit, deliberate scope limit: no per-tenant sticky preference).
+  const [includeColorContrastFix, setIncludeColorContrastFix] = useState(false);
   const [aiStats, setAiStats] = useState<{
     gemini: { totalTokens: number; estimatedCostUsd: number };
     claude: { totalTokens: number; estimatedCostUsd: number };
@@ -619,6 +628,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         setAiProgress({ analyzed, total });
         setAiAnalysisStatus(status);
         setGuidanceAcknowledgment(ack ?? null);
+        setHasLoadedAiStatus(true);
         if (stats) setAiStats(stats);
         if (status === 'complete') {
           setIsAnalyzingAi(false);
@@ -641,16 +651,19 @@ export const PdfAuditResultsPage: React.FC = () => {
         }
       }
     } catch {
-      // Non-fatal — silently ignore fetch errors during polling
+      // Non-fatal — silently ignore fetch errors during polling, but still
+      // unblock the button rather than leaving it disabled forever on a
+      // transient failure of the initial load.
+      if (isMountedRef.current) setHasLoadedAiStatus(true);
     }
   }, [jobId]);
 
-  const handleRerunWithColorContrastFix = useCallback(async () => {
+  const handleRerunAiAnalysis = useCallback(async () => {
     if (!jobId) return;
-    setIsRerunningColorContrastFix(true);
+    setIsRerunningAiAnalysis(true);
     try {
-      await triggerAiAnalysis(jobId, { colorContrastMode: 'apply-to-pdf' });
-      toast.success('Re-running AI analysis with color-contrast auto-fix…');
+      await triggerAiAnalysis(jobId, includeColorContrastFix ? { colorContrastMode: 'apply-to-pdf' } : undefined);
+      toast.success(includeColorContrastFix ? 'Re-running AI analysis with color-contrast auto-fix…' : 'Re-running AI analysis…');
       setIsAnalyzingAi(true);
       if (!aiPollingRef.current) {
         aiPollingRef.current = setInterval(fetchAiSuggestions, 3000);
@@ -658,9 +671,9 @@ export const PdfAuditResultsPage: React.FC = () => {
     } catch {
       toast.error('Failed to start AI re-analysis');
     } finally {
-      setIsRerunningColorContrastFix(false);
+      setIsRerunningAiAnalysis(false);
     }
-  }, [jobId, fetchAiSuggestions]);
+  }, [jobId, includeColorContrastFix, fetchAiSuggestions]);
 
   // Load existing AI suggestions on mount (in case analysis was already run)
   useEffect(() => {
@@ -1053,7 +1066,7 @@ export const PdfAuditResultsPage: React.FC = () => {
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-2 mt-4">
+          <div className="flex items-center flex-wrap gap-2 mt-4">
             <Button
               variant="primary"
               size="sm"
@@ -1095,6 +1108,37 @@ export const PdfAuditResultsPage: React.FC = () => {
                 : <><RotateCw className="h-4 w-4 mr-1" />Re-run Audit</>
               }
             </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRerunAiAnalysis}
+                disabled={isRerunningAiAnalysis || isAnalyzingAi || !hasLoadedAiStatus}
+                title={!hasLoadedAiStatus ? 'Loading AI analysis status…' : isAnalyzingAi ? 'AI analysis is already running' : undefined}
+              >
+                {isRerunningAiAnalysis
+                  ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Re-running…</>
+                  : <><Sparkles className="h-4 w-4 mr-1" />Re-run AI Analysis</>
+                }
+              </Button>
+              {/* A <div>, not <label> — <label> would auto-forward its click to the
+                  nested Checkbox <button> (buttons are labelable elements), which
+                  combined with this span's own onClick would double-toggle. */}
+              <div className="flex items-center gap-1.5 text-xs text-gray-600 select-none">
+                <Checkbox
+                  checked={includeColorContrastFix}
+                  onChange={setIncludeColorContrastFix}
+                  aria-label="Include color-contrast auto-fix on re-run"
+                />
+                <span
+                  className="cursor-pointer"
+                  onClick={() => setIncludeColorContrastFix(v => !v)}
+                  title="When checked, the system attempts to locate each contrast issue's text run on the page and, if confidently found, offers a real Apply-to-PDF fix instead of guidance only. Issues it can't confidently locate still fall back to guidance-only either way."
+                >
+                  Include color-contrast auto-fix
+                </span>
+              </div>
+            </div>
             <Button
               variant="outline"
               size="sm"
@@ -1131,8 +1175,6 @@ export const PdfAuditResultsPage: React.FC = () => {
         onViewAutoTagReport={handleViewAutoTagReport}
         onRetryAutoTag={handleRetryAutoTag}
         isRetryingAutoTag={isRetryingAutoTag}
-        onRerunWithColorContrastFix={handleRerunWithColorContrastFix}
-        isRerunningColorContrastFix={isRerunningColorContrastFix}
         jobId={jobId!}
       />
 
