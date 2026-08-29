@@ -1529,7 +1529,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         isOpen={showPacReport}
         onClose={() => setShowPacReport(false)}
         jobId={jobId!}
-        onGenerated={() => setJobFlags(prev => ({ acrGenerated: prev?.acrGenerated ?? false, pacReportGenerated: true }))}
+        onGenerated={() => setJobFlags(prev => ({ acrGenerated: prev?.acrGenerated ?? false, pacReportGenerated: true, lastReauditAt: prev?.lastReauditAt }))}
       />
     </div>
   );

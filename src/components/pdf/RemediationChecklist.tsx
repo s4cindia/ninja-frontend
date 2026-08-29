@@ -179,17 +179,24 @@ export function RemediationChecklist({
   const step3Started = appliedFixableCount > 0;
   const step4FullyResolved = step2Done && pendingGuidance.length === 0;
   const step4Acknowledged = guidanceAcknowledgment != null;
-  const step5Done = postRemediationStatus === 'complete';
+  const automatedVerificationDone = postRemediationStatus === 'complete';
+  // A manual "Re-run Audit" click satisfies "verified" too — it never sets
+  // postRemediationStatus (that's the automatic post-fix pass's field alone),
+  // so without this OR, a manual-only verification could never mark step 5
+  // done or unblock step 6 at all. An active automatic pass still wins for
+  // *display* purposes below — a fresh "pending" shouldn't read as done just
+  // because an older manual verification happened to precede it.
+  const verificationDone = automatedVerificationDone || !!lastVerifiedAt;
   // Done once AI Analysis has been re-run at least once since the most
-  // recent re-audit — a plain timestamp comparison, not a new poll.
+  // recent verification — a plain timestamp comparison, not a new poll.
   // lastVerifiedAt is the later of the automatic post-fix validation pass
   // and a manual "Re-run Audit" click, so this doesn't go stale when the
   // operator uses the manual path instead of/after the automatic one.
-  const reanalysisDone = step5Done && !!aiAnalyzedAt && !!lastVerifiedAt
+  const reanalysisDone = verificationDone && !!aiAnalyzedAt && !!lastVerifiedAt
     && new Date(aiAnalyzedAt).getTime() > new Date(lastVerifiedAt).getTime();
   // Treat 'pending' as active too, matching fetchAiSuggestions' own
   // pending-or-processing definition of "analysis is under way".
-  const reanalysisInProgress = step5Done && (aiAnalysisStatus === 'processing' || aiAnalysisStatus === 'pending');
+  const reanalysisInProgress = verificationDone && (aiAnalysisStatus === 'processing' || aiAnalysisStatus === 'pending');
   const artifactsStepDone = acrGenerated && pacReportGenerated;
   const trialStepApplicable = !!comparisonTrialId;
   const trialStepDone = trial?.status === 'validated';
@@ -286,12 +293,14 @@ export function RemediationChecklist({
       {
         id: 5,
         label: 'Re-audit to verify',
-        status: step5Done ? 'done' : postRemediationStatus === 'pending' ? 'in-progress' : 'not-started',
+        // An active automatic pass always wins for display, even if an
+        // earlier manual re-audit would otherwise already read "done".
+        status: postRemediationStatus === 'pending' ? 'in-progress' : verificationDone ? 'done' : 'not-started',
       },
       {
         id: 6,
         label: 'Re-run AI Analysis (final check)',
-        status: !step5Done
+        status: !verificationDone
           ? 'not-started'
           : reanalysisDone
             ? 'done'
@@ -352,7 +361,7 @@ export function RemediationChecklist({
   }, [
     aiAnalysisStatus, step2Done, step3Done, step3Started, step4FullyResolved, step4Acknowledged, guidanceAcknowledgment,
     noteInput, isSubmittingAck, handleAcknowledge, pendingGuidance.length, pendingFixable.length,
-    step5Done, postRemediationStatus, reanalysisDone, reanalysisInProgress, artifactsStepDone, acrGenerated, pacReportGenerated,
+    verificationDone, postRemediationStatus, reanalysisDone, reanalysisInProgress, artifactsStepDone, acrGenerated, pacReportGenerated,
     trialStepApplicable, trialStepDone, isValidatingTrial, isLoadingTrial, canValidateTrial, needsPdfxtData, handleValidateTrial,
   ]);
 
