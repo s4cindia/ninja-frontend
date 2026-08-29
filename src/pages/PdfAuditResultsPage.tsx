@@ -251,6 +251,18 @@ export const PdfAuditResultsPage: React.FC = () => {
   // overwrite on the next fetch), Math.max would otherwise let a previous
   // job's leftover total incorrectly clamp a new job's lower one.
   const [manualRemediationMs, setManualRemediationMs] = useState(0);
+  // Same independent-state, reconciled-via-latestTimestamp treatment as
+  // manualRemediationMs above, and for the same reason: nesting this in
+  // autoTagInfo would silently drop a just-logged timestamp whenever
+  // autoTagInfo was still null, and a slower in-flight status fetch could
+  // overwrite a fresher one. Updated both from /auto-tag/status responses
+  // (once ninja-backend PR #499 ships manualRemediationLastLoggedAt there)
+  // and immediately from ManualRemediationTimeLog's own POST response, so
+  // the guided remediation checklist's step 7 doesn't wait on the next poll.
+  const [manualRemediationLastLoggedAt, setManualRemediationLastLoggedAt] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    setManualRemediationLastLoggedAt(undefined);
+  }, [jobId]);
   useEffect(() => {
     setManualRemediationMs(0);
   }, [jobId]);
@@ -721,6 +733,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         setAutoTagInfo(info);
         applyAutoTagStatus(info);
         setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
+        setManualRemediationLastLoggedAt(prev => latestTimestamp(prev, info?.manualRemediationLastLoggedAt));
       })
       .catch(() => {
         autoTagFetchedJobRef.current = null; // allow retry if the fetch itself failed
@@ -775,6 +788,7 @@ export const PdfAuditResultsPage: React.FC = () => {
             setAutoTagInfo(info);
             applyAutoTagStatus(info);
             setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
+        setManualRemediationLastLoggedAt(prev => latestTimestamp(prev, info?.manualRemediationLastLoggedAt));
           }
           if (info?.status === 'complete' || info?.status === 'failed') {
             if (autoTagPollRef.current) {
@@ -827,6 +841,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         if (isMountedRef.current) {
           setAutoTagInfo(info);
           setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
+        setManualRemediationLastLoggedAt(prev => latestTimestamp(prev, info?.manualRemediationLastLoggedAt));
         }
         if (info?.postRemediationStatus !== 'pending') {
           if (autoTagPollRef.current) {
@@ -1187,6 +1202,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         postRemediationStatus={autoTagInfo?.postRemediationStatus}
         lastVerifiedAt={latestTimestamp(autoTagInfo?.postRemediationAudit?.runAt, jobFlags?.lastReauditAt)}
         aiAnalyzedAt={aiStats?.analyzedAt}
+        manualRemediationLastLoggedAt={manualRemediationLastLoggedAt}
         acrGenerated={jobFlags?.acrGenerated ?? false}
         pacReportGenerated={jobFlags?.pacReportGenerated ?? false}
         comparisonTrialId={autoTagInfo?.comparisonTrialId}
@@ -1196,7 +1212,10 @@ export const PdfAuditResultsPage: React.FC = () => {
       <ManualRemediationTimeLog
         jobId={jobId!}
         manualRemediationMs={manualRemediationMs}
-        onLogged={(totalMs) => setManualRemediationMs(prev => Math.max(prev, totalMs))}
+        onLogged={(totalMs, lastLoggedAt) => {
+          setManualRemediationMs(prev => Math.max(prev, totalMs));
+          setManualRemediationLastLoggedAt(prev => latestTimestamp(prev, lastLoggedAt));
+        }}
       />
 
       {/* Matterhorn Summary */}

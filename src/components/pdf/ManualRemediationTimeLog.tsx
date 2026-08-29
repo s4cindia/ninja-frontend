@@ -24,7 +24,7 @@ import { api, getErrorMessage } from '@/services/api';
 interface ManualRemediationTimeLogProps {
   jobId: string;
   manualRemediationMs: number;
-  onLogged: (totalMs: number) => void;
+  onLogged: (totalMs: number, lastLoggedAt?: string) => void;
 }
 
 function formatDuration(ms: number): string {
@@ -61,7 +61,12 @@ export function ManualRemediationTimeLog({ jobId, manualRemediationMs, onLogged 
         ...(noteInput.trim() ? { note: noteInput.trim() } : {}),
       });
       const totalMinutes = res.data.data.totalMinutes as number;
-      onLogged(Math.round(totalMinutes * 60000));
+      const log = res.data.data.log as Array<{ loggedAt?: string }> | undefined;
+      // The just-appended entry's own timestamp — lets the guided remediation
+      // checklist's step 7 (confirm manual fixes) react immediately, without
+      // waiting for the next /auto-tag/status poll to pick it up.
+      const lastLoggedAt = log && log.length > 0 ? log[log.length - 1]?.loggedAt : undefined;
+      onLogged(Math.round(totalMinutes * 60000), lastLoggedAt);
       closeForm();
       toast.success('Manual remediation time logged');
     } catch (err) {

@@ -47,10 +47,15 @@ describe('ManualRemediationTimeLog', () => {
     expect(saveButton).not.toBeDisabled();
   });
 
-  it('submits minutes and note, reports the new total upward, and closes the form', async () => {
+  it('submits minutes and note, reports the new total and the just-logged entry\'s timestamp upward, and closes the form', async () => {
     const onLogged = vi.fn();
     mockApi.post.mockResolvedValueOnce({
-      data: { data: { totalMinutes: 45, log: [] } },
+      data: {
+        data: {
+          totalMinutes: 45,
+          log: [{ minutes: 45, note: 'fixed byline in Acrobat', loggedAt: '2026-08-29T12:00:00.000Z', loggedBy: 'user_abc' }],
+        },
+      },
     });
 
     render(<ManualRemediationTimeLog jobId="job-123" manualRemediationMs={0} onLogged={onLogged} />);
@@ -66,9 +71,23 @@ describe('ManualRemediationTimeLog', () => {
       );
     });
     await waitFor(() => {
-      expect(onLogged).toHaveBeenCalledWith(45 * 60000);
+      expect(onLogged).toHaveBeenCalledWith(45 * 60000, '2026-08-29T12:00:00.000Z');
     });
     expect(screen.queryByPlaceholderText('Minutes')).not.toBeInTheDocument();
+  });
+
+  it('reports lastLoggedAt as undefined if the response omits a log array (defensive — should not crash)', async () => {
+    const onLogged = vi.fn();
+    mockApi.post.mockResolvedValueOnce({ data: { data: { totalMinutes: 10 } } });
+
+    render(<ManualRemediationTimeLog jobId="job-123" manualRemediationMs={0} onLogged={onLogged} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Log time' }));
+    fireEvent.change(screen.getByPlaceholderText('Minutes'), { target: { value: '10' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(onLogged).toHaveBeenCalledWith(10 * 60000, undefined);
+    });
   });
 
   it('omits note from the request body when left blank', async () => {
