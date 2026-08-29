@@ -37,6 +37,7 @@ import { PdfPageNavigator } from '@/components/pdf/PdfPageNavigator';
 import { PdfPreviewPanel } from '@/components/pdf/PdfPreviewPanel';
 import { PdfStatsCards } from '@/components/pdf/PdfStatsCards';
 import { RemediationChecklist } from '@/components/pdf/RemediationChecklist';
+import { ManualRemediationTimeLog } from '@/components/pdf/ManualRemediationTimeLog';
 import type { GuidanceAcknowledgment } from '@/components/pdf/RemediationChecklist';
 import { IssueCard, AiAnalysis } from '@/components/remediation/IssueCard';
 import { ApplyAllSuggestionsPanel } from '@/components/remediation/ApplyAllSuggestionsPanel';
@@ -230,6 +231,20 @@ export const PdfAuditResultsPage: React.FC = () => {
     retagOutcome?: 'success' | 'failed-strip-bailed' | 'failed-retag-error' | null;
     comparisonTrialId?: string | null;
   } | null>(null);
+  // Tracked independently of autoTagInfo (not nested inside it) so a
+  // just-submitted total is never lost: it can be set before autoTagInfo's
+  // first fetch resolves (prev would otherwise be null), and reconciled via
+  // Math.max against every subsequent /auto-tag/status response — for a
+  // given job the total only ever grows, so the max of any two reads is
+  // always the true value, with no risk of a slower in-flight GET stomping
+  // a fresher submission. Explicitly reset on jobId change (below) since,
+  // unlike this page's other per-job state (which self-corrects via plain
+  // overwrite on the next fetch), Math.max would otherwise let a previous
+  // job's leftover total incorrectly clamp a new job's lower one.
+  const [manualRemediationMs, setManualRemediationMs] = useState(0);
+  useEffect(() => {
+    setManualRemediationMs(0);
+  }, [jobId]);
   const [isRetryingAutoTag, setIsRetryingAutoTag] = useState(false);
   const [isReRunningAudit, setIsReRunningAudit] = useState(false);
   const [showPacReport, setShowPacReport] = useState(false);
@@ -692,6 +707,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         const info = res.data.data;
         setAutoTagInfo(info);
         applyAutoTagStatus(info);
+        setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
       })
       .catch(() => {
         autoTagFetchedJobRef.current = null; // allow retry if the fetch itself failed
@@ -745,6 +761,7 @@ export const PdfAuditResultsPage: React.FC = () => {
           if (isMountedRef.current) {
             setAutoTagInfo(info);
             applyAutoTagStatus(info);
+            setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
           }
           if (info?.status === 'complete' || info?.status === 'failed') {
             if (autoTagPollRef.current) {
@@ -794,7 +811,10 @@ export const PdfAuditResultsPage: React.FC = () => {
       try {
         const res = await api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`);
         const info = res.data.data;
-        if (isMountedRef.current) setAutoTagInfo(info);
+        if (isMountedRef.current) {
+          setAutoTagInfo(info);
+          setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
+        }
         if (info?.postRemediationStatus !== 'pending') {
           if (autoTagPollRef.current) {
             clearInterval(autoTagPollRef.current);
@@ -1129,6 +1149,12 @@ export const PdfAuditResultsPage: React.FC = () => {
         pacReportGenerated={jobFlags?.pacReportGenerated ?? false}
         comparisonTrialId={autoTagInfo?.comparisonTrialId}
         userRole={currentUser?.role}
+      />
+
+      <ManualRemediationTimeLog
+        jobId={jobId!}
+        manualRemediationMs={manualRemediationMs}
+        onLogged={(totalMs) => setManualRemediationMs(prev => Math.max(prev, totalMs))}
       />
 
       {/* Matterhorn Summary */}
