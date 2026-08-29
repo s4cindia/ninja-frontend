@@ -1519,4 +1519,59 @@ describe('PdfAuditResultsPage', () => {
       });
     });
   });
+
+  describe('Manual remediation time log', () => {
+    const jobId = 'job-123';
+    const auditUrl = `/pdf/job/${jobId}/audit/result`;
+    const statusUrl = `/pdf/${jobId}/auto-tag/status`;
+    const aiUrl = `/pdf/${jobId}/ai-analysis`;
+    const timeUrl = `/pdf/${jobId}/manual-remediation-time`;
+    const emptyAiResponse = { data: { data: { suggestions: [], analyzed: 0, total: 0, status: 'complete' } } };
+
+    it('is visible and usable with zero guidance-only items pending (regression: must not be gated on checklist step 4)', async () => {
+      const mockResult = createMockAuditResult();
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        // No pending guidance-only suggestions and no acknowledgment — step 4
+        // would read "Done", not "Not started"/"skipped" — the affordance
+        // must still show up regardless.
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe', manualRemediationMs: 25 * 60000 } } });
+        if (url === aiUrl) return Promise.resolve(emptyAiResponse);
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      expect(await screen.findByText(/25m/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Log time' })).toBeInTheDocument();
+    });
+
+    it('logs time and updates the running total shown on the page', async () => {
+      const mockResult = createMockAuditResult();
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe', manualRemediationMs: 0 } } });
+        if (url === aiUrl) return Promise.resolve(emptyAiResponse);
+        return Promise.resolve({ data: { data: {} } });
+      });
+      mockApi.post.mockImplementation((url: string) => {
+        if (url === timeUrl) return Promise.resolve({ data: { data: { totalMinutes: 30, log: [] } } });
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      expect(await screen.findByText(/0m/)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Log time' }));
+      fireEvent.change(screen.getByPlaceholderText('Minutes'), { target: { value: '30' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+      await waitFor(() => {
+        expect(mockApi.post).toHaveBeenCalledWith(timeUrl, { minutes: 30 });
+      });
+      await waitFor(() => {
+        expect(screen.getByText(/30m/)).toBeInTheDocument();
+      });
+    });
+  });
 });

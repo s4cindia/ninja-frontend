@@ -37,6 +37,7 @@ import { PdfPageNavigator } from '@/components/pdf/PdfPageNavigator';
 import { PdfPreviewPanel } from '@/components/pdf/PdfPreviewPanel';
 import { PdfStatsCards } from '@/components/pdf/PdfStatsCards';
 import { RemediationChecklist } from '@/components/pdf/RemediationChecklist';
+import { ManualRemediationTimeLog } from '@/components/pdf/ManualRemediationTimeLog';
 import type { GuidanceAcknowledgment } from '@/components/pdf/RemediationChecklist';
 import { IssueCard, AiAnalysis } from '@/components/remediation/IssueCard';
 import { ApplyAllSuggestionsPanel } from '@/components/remediation/ApplyAllSuggestionsPanel';
@@ -229,6 +230,7 @@ export const PdfAuditResultsPage: React.FC = () => {
     structureTreeCompleteness?: { totalElements: number; semanticElements: number; isEmptyShell: boolean } | null;
     retagOutcome?: 'success' | 'failed-strip-bailed' | 'failed-retag-error' | null;
     comparisonTrialId?: string | null;
+    manualRemediationMs?: number;
   } | null>(null);
   const [isRetryingAutoTag, setIsRetryingAutoTag] = useState(false);
   const [isReRunningAudit, setIsReRunningAudit] = useState(false);
@@ -1129,6 +1131,12 @@ export const PdfAuditResultsPage: React.FC = () => {
         pacReportGenerated={jobFlags?.pacReportGenerated ?? false}
         comparisonTrialId={autoTagInfo?.comparisonTrialId}
         userRole={currentUser?.role}
+      />
+
+      <ManualRemediationTimeLog
+        jobId={jobId!}
+        manualRemediationMs={autoTagInfo?.manualRemediationMs ?? 0}
+        onLogged={(totalMs) => setAutoTagInfo(prev => prev ? { ...prev, manualRemediationMs: totalMs } : prev)}
       />
 
       {/* Matterhorn Summary */}
