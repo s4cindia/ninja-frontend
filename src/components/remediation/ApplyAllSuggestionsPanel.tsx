@@ -1,25 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import axios from 'axios';
 import { Zap, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { applyAllAiSuggestions, ApplyAllAiSuggestionsResult } from '@/services/api/pdfAiAnalysis.service';
-
-/**
- * A definitive 4xx (auth/validation/not-found) means the request was
- * rejected before the apply-all loop ever started — nothing is running in
- * the background, so blocking a retry would just punish the user for no
- * reason. Only a response-less failure (dropped connection, CORS, DNS) or a
- * gateway-timeout-class status (502/503/504 — the infra gave up waiting on
- * the origin, which is exactly the CloudFront-vs-slow-backend scenario this
- * cooldown exists for) leaves real ambiguity about whether the backend is
- * still applying fixes.
- */
-function isAmbiguousApplyAllFailure(error: unknown): boolean {
-  if (!axios.isAxiosError(error)) return false;
-  if (!error.response) return true;
-  return [502, 503, 504].includes(error.response.status);
-}
+import {
+  getErrorMessage,
+  getRemediationCycleLockDetails,
+  remediationCycleSourceMessage,
+  type RemediationCycleSource,
+} from '@/services/api';
 
 interface ApplyAllSuggestionsPanelProps {
   jobId: string;
@@ -37,29 +26,24 @@ interface ApplyAllSuggestionsPanelProps {
   /** Dismiss the panel — via Cancel before applying, or Done/auto-close after. */
   onClose: () => void;
   /**
-   * Timestamp (Date.now()-style ms) until which retrying is blocked, or null
-   * if there's no active cooldown. Lifted to the caller because this panel
-   * unmounts on every close (the Dialog wrapper returns null when closed),
-   * so a cooldown tracked in local state would silently reset on reopen.
+   * Server-reported remediation-cycle lock state (from the same
+   * /auto-tag/status poll the page already runs) — the authoritative
+   * "is something already running for this job" signal, not a client-side
+   * guess. Disables the submit button while true.
    */
-  retryBlockedUntil?: number | null;
+  remediationCycleInProgress?: boolean;
+  remediationCycleSource?: RemediationCycleSource | null;
   /**
-   * Fires when the apply-all request itself errors (e.g. the backend is
-   * still synchronous and a slow batch outlasts CloudFront's origin-response
-   * timeout, so the browser sees a network error while the backend keeps
-   * applying fixes to completion in the background). A same-request retry
-   * right after would start a second, genuinely overlapping apply-all run
-   * against the same PDF — this is a temporary bridge until the backend's
-   * remediation-cycle lock rejects that case with a clean 409 instead.
+   * Fires when the apply-all request itself errors, so the caller can
+   * immediately re-poll /auto-tag/status rather than wait for the next
+   * regular tick — this is what keeps remediationCycleInProgress accurate
+   * right after a failure (e.g. the backend is still synchronous and a slow
+   * batch outlasts CloudFront's origin-response timeout, so the browser
+   * sees a network error while the backend keeps applying fixes to
+   * completion in the background).
    */
   onApplyError?: () => void;
 }
-
-/** How long to block a retry after an apply-all error. CloudFront's origin
- * timeout tops out at 60s; this adds margin for the backend to actually
- * finish writing/re-auditing after the connection was cut. Exported so the
- * caller sets the same duration it's setting `retryBlockedUntil` to. */
-export const APPLY_ALL_RETRY_COOLDOWN_MS = 90_000;
 
 function ResultsView({
   results,
@@ -172,28 +156,15 @@ export function ApplyAllSuggestionsPanel({
   pendingEligibleCount,
   onApplied,
   onClose,
-  retryBlockedUntil = null,
+  remediationCycleInProgress = false,
+  remediationCycleSource = null,
   onApplyError,
 }: ApplyAllSuggestionsPanelProps) {
   const [includePending, setIncludePending] = useState(false);
-  // Ticks once a second while a retry cooldown is active, so the countdown
-  // displays and the button re-enables itself once the cooldown lapses —
-  // without this, isRetryBlocked/retrySecondsLeft below would only ever be
-  // computed once per unrelated re-render.
-  const [nowTick, setNowTick] = useState(() => Date.now());
-  useEffect(() => {
-    if (retryBlockedUntil == null || retryBlockedUntil <= Date.now()) return;
-    const interval = setInterval(() => {
-      const now = Date.now();
-      setNowTick(now);
-      // retryBlockedUntil itself doesn't change once the cooldown lapses, so
-      // without this the effect's own dependency array would never re-run
-      // and the interval would keep re-rendering the panel every second
-      // indefinitely, even long after the button is re-enabled.
-      if (now >= retryBlockedUntil) clearInterval(interval);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [retryBlockedUntil]);
+  // Distinguishes a lock conflict (409 — expected/transient, not the
+  // caller's fault) from a genuine failure, so the error box can show the
+  // right message.
+  const [wasLockConflict, setWasLockConflict] = useState(false);
 
   const applyAllMutation = useMutation({
     mutationFn: () => applyAllAiSuggestions(jobId, includePending),
@@ -203,9 +174,8 @@ export function ApplyAllSuggestionsPanel({
       onApplied(result);
     },
     onError: (error) => {
-      if (isAmbiguousApplyAllFailure(error)) {
-        onApplyError?.();
-      }
+      setWasLockConflict(getRemediationCycleLockDetails(error) != null);
+      onApplyError?.();
     },
   });
 
@@ -214,9 +184,6 @@ export function ApplyAllSuggestionsPanel({
   }
 
   const totalToApply = eligibleCount + (includePending ? pendingEligibleCount : 0);
-
-  const isRetryBlocked = retryBlockedUntil != null && retryBlockedUntil > nowTick;
-  const retrySecondsLeft = isRetryBlocked ? Math.ceil((retryBlockedUntil - nowTick) / 1000) : 0;
 
   return (
     <div className="p-6">
@@ -269,8 +236,8 @@ export function ApplyAllSuggestionsPanel({
       <div className="flex gap-3">
         <button
           onClick={() => applyAllMutation.mutate()}
-          disabled={applyAllMutation.isPending || totalToApply === 0 || isRetryBlocked}
-          title={isRetryBlocked ? `Waiting in case the previous attempt is still processing on the server (${retrySecondsLeft}s)` : undefined}
+          disabled={applyAllMutation.isPending || totalToApply === 0 || remediationCycleInProgress}
+          title={remediationCycleInProgress ? remediationCycleSourceMessage(remediationCycleSource) : undefined}
           className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
         >
           {applyAllMutation.isPending ? (
@@ -278,8 +245,8 @@ export function ApplyAllSuggestionsPanel({
               <Loader2 className="animate-spin" size={20} aria-hidden="true" />
               Applying {totalToApply} {totalToApply === 1 ? 'fix' : 'fixes'}...
             </>
-          ) : isRetryBlocked ? (
-            <>Retry available in {retrySecondsLeft}s</>
+          ) : remediationCycleInProgress ? (
+            <>{remediationCycleSourceMessage(remediationCycleSource)}</>
           ) : (
             <>
               <Zap size={20} aria-hidden="true" />
@@ -299,13 +266,13 @@ export function ApplyAllSuggestionsPanel({
 
       {applyAllMutation.isError && (
         <div className="mt-4 bg-red-50 border border-red-200 rounded p-3">
-          <p className="text-sm text-red-800">
-            Failed to apply suggestions: {(applyAllMutation.error as Error)?.message || 'Unknown error'}
-          </p>
-          {isRetryBlocked && (
-            <p className="text-xs text-red-600 mt-1">
-              The previous attempt may still be applying fixes in the background — retrying now
-              could apply the same suggestions twice. Retry available in {retrySecondsLeft}s.
+          {wasLockConflict ? (
+            <p className="text-sm text-red-800">
+              A remediation cycle is already in progress. This page will update automatically.
+            </p>
+          ) : (
+            <p className="text-sm text-red-800">
+              Failed to apply suggestions: {getErrorMessage(applyAllMutation.error)}
             </p>
           )}
         </div>

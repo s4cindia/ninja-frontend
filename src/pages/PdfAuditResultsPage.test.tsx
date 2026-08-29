@@ -8,8 +8,18 @@ import { api } from '@/services/api';
 import { pdfRemediationService } from '@/services/pdf-remediation.service';
 import type { PdfAuditResult, PdfAuditIssue, MatterhornSummary } from '@/types/pdf.types';
 
-// Mock dependencies
-vi.mock('@/services/api');
+// Mock dependencies. Keeps the real (pure) getErrorMessage/
+// getRemediationCycleLockDetails/remediationCycleSourceMessage — a blanket
+// automock would silently stub these to return undefined, which happened to
+// not break any PRE-EXISTING assertion (none checked exact error text/lock
+// detection), but would make new tests of that logic meaningless.
+vi.mock('@/services/api', async () => {
+  const actual = await vi.importActual<typeof import('@/services/api')>('@/services/api');
+  return {
+    ...actual,
+    api: { get: vi.fn(), post: vi.fn(), defaults: { baseURL: '' } },
+  };
+});
 vi.mock('@/services/pdf-remediation.service', () => ({
   pdfRemediationService: { reauditPdf: vi.fn() },
 }));
@@ -1237,6 +1247,59 @@ describe('PdfAuditResultsPage', () => {
       });
     });
 
+    it('regression: disables Re-run AI Analysis (and shows a source-specific title) once /auto-tag/status reports a remediation cycle in progress from elsewhere, e.g. an Apply All running concurrently', async () => {
+      const mockResult = createMockAuditResult();
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({
+          data: {
+            data: {
+              status: 'complete', taggerSource: 'adobe',
+              remediationCycleInProgress: true, remediationCycleSource: 'apply_all',
+            },
+          },
+        });
+        if (url === aiUrl) return Promise.resolve(completeAiResponse);
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      const rerunButton = await screen.findByRole('button', { name: 'Re-run AI Analysis' });
+      // Wait for the LOCK-specific title, not just "disabled" — the button
+      // also starts disabled during the initial hasLoadedAiStatus loading
+      // phase, so a bare toBeDisabled() wait would pass trivially even if
+      // the lock gate itself were missing.
+      await waitFor(() => {
+        expect(rerunButton).toHaveAttribute('title', expect.stringMatching(/Applying fixes is still in progress/));
+      });
+      expect(rerunButton).toBeDisabled();
+    });
+
+    it('regression: a 409 REMEDIATION_CYCLE_IN_PROGRESS response from the trigger immediately re-polls /auto-tag/status instead of waiting for the next regular tick', async () => {
+      mockCommonGets();
+      mockApi.post.mockRejectedValue({
+        isAxiosError: true,
+        message: 'Conflict',
+        response: { status: 409, data: { error: { code: 'REMEDIATION_CYCLE_IN_PROGRESS', message: 'locked', details: { source: 'analyze_job' } } } },
+      });
+
+      renderWithRouter(jobId);
+
+      const rerunButton = await screen.findByRole('button', { name: 'Re-run AI Analysis' });
+      await waitFor(() => expect(rerunButton).not.toBeDisabled());
+      const statusCallsBefore = mockApi.get.mock.calls.filter(([url]) => url === statusUrl).length;
+
+      await act(async () => {
+        fireEvent.click(rerunButton);
+      });
+
+      await waitFor(() => {
+        const statusCallsAfter = mockApi.get.mock.calls.filter(([url]) => url === statusUrl).length;
+        expect(statusCallsAfter).toBeGreaterThan(statusCallsBefore);
+      });
+    });
+
     it('is disabled (not hidden) from page load when AI analysis is already running (regression: the old link used to disappear entirely here — the relocated button stays visible, disabled, with an explanatory title)', async () => {
       const mockResult = createMockAuditResult();
       mockApi.get.mockImplementation((url: string) => {
@@ -1782,6 +1845,56 @@ describe('PdfAuditResultsPage', () => {
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: 'Re-run Audit' })).not.toBeDisabled();
+      });
+    });
+
+    it('regression: disables Re-run Audit (and shows a source-specific title) once /auto-tag/status reports a remediation cycle in progress from elsewhere', async () => {
+      const mockResult = createMockAuditResult();
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({
+          data: {
+            data: {
+              status: 'complete', taggerSource: 'adobe',
+              remediationCycleInProgress: true, remediationCycleSource: 'analyze_job',
+            },
+          },
+        });
+        if (url === aiUrl) return Promise.resolve(emptyAiResponse);
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      const reRunButton = await screen.findByRole('button', { name: 'Re-run Audit' });
+      await waitFor(() => expect(reRunButton).toBeDisabled());
+      expect(reRunButton).toHaveAttribute('title', expect.stringMatching(/AI analysis is running/));
+    });
+
+    it('regression: a 409 REMEDIATION_CYCLE_IN_PROGRESS response immediately re-polls /auto-tag/status instead of waiting for the next regular tick', async () => {
+      const mockResult = createMockAuditResult();
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve(emptyAiResponse);
+        return Promise.resolve({ data: { data: {} } });
+      });
+      mockApi.post.mockRejectedValue({
+        isAxiosError: true,
+        message: 'Conflict',
+        response: { status: 409, data: { error: { code: 'REMEDIATION_CYCLE_IN_PROGRESS', message: 'locked', details: { source: 'apply_all' } } } },
+      });
+
+      renderWithRouter(jobId);
+
+      const reRunButton = await screen.findByRole('button', { name: 'Re-run Audit' });
+      const statusCallsBefore = mockApi.get.mock.calls.filter(([url]) => url === statusUrl).length;
+
+      fireEvent.click(reRunButton);
+
+      await waitFor(() => {
+        const statusCallsAfter = mockApi.get.mock.calls.filter(([url]) => url === statusUrl).length;
+        expect(statusCallsAfter).toBeGreaterThan(statusCallsBefore);
       });
     });
   });

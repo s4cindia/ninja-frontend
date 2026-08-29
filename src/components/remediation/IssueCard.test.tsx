@@ -5,7 +5,16 @@ import { IssueCard, type AiAnalysis } from './IssueCard';
 import { api } from '@/services/api';
 import type { PdfAuditIssue } from '@/types/pdf.types';
 
-vi.mock('@/services/api');
+// Keeps the real (pure) getErrorMessage/getRemediationCycleLockDetails/
+// remediationCycleSourceMessage — a blanket automock would stub these to
+// return undefined, making tests of the 409-lock-conflict handling meaningless.
+vi.mock('@/services/api', async () => {
+  const actual = await vi.importActual<typeof import('@/services/api')>('@/services/api');
+  return {
+    ...actual,
+    api: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
+  };
+});
 
 function renderWithQuery(ui: React.ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -330,6 +339,76 @@ describe('IssueCard', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
 
       await waitFor(() => expect(mockApi.post).toHaveBeenCalled());
+    });
+  });
+
+  describe('Remediation-cycle lock gating', () => {
+    const mockApi = api as Mocked<typeof api>;
+    const mockAiSuggestion: AiAnalysis = {
+      id: 'ai-1',
+      jobId: 'job-1',
+      issueId: 'pdf-issue-1',
+      suggestionType: 'alt-text',
+      value: 'A description',
+      guidance: null,
+      confidence: 0.92,
+      rationale: 'because',
+      model: 'gemini',
+      applyMode: 'apply-to-pdf',
+      status: 'pending',
+      createdAt: '2024-01-15T10:00:00Z',
+      updatedAt: '2024-01-15T10:00:00Z',
+    };
+
+    beforeEach(() => {
+      mockApi.post.mockReset();
+      mockApi.patch.mockReset();
+    });
+
+    it('regression: the Apply button is disabled and explains what is running when remediationCycleInProgress is true — Approve/Dismiss stay enabled since they do not touch the PDF', () => {
+      renderWithQuery(
+        <IssueCard
+          issue={mockPdfIssue}
+          jobId="job-1"
+          aiSuggestion={mockAiSuggestion}
+          remediationCycleInProgress={true}
+          remediationCycleSource="apply_all"
+        />
+      );
+
+      const applyButton = screen.getByRole('button', { name: 'Apply' });
+      expect(applyButton).toBeDisabled();
+      expect(applyButton).toHaveAttribute('title', expect.stringMatching(/Applying fixes is still in progress/));
+      expect(screen.getByRole('button', { name: 'Approve' })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Dismiss' })).not.toBeDisabled();
+    });
+
+    it('regression: a 409 REMEDIATION_CYCLE_IN_PROGRESS error on Apply shows a transient message and notifies the caller to re-poll, instead of a generic failure toast', async () => {
+      mockApi.post.mockRejectedValue({
+        isAxiosError: true,
+        message: 'Conflict',
+        response: { status: 409, data: { error: { code: 'REMEDIATION_CYCLE_IN_PROGRESS', message: 'locked', details: { source: 'apply_single' } } } },
+      });
+      const onApplyError = vi.fn();
+      renderWithQuery(
+        <IssueCard issue={mockPdfIssue} jobId="job-1" aiSuggestion={mockAiSuggestion} onApplyError={onApplyError} />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+      await waitFor(() => expect(onApplyError).toHaveBeenCalledTimes(1));
+    });
+
+    it('regression: a non-lock Apply error still notifies the caller to re-poll (any error could mean a cycle just started server-side)', async () => {
+      mockApi.post.mockRejectedValue({ isAxiosError: true, message: 'Network Error', response: undefined });
+      const onApplyError = vi.fn();
+      renderWithQuery(
+        <IssueCard issue={mockPdfIssue} jobId="job-1" aiSuggestion={mockAiSuggestion} onApplyError={onApplyError} />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+      await waitFor(() => expect(onApplyError).toHaveBeenCalledTimes(1));
     });
   });
 
