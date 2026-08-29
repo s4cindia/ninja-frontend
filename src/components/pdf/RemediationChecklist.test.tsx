@@ -245,12 +245,56 @@ describe('RemediationChecklist', () => {
     expect(screen.getByText('5. Re-audit to verify').closest('div')!.parentElement).toHaveTextContent('Done');
   });
 
-  it('step 6 only shows Done once both ACR and PAC report are generated', () => {
+  it('step 7 only shows Done once both ACR and PAC report are generated', () => {
     const { rerender } = render(<RemediationChecklist {...baseProps} acrGenerated pacReportGenerated={false} />);
-    expect(screen.getByText('6. Generate compliance artifacts').closest('div')!.parentElement).toHaveTextContent('In progress');
+    expect(screen.getByText('7. Generate compliance artifacts').closest('div')!.parentElement).toHaveTextContent('In progress');
 
     rerender(<RemediationChecklist {...baseProps} acrGenerated pacReportGenerated />);
-    expect(screen.getByText('6. Generate compliance artifacts').closest('div')!.parentElement).toHaveTextContent('Done');
+    expect(screen.getByText('7. Generate compliance artifacts').closest('div')!.parentElement).toHaveTextContent('Done');
+  });
+
+  it('step 6 (re-run AI Analysis) is not-started until step 5 is done, then reflects whether analysis ran again since the last re-audit', () => {
+    const { rerender } = render(<RemediationChecklist {...baseProps} postRemediationStatus={undefined} />);
+    expect(screen.getByText('6. Re-run AI Analysis (final check)').closest('div')!.parentElement).toHaveTextContent('Not started');
+
+    // Re-audit just completed, AI Analysis hasn't been re-run since.
+    rerender(
+      <RemediationChecklist
+        {...baseProps}
+        postRemediationStatus="complete"
+        postRemediationAuditRunAt="2026-08-29T00:00:00.000Z"
+        aiAnalyzedAt="2026-08-28T00:00:00.000Z"
+      />
+    );
+    expect(screen.getByText('6. Re-run AI Analysis (final check)').closest('div')!.parentElement).toHaveTextContent('Not started');
+
+    // AI Analysis currently running again.
+    rerender(
+      <RemediationChecklist
+        {...baseProps}
+        aiAnalysisStatus="processing"
+        postRemediationStatus="complete"
+        postRemediationAuditRunAt="2026-08-29T00:00:00.000Z"
+        aiAnalyzedAt="2026-08-28T00:00:00.000Z"
+      />
+    );
+    expect(screen.getByText('6. Re-run AI Analysis (final check)').closest('div')!.parentElement).toHaveTextContent('In progress');
+
+    // Re-run finished after the re-audit — done, and since a fixable
+    // suggestion exists, nudge the operator back to step 3.
+    rerender(
+      <RemediationChecklist
+        {...baseProps}
+        aiAnalysisStatus="complete"
+        aiSuggestions={suggestionsMap([suggestion({ issueId: 'a', applyMode: 'apply-to-pdf', status: 'pending' })])}
+        postRemediationStatus="complete"
+        postRemediationAuditRunAt="2026-08-29T00:00:00.000Z"
+        aiAnalyzedAt="2026-08-29T00:05:00.000Z"
+      />
+    );
+    const step6Container = screen.getByText('6. Re-run AI Analysis (final check)').closest('div')!.parentElement!;
+    expect(step6Container).toHaveTextContent('Done');
+    expect(step6Container).toHaveTextContent('1 fixable suggestion(s) now available — consider revisiting step 3.');
   });
 
   it('step 7 does not render when there is no linked comparison trial', () => {
@@ -268,7 +312,7 @@ describe('RemediationChecklist', () => {
     await waitFor(() => {
       expect(mockService.getTrial).toHaveBeenCalledWith('ct_xyz789');
     });
-    expect(screen.getByText(/7\. Mark comparison trial complete/)).toBeInTheDocument();
+    expect(screen.getByText(/8\. Mark comparison trial complete/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Mark trial complete' }));
 
@@ -276,7 +320,7 @@ describe('RemediationChecklist', () => {
       expect(mockService.validateTrial).toHaveBeenCalledWith('ct_xyz789');
     });
     await waitFor(() => {
-      expect(screen.getByText('7. Mark comparison trial complete').closest('div')!.parentElement).toHaveTextContent('Done');
+      expect(screen.getByText('8. Mark comparison trial complete').closest('div')!.parentElement).toHaveTextContent('Done');
     });
   });
 

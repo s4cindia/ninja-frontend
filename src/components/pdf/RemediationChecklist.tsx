@@ -1,11 +1,18 @@
 /**
  * RemediationChecklist
  *
- * Soft-gated, 7-step guided checklist for the PDF Audit Results page.
+ * Soft-gated, 8-step guided checklist for the PDF Audit Results page.
  * Purely advisory — every existing action on the page stays fully clickable
  * regardless of checklist state. It only surfaces status badges and a
  * "recommended next" nudge, computed from data this page already fetches
- * (plus one job-flags lookup for step 6 and one trial lookup for step 7).
+ * (plus one job-flags lookup for step 7 and one trial lookup for step 8).
+ *
+ * Step 6 (re-run AI Analysis after re-audit) exists because some
+ * fix-eligibility checks are gated on file state that only becomes true once
+ * fixes have actually been applied (e.g. HEADING-SKIP's rule-based auto-fix
+ * needs /MarkInfo /Marked, which isn't set until after the apply+re-audit
+ * cycle) — so a second AI Analysis pass can surface newly-fixable issues that
+ * the first pass legitimately couldn't have found.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -36,6 +43,8 @@ interface RemediationChecklistProps {
   guidanceAcknowledgment: GuidanceAcknowledgment | null;
   onGuidanceAcknowledged: (ack: GuidanceAcknowledgment) => void;
   postRemediationStatus?: 'pending' | 'complete' | 'failed';
+  postRemediationAuditRunAt?: string | null;
+  aiAnalyzedAt?: string | null;
   acrGenerated: boolean;
   pacReportGenerated: boolean;
   comparisonTrialId?: string | null;
@@ -108,6 +117,8 @@ export function RemediationChecklist({
   guidanceAcknowledgment,
   onGuidanceAcknowledged,
   postRemediationStatus,
+  postRemediationAuditRunAt,
+  aiAnalyzedAt,
   acrGenerated,
   pacReportGenerated,
   comparisonTrialId,
@@ -129,7 +140,7 @@ export function RemediationChecklist({
     setIsLoadingTrial(true);
     comparisonStudyService.getTrial(comparisonTrialId)
       .then((t) => { if (!cancelled) setTrial(t); })
-      .catch(() => { /* non-fatal — step 7 just shows as not-started */ })
+      .catch(() => { /* non-fatal — step 8 just shows as not-started */ })
       .finally(() => { if (!cancelled) setIsLoadingTrial(false); });
     return () => { cancelled = true; };
   }, [comparisonTrialId]);
@@ -169,9 +180,14 @@ export function RemediationChecklist({
   const step4FullyResolved = step2Done && pendingGuidance.length === 0;
   const step4Acknowledged = guidanceAcknowledgment != null;
   const step5Done = postRemediationStatus === 'complete';
-  const step6Done = acrGenerated && pacReportGenerated;
-  const step7Applicable = !!comparisonTrialId;
-  const step7Done = trial?.status === 'validated';
+  // Done once AI Analysis has been re-run at least once since the most
+  // recent re-audit — a plain timestamp comparison, not a new poll.
+  const reanalysisDone = step5Done && !!aiAnalyzedAt && !!postRemediationAuditRunAt
+    && new Date(aiAnalyzedAt).getTime() > new Date(postRemediationAuditRunAt).getTime();
+  const reanalysisInProgress = step5Done && aiAnalysisStatus === 'processing';
+  const artifactsStepDone = acrGenerated && pacReportGenerated;
+  const trialStepApplicable = !!comparisonTrialId;
+  const trialStepDone = trial?.status === 'validated';
 
   const canValidateTrial = userRole === 'ADMIN' || userRole === 'OPERATOR';
   // Mirrors the guard on ComparisonTrialWorkspacePage's own Validate button —
@@ -269,9 +285,27 @@ export function RemediationChecklist({
       },
       {
         id: 6,
+        label: 'Re-run AI Analysis (final check)',
+        status: !step5Done
+          ? 'not-started'
+          : reanalysisDone
+            ? 'done'
+            : reanalysisInProgress
+              ? 'in-progress'
+              : 'not-started',
+        detail: reanalysisDone && pendingFixable.length > 0
+          ? (
+            <p className="text-xs text-blue-700">
+              {pendingFixable.length} fixable suggestion(s) now available — consider revisiting step 3.
+            </p>
+          )
+          : undefined,
+      },
+      {
+        id: 7,
         label: 'Generate compliance artifacts',
-        status: step6Done ? 'done' : (acrGenerated || pacReportGenerated) ? 'in-progress' : 'not-started',
-        detail: !step6Done ? (
+        status: artifactsStepDone ? 'done' : (acrGenerated || pacReportGenerated) ? 'in-progress' : 'not-started',
+        detail: !artifactsStepDone ? (
           <p className="text-xs text-gray-500">
             {acrGenerated ? 'ACR generated. ' : 'ACR not generated. '}
             {pacReportGenerated ? 'PAC report generated.' : 'PAC report not generated.'}
@@ -280,12 +314,12 @@ export function RemediationChecklist({
       },
     ];
 
-    if (step7Applicable) {
+    if (trialStepApplicable) {
       list.push({
-        id: 7,
+        id: 8,
         label: 'Mark comparison trial complete',
-        status: step7Done ? 'done' : isValidatingTrial ? 'in-progress' : 'not-started',
-        detail: step7Done
+        status: trialStepDone ? 'done' : isValidatingTrial ? 'in-progress' : 'not-started',
+        detail: trialStepDone
           ? undefined
           : (
             <div className="flex items-center gap-2">
@@ -312,9 +346,9 @@ export function RemediationChecklist({
     return list;
   }, [
     aiAnalysisStatus, step2Done, step3Done, step3Started, step4FullyResolved, step4Acknowledged, guidanceAcknowledgment,
-    noteInput, isSubmittingAck, handleAcknowledge, pendingGuidance.length,
-    step5Done, postRemediationStatus, step6Done, acrGenerated, pacReportGenerated,
-    step7Applicable, step7Done, isValidatingTrial, isLoadingTrial, canValidateTrial, needsPdfxtData, handleValidateTrial,
+    noteInput, isSubmittingAck, handleAcknowledge, pendingGuidance.length, pendingFixable.length,
+    step5Done, postRemediationStatus, reanalysisDone, reanalysisInProgress, artifactsStepDone, acrGenerated, pacReportGenerated,
+    trialStepApplicable, trialStepDone, isValidatingTrial, isLoadingTrial, canValidateTrial, needsPdfxtData, handleValidateTrial,
   ]);
 
   const recommendedNextId = useMemo(

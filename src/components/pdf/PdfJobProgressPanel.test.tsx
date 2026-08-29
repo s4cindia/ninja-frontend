@@ -123,6 +123,21 @@ describe('PdfJobProgressPanel', () => {
     expect(container.textContent).toContain('5H');
   });
 
+  it('labels the row "Seam-C (YOLO)" instead of "Adobe AutoTag" when that\'s the tagger that actually ran (regression: used to say Adobe unconditionally)', () => {
+    render(
+      <PdfJobProgressPanel
+        jobData={job({
+          input: { autoTagProgress: { startedAt: '2026-08-01T10:00:05.000Z', status: 'processing' } },
+          output: { taggerSource: 'seam-c' },
+        })}
+        progress={15}
+      />
+    );
+
+    expect(screen.getByText('Seam-C (YOLO)')).toBeInTheDocument();
+    expect(screen.queryByText('Adobe AutoTag')).not.toBeInTheDocument();
+  });
+
   it('handles a null jobData without crashing, rendering an empty Timing table', () => {
     render(<PdfJobProgressPanel jobData={null} progress={0} />);
 

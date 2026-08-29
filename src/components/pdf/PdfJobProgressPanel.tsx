@@ -104,6 +104,10 @@ export function PdfJobProgressPanel({
   const autoTagProg = jobData?.input?.autoTagProgress as AutoTagProgress | undefined;
   const hasAutoTag = !!autoTagProg;
   const autoTagEnd = autoTagProg?.completedAt ? new Date(autoTagProg.completedAt) : null;
+  // Seam-C is the default tagger; Adobe is only the fallback — this used to
+  // say "Adobe AutoTag" unconditionally regardless of which one actually ran.
+  const taggerSource = jobData?.output?.taggerSource as string | null | undefined;
+  const autoTagLabel = taggerSource === 'seam-c' ? 'Seam-C (YOLO)' : 'Adobe AutoTag';
   const extractionDone = (totalPages ? progress >= 88 : false) || vp.length > 0 || auditEnd !== null;
   const extractionEnd = vp.length > 0 ? new Date(vp[0].startedAt) : (extractionDone ? auditEnd : null);
   const extractionStart = hasAutoTag ? autoTagEnd : auditStart;
@@ -125,7 +129,7 @@ export function PdfJobProgressPanel({
       status: auditStart ? 'done' as const : queueStart ? 'running' as const : 'pending' as const,
     },
     ...(hasAutoTag ? [{
-      label: 'Adobe AutoTag',
+      label: autoTagLabel,
       start: autoTagProg?.startedAt ? new Date(autoTagProg.startedAt) : auditStart,
       end: autoTagEnd,
       status: (autoTagProg?.status === 'complete' || autoTagProg?.status === 'failed') ? 'done' as const : auditStart ? 'running' as const : 'pending' as const,

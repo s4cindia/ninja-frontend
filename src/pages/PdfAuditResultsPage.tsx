@@ -197,6 +197,7 @@ export const PdfAuditResultsPage: React.FC = () => {
     claude: { totalTokens: number; estimatedCostUsd: number };
     totalTokens: number;
     totalCostUsd: number;
+    analyzedAt?: string;
   } | null>(null);
   const aiPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoTagPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -579,6 +580,7 @@ export const PdfAuditResultsPage: React.FC = () => {
             claude: { totalTokens: number; estimatedCostUsd: number };
             totalTokens: number;
             totalCostUsd: number;
+            analyzedAt?: string;
           } | null;
           guidanceAcknowledgment?: GuidanceAcknowledgment | null;
         };
@@ -1106,6 +1108,8 @@ export const PdfAuditResultsPage: React.FC = () => {
         guidanceAcknowledgment={guidanceAcknowledgment}
         onGuidanceAcknowledged={setGuidanceAcknowledgment}
         postRemediationStatus={autoTagInfo?.postRemediationStatus}
+        postRemediationAuditRunAt={autoTagInfo?.postRemediationAudit?.runAt}
+        aiAnalyzedAt={aiStats?.analyzedAt}
         acrGenerated={jobFlags?.acrGenerated ?? false}
         pacReportGenerated={jobFlags?.pacReportGenerated ?? false}
         comparisonTrialId={autoTagInfo?.comparisonTrialId}
