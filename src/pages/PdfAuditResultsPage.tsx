@@ -234,10 +234,17 @@ export const PdfAuditResultsPage: React.FC = () => {
   // Tracked independently of autoTagInfo (not nested inside it) so a
   // just-submitted total is never lost: it can be set before autoTagInfo's
   // first fetch resolves (prev would otherwise be null), and reconciled via
-  // Math.max against every subsequent /auto-tag/status response — the total
-  // only ever grows, so the max of any two reads is always the true value,
-  // with no risk of a slower in-flight GET stomping a fresher submission.
+  // Math.max against every subsequent /auto-tag/status response — for a
+  // given job the total only ever grows, so the max of any two reads is
+  // always the true value, with no risk of a slower in-flight GET stomping
+  // a fresher submission. Explicitly reset on jobId change (below) since,
+  // unlike this page's other per-job state (which self-corrects via plain
+  // overwrite on the next fetch), Math.max would otherwise let a previous
+  // job's leftover total incorrectly clamp a new job's lower one.
   const [manualRemediationMs, setManualRemediationMs] = useState(0);
+  useEffect(() => {
+    setManualRemediationMs(0);
+  }, [jobId]);
   const [isRetryingAutoTag, setIsRetryingAutoTag] = useState(false);
   const [isReRunningAudit, setIsReRunningAudit] = useState(false);
   const [showPacReport, setShowPacReport] = useState(false);
