@@ -245,20 +245,108 @@ describe('RemediationChecklist', () => {
     expect(screen.getByText('5. Re-audit to verify').closest('div')!.parentElement).toHaveTextContent('Done');
   });
 
-  it('step 6 only shows Done once both ACR and PAC report are generated', () => {
-    const { rerender } = render(<RemediationChecklist {...baseProps} acrGenerated pacReportGenerated={false} />);
-    expect(screen.getByText('6. Generate compliance artifacts').closest('div')!.parentElement).toHaveTextContent('In progress');
-
-    rerender(<RemediationChecklist {...baseProps} acrGenerated pacReportGenerated />);
-    expect(screen.getByText('6. Generate compliance artifacts').closest('div')!.parentElement).toHaveTextContent('Done');
+  it('step 5 reads Done from a manual-only re-audit too, with no automatic postRemediationStatus pass ever having run (regression: manual Re-run Audit never sets postRemediationStatus, so step 5/6 could never progress on that path alone)', () => {
+    // lastVerifiedAt populated (from a manual re-audit), postRemediationStatus
+    // never set at all — the manual-only path.
+    render(<RemediationChecklist {...baseProps} postRemediationStatus={undefined} lastVerifiedAt="2026-08-29T00:00:00.000Z" />);
+    expect(screen.getByText('5. Re-audit to verify').closest('div')!.parentElement).toHaveTextContent('Done');
   });
 
-  it('step 7 does not render when there is no linked comparison trial', () => {
+  it('step 5 still shows In progress for a fresh automatic pass, even if an older manual re-audit already made lastVerifiedAt truthy', () => {
+    render(
+      <RemediationChecklist
+        {...baseProps}
+        postRemediationStatus="pending"
+        lastVerifiedAt="2026-08-20T00:00:00.000Z"
+      />
+    );
+    expect(screen.getByText('5. Re-audit to verify').closest('div')!.parentElement).toHaveTextContent('In progress');
+  });
+
+  it('step 7 only shows Done once both ACR and PAC report are generated', () => {
+    const { rerender } = render(<RemediationChecklist {...baseProps} acrGenerated pacReportGenerated={false} />);
+    expect(screen.getByText('7. Generate compliance artifacts').closest('div')!.parentElement).toHaveTextContent('In progress');
+
+    rerender(<RemediationChecklist {...baseProps} acrGenerated pacReportGenerated />);
+    expect(screen.getByText('7. Generate compliance artifacts').closest('div')!.parentElement).toHaveTextContent('Done');
+  });
+
+  it('step 6 (re-run AI Analysis) is not-started until step 5 is done, then reflects whether analysis ran again since the last re-audit', () => {
+    const { rerender } = render(<RemediationChecklist {...baseProps} postRemediationStatus={undefined} />);
+    expect(screen.getByText('6. Re-run AI Analysis (final check)').closest('div')!.parentElement).toHaveTextContent('Not started');
+
+    // Re-audit just completed, AI Analysis hasn't been re-run since.
+    rerender(
+      <RemediationChecklist
+        {...baseProps}
+        postRemediationStatus="complete"
+        lastVerifiedAt="2026-08-29T00:00:00.000Z"
+        aiAnalyzedAt="2026-08-28T00:00:00.000Z"
+      />
+    );
+    expect(screen.getByText('6. Re-run AI Analysis (final check)').closest('div')!.parentElement).toHaveTextContent('Not started');
+
+    // AI Analysis currently running again.
+    rerender(
+      <RemediationChecklist
+        {...baseProps}
+        aiAnalysisStatus="processing"
+        postRemediationStatus="complete"
+        lastVerifiedAt="2026-08-29T00:00:00.000Z"
+        aiAnalyzedAt="2026-08-28T00:00:00.000Z"
+      />
+    );
+    expect(screen.getByText('6. Re-run AI Analysis (final check)').closest('div')!.parentElement).toHaveTextContent('In progress');
+
+    // Also in progress while merely queued ('pending'), matching
+    // fetchAiSuggestions' own pending-or-processing definition of "active".
+    rerender(
+      <RemediationChecklist
+        {...baseProps}
+        aiAnalysisStatus="pending"
+        postRemediationStatus="complete"
+        lastVerifiedAt="2026-08-29T00:00:00.000Z"
+        aiAnalyzedAt="2026-08-28T00:00:00.000Z"
+      />
+    );
+    expect(screen.getByText('6. Re-run AI Analysis (final check)').closest('div')!.parentElement).toHaveTextContent('In progress');
+
+    // Re-run finished after the re-audit — done, and since a fixable
+    // suggestion exists, nudge the operator back to step 3.
+    rerender(
+      <RemediationChecklist
+        {...baseProps}
+        aiAnalysisStatus="complete"
+        aiSuggestions={suggestionsMap([suggestion({ issueId: 'a', applyMode: 'apply-to-pdf', status: 'pending' })])}
+        postRemediationStatus="complete"
+        lastVerifiedAt="2026-08-29T00:00:00.000Z"
+        aiAnalyzedAt="2026-08-29T00:05:00.000Z"
+      />
+    );
+    const step6Container = screen.getByText('6. Re-run AI Analysis (final check)').closest('div')!.parentElement!;
+    expect(step6Container).toHaveTextContent('Done');
+    expect(step6Container).toHaveTextContent('1 fixable suggestion(s) now available — consider revisiting step 3.');
+  });
+
+  it('step 6 can also progress on a manual-only re-audit, with postRemediationStatus never set at all', () => {
+    render(
+      <RemediationChecklist
+        {...baseProps}
+        aiAnalysisStatus="complete"
+        postRemediationStatus={undefined}
+        lastVerifiedAt="2026-08-29T00:00:00.000Z"
+        aiAnalyzedAt="2026-08-29T00:05:00.000Z"
+      />
+    );
+    expect(screen.getByText('6. Re-run AI Analysis (final check)').closest('div')!.parentElement).toHaveTextContent('Done');
+  });
+
+  it('step 8 does not render when there is no linked comparison trial', () => {
     render(<RemediationChecklist {...baseProps} comparisonTrialId={null} />);
     expect(screen.queryByText(/Mark comparison trial complete/)).not.toBeInTheDocument();
   });
 
-  it('step 7 renders, fetches trial status, and confirms via the validate endpoint for an admin/operator', async () => {
+  it('step 8 renders, fetches trial status, and confirms via the validate endpoint for an admin/operator', async () => {
     const trial = { id: 'ct_xyz789', status: 'pdfxt_logged' } as ComparisonTrialWithJob;
     mockService.getTrial.mockResolvedValueOnce(trial);
     mockService.validateTrial.mockResolvedValueOnce({ ...trial, status: 'validated' } as ComparisonTrialWithJob);
@@ -268,7 +356,7 @@ describe('RemediationChecklist', () => {
     await waitFor(() => {
       expect(mockService.getTrial).toHaveBeenCalledWith('ct_xyz789');
     });
-    expect(screen.getByText(/7\. Mark comparison trial complete/)).toBeInTheDocument();
+    expect(screen.getByText(/8\. Mark comparison trial complete/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Mark trial complete' }));
 
@@ -276,11 +364,11 @@ describe('RemediationChecklist', () => {
       expect(mockService.validateTrial).toHaveBeenCalledWith('ct_xyz789');
     });
     await waitFor(() => {
-      expect(screen.getByText('7. Mark comparison trial complete').closest('div')!.parentElement).toHaveTextContent('Done');
+      expect(screen.getByText('8. Mark comparison trial complete').closest('div')!.parentElement).toHaveTextContent('Done');
     });
   });
 
-  it('step 7 disables the confirm button and explains why for a non-admin/operator role', async () => {
+  it('step 8 disables the confirm button and explains why for a non-admin/operator role', async () => {
     mockService.getTrial.mockResolvedValueOnce({ id: 'ct_xyz789', status: 'registered' } as ComparisonTrialWithJob);
 
     render(<RemediationChecklist {...baseProps} comparisonTrialId="ct_xyz789" userRole="VIEWER" />);
@@ -291,7 +379,7 @@ describe('RemediationChecklist', () => {
     expect(screen.getByText('Requires an Admin or Operator role.')).toBeInTheDocument();
   });
 
-  it('step 7 disables the confirm button for an admin/operator until pdfxt data is logged (mirrors the trial workspace guard)', async () => {
+  it('step 8 disables the confirm button for an admin/operator until pdfxt data is logged (mirrors the trial workspace guard)', async () => {
     mockService.getTrial.mockResolvedValueOnce({ id: 'ct_xyz789', status: 'registered' } as ComparisonTrialWithJob);
 
     render(<RemediationChecklist {...baseProps} comparisonTrialId="ct_xyz789" userRole="ADMIN" />);
