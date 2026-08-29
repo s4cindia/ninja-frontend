@@ -118,4 +118,59 @@ describe('ApplyAllSuggestionsPanel', () => {
     expect(mockApplyAll).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it('regression: a response-less network error notifies the caller so a retry can be blocked — this is the bridge fix for a false-timeout race (CloudFront can kill the connection on a large batch while the backend keeps applying fixes to completion server-side; an immediate retry would start a second, genuinely overlapping run)', async () => {
+    mockApplyAll.mockRejectedValue({ isAxiosError: true, message: 'Network Error', response: undefined });
+    const onApplyError = vi.fn();
+    renderPanel({ onApplyError });
+
+    fireEvent.click(screen.getByRole('button', { name: /Apply All \(3\)/ }));
+
+    await waitFor(() => {
+      expect(onApplyError).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('regression: a 504 Gateway Timeout also notifies the caller — CloudFront returns an actual response in this case (unlike a dropped connection), but the origin may still be applying fixes', async () => {
+    mockApplyAll.mockRejectedValue({ isAxiosError: true, message: 'Gateway Timeout', response: { status: 504, data: {} } });
+    const onApplyError = vi.fn();
+    renderPanel({ onApplyError });
+
+    fireEvent.click(screen.getByRole('button', { name: /Apply All \(3\)/ }));
+
+    await waitFor(() => {
+      expect(onApplyError).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('regression: a definitive 4xx rejection does NOT block a retry — the request was rejected before the apply-all loop could start, so there is nothing running in the background to collide with', async () => {
+    mockApplyAll.mockRejectedValue({ isAxiosError: true, message: 'Unauthorized', response: { status: 401, data: {} } });
+    const onApplyError = vi.fn();
+    renderPanel({ onApplyError });
+
+    fireEvent.click(screen.getByRole('button', { name: /Apply All \(3\)/ }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Failed to apply suggestions/)).toBeInTheDocument();
+    });
+    expect(onApplyError).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /Apply All \(3\)/ })).not.toBeDisabled();
+  });
+
+  it('regression: while retryBlockedUntil is in the future, the Apply All button is disabled and explains why, instead of allowing an immediate retry that could double-apply fixes', () => {
+    renderPanel({ retryBlockedUntil: Date.now() + 45_000 });
+
+    const button = screen.getByRole('button', { name: /Retry available in 4[45]s/ });
+    expect(button).toBeDisabled();
+    expect(mockApplyAll).not.toHaveBeenCalled();
+
+    fireEvent.click(button);
+    expect(mockApplyAll).not.toHaveBeenCalled();
+  });
+
+  it('regression: once retryBlockedUntil is in the past (or null), the button is a normal enabled Apply All button again', () => {
+    renderPanel({ retryBlockedUntil: Date.now() - 1000 });
+
+    expect(screen.getByRole('button', { name: /Apply All \(3\)/ })).not.toBeDisabled();
+  });
 });
