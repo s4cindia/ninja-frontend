@@ -1,18 +1,23 @@
 /**
  * RemediationChecklist
  *
- * Soft-gated, 8-step guided checklist for the PDF Audit Results page.
+ * Soft-gated, 9-step guided checklist for the PDF Audit Results page.
  * Purely advisory — every existing action on the page stays fully clickable
  * regardless of checklist state. It only surfaces status badges and a
  * "recommended next" nudge, computed from data this page already fetches
- * (plus one job-flags lookup for step 7 and one trial lookup for step 8).
+ * (plus one job-flags lookup for step 8 and one trial lookup for step 9).
  *
- * Step 6 (re-run AI Analysis after re-audit) exists because some
- * fix-eligibility checks are gated on file state that only becomes true once
- * fixes have actually been applied (e.g. HEADING-SKIP's rule-based auto-fix
- * needs /MarkInfo /Marked, which isn't set until after the apply+re-audit
- * cycle) — so a second AI Analysis pass can surface newly-fixable issues that
- * the first pass legitimately couldn't have found.
+ * Re-audit and re-run-AI-analysis (steps 4-5) come BEFORE resolving
+ * guidance-only items (step 6): a guidance-only issue can turn out to be
+ * auto-fixable after all once the file's actually been through an
+ * apply+re-audit cycle (e.g. HEADING-SKIP's rule-based auto-fix needs
+ * /MarkInfo /Marked, which isn't set until partway through remediation) —
+ * so resolving guidance manually first risks the operator doing in Acrobat
+ * Pro what would've become auto-fixable for free with one more check.
+ * Step 7 (a second re-audit) exists because guidance-only fixes happen
+ * entirely outside Ninja — nothing on this page's automatic post-fix pass
+ * ever observes them — so the only way to confirm they landed is another
+ * explicit re-audit after they're done.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -45,6 +50,8 @@ interface RemediationChecklistProps {
   postRemediationStatus?: 'pending' | 'complete' | 'failed';
   lastVerifiedAt?: string | null;
   aiAnalyzedAt?: string | null;
+  /** Latest manual-remediation-time log entry's timestamp, or null if none logged. */
+  manualRemediationLastLoggedAt?: string | null;
   acrGenerated: boolean;
   pacReportGenerated: boolean;
   comparisonTrialId?: string | null;
@@ -64,6 +71,17 @@ const STATUS_BADGE_VARIANT: Record<StepStatus, 'default' | 'success' | 'warning'
   done: 'success',
   skipped: 'warning',
 };
+
+// ISO 8601 timestamps sort lexicographically in chronological order, so this
+// avoids needing to parse dates just to find the most recent one.
+function latestTimestamp(...timestamps: Array<string | null | undefined>): string | undefined {
+  return timestamps.filter((t): t is string => !!t).sort().pop();
+}
+
+function isAfter(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  return new Date(a).getTime() > new Date(b).getTime();
+}
 
 function StatusIcon({ status }: { status: StepStatus }) {
   switch (status) {
@@ -119,6 +137,7 @@ export function RemediationChecklist({
   postRemediationStatus,
   lastVerifiedAt,
   aiAnalyzedAt,
+  manualRemediationLastLoggedAt,
   acrGenerated,
   pacReportGenerated,
   comparisonTrialId,
@@ -140,7 +159,7 @@ export function RemediationChecklist({
     setIsLoadingTrial(true);
     comparisonStudyService.getTrial(comparisonTrialId)
       .then((t) => { if (!cancelled) setTrial(t); })
-      .catch(() => { /* non-fatal — step 8 just shows as not-started */ })
+      .catch(() => { /* non-fatal — step 9 just shows as not-started */ })
       .finally(() => { if (!cancelled) setIsLoadingTrial(false); });
     return () => { cancelled = true; };
   }, [comparisonTrialId]);
@@ -177,26 +196,56 @@ export function RemediationChecklist({
   const step2Done = aiAnalysisStatus === 'complete';
   const step3Done = step2Done && pendingFixable.length === 0;
   const step3Started = appliedFixableCount > 0;
-  const step4FullyResolved = step2Done && pendingGuidance.length === 0;
-  const step4Acknowledged = guidanceAcknowledgment != null;
+
+  // Step 4: first re-audit.
   const automatedVerificationDone = postRemediationStatus === 'complete';
   // A manual "Re-run Audit" click satisfies "verified" too — it never sets
   // postRemediationStatus (that's the automatic post-fix pass's field alone),
-  // so without this OR, a manual-only verification could never mark step 5
-  // done or unblock step 6 at all. An active automatic pass still wins for
+  // so without this OR, a manual-only verification could never mark step 4
+  // done or unblock step 5 at all. An active automatic pass still wins for
   // *display* purposes below — a fresh "pending" shouldn't read as done just
   // because an older manual verification happened to precede it.
   const verificationDone = automatedVerificationDone || !!lastVerifiedAt;
-  // Done once AI Analysis has been re-run at least once since the most
-  // recent verification — a plain timestamp comparison, not a new poll.
-  // lastVerifiedAt is the later of the automatic post-fix validation pass
-  // and a manual "Re-run Audit" click, so this doesn't go stale when the
-  // operator uses the manual path instead of/after the automatic one.
-  const reanalysisDone = verificationDone && !!aiAnalyzedAt && !!lastVerifiedAt
-    && new Date(aiAnalyzedAt).getTime() > new Date(lastVerifiedAt).getTime();
+
+  // Step 5: re-run AI Analysis (final check) — done once AI Analysis has
+  // been re-run at least once since the most recent verification.
+  const reanalysisDone = verificationDone && !!aiAnalyzedAt && isAfter(aiAnalyzedAt, lastVerifiedAt);
   // Treat 'pending' as active too, matching fetchAiSuggestions' own
   // pending-or-processing definition of "analysis is under way".
   const reanalysisInProgress = verificationDone && (aiAnalysisStatus === 'processing' || aiAnalysisStatus === 'pending');
+
+  // Step 6: guidance-only items.
+  const guidanceFullyResolved = step2Done && pendingGuidance.length === 0;
+  const guidanceAcknowledgedFlag = guidanceAcknowledgment != null;
+  const guidanceResolved = guidanceFullyResolved || guidanceAcknowledgedFlag;
+
+  // Step 7: a second re-audit, to confirm guidance-only manual work actually
+  // landed (nothing else on this page ever re-audits after that work, since
+  // it all happens outside Ninja). Anchor to whichever timestamp signal
+  // guidance resolution produced — an acknowledgment, or the latest manual
+  // time log entry.
+  const guidanceResolutionSignal = latestTimestamp(
+    guidanceAcknowledgment?.acknowledgedAt,
+    manualRemediationLastLoggedAt
+  );
+  // Fallback for the case where the operator resolved every guidance item
+  // by hand without ever using acknowledge-and-skip or the manual time
+  // logger — no timestamp signal exists to anchor to. Snapshot lastVerifiedAt
+  // the moment guidance first resolves, and require a *newer* one after that
+  // — i.e. "any re-audit since guidance was finished", the closest honest
+  // approximation available from data this page has. Not perfectly precise
+  // (can't distinguish "re-audited to confirm" from "re-audited for an
+  // unrelated reason"), but reasonable given the signals available.
+  const [verifiedAtWhenGuidanceResolved, setVerifiedAtWhenGuidanceResolved] = useState<string | null>(null);
+  useEffect(() => {
+    if (guidanceResolved && verifiedAtWhenGuidanceResolved === null) {
+      setVerifiedAtWhenGuidanceResolved(lastVerifiedAt ?? '');
+    }
+  }, [guidanceResolved, lastVerifiedAt, verifiedAtWhenGuidanceResolved]);
+  const secondReauditDone = guidanceResolutionSignal
+    ? isAfter(lastVerifiedAt, guidanceResolutionSignal)
+    : guidanceFullyResolved && verifiedAtWhenGuidanceResolved !== null && isAfter(lastVerifiedAt, verifiedAtWhenGuidanceResolved);
+
   const artifactsStepDone = acrGenerated && pacReportGenerated;
   const trialStepApplicable = !!comparisonTrialId;
   const trialStepDone = trial?.status === 'validated';
@@ -252,17 +301,44 @@ export function RemediationChecklist({
       },
       {
         id: 4,
+        label: 'Re-audit to verify',
+        // An active automatic pass always wins for display, even if an
+        // earlier manual re-audit would otherwise already read "done".
+        status: postRemediationStatus === 'pending' ? 'in-progress' : verificationDone ? 'done' : 'not-started',
+      },
+      {
+        id: 5,
+        label: 'Re-run AI Analysis (final check)',
+        status: !verificationDone
+          ? 'not-started'
+          : reanalysisDone
+            ? 'done'
+            : reanalysisInProgress
+              ? 'in-progress'
+              : 'not-started',
+        detail: reanalysisDone && pendingFixable.length > 0
+          ? (
+            <p className="text-xs text-blue-700">
+              {pendingFixable.length} fixable suggestion(s) now available — consider revisiting step 3.
+            </p>
+          )
+          : undefined,
+      },
+      {
+        id: 6,
         label: 'Resolve guidance-only items',
+        // Gated on step2Done (not verificationDone) — same condition as
+        // before the reorder, just at a new position in the list.
         status: !step2Done
           ? 'not-started'
-          : step4FullyResolved
+          : guidanceFullyResolved
             ? 'done'
-            : step4Acknowledged
+            : guidanceAcknowledgedFlag
               ? 'skipped'
               : 'not-started',
-        detail: !step2Done || step4FullyResolved
+        detail: !step2Done || guidanceFullyResolved
           ? undefined
-          : step4Acknowledged
+          : guidanceAcknowledgedFlag
             ? (
               <p className="text-xs text-amber-700">
                 &ldquo;{guidanceAcknowledgment!.note}&rdquo; — {guidanceAcknowledgment!.remainingCount} item(s) left as-is,
@@ -291,32 +367,19 @@ export function RemediationChecklist({
             ),
       },
       {
-        id: 5,
-        label: 'Re-audit to verify',
-        // An active automatic pass always wins for display, even if an
-        // earlier manual re-audit would otherwise already read "done".
-        status: postRemediationStatus === 'pending' ? 'in-progress' : verificationDone ? 'done' : 'not-started',
-      },
-      {
-        id: 6,
-        label: 'Re-run AI Analysis (final check)',
-        status: !verificationDone
-          ? 'not-started'
-          : reanalysisDone
-            ? 'done'
-            : reanalysisInProgress
-              ? 'in-progress'
-              : 'not-started',
-        detail: reanalysisDone && pendingFixable.length > 0
+        id: 7,
+        label: 'Re-audit again to confirm manual fixes',
+        status: !guidanceResolved ? 'not-started' : secondReauditDone ? 'done' : 'not-started',
+        detail: guidanceResolved && !secondReauditDone
           ? (
-            <p className="text-xs text-blue-700">
-              {pendingFixable.length} fixable suggestion(s) now available — consider revisiting step 3.
+            <p className="text-xs text-gray-500">
+              Guidance-only work is outside Ninja — re-run the audit to confirm it landed.
             </p>
           )
           : undefined,
       },
       {
-        id: 7,
+        id: 8,
         label: 'Generate compliance artifacts',
         status: artifactsStepDone ? 'done' : (acrGenerated || pacReportGenerated) ? 'in-progress' : 'not-started',
         detail: !artifactsStepDone ? (
@@ -330,7 +393,7 @@ export function RemediationChecklist({
 
     if (trialStepApplicable) {
       list.push({
-        id: 8,
+        id: 9,
         label: 'Mark comparison trial complete',
         status: trialStepDone ? 'done' : isValidatingTrial ? 'in-progress' : 'not-started',
         detail: trialStepDone
@@ -359,9 +422,10 @@ export function RemediationChecklist({
 
     return list;
   }, [
-    aiAnalysisStatus, step2Done, step3Done, step3Started, step4FullyResolved, step4Acknowledged, guidanceAcknowledgment,
+    aiAnalysisStatus, step2Done, step3Done, step3Started, guidanceFullyResolved, guidanceAcknowledgedFlag, guidanceAcknowledgment,
     noteInput, isSubmittingAck, handleAcknowledge, pendingGuidance.length, pendingFixable.length,
-    verificationDone, postRemediationStatus, reanalysisDone, reanalysisInProgress, artifactsStepDone, acrGenerated, pacReportGenerated,
+    verificationDone, postRemediationStatus, reanalysisDone, reanalysisInProgress,
+    guidanceResolved, secondReauditDone, artifactsStepDone, acrGenerated, pacReportGenerated,
     trialStepApplicable, trialStepDone, isValidatingTrial, isLoadingTrial, canValidateTrial, needsPdfxtData, handleValidateTrial,
   ]);
 

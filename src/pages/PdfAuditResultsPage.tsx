@@ -239,6 +239,7 @@ export const PdfAuditResultsPage: React.FC = () => {
     structureTreeCompleteness?: { totalElements: number; semanticElements: number; isEmptyShell: boolean } | null;
     retagOutcome?: 'success' | 'failed-strip-bailed' | 'failed-retag-error' | null;
     comparisonTrialId?: string | null;
+    manualRemediationLastLoggedAt?: string | null;
   } | null>(null);
   // Tracked independently of autoTagInfo (not nested inside it) so a
   // just-submitted total is never lost: it can be set before autoTagInfo's
@@ -1187,6 +1188,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         postRemediationStatus={autoTagInfo?.postRemediationStatus}
         lastVerifiedAt={latestTimestamp(autoTagInfo?.postRemediationAudit?.runAt, jobFlags?.lastReauditAt)}
         aiAnalyzedAt={aiStats?.analyzedAt}
+        manualRemediationLastLoggedAt={autoTagInfo?.manualRemediationLastLoggedAt}
         acrGenerated={jobFlags?.acrGenerated ?? false}
         pacReportGenerated={jobFlags?.pacReportGenerated ?? false}
         comparisonTrialId={autoTagInfo?.comparisonTrialId}
