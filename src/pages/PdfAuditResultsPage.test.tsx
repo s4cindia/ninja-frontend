@@ -1573,5 +1573,40 @@ describe('PdfAuditResultsPage', () => {
         expect(screen.getByText(/30m/)).toBeInTheDocument();
       });
     });
+
+    it('preserves a submitted total against a slower auto-tag status fetch, whether it resolves before or after the submit (regression: onLogged used to silently drop the total when autoTagInfo was still null, and a late status response could overwrite a fresher submitted total)', async () => {
+      const mockResult = createMockAuditResult();
+      let resolveStatus!: (value: unknown) => void;
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        // Still in flight when the operator submits — autoTagInfo is null.
+        if (url === statusUrl) return new Promise((resolve) => { resolveStatus = resolve; });
+        if (url === aiUrl) return Promise.resolve(emptyAiResponse);
+        return Promise.resolve({ data: { data: {} } });
+      });
+      mockApi.post.mockImplementation((url: string) => {
+        if (url === timeUrl) return Promise.resolve({ data: { data: { totalMinutes: 20, log: [] } } });
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      const logTimeButton = await screen.findByRole('button', { name: 'Log time' });
+      fireEvent.click(logTimeButton);
+      fireEvent.change(screen.getByPlaceholderText('Minutes'), { target: { value: '20' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/20m/)).toBeInTheDocument();
+      });
+
+      // The status fetch finally resolves with an older (lower) total — must
+      // not stomp the fresher submitted value.
+      await act(async () => {
+        resolveStatus({ data: { data: { status: 'complete', taggerSource: 'adobe', manualRemediationMs: 0 } } });
+      });
+
+      expect(screen.getByText(/20m/)).toBeInTheDocument();
+    });
   });
 });

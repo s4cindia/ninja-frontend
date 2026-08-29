@@ -230,8 +230,14 @@ export const PdfAuditResultsPage: React.FC = () => {
     structureTreeCompleteness?: { totalElements: number; semanticElements: number; isEmptyShell: boolean } | null;
     retagOutcome?: 'success' | 'failed-strip-bailed' | 'failed-retag-error' | null;
     comparisonTrialId?: string | null;
-    manualRemediationMs?: number;
   } | null>(null);
+  // Tracked independently of autoTagInfo (not nested inside it) so a
+  // just-submitted total is never lost: it can be set before autoTagInfo's
+  // first fetch resolves (prev would otherwise be null), and reconciled via
+  // Math.max against every subsequent /auto-tag/status response — the total
+  // only ever grows, so the max of any two reads is always the true value,
+  // with no risk of a slower in-flight GET stomping a fresher submission.
+  const [manualRemediationMs, setManualRemediationMs] = useState(0);
   const [isRetryingAutoTag, setIsRetryingAutoTag] = useState(false);
   const [isReRunningAudit, setIsReRunningAudit] = useState(false);
   const [showPacReport, setShowPacReport] = useState(false);
@@ -694,6 +700,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         const info = res.data.data;
         setAutoTagInfo(info);
         applyAutoTagStatus(info);
+        setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
       })
       .catch(() => {
         autoTagFetchedJobRef.current = null; // allow retry if the fetch itself failed
@@ -747,6 +754,7 @@ export const PdfAuditResultsPage: React.FC = () => {
           if (isMountedRef.current) {
             setAutoTagInfo(info);
             applyAutoTagStatus(info);
+            setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
           }
           if (info?.status === 'complete' || info?.status === 'failed') {
             if (autoTagPollRef.current) {
@@ -796,7 +804,10 @@ export const PdfAuditResultsPage: React.FC = () => {
       try {
         const res = await api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`);
         const info = res.data.data;
-        if (isMountedRef.current) setAutoTagInfo(info);
+        if (isMountedRef.current) {
+          setAutoTagInfo(info);
+          setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
+        }
         if (info?.postRemediationStatus !== 'pending') {
           if (autoTagPollRef.current) {
             clearInterval(autoTagPollRef.current);
@@ -1135,8 +1146,8 @@ export const PdfAuditResultsPage: React.FC = () => {
 
       <ManualRemediationTimeLog
         jobId={jobId!}
-        manualRemediationMs={autoTagInfo?.manualRemediationMs ?? 0}
-        onLogged={(totalMs) => setAutoTagInfo(prev => prev ? { ...prev, manualRemediationMs: totalMs } : prev)}
+        manualRemediationMs={manualRemediationMs}
+        onLogged={(totalMs) => setManualRemediationMs(prev => Math.max(prev, totalMs))}
       />
 
       {/* Matterhorn Summary */}
