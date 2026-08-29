@@ -483,126 +483,125 @@ describe('RemediationChecklist', () => {
       expect(screen.getByText('7. Re-audit again to confirm manual fixes').closest('div')!.parentElement).toHaveTextContent('Not started');
     });
 
-    it('falls back to "any re-audit since guidance resolved" when neither timestamp signal exists (every item resolved to zero by hand)', () => {
+    it('falls back to "the AI Analysis pass that found zero guidance items was itself informed by the latest re-audit" (aiAnalyzedAt at-or-after lastVerifiedAt) when neither timestamp signal exists', () => {
       const { rerender } = render(
         <RemediationChecklist
           {...baseProps}
           aiAnalysisStatus="complete"
           aiSuggestions={suggestionsMap([suggestion({ issueId: 'a', applyMode: 'guidance-only', status: 'pending' })])}
           lastVerifiedAt="2026-08-29T00:00:00.000Z"
+          aiAnalyzedAt="2026-08-29T00:00:00.000Z"
         />
       );
       // Guidance not resolved yet — not-started.
       expect(screen.getByText('7. Re-audit again to confirm manual fixes').closest('div')!.parentElement).toHaveTextContent('Not started');
 
-      // Guidance fully resolved by hand (count hits zero), no ack/manual-log
-      // signal. lastVerifiedAt hasn't changed since — must not read done yet.
+      // Guidance now reads as fully resolved (pruned server-side after a
+      // verified re-audit — ninja-backend PR #500), but the analysis pass
+      // that discovered this predates the most recent re-audit — stale,
+      // must not read done yet.
       rerender(
         <RemediationChecklist
           {...baseProps}
           aiAnalysisStatus="complete"
-          aiSuggestions={suggestionsMap([suggestion({ issueId: 'a', applyMode: 'guidance-only', status: 'applied' })])}
-          lastVerifiedAt="2026-08-29T00:00:00.000Z"
+          aiSuggestions={suggestionsMap([])}
+          lastVerifiedAt="2026-08-29T02:00:00.000Z"
+          aiAnalyzedAt="2026-08-29T00:00:00.000Z"
         />
       );
       expect(screen.getByText('7. Re-audit again to confirm manual fixes').closest('div')!.parentElement).toHaveTextContent('Not started');
 
-      // A fresh re-audit happens afterward — now done.
+      // A fresh AI Analysis pass runs after that re-audit — now done.
       rerender(
         <RemediationChecklist
           {...baseProps}
           aiAnalysisStatus="complete"
-          aiSuggestions={suggestionsMap([suggestion({ issueId: 'a', applyMode: 'guidance-only', status: 'applied' })])}
-          lastVerifiedAt="2026-08-29T03:00:00.000Z"
+          aiSuggestions={suggestionsMap([])}
+          lastVerifiedAt="2026-08-29T02:00:00.000Z"
+          aiAnalyzedAt="2026-08-29T02:30:00.000Z"
         />
       );
       expect(screen.getByText('7. Re-audit again to confirm manual fixes').closest('div')!.parentElement).toHaveTextContent('Done');
     });
 
-    it('regression: the fallback still works when guidance resolves before any re-audit has ever run (lastVerifiedAt undefined at resolution time)', () => {
+    it('regression: is done immediately once the confirming re-audit and the analysis pass that found zero guidance land at the exact same instant (at-or-equal, not strictly after) — the real ReauditButton -> re-run AI Analysis flow does not require a THIRD re-audit', () => {
+      // analyzeJob (backend) always writes analyzedAt strictly after reading
+      // the fresh auditReport that the prior re-audit wrote, so in practice
+      // aiAnalyzedAt > lastVerifiedAt — but the component itself should not
+      // depend on strict inequality holding; an equal timestamp must also
+      // count as "informed by," not require yet another re-audit.
+      render(
+        <RemediationChecklist
+          {...baseProps}
+          aiAnalysisStatus="complete"
+          aiSuggestions={suggestionsMap([])}
+          lastVerifiedAt="2026-08-29T02:00:00.000Z"
+          aiAnalyzedAt="2026-08-29T02:00:00.000Z"
+        />
+      );
+      expect(screen.getByText('7. Re-audit again to confirm manual fixes').closest('div')!.parentElement).toHaveTextContent('Done');
+    });
+
+    it('regression: does not get stuck "not started" forever when guidance resolves before any re-audit has ever run (lastVerifiedAt undefined at resolution time)', () => {
       const { rerender } = render(
         <RemediationChecklist
           {...baseProps}
           aiAnalysisStatus="complete"
-          aiSuggestions={suggestionsMap([suggestion({ issueId: 'a', applyMode: 'guidance-only', status: 'applied' })])}
+          aiSuggestions={suggestionsMap([])}
           lastVerifiedAt={undefined}
+          aiAnalyzedAt="2026-08-28T00:00:00.000Z"
         />
       );
-      // Guidance resolved by hand, no re-audit has ever happened — must not
-      // be stuck "not started" forever once a re-audit does eventually run.
       expect(screen.getByText('7. Re-audit again to confirm manual fixes').closest('div')!.parentElement).toHaveTextContent('Not started');
 
       rerender(
         <RemediationChecklist
           {...baseProps}
           aiAnalysisStatus="complete"
-          aiSuggestions={suggestionsMap([suggestion({ issueId: 'a', applyMode: 'guidance-only', status: 'applied' })])}
+          aiSuggestions={suggestionsMap([])}
           lastVerifiedAt="2026-08-29T00:00:00.000Z"
+          aiAnalyzedAt="2026-08-29T00:30:00.000Z"
         />
       );
       expect(screen.getByText('7. Re-audit again to confirm manual fixes').closest('div')!.parentElement).toHaveTextContent('Done');
     });
 
-    it('regression: the fallback snapshot resets when guidance becomes unresolved again, so a stale snapshot cannot mark newer guidance work done for free', () => {
+    it('re-flips to Not started when a later AI Analysis re-run introduces a new pending guidance-only item, then Done again once confirmed by a fresh re-audit + re-analysis', () => {
       const { rerender } = render(
         <RemediationChecklist
           {...baseProps}
           aiAnalysisStatus="complete"
-          aiSuggestions={suggestionsMap([suggestion({ issueId: 'a', applyMode: 'guidance-only', status: 'applied' })])}
-          lastVerifiedAt="2026-08-29T00:00:00.000Z"
-        />
-      );
-      // First cycle resolves and gets confirmed by a re-audit.
-      rerender(
-        <RemediationChecklist
-          {...baseProps}
-          aiAnalysisStatus="complete"
-          aiSuggestions={suggestionsMap([suggestion({ issueId: 'a', applyMode: 'guidance-only', status: 'applied' })])}
+          aiSuggestions={suggestionsMap([])}
           lastVerifiedAt="2026-08-29T01:00:00.000Z"
+          aiAnalyzedAt="2026-08-29T01:30:00.000Z"
         />
       );
       expect(screen.getByText('7. Re-audit again to confirm manual fixes').closest('div')!.parentElement).toHaveTextContent('Done');
 
       // A later AI Analysis re-run introduces a NEW pending guidance-only
-      // item — step 7 must drop back to not-started, not stay "Done" from
-      // the old snapshot.
+      // item — step 7 must drop back to not-started immediately, unlike
+      // the old snapshot-based fallback which could stay "Done" from a
+      // stale earlier cycle.
       rerender(
         <RemediationChecklist
           {...baseProps}
           aiAnalysisStatus="complete"
-          aiSuggestions={suggestionsMap([
-            suggestion({ issueId: 'a', applyMode: 'guidance-only', status: 'applied' }),
-            suggestion({ issueId: 'b', applyMode: 'guidance-only', status: 'pending' }),
-          ])}
+          aiSuggestions={suggestionsMap([suggestion({ issueId: 'b', applyMode: 'guidance-only', status: 'pending' })])}
           lastVerifiedAt="2026-08-29T01:00:00.000Z"
+          aiAnalyzedAt="2026-08-29T01:30:00.000Z"
         />
       );
       expect(screen.getByText('7. Re-audit again to confirm manual fixes').closest('div')!.parentElement).toHaveTextContent('Not started');
 
-      // Resolving the new item alone (same lastVerifiedAt as before) must
-      // NOT be done yet — needs a fresh re-audit for this new cycle.
+      // Manually fixed and re-verified via a fresh re-audit + re-analysis —
+      // done again.
       rerender(
         <RemediationChecklist
           {...baseProps}
           aiAnalysisStatus="complete"
-          aiSuggestions={suggestionsMap([
-            suggestion({ issueId: 'a', applyMode: 'guidance-only', status: 'applied' }),
-            suggestion({ issueId: 'b', applyMode: 'guidance-only', status: 'applied' }),
-          ])}
-          lastVerifiedAt="2026-08-29T01:00:00.000Z"
-        />
-      );
-      expect(screen.getByText('7. Re-audit again to confirm manual fixes').closest('div')!.parentElement).toHaveTextContent('Not started');
-
-      rerender(
-        <RemediationChecklist
-          {...baseProps}
-          aiAnalysisStatus="complete"
-          aiSuggestions={suggestionsMap([
-            suggestion({ issueId: 'a', applyMode: 'guidance-only', status: 'applied' }),
-            suggestion({ issueId: 'b', applyMode: 'guidance-only', status: 'applied' }),
-          ])}
+          aiSuggestions={suggestionsMap([])}
           lastVerifiedAt="2026-08-29T02:00:00.000Z"
+          aiAnalyzedAt="2026-08-29T02:30:00.000Z"
         />
       );
       expect(screen.getByText('7. Re-audit again to confirm manual fixes').closest('div')!.parentElement).toHaveTextContent('Done');
