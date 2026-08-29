@@ -5,10 +5,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import { PdfAuditResultsPage } from './PdfAuditResultsPage';
 import { api } from '@/services/api';
+import { pdfRemediationService } from '@/services/pdf-remediation.service';
 import type { PdfAuditResult, PdfAuditIssue, MatterhornSummary } from '@/types/pdf.types';
 
 // Mock dependencies
 vi.mock('@/services/api');
+vi.mock('@/services/pdf-remediation.service', () => ({
+  pdfRemediationService: { reauditPdf: vi.fn() },
+}));
 vi.mock('@/components/pdf/PdfPreviewPanel', () => ({
   PdfPreviewPanel: ({ pdfUrl, currentPage, onPageChange, onIssueSelect }: {
     pdfUrl: string;
@@ -1678,6 +1682,89 @@ describe('PdfAuditResultsPage', () => {
       });
 
       expect(screen.getByText(/20m/)).toBeInTheDocument();
+    });
+  });
+
+  describe('Verify manual fixes (upload + re-audit)', () => {
+    const jobId = 'job-123';
+    const auditUrl = `/pdf/job/${jobId}/audit/result`;
+    const statusUrl = `/pdf/${jobId}/auto-tag/status`;
+    const aiUrl = `/pdf/${jobId}/ai-analysis`;
+    const emptyAiResponse = { data: { data: { suggestions: [], analyzed: 0, total: 0, status: 'complete' } } };
+    const mockReaudit = pdfRemediationService.reauditPdf as Mocked<typeof pdfRemediationService>['reauditPdf'];
+
+    it('is visible and usable regardless of checklist state (regression: must not be gated behind a specific step, same as manual time logging)', async () => {
+      const mockResult = createMockAuditResult();
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve(emptyAiResponse);
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      expect(await screen.findByRole('button', { name: /Upload Fixed PDF/ })).toBeInTheDocument();
+    });
+
+    it('uploading a fixed PDF refreshes the audit result and auto-tag status shown on the page', async () => {
+      const preFixResult = createMockAuditResult({ score: 75 });
+      const postFixResult = createMockAuditResult({ score: 90 });
+      let auditCallCount = 0;
+      let statusCallCount = 0;
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) {
+          auditCallCount += 1;
+          return Promise.resolve({ data: { data: auditCallCount === 1 ? preFixResult : postFixResult } });
+        }
+        if (url === statusUrl) {
+          statusCallCount += 1;
+          return Promise.resolve({
+            data: {
+              data: statusCallCount === 1
+                ? { status: 'complete', taggerSource: 'adobe' }
+                : {
+                  status: 'complete',
+                  taggerSource: 'adobe',
+                  postRemediationStatus: 'complete',
+                  postRemediationAudit: { runAt: '2026-08-30T00:00:00.000Z', resolved: 2, remaining: 8, regressions: 0, resolutionRate: 20 },
+                },
+            },
+          });
+        }
+        if (url === aiUrl) return Promise.resolve(emptyAiResponse);
+        return Promise.resolve({ data: { data: {} } });
+      });
+      mockReaudit.mockResolvedValueOnce({
+        success: true,
+        jobId,
+        originalAuditId: 'audit-1',
+        reauditId: 'audit-2',
+        fileName: 'fixed.pdf',
+        comparison: {},
+        metrics: { resolvedCount: 2, remainingCount: 8, regressionCount: 0 },
+      } as never);
+
+      renderWithRouter(jobId);
+
+      expect(await screen.findByText('75')).toBeInTheDocument();
+      const uploadButton = screen.getByRole('button', { name: /Upload Fixed PDF/ });
+      const fileInput = document.querySelector('input[type="file"][accept=".pdf,application/pdf"]') as HTMLInputElement;
+      const file = new File([new Uint8Array(10)], 'fixed.pdf', { type: 'application/pdf' });
+
+      await act(async () => {
+        fireEvent.change(fileInput, { target: { files: [file] } });
+      });
+
+      await waitFor(() => {
+        expect(mockReaudit).toHaveBeenCalledWith(jobId, file);
+      });
+      await waitFor(() => {
+        expect(screen.getByText('90')).toBeInTheDocument();
+      });
+      expect(uploadButton).toBeInTheDocument(); // sanity — didn't unmount mid-refresh
+      expect(auditCallCount).toBe(2);
+      expect(statusCallCount).toBe(2);
     });
   });
 });

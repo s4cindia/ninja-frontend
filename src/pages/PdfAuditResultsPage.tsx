@@ -39,6 +39,8 @@ import { PdfPreviewPanel } from '@/components/pdf/PdfPreviewPanel';
 import { PdfStatsCards } from '@/components/pdf/PdfStatsCards';
 import { RemediationChecklist } from '@/components/pdf/RemediationChecklist';
 import { ManualRemediationTimeLog } from '@/components/pdf/ManualRemediationTimeLog';
+import { VerifyManualFixesCard } from '@/components/pdf/VerifyManualFixesCard';
+import type { ReauditComparisonResult } from '@/types/pdf-remediation.types';
 import type { GuidanceAcknowledgment } from '@/components/pdf/RemediationChecklist';
 import { IssueCard, AiAnalysis } from '@/components/remediation/IssueCard';
 import { ApplyAllSuggestionsPanel } from '@/components/remediation/ApplyAllSuggestionsPanel';
@@ -811,6 +813,30 @@ export const PdfAuditResultsPage: React.FC = () => {
     }
   };
 
+  // VerifyManualFixesCard's upload already awaits reauditPdf itself and
+  // shows its own toast/success note — this only needs to refresh this
+  // page's own state afterward: auditResult (the audit report was
+  // replaced) and autoTagInfo (postRemediationAudit.runAt is now fresh,
+  // which is what the checklist's re-audit steps key off — same field
+  // reauditCurrentFile's fresh-fetch below reads, just via upload instead
+  // of re-auditing the current stored file).
+  const handleManualFixReaudited = useCallback(async (_result: ReauditComparisonResult) => {
+    await fetchAuditResult();
+    if (!jobId) return;
+    try {
+      const res = await api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`);
+      if (!isMountedRef.current) return;
+      const info = res.data.data;
+      setAutoTagInfo(info);
+      applyAutoTagStatus(info);
+      setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
+      setManualRemediationLastLoggedAt(prev => latestTimestamp(prev, info?.manualRemediationLastLoggedAt));
+    } catch {
+      // Non-fatal — the checklist just won't reflect this until the next
+      // poll/visit; the upload itself already succeeded and was reported.
+    }
+  }, [jobId, fetchAuditResult, applyAutoTagStatus]);
+
   const handleReRunAuditForCurrentJob = async () => {
     if (!jobId || isReRunningAudit) return;
     setIsReRunningAudit(true);
@@ -1217,6 +1243,8 @@ export const PdfAuditResultsPage: React.FC = () => {
           setManualRemediationLastLoggedAt(prev => latestTimestamp(prev, lastLoggedAt));
         }}
       />
+
+      <VerifyManualFixesCard jobId={jobId!} onReaudited={handleManualFixReaudited} />
 
       {/* Matterhorn Summary */}
       <div className="px-6 py-4 bg-white border-b border-gray-200">
