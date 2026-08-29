@@ -218,6 +218,15 @@ export const PdfAuditResultsPage: React.FC = () => {
     analyzedAt?: string;
   } | null>(null);
   const aiPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Guards against an out-of-order poll response: fetchAiSuggestions polls
+  // every 3s via setInterval regardless of whether the PREVIOUS call's
+  // request has resolved yet, so on a slow/busy backend (e.g. a large
+  // document's AI Analysis pass competing for the same DB rows) an older
+  // request can resolve AFTER a newer one and silently overwrite fresher
+  // state — including aiSuggestions — with a stale snapshot. Incremented at
+  // the start of every call; a response is only applied if it's still the
+  // most recent request when it arrives.
+  const aiFetchRequestIdRef = useRef(0);
   const autoTagPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoTagFetchedJobRef = useRef<string | null>(null);
 
@@ -612,6 +621,7 @@ export const PdfAuditResultsPage: React.FC = () => {
   // Fetch AI suggestions and update state
   const fetchAiSuggestions = useCallback(async () => {
     if (!jobId) return;
+    const requestId = ++aiFetchRequestIdRef.current;
     try {
       const res = await api.get<{
         data: {
@@ -637,7 +647,13 @@ export const PdfAuditResultsPage: React.FC = () => {
         console.log('[AI Debug] map size:', map.size, 'status:', status);
         console.log('[AI Debug] sample issueIds:', suggestions.slice(0, 5).map(s => s.issueId));
       }
-      if (isMountedRef.current) {
+      // Discard an out-of-order response: if a newer fetchAiSuggestions call
+      // has since started (aiFetchRequestIdRef.current moved past this
+      // call's id), applying THIS response now would overwrite fresher
+      // state with a stale snapshot — the exact mechanism behind a reported
+      // bug where the checklist briefly showed contradictory step badges
+      // after a slow poll response landed late.
+      if (isMountedRef.current && requestId === aiFetchRequestIdRef.current) {
         setAiSuggestions(map);
         setAiProgress({ analyzed, total });
         setAiAnalysisStatus(status);
@@ -667,8 +683,10 @@ export const PdfAuditResultsPage: React.FC = () => {
     } catch {
       // Non-fatal — silently ignore fetch errors during polling, but still
       // unblock the button rather than leaving it disabled forever on a
-      // transient failure of the initial load.
-      if (isMountedRef.current) setHasLoadedAiStatus(true);
+      // transient failure of the initial load. Same staleness guard as the
+      // success path — a stale failure must not prematurely re-enable the
+      // button while a newer request is still genuinely in flight.
+      if (isMountedRef.current && requestId === aiFetchRequestIdRef.current) setHasLoadedAiStatus(true);
     }
   }, [jobId]);
 
