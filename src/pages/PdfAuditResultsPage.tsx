@@ -200,6 +200,11 @@ export const PdfAuditResultsPage: React.FC = () => {
   const [isAnalyzingAi, setIsAnalyzingAi] = useState(false);
   const [aiProgress, setAiProgress] = useState<{ analyzed: number; total: number } | null>(null);
   const [isRerunningAiAnalysis, setIsRerunningAiAnalysis] = useState(false);
+  // isAnalyzingAi starts false and only reflects reality once the initial
+  // fetchAiSuggestions() call resolves — without this, Re-run AI Analysis is
+  // clickable during that brief loading window even if analysis is already
+  // running server-side (e.g. the very first pass, still in flight).
+  const [hasLoadedAiStatus, setHasLoadedAiStatus] = useState(false);
   // Session-only — resets on reload/revisit, never persisted server-side
   // (an explicit, deliberate scope limit: no per-tenant sticky preference).
   const [includeColorContrastFix, setIncludeColorContrastFix] = useState(false);
@@ -623,6 +628,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         setAiProgress({ analyzed, total });
         setAiAnalysisStatus(status);
         setGuidanceAcknowledgment(ack ?? null);
+        setHasLoadedAiStatus(true);
         if (stats) setAiStats(stats);
         if (status === 'complete') {
           setIsAnalyzingAi(false);
@@ -645,7 +651,10 @@ export const PdfAuditResultsPage: React.FC = () => {
         }
       }
     } catch {
-      // Non-fatal — silently ignore fetch errors during polling
+      // Non-fatal — silently ignore fetch errors during polling, but still
+      // unblock the button rather than leaving it disabled forever on a
+      // transient failure of the initial load.
+      if (isMountedRef.current) setHasLoadedAiStatus(true);
     }
   }, [jobId]);
 
@@ -1057,7 +1066,7 @@ export const PdfAuditResultsPage: React.FC = () => {
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-2 mt-4">
+          <div className="flex items-center flex-wrap gap-2 mt-4">
             <Button
               variant="primary"
               size="sm"
@@ -1104,8 +1113,8 @@ export const PdfAuditResultsPage: React.FC = () => {
                 variant="outline"
                 size="sm"
                 onClick={handleRerunAiAnalysis}
-                disabled={isRerunningAiAnalysis || isAnalyzingAi}
-                title={isAnalyzingAi ? 'AI analysis is already running' : undefined}
+                disabled={isRerunningAiAnalysis || isAnalyzingAi || !hasLoadedAiStatus}
+                title={!hasLoadedAiStatus ? 'Loading AI analysis status…' : isAnalyzingAi ? 'AI analysis is already running' : undefined}
               >
                 {isRerunningAiAnalysis
                   ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Re-running…</>

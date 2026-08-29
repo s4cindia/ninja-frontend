@@ -1123,6 +1123,10 @@ describe('PdfAuditResultsPage', () => {
       renderWithRouter(jobId);
 
       const rerunButton = await screen.findByRole('button', { name: 'Re-run AI Analysis' });
+      // The initial fetchAiSuggestions() request must resolve (enabling the
+      // button) before clicking it — done under real timers, since waitFor's
+      // polling doesn't work under fake ones.
+      await waitFor(() => expect(rerunButton).not.toBeDisabled());
       const aiCallsBefore = mockApi.get.mock.calls.filter(([url]) => url === aiUrl).length;
 
       vi.useFakeTimers();
@@ -1147,6 +1151,7 @@ describe('PdfAuditResultsPage', () => {
       renderWithRouter(jobId);
 
       const rerunButton = await screen.findByRole('button', { name: 'Re-run AI Analysis' });
+      await waitFor(() => expect(rerunButton).not.toBeDisabled());
       fireEvent.click(screen.getByRole('checkbox', { name: 'Include color-contrast auto-fix on re-run' }));
 
       vi.useFakeTimers();
@@ -1185,6 +1190,7 @@ describe('PdfAuditResultsPage', () => {
       renderWithRouter(jobId);
 
       const rerunButton = await screen.findByRole('button', { name: 'Re-run AI Analysis' });
+      await waitFor(() => expect(rerunButton).not.toBeDisabled());
 
       vi.useFakeTimers();
       try {
@@ -1216,10 +1222,12 @@ describe('PdfAuditResultsPage', () => {
       renderWithRouter(jobId);
 
       const rerunButton = await screen.findByRole('button', { name: 'Re-run AI Analysis' });
+      await waitFor(() => expect(rerunButton).not.toBeDisabled());
       await act(async () => {
         fireEvent.click(rerunButton);
       });
 
+      expect(mockApi.post).toHaveBeenCalledWith(aiUrl, undefined);
       await waitFor(() => {
         expect(screen.getByRole('button', { name: 'Re-run AI Analysis' })).not.toBeDisabled();
       });
@@ -1239,6 +1247,32 @@ describe('PdfAuditResultsPage', () => {
       const rerunButton = await screen.findByRole('button', { name: 'Re-run AI Analysis' });
       expect(rerunButton).toBeDisabled();
       expect(rerunButton).toHaveAttribute('title', 'AI analysis is already running');
+    });
+
+    it('stays disabled until the initial AI status request resolves, even if that takes a while (regression: isAnalyzingAi starts false, so a slow initial fetch used to leave the button clickable before the real status was known)', async () => {
+      const mockResult = createMockAuditResult();
+      let resolveAiStatus!: (value: unknown) => void;
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return new Promise((resolve) => { resolveAiStatus = resolve; });
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      const rerunButton = await screen.findByRole('button', { name: 'Re-run AI Analysis' });
+      expect(rerunButton).toBeDisabled();
+      expect(rerunButton).toHaveAttribute('title', 'Loading AI analysis status…');
+
+      await act(async () => {
+        resolveAiStatus(completeAiResponse);
+      });
+
+      await waitFor(() => {
+        expect(rerunButton).not.toBeDisabled();
+      });
+      expect(rerunButton).not.toHaveAttribute('title');
     });
   });
 
