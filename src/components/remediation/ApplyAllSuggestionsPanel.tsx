@@ -159,15 +159,26 @@ export function ApplyAllSuggestionsPanel({
         <div>
           <h3 className="text-lg font-semibold">Apply All Approved</h3>
           <p className="text-sm text-gray-600">
-            Apply {eligibleCount} approved {eligibleCount === 1 ? 'suggestion' : 'suggestions'} to the PDF
+            {includePending && pendingEligibleCount > 0 ? (
+              <>
+                Apply {totalToApply} {totalToApply === 1 ? 'suggestion' : 'suggestions'} to the PDF{' '}
+                <span className="text-gray-400">({eligibleCount} approved, {pendingEligibleCount} awaiting review)</span>
+              </>
+            ) : (
+              <>Apply {eligibleCount} approved {eligibleCount === 1 ? 'suggestion' : 'suggestions'} to the PDF</>
+            )}
           </p>
         </div>
       </div>
 
       <div className="bg-green-50 border border-green-200 rounded p-3 mb-4">
         <p className="text-sm text-green-800">
-          All {eligibleCount} approved {eligibleCount === 1 ? 'fix' : 'fixes'} will be applied automatically.
-          This also kicks off a post-fix validation audit to confirm what was resolved.
+          {includePending && pendingEligibleCount > 0 ? (
+            <>All {totalToApply} {totalToApply === 1 ? 'fix' : 'fixes'} ({eligibleCount} approved, {pendingEligibleCount} awaiting review) will be applied automatically.</>
+          ) : (
+            <>All {eligibleCount} approved {eligibleCount === 1 ? 'fix' : 'fixes'} will be applied automatically.</>
+          )}
+          {' '}This also kicks off a post-fix validation audit to confirm what was resolved.
         </p>
       </div>
 
