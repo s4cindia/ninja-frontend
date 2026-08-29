@@ -75,6 +75,23 @@ describe('ApplyAllSuggestionsPanel', () => {
     });
   });
 
+  it('regression: checking "include pending" updates the headline/description off the 0-approved default, instead of leaving them contradicting the "Apply All (N)" button — reported live as "why does it say 0 approved" next to "Apply All (260)"', () => {
+    renderPanel({ eligibleCount: 0, pendingEligibleCount: 260 });
+
+    // Before checking the toggle, the 0-approved headline is accurate: there
+    // is nothing pending-inclusive going on yet.
+    expect(screen.getByText(/Apply 0 approved suggestions to the PDF/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /Also include 260 suggestions awaiting review/ }));
+
+    // Once the toggle is checked, the button and headline must agree — no
+    // more "0 approved" text sitting next to "Apply All (260)".
+    expect(screen.getByRole('button', { name: /Apply All \(260\)/ })).toBeInTheDocument();
+    expect(screen.queryByText(/Apply 0 approved suggestions to the PDF/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Apply 260 suggestions to the PDF/)).toBeInTheDocument();
+    expect(screen.getAllByText(/0 approved, 260 awaiting review/).length).toBeGreaterThan(0);
+  });
+
   it('shows aggregate results with per-issue failure reasons, not a reconstructed issue list', async () => {
     mockApplyAll.mockResolvedValue({
       applied: 2,
