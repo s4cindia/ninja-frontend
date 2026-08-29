@@ -296,6 +296,13 @@ export const PdfAuditResultsPage: React.FC = () => {
   // closed, which would otherwise silently reset the cooldown the instant
   // the user reopens the modal to retry.
   const [applyAllRetryBlockedUntil, setApplyAllRetryBlockedUntil] = useState<number | null>(null);
+  // Defensive: if jobId ever changes without a remount (React Router reuses
+  // this component across a param-only route change), a stale cooldown from
+  // the PREVIOUS job's error must not carry over and block Apply All on an
+  // unrelated PDF.
+  useEffect(() => {
+    setApplyAllRetryBlockedUntil(null);
+  }, [jobId]);
 
   // Guided remediation checklist state — aiAnalysisStatus/guidanceAcknowledgment
   // ride on the existing AI-analysis fetch; jobFlags needs one extra lookup

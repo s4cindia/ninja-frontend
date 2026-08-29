@@ -1,8 +1,25 @@
 import { useState, useEffect, useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import axios from 'axios';
 import { Zap, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { applyAllAiSuggestions, ApplyAllAiSuggestionsResult } from '@/services/api/pdfAiAnalysis.service';
+
+/**
+ * A definitive 4xx (auth/validation/not-found) means the request was
+ * rejected before the apply-all loop ever started — nothing is running in
+ * the background, so blocking a retry would just punish the user for no
+ * reason. Only a response-less failure (dropped connection, CORS, DNS) or a
+ * gateway-timeout-class status (502/503/504 — the infra gave up waiting on
+ * the origin, which is exactly the CloudFront-vs-slow-backend scenario this
+ * cooldown exists for) leaves real ambiguity about whether the backend is
+ * still applying fixes.
+ */
+function isAmbiguousApplyAllFailure(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) return false;
+  if (!error.response) return true;
+  return [502, 503, 504].includes(error.response.status);
+}
 
 interface ApplyAllSuggestionsPanelProps {
   jobId: string;
@@ -166,7 +183,15 @@ export function ApplyAllSuggestionsPanel({
   const [nowTick, setNowTick] = useState(() => Date.now());
   useEffect(() => {
     if (retryBlockedUntil == null || retryBlockedUntil <= Date.now()) return;
-    const interval = setInterval(() => setNowTick(Date.now()), 1000);
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setNowTick(now);
+      // retryBlockedUntil itself doesn't change once the cooldown lapses, so
+      // without this the effect's own dependency array would never re-run
+      // and the interval would keep re-rendering the panel every second
+      // indefinitely, even long after the button is re-enabled.
+      if (now >= retryBlockedUntil) clearInterval(interval);
+    }, 1000);
     return () => clearInterval(interval);
   }, [retryBlockedUntil]);
 
@@ -177,8 +202,10 @@ export function ApplyAllSuggestionsPanel({
       // guessing which issues succeeded from this response.
       onApplied(result);
     },
-    onError: () => {
-      onApplyError?.();
+    onError: (error) => {
+      if (isAmbiguousApplyAllFailure(error)) {
+        onApplyError?.();
+      }
     },
   });
 
