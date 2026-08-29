@@ -461,6 +461,95 @@ describe('RemediationChecklist', () => {
       );
       expect(screen.getByText('7. Re-audit again to confirm manual fixes').closest('div')!.parentElement).toHaveTextContent('Done');
     });
+
+    it('regression: the fallback still works when guidance resolves before any re-audit has ever run (lastVerifiedAt undefined at resolution time)', () => {
+      const { rerender } = render(
+        <RemediationChecklist
+          {...baseProps}
+          aiAnalysisStatus="complete"
+          aiSuggestions={suggestionsMap([suggestion({ issueId: 'a', applyMode: 'guidance-only', status: 'applied' })])}
+          lastVerifiedAt={undefined}
+        />
+      );
+      // Guidance resolved by hand, no re-audit has ever happened — must not
+      // be stuck "not started" forever once a re-audit does eventually run.
+      expect(screen.getByText('7. Re-audit again to confirm manual fixes').closest('div')!.parentElement).toHaveTextContent('Not started');
+
+      rerender(
+        <RemediationChecklist
+          {...baseProps}
+          aiAnalysisStatus="complete"
+          aiSuggestions={suggestionsMap([suggestion({ issueId: 'a', applyMode: 'guidance-only', status: 'applied' })])}
+          lastVerifiedAt="2026-08-29T00:00:00.000Z"
+        />
+      );
+      expect(screen.getByText('7. Re-audit again to confirm manual fixes').closest('div')!.parentElement).toHaveTextContent('Done');
+    });
+
+    it('regression: the fallback snapshot resets when guidance becomes unresolved again, so a stale snapshot cannot mark newer guidance work done for free', () => {
+      const { rerender } = render(
+        <RemediationChecklist
+          {...baseProps}
+          aiAnalysisStatus="complete"
+          aiSuggestions={suggestionsMap([suggestion({ issueId: 'a', applyMode: 'guidance-only', status: 'applied' })])}
+          lastVerifiedAt="2026-08-29T00:00:00.000Z"
+        />
+      );
+      // First cycle resolves and gets confirmed by a re-audit.
+      rerender(
+        <RemediationChecklist
+          {...baseProps}
+          aiAnalysisStatus="complete"
+          aiSuggestions={suggestionsMap([suggestion({ issueId: 'a', applyMode: 'guidance-only', status: 'applied' })])}
+          lastVerifiedAt="2026-08-29T01:00:00.000Z"
+        />
+      );
+      expect(screen.getByText('7. Re-audit again to confirm manual fixes').closest('div')!.parentElement).toHaveTextContent('Done');
+
+      // A later AI Analysis re-run introduces a NEW pending guidance-only
+      // item — step 7 must drop back to not-started, not stay "Done" from
+      // the old snapshot.
+      rerender(
+        <RemediationChecklist
+          {...baseProps}
+          aiAnalysisStatus="complete"
+          aiSuggestions={suggestionsMap([
+            suggestion({ issueId: 'a', applyMode: 'guidance-only', status: 'applied' }),
+            suggestion({ issueId: 'b', applyMode: 'guidance-only', status: 'pending' }),
+          ])}
+          lastVerifiedAt="2026-08-29T01:00:00.000Z"
+        />
+      );
+      expect(screen.getByText('7. Re-audit again to confirm manual fixes').closest('div')!.parentElement).toHaveTextContent('Not started');
+
+      // Resolving the new item alone (same lastVerifiedAt as before) must
+      // NOT be done yet — needs a fresh re-audit for this new cycle.
+      rerender(
+        <RemediationChecklist
+          {...baseProps}
+          aiAnalysisStatus="complete"
+          aiSuggestions={suggestionsMap([
+            suggestion({ issueId: 'a', applyMode: 'guidance-only', status: 'applied' }),
+            suggestion({ issueId: 'b', applyMode: 'guidance-only', status: 'applied' }),
+          ])}
+          lastVerifiedAt="2026-08-29T01:00:00.000Z"
+        />
+      );
+      expect(screen.getByText('7. Re-audit again to confirm manual fixes').closest('div')!.parentElement).toHaveTextContent('Not started');
+
+      rerender(
+        <RemediationChecklist
+          {...baseProps}
+          aiAnalysisStatus="complete"
+          aiSuggestions={suggestionsMap([
+            suggestion({ issueId: 'a', applyMode: 'guidance-only', status: 'applied' }),
+            suggestion({ issueId: 'b', applyMode: 'guidance-only', status: 'applied' }),
+          ])}
+          lastVerifiedAt="2026-08-29T02:00:00.000Z"
+        />
+      );
+      expect(screen.getByText('7. Re-audit again to confirm manual fixes').closest('div')!.parentElement).toHaveTextContent('Done');
+    });
   });
 
   it('step 8 only shows Done once both ACR and PAC report are generated', () => {

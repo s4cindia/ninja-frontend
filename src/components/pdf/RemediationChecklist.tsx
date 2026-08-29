@@ -236,15 +236,31 @@ export function RemediationChecklist({
   // approximation available from data this page has. Not perfectly precise
   // (can't distinguish "re-audited to confirm" from "re-audited for an
   // unrelated reason"), but reasonable given the signals available.
-  const [verifiedAtWhenGuidanceResolved, setVerifiedAtWhenGuidanceResolved] = useState<string | null>(null);
+  //
+  // The snapshot is `{ verifiedAt } | null`, not a bare `string | null` —
+  // verifiedAt can itself legitimately be null (guidance resolved before any
+  // re-audit ever ran), which must stay distinguishable from "not snapshotted
+  // yet". Collapsing both to '' previously meant isAfter(_, '') — which
+  // rejects a falsy second argument — could never turn true again, so step 7
+  // could get stuck "not started" forever. Also reset whenever guidance
+  // becomes unresolved again (e.g. a later AI Analysis re-run introduces new
+  // guidance-only items), so a stale snapshot from an earlier resolution
+  // cycle can't mark the new one done for free.
+  const [guidanceResolvedSnapshot, setGuidanceResolvedSnapshot] = useState<{ verifiedAt: string | null } | null>(null);
   useEffect(() => {
-    if (guidanceResolved && verifiedAtWhenGuidanceResolved === null) {
-      setVerifiedAtWhenGuidanceResolved(lastVerifiedAt ?? '');
+    if (guidanceResolved && guidanceResolvedSnapshot === null) {
+      setGuidanceResolvedSnapshot({ verifiedAt: lastVerifiedAt ?? null });
+    } else if (!guidanceResolved && guidanceResolvedSnapshot !== null) {
+      setGuidanceResolvedSnapshot(null);
     }
-  }, [guidanceResolved, lastVerifiedAt, verifiedAtWhenGuidanceResolved]);
+  }, [guidanceResolved, lastVerifiedAt, guidanceResolvedSnapshot]);
   const secondReauditDone = guidanceResolutionSignal
     ? isAfter(lastVerifiedAt, guidanceResolutionSignal)
-    : guidanceFullyResolved && verifiedAtWhenGuidanceResolved !== null && isAfter(lastVerifiedAt, verifiedAtWhenGuidanceResolved);
+    : guidanceFullyResolved && guidanceResolvedSnapshot !== null && (
+      guidanceResolvedSnapshot.verifiedAt === null
+        ? !!lastVerifiedAt
+        : isAfter(lastVerifiedAt, guidanceResolvedSnapshot.verifiedAt)
+    );
 
   const artifactsStepDone = acrGenerated && pacReportGenerated;
   const trialStepApplicable = !!comparisonTrialId;
