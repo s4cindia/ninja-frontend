@@ -43,7 +43,7 @@ import { VerifyManualFixesCard } from '@/components/pdf/VerifyManualFixesCard';
 import type { ReauditComparisonResult } from '@/types/pdf-remediation.types';
 import type { GuidanceAcknowledgment } from '@/components/pdf/RemediationChecklist';
 import { IssueCard, AiAnalysis } from '@/components/remediation/IssueCard';
-import { ApplyAllSuggestionsPanel } from '@/components/remediation/ApplyAllSuggestionsPanel';
+import { ApplyAllSuggestionsPanel, APPLY_ALL_RETRY_COOLDOWN_MS } from '@/components/remediation/ApplyAllSuggestionsPanel';
 import { useRemediationTimer } from '@/hooks/useRemediationTimer';
 import { triggerAiAnalysis } from '@/services/api/pdfAiAnalysis.service';
 import type { ApplyAllAiSuggestionsResult } from '@/services/api/pdfAiAnalysis.service';
@@ -291,6 +291,11 @@ export const PdfAuditResultsPage: React.FC = () => {
   const [isReRunningAudit, setIsReRunningAudit] = useState(false);
   const [showPacReport, setShowPacReport] = useState(false);
   const [showApplyAllPanel, setShowApplyAllPanel] = useState(false);
+  // Lifted out of ApplyAllSuggestionsPanel (rather than kept as its local
+  // state) because the Dialog wrapper unmounts that panel whenever it's
+  // closed, which would otherwise silently reset the cooldown the instant
+  // the user reopens the modal to retry.
+  const [applyAllRetryBlockedUntil, setApplyAllRetryBlockedUntil] = useState<number | null>(null);
 
   // Guided remediation checklist state — aiAnalysisStatus/guidanceAcknowledgment
   // ride on the existing AI-analysis fetch; jobFlags needs one extra lookup
@@ -934,6 +939,7 @@ export const PdfAuditResultsPage: React.FC = () => {
   // of patching aiSuggestions locally — apply-all's response only carries
   // aggregate counts, not which issues succeeded.
   const handleApplyAllSuccess = useCallback((result: ApplyAllAiSuggestionsResult) => {
+    setApplyAllRetryBlockedUntil(null);
     fetchAiSuggestions();
     pollPostRemediationStatus();
     recordBulkApply(result.applied);
@@ -1672,6 +1678,8 @@ export const PdfAuditResultsPage: React.FC = () => {
             pendingEligibleCount={pendingEligible}
             onApplied={handleApplyAllSuccess}
             onClose={() => setShowApplyAllPanel(false)}
+            retryBlockedUntil={applyAllRetryBlockedUntil}
+            onApplyError={() => setApplyAllRetryBlockedUntil(Date.now() + APPLY_ALL_RETRY_COOLDOWN_MS)}
           />
         </DialogContent>
       </Dialog>

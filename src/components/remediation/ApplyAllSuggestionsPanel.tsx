@@ -19,7 +19,30 @@ interface ApplyAllSuggestionsPanelProps {
   onApplied: (result: ApplyAllAiSuggestionsResult) => void;
   /** Dismiss the panel — via Cancel before applying, or Done/auto-close after. */
   onClose: () => void;
+  /**
+   * Timestamp (Date.now()-style ms) until which retrying is blocked, or null
+   * if there's no active cooldown. Lifted to the caller because this panel
+   * unmounts on every close (the Dialog wrapper returns null when closed),
+   * so a cooldown tracked in local state would silently reset on reopen.
+   */
+  retryBlockedUntil?: number | null;
+  /**
+   * Fires when the apply-all request itself errors (e.g. the backend is
+   * still synchronous and a slow batch outlasts CloudFront's origin-response
+   * timeout, so the browser sees a network error while the backend keeps
+   * applying fixes to completion in the background). A same-request retry
+   * right after would start a second, genuinely overlapping apply-all run
+   * against the same PDF — this is a temporary bridge until the backend's
+   * remediation-cycle lock rejects that case with a clean 409 instead.
+   */
+  onApplyError?: () => void;
 }
+
+/** How long to block a retry after an apply-all error. CloudFront's origin
+ * timeout tops out at 60s; this adds margin for the backend to actually
+ * finish writing/re-auditing after the connection was cut. Exported so the
+ * caller sets the same duration it's setting `retryBlockedUntil` to. */
+export const APPLY_ALL_RETRY_COOLDOWN_MS = 90_000;
 
 function ResultsView({
   results,
@@ -132,8 +155,20 @@ export function ApplyAllSuggestionsPanel({
   pendingEligibleCount,
   onApplied,
   onClose,
+  retryBlockedUntil = null,
+  onApplyError,
 }: ApplyAllSuggestionsPanelProps) {
   const [includePending, setIncludePending] = useState(false);
+  // Ticks once a second while a retry cooldown is active, so the countdown
+  // displays and the button re-enables itself once the cooldown lapses —
+  // without this, isRetryBlocked/retrySecondsLeft below would only ever be
+  // computed once per unrelated re-render.
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    if (retryBlockedUntil == null || retryBlockedUntil <= Date.now()) return;
+    const interval = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [retryBlockedUntil]);
 
   const applyAllMutation = useMutation({
     mutationFn: () => applyAllAiSuggestions(jobId, includePending),
@@ -142,6 +177,9 @@ export function ApplyAllSuggestionsPanel({
       // guessing which issues succeeded from this response.
       onApplied(result);
     },
+    onError: () => {
+      onApplyError?.();
+    },
   });
 
   if (applyAllMutation.data) {
@@ -149,6 +187,9 @@ export function ApplyAllSuggestionsPanel({
   }
 
   const totalToApply = eligibleCount + (includePending ? pendingEligibleCount : 0);
+
+  const isRetryBlocked = retryBlockedUntil != null && retryBlockedUntil > nowTick;
+  const retrySecondsLeft = isRetryBlocked ? Math.ceil((retryBlockedUntil - nowTick) / 1000) : 0;
 
   return (
     <div className="p-6">
@@ -201,7 +242,8 @@ export function ApplyAllSuggestionsPanel({
       <div className="flex gap-3">
         <button
           onClick={() => applyAllMutation.mutate()}
-          disabled={applyAllMutation.isPending || totalToApply === 0}
+          disabled={applyAllMutation.isPending || totalToApply === 0 || isRetryBlocked}
+          title={isRetryBlocked ? `Waiting in case the previous attempt is still processing on the server (${retrySecondsLeft}s)` : undefined}
           className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
         >
           {applyAllMutation.isPending ? (
@@ -209,6 +251,8 @@ export function ApplyAllSuggestionsPanel({
               <Loader2 className="animate-spin" size={20} aria-hidden="true" />
               Applying {totalToApply} {totalToApply === 1 ? 'fix' : 'fixes'}...
             </>
+          ) : isRetryBlocked ? (
+            <>Retry available in {retrySecondsLeft}s</>
           ) : (
             <>
               <Zap size={20} aria-hidden="true" />
@@ -231,6 +275,12 @@ export function ApplyAllSuggestionsPanel({
           <p className="text-sm text-red-800">
             Failed to apply suggestions: {(applyAllMutation.error as Error)?.message || 'Unknown error'}
           </p>
+          {isRetryBlocked && (
+            <p className="text-xs text-red-600 mt-1">
+              The previous attempt may still be applying fixes in the background — retrying now
+              could apply the same suggestions twice. Retry available in {retrySecondsLeft}s.
+            </p>
+          )}
         </div>
       )}
     </div>
