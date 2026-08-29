@@ -141,4 +141,23 @@ describe('VerifyManualFixesCard', () => {
       expect(screen.getByRole('button', { name: /Upload Fixed PDF/ })).not.toBeDisabled();
     });
   });
+
+  it('regression: clears a prior success note once a subsequent upload fails, so a failed retry does not keep showing the earlier successful counts as if it also succeeded', async () => {
+    mockService.reauditPdf.mockResolvedValueOnce(successResult({ metrics: { ...successResult().metrics, resolvedCount: 3 } }));
+    const { container } = renderCard();
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { files: [pdfFile()] } });
+    await waitFor(() => {
+      expect(screen.getByText(/3/)).toBeInTheDocument();
+    });
+
+    mockService.reauditPdf.mockRejectedValueOnce(new Error('network error'));
+    fireEvent.change(input, { target: { files: [pdfFile()] } });
+
+    await waitFor(() => {
+      expect(mockService.reauditPdf).toHaveBeenCalledTimes(2);
+    });
+    expect(screen.queryByText(/issue\(s\) resolved/)).not.toBeInTheDocument();
+  });
 });

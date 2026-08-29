@@ -50,6 +50,11 @@ export function VerifyManualFixesCard({ jobId, onReaudited }: VerifyManualFixesC
     }
 
     setIsUploading(true);
+    // Clear any earlier success note up front — otherwise a failed retry
+    // after a prior successful upload would leave the old green
+    // resolved/remaining counts on screen alongside the new error toast,
+    // misleadingly implying this attempt also succeeded.
+    setLastResult(null);
     try {
       const result = await reauditPdf(jobId, file);
       if (result.success) {
