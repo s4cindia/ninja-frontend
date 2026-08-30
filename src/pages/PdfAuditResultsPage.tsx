@@ -40,6 +40,7 @@ import { PdfStatsCards } from '@/components/pdf/PdfStatsCards';
 import { RemediationChecklist } from '@/components/pdf/RemediationChecklist';
 import { ManualRemediationTimeLog } from '@/components/pdf/ManualRemediationTimeLog';
 import { VerifyManualFixesCard } from '@/components/pdf/VerifyManualFixesCard';
+import { RemediationHistoryCard } from '@/components/pdf/RemediationHistoryCard';
 import type { ReauditComparisonResult } from '@/types/pdf-remediation.types';
 import type { GuidanceAcknowledgment } from '@/components/pdf/RemediationChecklist';
 import { IssueCard, AiAnalysis } from '@/components/remediation/IssueCard';
@@ -285,6 +286,14 @@ export const PdfAuditResultsPage: React.FC = () => {
     lockedBy: string | null;
     source: RemediationCycleSource | null;
   }>({ inProgress: false, lockedAt: null, lockedBy: null, source: null });
+  // Bumped after a local action succeeds via a path RemediationHistoryCard's
+  // own lock-transition detection can't see (upload/current-file re-audit
+  // are awaited directly — their one request/response IS the whole cycle,
+  // so no intermediate poll ever observes it as "in progress"; single-apply
+  // doesn't touch the lock at all; a fast apply-all can finish before the
+  // first 5s poll tick).
+  const [historyRefreshTrigger, setHistoryRefreshTrigger] = useState(0);
+  const bumpHistoryRefreshTrigger = useCallback(() => setHistoryRefreshTrigger(t => t + 1), []);
 
   // requestJobId is the jobId a caller's closure captured at request time —
   // compared against the LIVE activeJobIdRef so a response for a job the
@@ -962,6 +971,7 @@ export const PdfAuditResultsPage: React.FC = () => {
   // of re-auditing the current stored file).
   const handleManualFixReaudited = useCallback(async (_result: ReauditComparisonResult) => {
     await fetchAuditResult();
+    bumpHistoryRefreshTrigger();
     if (!jobId) return;
     try {
       const res = await api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`);
@@ -976,7 +986,7 @@ export const PdfAuditResultsPage: React.FC = () => {
       // Non-fatal — the checklist just won't reflect this until the next
       // poll/visit; the upload itself already succeeded and was reported.
     }
-  }, [jobId, fetchAuditResult, applyAutoTagStatus, applyRemediationCycleLock]);
+  }, [jobId, fetchAuditResult, applyAutoTagStatus, applyRemediationCycleLock, bumpHistoryRefreshTrigger]);
 
   const handleReRunAuditForCurrentJob = async () => {
     if (!jobId || isReRunningAudit || remediationCycleLock.inProgress) return;
@@ -986,6 +996,7 @@ export const PdfAuditResultsPage: React.FC = () => {
       toast.success('Audit re-run complete');
       await fetchAuditResult();
       await fetchJobFlags();
+      bumpHistoryRefreshTrigger();
     } catch (err) {
       const lockDetails = getRemediationCycleLockDetails(err);
       if (lockDetails) {
@@ -1045,7 +1056,8 @@ export const PdfAuditResultsPage: React.FC = () => {
     fetchAiSuggestions();
     pollPostRemediationStatus();
     recordBulkApply(result.applied);
-  }, [fetchAiSuggestions, pollPostRemediationStatus, recordBulkApply]);
+    bumpHistoryRefreshTrigger();
+  }, [fetchAiSuggestions, pollPostRemediationStatus, recordBulkApply, bumpHistoryRefreshTrigger]);
 
   const handleDownloadReport = (_format: 'pdf' | 'docx' | 'json' = 'json') => {
     if (!auditResult || !jobId) return;
@@ -1412,6 +1424,12 @@ export const PdfAuditResultsPage: React.FC = () => {
         remediationCycleInProgress={remediationCycleLock.inProgress}
         remediationCycleSource={remediationCycleLock.source}
         onApplyError={() => { void refreshRemediationCycleLock(); }}
+      />
+
+      <RemediationHistoryCard
+        jobId={jobId!}
+        remediationCycleInProgress={remediationCycleLock.inProgress}
+        refreshTrigger={historyRefreshTrigger}
       />
 
       {/* Matterhorn Summary */}
@@ -1784,6 +1802,12 @@ export const PdfAuditResultsPage: React.FC = () => {
                         next.set(updated.issueId, updated);
                         return next;
                       });
+                      // Single-apply doesn't touch remediationCycleLock at
+                      // all (see IssueCard), so the history card's
+                      // lock-transition detection would never catch this —
+                      // approve/reject also land here but don't produce a
+                      // history event, so only bump on a real apply.
+                      if (updated.status === 'applied') bumpHistoryRefreshTrigger();
                     }}
                   />
                 ))}

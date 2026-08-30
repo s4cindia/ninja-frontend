@@ -275,3 +275,49 @@ export interface Issue {
   /** Location details */
   location?: string;
 }
+
+/** What kind of action a remediation-history event records. */
+export type RemediationHistoryAction = 'apply_fixes' | 'reaudit' | 'ai_analysis';
+
+/** Same source values as the remediation-cycle lock (RemediationCycleSource in services/api.ts) — the event records what acquired the lock. */
+export type RemediationHistoryEventSource =
+  | 'apply_all'
+  | 'apply_single'
+  | 'reaudit_pdf_upload'
+  | 'reaudit_current_file'
+  | 'analyze_job';
+
+/**
+ * One recorded step within a remediation cycle (e.g. an apply-all cycle
+ * produces an apply_fixes event followed by a reaudit event, both sharing
+ * one cycleNumber). Count/rate fields are only populated for the action
+ * types they're relevant to — apply_fixes reports appliedCount/failedCount,
+ * reaudit reports resolvedCount/remainingCount/regressionCount/resolutionRate.
+ */
+export interface RemediationHistoryEvent {
+  action: RemediationHistoryAction;
+  source: RemediationHistoryEventSource;
+  status: 'completed' | 'failed';
+  appliedCount?: number | null;
+  failedCount?: number | null;
+  resolvedCount?: number | null;
+  remainingCount?: number | null;
+  regressionCount?: number | null;
+  resolutionRate?: number | null;
+  errorMessage?: string | null;
+  triggeredBy?: string | null;
+  startedAt: string;
+  completedAt?: string | null;
+}
+
+/**
+ * One remediation cycle's events, grouped by the lock's cycleNumber. Display
+ * "Run N" using the run's POSITION in the sorted runs array, never the
+ * literal cycleNumber — cycleNumber is an internal monotonic counter that
+ * also increments on cycles producing no history event (e.g. an apply-all
+ * with nothing to apply, or a rejected 409 attempt), so it can have gaps.
+ */
+export interface RemediationHistoryRun {
+  cycleNumber: number;
+  events: RemediationHistoryEvent[];
+}

@@ -21,7 +21,7 @@ vi.mock('@/services/api', async () => {
   };
 });
 vi.mock('@/services/pdf-remediation.service', () => ({
-  pdfRemediationService: { reauditPdf: vi.fn() },
+  pdfRemediationService: { reauditPdf: vi.fn(), getRemediationHistory: vi.fn().mockResolvedValue([]) },
 }));
 vi.mock('@/components/pdf/PdfPreviewPanel', () => ({
   PdfPreviewPanel: ({ pdfUrl, currentPage, onPageChange, onIssueSelect }: {
