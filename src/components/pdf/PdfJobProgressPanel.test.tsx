@@ -152,7 +152,7 @@ describe('PdfJobProgressPanel', () => {
           // taggerSource is never set in this branch — nothing tagged the
           // document this run, Seam C's own struct-tree builder refused to
           // touch a doc that already has a real /StructTreeRoot.
-          output: {},
+          output: { autoTagSkipReason: 'already-tagged' },
         })}
         progress={15}
       />
@@ -171,6 +171,28 @@ describe('PdfJobProgressPanel', () => {
     const autoTagRow = screen.getByText('AutoTag').closest('tr')!;
     expect(autoTagRow).not.toHaveTextContent('running…');
     expect(autoTagRow).toHaveTextContent('4m 5s');
+  });
+
+  it('regression: a job skipped because no tagger is configured shows "no tagger available", not the "already tagged" detail — the two skip reasons must not be conflated (PdfStatsCards already distinguishes them)', () => {
+    render(
+      <PdfJobProgressPanel
+        jobData={job({
+          input: {
+            autoTagProgress: {
+              startedAt: '2026-08-01T10:00:05.000Z',
+              completedAt: '2026-08-01T10:00:06.000Z',
+              status: 'skipped',
+            },
+          },
+          output: { autoTagSkipReason: 'no-tagger-configured' },
+        })}
+        progress={15}
+      />
+    );
+
+    const autoTagRow = screen.getByText('AutoTag').closest('tr')!;
+    expect(autoTagRow).toHaveTextContent('no tagger available');
+    expect(autoTagRow).not.toHaveTextContent('already tagged — used existing structure');
   });
 
   it('handles a null jobData without crashing, rendering an empty Timing table', () => {

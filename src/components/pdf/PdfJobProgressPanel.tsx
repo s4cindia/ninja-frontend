@@ -117,6 +117,10 @@ export function PdfJobProgressPanel({
   // did — mirror PdfStatsCards' generic "Document already tagged" handling
   // of the same skip instead of guessing a tagger.
   const autoTagSkipped = autoTagProg?.status === 'skipped';
+  // Two distinct skip reasons exist (PdfStatsCards already distinguishes
+  // them): 'already-tagged' (this branch) vs. 'no-tagger-configured' (no
+  // Seam-C/Adobe available at all — nothing to do with existing structure).
+  const autoTagSkipReason = jobData?.output?.autoTagSkipReason as string | null | undefined;
   const autoTagLabel = taggerSource === 'seam-c'
     ? 'Seam-C (YOLO)'
     : taggerSource === 'adobe'
@@ -156,6 +160,7 @@ export function PdfJobProgressPanel({
       detail: autoTagProg?.status === 'complete' && autoTagProg.elementCounts
         ? `${autoTagProg.elementCounts.figures ?? 0}F · ${autoTagProg.elementCounts.tables ?? 0}T · ${autoTagProg.elementCounts.headings ?? 0}H`
         : autoTagProg?.status === 'failed' ? 'failed'
+        : autoTagSkipped && autoTagSkipReason === 'no-tagger-configured' ? 'no tagger available'
         : autoTagSkipped ? 'already tagged — used existing structure'
         : undefined,
     }] : []),
