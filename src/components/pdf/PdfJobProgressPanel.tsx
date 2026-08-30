@@ -107,7 +107,23 @@ export function PdfJobProgressPanel({
   // Seam-C is the default tagger; Adobe is only the fallback — this used to
   // say "Adobe AutoTag" unconditionally regardless of which one actually ran.
   const taggerSource = jobData?.output?.taggerSource as string | null | undefined;
-  const autoTagLabel = taggerSource === 'seam-c' ? 'Seam-C (YOLO)' : 'Adobe AutoTag';
+  // A forceAutoTag (Comparison Study) job whose PDF already has real
+  // structure never actually tags anything — Seam C's own struct-tree
+  // builder refuses to touch a document that already has a real
+  // /StructTreeRoot, so the worker just audits the existing structure and
+  // never sets taggerSource at all (see accessibility.processor.ts's
+  // alreadyTagged/!retagSucceeded branch). Defaulting the label to "Adobe
+  // AutoTag" in that case falsely claims Adobe ran this pass, when nothing
+  // did — mirror PdfStatsCards' generic "Document already tagged" handling
+  // of the same skip instead of guessing a tagger.
+  const autoTagSkipped = autoTagProg?.status === 'skipped';
+  const autoTagLabel = taggerSource === 'seam-c'
+    ? 'Seam-C (YOLO)'
+    : taggerSource === 'adobe'
+      ? 'Adobe AutoTag'
+      : autoTagSkipped
+        ? 'AutoTag'
+        : 'Adobe AutoTag'; // still running — genuinely not yet known
   const extractionDone = (totalPages ? progress >= 88 : false) || vp.length > 0 || auditEnd !== null;
   const extractionEnd = vp.length > 0 ? new Date(vp[0].startedAt) : (extractionDone ? auditEnd : null);
   const extractionStart = hasAutoTag ? autoTagEnd : auditStart;
@@ -132,10 +148,16 @@ export function PdfJobProgressPanel({
       label: autoTagLabel,
       start: autoTagProg?.startedAt ? new Date(autoTagProg.startedAt) : auditStart,
       end: autoTagEnd,
-      status: (autoTagProg?.status === 'complete' || autoTagProg?.status === 'failed') ? 'done' as const : auditStart ? 'running' as const : 'pending' as const,
+      // 'skipped' is a concluded outcome (the completeness check that
+      // decides this finished and wrote completedAt) just like complete/
+      // failed — omitting it here left the row showing "running…" forever
+      // for an already-tagged-so-nothing-to-do job.
+      status: (autoTagProg?.status === 'complete' || autoTagProg?.status === 'failed' || autoTagProg?.status === 'skipped') ? 'done' as const : auditStart ? 'running' as const : 'pending' as const,
       detail: autoTagProg?.status === 'complete' && autoTagProg.elementCounts
         ? `${autoTagProg.elementCounts.figures ?? 0}F · ${autoTagProg.elementCounts.tables ?? 0}T · ${autoTagProg.elementCounts.headings ?? 0}H`
-        : autoTagProg?.status === 'failed' ? 'failed' : undefined,
+        : autoTagProg?.status === 'failed' ? 'failed'
+        : autoTagSkipped ? 'already tagged — used existing structure'
+        : undefined,
     }] : []),
     { label: 'Extraction', start: extractionStart, end: extractionEnd, status: extractionDone ? 'done' as const : (hasAutoTag ? autoTagEnd : auditStart) ? 'running' as const : 'pending' as const },
     ...VALIDATOR_LABELS.map((lbl, idx) => {

@@ -138,6 +138,41 @@ describe('PdfJobProgressPanel', () => {
     expect(screen.queryByText('Adobe AutoTag')).not.toBeInTheDocument();
   });
 
+  it('regression: a forceAutoTag job whose PDF already has real structure never actually tags anything — the row must not falsely claim "Adobe AutoTag" ran, and must not show "running…" forever once the completeness check has concluded', () => {
+    const { container } = render(
+      <PdfJobProgressPanel
+        jobData={job({
+          input: {
+            autoTagProgress: {
+              startedAt: '2026-08-01T10:00:05.000Z',
+              completedAt: '2026-08-01T10:04:10.000Z', // completeness check took ~4m
+              status: 'skipped',
+            },
+          },
+          // taggerSource is never set in this branch — nothing tagged the
+          // document this run, Seam C's own struct-tree builder refused to
+          // touch a doc that already has a real /StructTreeRoot.
+          output: {},
+        })}
+        progress={15}
+      />
+    );
+
+    expect(screen.queryByText('Adobe AutoTag')).not.toBeInTheDocument();
+    expect(screen.queryByText('Seam-C (YOLO)')).not.toBeInTheDocument();
+    expect(screen.getByText('AutoTag')).toBeInTheDocument();
+    expect(container.textContent).toContain('already tagged — used existing structure');
+    // Status must read as concluded (done), not stuck showing "running…"
+    // forever — the completeness check that decided this DID finish and
+    // recorded a real completedAt. Scoped to the AutoTag row itself (not
+    // container-wide) since Extraction legitimately still shows "running…"
+    // with this test's otherwise-minimal mock data — an unrelated row, not
+    // what this assertion is about.
+    const autoTagRow = screen.getByText('AutoTag').closest('tr')!;
+    expect(autoTagRow).not.toHaveTextContent('running…');
+    expect(autoTagRow).toHaveTextContent('4m 5s');
+  });
+
   it('handles a null jobData without crashing, rendering an empty Timing table', () => {
     render(<PdfJobProgressPanel jobData={null} progress={0} />);
 
