@@ -241,8 +241,10 @@ export const PdfAuditResultsPage: React.FC = () => {
   // Kept in sync with jobId via an effect below so a response can be checked
   // against the CURRENTLY active job even if it was produced by a stale
   // closure (e.g. an interval started before jobId changed, that the
-  // cleanup effect below has since raced to clear).
-  const activeAiJobIdRef = useRef<string | undefined>(undefined);
+  // cleanup effect below has since raced to clear). Shared by every
+  // response-application site that needs this guard (AI-analysis polling,
+  // remediation-cycle lock polling) rather than one ref per concern.
+  const activeJobIdRef = useRef<string | undefined>(undefined);
   const autoTagPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoTagFetchedJobRef = useRef<string | null>(null);
 
@@ -284,12 +286,19 @@ export const PdfAuditResultsPage: React.FC = () => {
     source: RemediationCycleSource | null;
   }>({ inProgress: false, lockedAt: null, lockedBy: null, source: null });
 
-  const applyRemediationCycleLock = useCallback((info: {
+  // requestJobId is the jobId a caller's closure captured at request time —
+  // compared against the LIVE activeJobIdRef so a response for a job the
+  // user has since navigated away from (jobId changed without a remount)
+  // can't overwrite the current job's lock state. Every call site below
+  // passes its own closure's `jobId`, which freezes at the value current
+  // when that closure was created.
+  const applyRemediationCycleLock = useCallback((requestJobId: string, info: {
     remediationCycleInProgress?: boolean;
     remediationCycleLockedAt?: string | null;
     remediationCycleLockedBy?: string | null;
     remediationCycleSource?: RemediationCycleSource | null;
   } | undefined) => {
+    if (requestJobId !== activeJobIdRef.current) return;
     setRemediationCycleLock({
       inProgress: info?.remediationCycleInProgress ?? false,
       lockedAt: info?.remediationCycleLockedAt ?? null,
@@ -304,15 +313,38 @@ export const PdfAuditResultsPage: React.FC = () => {
   // retry on that.
   const refreshRemediationCycleLock = useCallback(async () => {
     if (!jobId) return;
+    const requestJobId = jobId;
     try {
       const res = await api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`);
       if (!isMountedRef.current) return;
-      applyRemediationCycleLock(res.data.data);
+      applyRemediationCycleLock(requestJobId, res.data.data);
     } catch {
       // Non-fatal — the lock state just won't refresh from this attempt;
       // the next regular poll will pick it up.
     }
   }, [jobId, applyRemediationCycleLock]);
+
+  // Nothing else in this file polls purely because "the lock is still
+  // held" — the other intervals below are all driven by a LOCAL action
+  // (retrying auto-tag, a just-finished Apply All), not by lock state
+  // itself. Without this, a lock acquired by something else entirely (the
+  // page loading mid-cycle, another client, or a 409/error re-poll that
+  // still shows it active) would leave every gated control disabled until
+  // the user manually reloads, since nothing would ever notice it clear.
+  useEffect(() => {
+    if (!jobId || !remediationCycleLock.inProgress) return;
+    const requestJobId = jobId;
+    const interval = setInterval(async () => {
+      try {
+        const res = await api.get(`/pdf/${encodeURIComponent(requestJobId)}/auto-tag/status`);
+        if (!isMountedRef.current) return;
+        applyRemediationCycleLock(requestJobId, res.data.data);
+      } catch {
+        // Transient — try again next tick.
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [jobId, remediationCycleLock.inProgress, applyRemediationCycleLock]);
 
   // Tracked independently of autoTagInfo (not nested inside it) so a
   // just-submitted total is never lost: it can be set before autoTagInfo's
@@ -709,11 +741,11 @@ export const PdfAuditResultsPage: React.FC = () => {
       // Discard a response that is either stale (an older request resolving
       // after a newer one already applied — the reported bug where the
       // checklist briefly showed contradictory step badges) or for a job the
-      // user has since navigated away from (activeAiJobIdRef tracks the
+      // user has since navigated away from (activeJobIdRef tracks the
       // CURRENT jobId, which a stale closure's own `jobId` cannot).
       if (
         isMountedRef.current &&
-        requestJobId === activeAiJobIdRef.current &&
+        requestJobId === activeJobIdRef.current &&
         requestId > aiFetchAppliedIdRef.current
       ) {
         aiFetchAppliedIdRef.current = requestId;
@@ -749,7 +781,7 @@ export const PdfAuditResultsPage: React.FC = () => {
       // transient failure of the initial load. Setting this true is
       // idempotent, so no ordering guard is needed here — only the jobId
       // check, so a failure for an abandoned job can't affect the current one.
-      if (isMountedRef.current && requestJobId === activeAiJobIdRef.current) setHasLoadedAiStatus(true);
+      if (isMountedRef.current && requestJobId === activeJobIdRef.current) setHasLoadedAiStatus(true);
     }
   }, [jobId]);
 
@@ -780,13 +812,13 @@ export const PdfAuditResultsPage: React.FC = () => {
     }
   }, [jobId, includeColorContrastFix, fetchAiSuggestions, remediationCycleLock.inProgress, refreshRemediationCycleLock]);
 
-  // Keep activeAiJobIdRef in sync with jobId, and stop any AI-analysis
+  // Keep activeJobIdRef in sync with jobId, and stop any AI-analysis
   // polling interval left over from a previous jobId before it can run
   // fetchAiSuggestions again with a stale closure. Declared before the
   // "load on mount" effect below so its cleanup (for the OLD jobId) runs
   // before that effect re-fires fetchAiSuggestions for the NEW jobId.
   useEffect(() => {
-    activeAiJobIdRef.current = jobId;
+    activeJobIdRef.current = jobId;
     return () => {
       if (aiPollingRef.current) {
         clearInterval(aiPollingRef.current);
@@ -840,7 +872,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         const info = res.data.data;
         setAutoTagInfo(info);
         applyAutoTagStatus(info);
-        applyRemediationCycleLock(info);
+        applyRemediationCycleLock(jobId, info);
         setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
         setManualRemediationLastLoggedAt(prev => latestTimestamp(prev, info?.manualRemediationLastLoggedAt));
       })
@@ -896,7 +928,7 @@ export const PdfAuditResultsPage: React.FC = () => {
           if (isMountedRef.current) {
             setAutoTagInfo(info);
             applyAutoTagStatus(info);
-            applyRemediationCycleLock(info);
+            applyRemediationCycleLock(jobId, info);
             setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
         setManualRemediationLastLoggedAt(prev => latestTimestamp(prev, info?.manualRemediationLastLoggedAt));
           }
@@ -937,7 +969,7 @@ export const PdfAuditResultsPage: React.FC = () => {
       const info = res.data.data;
       setAutoTagInfo(info);
       applyAutoTagStatus(info);
-      applyRemediationCycleLock(info);
+      applyRemediationCycleLock(jobId, info);
       setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
       setManualRemediationLastLoggedAt(prev => latestTimestamp(prev, info?.manualRemediationLastLoggedAt));
     } catch {
@@ -984,7 +1016,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         const info = res.data.data;
         if (isMountedRef.current) {
           setAutoTagInfo(info);
-          applyRemediationCycleLock(info);
+          applyRemediationCycleLock(jobId, info);
           setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
         setManualRemediationLastLoggedAt(prev => latestTimestamp(prev, info?.manualRemediationLastLoggedAt));
         }

@@ -1276,6 +1276,43 @@ describe('PdfAuditResultsPage', () => {
       expect(rerunButton).toBeDisabled();
     });
 
+    it('regression: keeps polling /auto-tag/status while a remediation cycle acquired by something ELSE (not a local action) is in progress, and re-enables the button once the server reports it cleared — without this, nothing in the page would ever notice an externally-held lock clear, leaving every gated control disabled until reload', async () => {
+      let remediationCycleInProgress = true;
+      const mockResult = createMockAuditResult();
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({
+          data: {
+            data: {
+              status: 'complete', taggerSource: 'adobe',
+              remediationCycleInProgress, remediationCycleSource: remediationCycleInProgress ? 'analyze_job' : null,
+            },
+          },
+        });
+        if (url === aiUrl) return Promise.resolve(completeAiResponse);
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      const rerunButton = await screen.findByRole('button', { name: 'Re-run AI Analysis' });
+      await waitFor(() => {
+        expect(rerunButton).toHaveAttribute('title', expect.stringMatching(/AI analysis is running/));
+      });
+
+      // The lock clears server-side (some OTHER action finished) — nothing
+      // local triggered this, so only a dedicated "poll while locked" loop
+      // can ever observe it. Real timers throughout (not fake): the poll
+      // interval was already created under real time by the initial page
+      // load, well before this point, so switching to fake timers now
+      // wouldn't control it — it was scheduled before the switch.
+      remediationCycleInProgress = false;
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Re-run AI Analysis' })).not.toBeDisabled();
+      }, { timeout: 7000 });
+    }, 10000);
+
     it('regression: a 409 REMEDIATION_CYCLE_IN_PROGRESS response from the trigger immediately re-polls /auto-tag/status instead of waiting for the next regular tick', async () => {
       mockCommonGets();
       mockApi.post.mockRejectedValue({
