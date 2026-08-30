@@ -23,14 +23,25 @@ import toast from 'react-hot-toast';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { usePdfReaudit } from '@/hooks/usePdfRemediation';
+import { getErrorMessage, getRemediationCycleLockDetails, remediationCycleSourceMessage, type RemediationCycleSource } from '@/services/api';
 import type { ReauditComparisonResult } from '@/types/pdf-remediation.types';
 
 interface VerifyManualFixesCardProps {
   jobId: string;
   onReaudited: (result: ReauditComparisonResult) => void;
+  remediationCycleInProgress?: boolean;
+  remediationCycleSource?: RemediationCycleSource | null;
+  /** Fires when the re-audit upload errors, so the caller can re-poll the lock state. */
+  onApplyError?: () => void;
 }
 
-export function VerifyManualFixesCard({ jobId, onReaudited }: VerifyManualFixesCardProps) {
+export function VerifyManualFixesCard({
+  jobId,
+  onReaudited,
+  remediationCycleInProgress = false,
+  remediationCycleSource = null,
+  onApplyError,
+}: VerifyManualFixesCardProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [lastResult, setLastResult] = useState<ReauditComparisonResult | null>(null);
@@ -38,7 +49,7 @@ export function VerifyManualFixesCard({ jobId, onReaudited }: VerifyManualFixesC
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || remediationCycleInProgress) return;
 
     if (!file.name.toLowerCase().endsWith('.pdf')) {
       toast.error('Please select a PDF file');
@@ -64,8 +75,16 @@ export function VerifyManualFixesCard({ jobId, onReaudited }: VerifyManualFixesC
       } else {
         toast.error('Re-audit failed');
       }
-    } catch {
-      toast.error('Failed to re-audit PDF');
+    } catch (err) {
+      const lockDetails = getRemediationCycleLockDetails(err);
+      if (lockDetails) {
+        // Not fatal — a genuine click/poll race (should be rare, the button
+        // is pre-disabled once the lock is known).
+        toast('A remediation cycle is already in progress. This page will update automatically.');
+      } else {
+        toast.error(getErrorMessage(err));
+      }
+      onApplyError?.();
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -90,7 +109,8 @@ export function VerifyManualFixesCard({ jobId, onReaudited }: VerifyManualFixesC
           <Button
             size="sm"
             variant="outline"
-            disabled={isUploading}
+            disabled={isUploading || remediationCycleInProgress}
+            title={remediationCycleInProgress ? remediationCycleSourceMessage(remediationCycleSource) : undefined}
             onClick={() => fileInputRef.current?.click()}
           >
             {isUploading ? (

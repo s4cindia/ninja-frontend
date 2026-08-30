@@ -151,6 +151,56 @@ export function getErrorMessage(error: unknown): string {
   return 'An unexpected error occurred';
 }
 
+/**
+ * The backend's per-job remediation-cycle lock: only one of
+ * apply-fixes/re-audit/AI-analysis can run at a time, and 5 endpoints
+ * (apply-all, single apply, re-run AI analysis, both re-audit endpoints)
+ * return this shape with a 409 when another cycle is already in flight.
+ */
+export type RemediationCycleSource =
+  | 'apply_all'
+  | 'apply_single'
+  | 'reaudit_pdf_upload'
+  | 'reaudit_current_file'
+  | 'analyze_job';
+
+export interface RemediationCycleLockDetails {
+  lockedAt?: string | null;
+  lockedBy?: string | null;
+  source?: RemediationCycleSource | null;
+}
+
+/**
+ * Returns the lock details if `error` is a 409 REMEDIATION_CYCLE_IN_PROGRESS
+ * response, or null otherwise (including for any other error shape/status —
+ * ApiError's `details` is typed as an array elsewhere for validation errors,
+ * so this lock error is read as its own narrower shape rather than reusing
+ * that type).
+ */
+export function getRemediationCycleLockDetails(error: unknown): RemediationCycleLockDetails | null {
+  if (!axios.isAxiosError(error) || error.response?.status !== 409) return null;
+  const data = error.response.data as { error?: { code?: string; details?: RemediationCycleLockDetails } } | undefined;
+  if (data?.error?.code !== 'REMEDIATION_CYCLE_IN_PROGRESS') return null;
+  return data.error.details ?? {};
+}
+
+/** Human-readable label for what's currently holding the remediation-cycle lock. */
+export function remediationCycleSourceMessage(source: RemediationCycleSource | null | undefined): string {
+  switch (source) {
+    case 'apply_all':
+      return 'Applying fixes is still in progress.';
+    case 'apply_single':
+      return 'Applying a fix is still in progress.';
+    case 'reaudit_pdf_upload':
+    case 'reaudit_current_file':
+      return 'Re-auditing is still in progress.';
+    case 'analyze_job':
+      return 'AI analysis is running — other actions are paused until it finishes.';
+    default:
+      return 'A remediation cycle is already in progress.';
+  }
+}
+
 export interface CriterionCheck {
   id: string;
   description: string;

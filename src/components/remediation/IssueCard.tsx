@@ -4,7 +4,7 @@ import { Zap, CheckCircle, AlertTriangle, FileText, ExternalLink, ChevronDown, C
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/utils/cn';
 import { Tooltip } from '../ui/Tooltip';
-import { api } from '@/services/api';
+import { api, getErrorMessage, getRemediationCycleLockDetails, remediationCycleSourceMessage, type RemediationCycleSource } from '@/services/api';
 import type { PdfAuditIssue } from '@/types/pdf.types';
 
 export interface AiAnalysis {
@@ -66,6 +66,15 @@ interface IssueCardProps {
   /** Comparison Study remediation-timer hooks — optional-chained since IssueCard is also used outside that flow. */
   recordApplied?: (count?: number) => void;
   recordSuggestionDecision?: (decision: 'accepted' | 'rejected') => void;
+  /**
+   * Server-reported remediation-cycle lock — gates the per-issue Apply
+   * button only (approve/reject don't touch the PDF, so they stay usable
+   * while a cycle from elsewhere is in progress).
+   */
+  remediationCycleInProgress?: boolean;
+  remediationCycleSource?: RemediationCycleSource | null;
+  /** Fires when the apply request errors, so the caller can re-poll the lock state. */
+  onApplyError?: () => void;
 }
 
 export function IssueCard({
@@ -81,6 +90,9 @@ export function IssueCard({
   issueNumber,
   recordApplied,
   recordSuggestionDecision,
+  remediationCycleInProgress = false,
+  remediationCycleSource = null,
+  onApplyError,
 }: IssueCardProps) {
   const isPdf = isPdfIssue(issue);
   const [explanationOpen, setExplanationOpen] = useState(false);
@@ -130,8 +142,15 @@ export function IssueCard({
       toast.success('Fix applied to PDF');
     },
     onError: (err: unknown) => {
-      const message = err instanceof Error ? err.message : 'Failed to apply fix';
-      toast.error(message);
+      const lockDetails = getRemediationCycleLockDetails(err);
+      if (lockDetails) {
+        // Not fatal — a genuine click/poll race (should be rare, the button
+        // is pre-disabled once the lock is known).
+        toast('A remediation cycle is already in progress. This page will update automatically.');
+      } else {
+        toast.error(getErrorMessage(err));
+      }
+      onApplyError?.();
     },
   });
   // PDF issues may arrive with `code` (backend) or `ruleId` (type definition) — handle both
@@ -415,7 +434,8 @@ export function IssueCard({
                     <button
                       type="button"
                       className="px-2 py-0.5 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors disabled:opacity-50"
-                      disabled={!jobId || applyMutation.isPending || updateStatusMutation.isPending}
+                      disabled={!jobId || applyMutation.isPending || updateStatusMutation.isPending || remediationCycleInProgress}
+                      title={remediationCycleInProgress ? remediationCycleSourceMessage(remediationCycleSource) : undefined}
                       onClick={() => applyMutation.mutate()}
                     >
                       {applyMutation.isPending ? <><Loader2 size={11} className="animate-spin" /> Applying…</> : 'Apply'}

@@ -11,13 +11,16 @@ vi.mock('@/services/pdf-remediation.service', () => ({
 
 const mockService = pdfRemediationService as Mocked<typeof pdfRemediationService>;
 
-function renderCard(onReaudited = vi.fn()) {
+function renderCard(
+  onReaudited = vi.fn(),
+  props?: Partial<React.ComponentProps<typeof VerifyManualFixesCard>>
+) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return {
     onReaudited,
     ...render(
       <QueryClientProvider client={queryClient}>
-        <VerifyManualFixesCard jobId="job-123" onReaudited={onReaudited} />
+        <VerifyManualFixesCard jobId="job-123" onReaudited={onReaudited} {...props} />
       </QueryClientProvider>
     ),
   };
@@ -159,5 +162,45 @@ describe('VerifyManualFixesCard', () => {
       expect(mockService.reauditPdf).toHaveBeenCalledTimes(2);
     });
     expect(screen.queryByText(/issue\(s\) resolved/)).not.toBeInTheDocument();
+  });
+
+  describe('Remediation-cycle lock gating', () => {
+    it('regression: the upload button is disabled and explains what is running when remediationCycleInProgress is true, and selecting a file does not call the API', () => {
+      const { container } = renderCard(vi.fn(), { remediationCycleInProgress: true, remediationCycleSource: 'apply_all' });
+      const button = screen.getByRole('button', { name: /Upload Fixed PDF/ });
+      expect(button).toBeDisabled();
+      expect(button).toHaveAttribute('title', expect.stringMatching(/Applying fixes is still in progress/));
+
+      const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+      fireEvent.change(input, { target: { files: [pdfFile()] } });
+
+      expect(mockService.reauditPdf).not.toHaveBeenCalled();
+    });
+
+    it('regression: a 409 REMEDIATION_CYCLE_IN_PROGRESS error shows a transient message and notifies the caller to re-poll, instead of the old swallowed-error generic toast', async () => {
+      mockService.reauditPdf.mockRejectedValueOnce({
+        isAxiosError: true,
+        message: 'Conflict',
+        response: { status: 409, data: { error: { code: 'REMEDIATION_CYCLE_IN_PROGRESS', message: 'locked', details: { source: 'reaudit_pdf_upload' } } } },
+      });
+      const onApplyError = vi.fn();
+      const { container } = renderCard(vi.fn(), { onApplyError });
+      const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+
+      fireEvent.change(input, { target: { files: [pdfFile()] } });
+
+      await waitFor(() => expect(onApplyError).toHaveBeenCalledTimes(1));
+    });
+
+    it('regression: a non-lock upload error still notifies the caller to re-poll', async () => {
+      mockService.reauditPdf.mockRejectedValueOnce({ isAxiosError: true, message: 'Network Error', response: undefined });
+      const onApplyError = vi.fn();
+      const { container } = renderCard(vi.fn(), { onApplyError });
+      const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+
+      fireEvent.change(input, { target: { files: [pdfFile()] } });
+
+      await waitFor(() => expect(onApplyError).toHaveBeenCalledTimes(1));
+    });
   });
 });

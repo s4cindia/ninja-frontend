@@ -43,11 +43,17 @@ import { VerifyManualFixesCard } from '@/components/pdf/VerifyManualFixesCard';
 import type { ReauditComparisonResult } from '@/types/pdf-remediation.types';
 import type { GuidanceAcknowledgment } from '@/components/pdf/RemediationChecklist';
 import { IssueCard, AiAnalysis } from '@/components/remediation/IssueCard';
-import { ApplyAllSuggestionsPanel, APPLY_ALL_RETRY_COOLDOWN_MS } from '@/components/remediation/ApplyAllSuggestionsPanel';
+import { ApplyAllSuggestionsPanel } from '@/components/remediation/ApplyAllSuggestionsPanel';
 import { useRemediationTimer } from '@/hooks/useRemediationTimer';
 import { triggerAiAnalysis } from '@/services/api/pdfAiAnalysis.service';
 import type { ApplyAllAiSuggestionsResult } from '@/services/api/pdfAiAnalysis.service';
-import { api } from '@/services/api';
+import {
+  api,
+  getErrorMessage,
+  getRemediationCycleLockDetails,
+  remediationCycleSourceMessage,
+  type RemediationCycleSource,
+} from '@/services/api';
 import { useAuthStore } from '@/stores/auth.store';
 
 /**
@@ -235,8 +241,10 @@ export const PdfAuditResultsPage: React.FC = () => {
   // Kept in sync with jobId via an effect below so a response can be checked
   // against the CURRENTLY active job even if it was produced by a stale
   // closure (e.g. an interval started before jobId changed, that the
-  // cleanup effect below has since raced to clear).
-  const activeAiJobIdRef = useRef<string | undefined>(undefined);
+  // cleanup effect below has since raced to clear). Shared by every
+  // response-application site that needs this guard (AI-analysis polling,
+  // remediation-cycle lock polling) rather than one ref per concern.
+  const activeJobIdRef = useRef<string | undefined>(undefined);
   const autoTagPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoTagFetchedJobRef = useRef<string | null>(null);
 
@@ -260,7 +268,84 @@ export const PdfAuditResultsPage: React.FC = () => {
     structureTreeCompleteness?: { totalElements: number; semanticElements: number; isEmptyShell: boolean } | null;
     retagOutcome?: 'success' | 'failed-strip-bailed' | 'failed-retag-error' | null;
     comparisonTrialId?: string | null;
+    remediationCycleInProgress?: boolean;
+    remediationCycleLockedAt?: string | null;
+    remediationCycleLockedBy?: string | null;
+    remediationCycleSource?: RemediationCycleSource | null;
   } | null>(null);
+  // Server-reported remediation-cycle lock, extracted from the same
+  // /auto-tag/status response autoTagInfo already comes from (see
+  // applyRemediationCycleLock below). Gates Apply All, single apply,
+  // Re-run AI Analysis, and both re-audit actions — this is server truth,
+  // so it stays correct regardless of what happened to any one client's own
+  // request (a dropped connection no longer means a retry looks safe).
+  const [remediationCycleLock, setRemediationCycleLock] = useState<{
+    inProgress: boolean;
+    lockedAt: string | null;
+    lockedBy: string | null;
+    source: RemediationCycleSource | null;
+  }>({ inProgress: false, lockedAt: null, lockedBy: null, source: null });
+
+  // requestJobId is the jobId a caller's closure captured at request time —
+  // compared against the LIVE activeJobIdRef so a response for a job the
+  // user has since navigated away from (jobId changed without a remount)
+  // can't overwrite the current job's lock state. Every call site below
+  // passes its own closure's `jobId`, which freezes at the value current
+  // when that closure was created.
+  const applyRemediationCycleLock = useCallback((requestJobId: string, info: {
+    remediationCycleInProgress?: boolean;
+    remediationCycleLockedAt?: string | null;
+    remediationCycleLockedBy?: string | null;
+    remediationCycleSource?: RemediationCycleSource | null;
+  } | undefined) => {
+    if (requestJobId !== activeJobIdRef.current) return;
+    setRemediationCycleLock({
+      inProgress: info?.remediationCycleInProgress ?? false,
+      lockedAt: info?.remediationCycleLockedAt ?? null,
+      lockedBy: info?.remediationCycleLockedBy ?? null,
+      source: info?.remediationCycleSource ?? null,
+    });
+  }, []);
+
+  // On-demand refresh used after any of the 5 lock-gated actions errors:
+  // rather than a client-side guess at how long to block a retry (the old
+  // approach), ask the server what's actually true right now and gate the
+  // retry on that.
+  const refreshRemediationCycleLock = useCallback(async () => {
+    if (!jobId) return;
+    const requestJobId = jobId;
+    try {
+      const res = await api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`);
+      if (!isMountedRef.current) return;
+      applyRemediationCycleLock(requestJobId, res.data.data);
+    } catch {
+      // Non-fatal — the lock state just won't refresh from this attempt;
+      // the next regular poll will pick it up.
+    }
+  }, [jobId, applyRemediationCycleLock]);
+
+  // Nothing else in this file polls purely because "the lock is still
+  // held" — the other intervals below are all driven by a LOCAL action
+  // (retrying auto-tag, a just-finished Apply All), not by lock state
+  // itself. Without this, a lock acquired by something else entirely (the
+  // page loading mid-cycle, another client, or a 409/error re-poll that
+  // still shows it active) would leave every gated control disabled until
+  // the user manually reloads, since nothing would ever notice it clear.
+  useEffect(() => {
+    if (!jobId || !remediationCycleLock.inProgress) return;
+    const requestJobId = jobId;
+    const interval = setInterval(async () => {
+      try {
+        const res = await api.get(`/pdf/${encodeURIComponent(requestJobId)}/auto-tag/status`);
+        if (!isMountedRef.current) return;
+        applyRemediationCycleLock(requestJobId, res.data.data);
+      } catch {
+        // Transient — try again next tick.
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [jobId, remediationCycleLock.inProgress, applyRemediationCycleLock]);
+
   // Tracked independently of autoTagInfo (not nested inside it) so a
   // just-submitted total is never lost: it can be set before autoTagInfo's
   // first fetch resolves (prev would otherwise be null), and reconciled via
@@ -291,18 +376,6 @@ export const PdfAuditResultsPage: React.FC = () => {
   const [isReRunningAudit, setIsReRunningAudit] = useState(false);
   const [showPacReport, setShowPacReport] = useState(false);
   const [showApplyAllPanel, setShowApplyAllPanel] = useState(false);
-  // Lifted out of ApplyAllSuggestionsPanel (rather than kept as its local
-  // state) because the Dialog wrapper unmounts that panel whenever it's
-  // closed, which would otherwise silently reset the cooldown the instant
-  // the user reopens the modal to retry.
-  const [applyAllRetryBlockedUntil, setApplyAllRetryBlockedUntil] = useState<number | null>(null);
-  // Defensive: if jobId ever changes without a remount (React Router reuses
-  // this component across a param-only route change), a stale cooldown from
-  // the PREVIOUS job's error must not carry over and block Apply All on an
-  // unrelated PDF.
-  useEffect(() => {
-    setApplyAllRetryBlockedUntil(null);
-  }, [jobId]);
 
   // Guided remediation checklist state — aiAnalysisStatus/guidanceAcknowledgment
   // ride on the existing AI-analysis fetch; jobFlags needs one extra lookup
@@ -668,11 +741,11 @@ export const PdfAuditResultsPage: React.FC = () => {
       // Discard a response that is either stale (an older request resolving
       // after a newer one already applied — the reported bug where the
       // checklist briefly showed contradictory step badges) or for a job the
-      // user has since navigated away from (activeAiJobIdRef tracks the
+      // user has since navigated away from (activeJobIdRef tracks the
       // CURRENT jobId, which a stale closure's own `jobId` cannot).
       if (
         isMountedRef.current &&
-        requestJobId === activeAiJobIdRef.current &&
+        requestJobId === activeJobIdRef.current &&
         requestId > aiFetchAppliedIdRef.current
       ) {
         aiFetchAppliedIdRef.current = requestId;
@@ -708,12 +781,12 @@ export const PdfAuditResultsPage: React.FC = () => {
       // transient failure of the initial load. Setting this true is
       // idempotent, so no ordering guard is needed here — only the jobId
       // check, so a failure for an abandoned job can't affect the current one.
-      if (isMountedRef.current && requestJobId === activeAiJobIdRef.current) setHasLoadedAiStatus(true);
+      if (isMountedRef.current && requestJobId === activeJobIdRef.current) setHasLoadedAiStatus(true);
     }
   }, [jobId]);
 
   const handleRerunAiAnalysis = useCallback(async () => {
-    if (!jobId) return;
+    if (!jobId || remediationCycleLock.inProgress) return;
     setIsRerunningAiAnalysis(true);
     try {
       await triggerAiAnalysis(jobId, includeColorContrastFix ? { colorContrastMode: 'apply-to-pdf' } : undefined);
@@ -722,20 +795,30 @@ export const PdfAuditResultsPage: React.FC = () => {
       if (!aiPollingRef.current) {
         aiPollingRef.current = setInterval(fetchAiSuggestions, 3000);
       }
-    } catch {
-      toast.error('Failed to start AI re-analysis');
+    } catch (err) {
+      // Re-run AI analysis holds the remediation-cycle lock for its entire
+      // run (can be minutes on large documents) — refreshRemediationCycleLock
+      // below picks that up and other actions correctly stay disabled for
+      // that whole span, not just this button.
+      const lockDetails = getRemediationCycleLockDetails(err);
+      if (lockDetails) {
+        toast('A remediation cycle is already in progress. This page will update automatically.');
+      } else {
+        toast.error(getErrorMessage(err) || 'Failed to start AI re-analysis');
+      }
+      await refreshRemediationCycleLock();
     } finally {
       setIsRerunningAiAnalysis(false);
     }
-  }, [jobId, includeColorContrastFix, fetchAiSuggestions]);
+  }, [jobId, includeColorContrastFix, fetchAiSuggestions, remediationCycleLock.inProgress, refreshRemediationCycleLock]);
 
-  // Keep activeAiJobIdRef in sync with jobId, and stop any AI-analysis
+  // Keep activeJobIdRef in sync with jobId, and stop any AI-analysis
   // polling interval left over from a previous jobId before it can run
   // fetchAiSuggestions again with a stale closure. Declared before the
   // "load on mount" effect below so its cleanup (for the OLD jobId) runs
   // before that effect re-fires fetchAiSuggestions for the NEW jobId.
   useEffect(() => {
-    activeAiJobIdRef.current = jobId;
+    activeJobIdRef.current = jobId;
     return () => {
       if (aiPollingRef.current) {
         clearInterval(aiPollingRef.current);
@@ -789,13 +872,14 @@ export const PdfAuditResultsPage: React.FC = () => {
         const info = res.data.data;
         setAutoTagInfo(info);
         applyAutoTagStatus(info);
+        applyRemediationCycleLock(jobId, info);
         setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
         setManualRemediationLastLoggedAt(prev => latestTimestamp(prev, info?.manualRemediationLastLoggedAt));
       })
       .catch(() => {
         autoTagFetchedJobRef.current = null; // allow retry if the fetch itself failed
       });
-  }, [jobId, auditResult, applyAutoTagStatus]);
+  }, [jobId, auditResult, applyAutoTagStatus, applyRemediationCycleLock]);
 
   // Whether ACR/PAC have already been generated for this job, plus the
   // last manual re-audit time — all three live on job.output, which no
@@ -844,6 +928,7 @@ export const PdfAuditResultsPage: React.FC = () => {
           if (isMountedRef.current) {
             setAutoTagInfo(info);
             applyAutoTagStatus(info);
+            applyRemediationCycleLock(jobId, info);
             setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
         setManualRemediationLastLoggedAt(prev => latestTimestamp(prev, info?.manualRemediationLastLoggedAt));
           }
@@ -884,16 +969,17 @@ export const PdfAuditResultsPage: React.FC = () => {
       const info = res.data.data;
       setAutoTagInfo(info);
       applyAutoTagStatus(info);
+      applyRemediationCycleLock(jobId, info);
       setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
       setManualRemediationLastLoggedAt(prev => latestTimestamp(prev, info?.manualRemediationLastLoggedAt));
     } catch {
       // Non-fatal — the checklist just won't reflect this until the next
       // poll/visit; the upload itself already succeeded and was reported.
     }
-  }, [jobId, fetchAuditResult, applyAutoTagStatus]);
+  }, [jobId, fetchAuditResult, applyAutoTagStatus, applyRemediationCycleLock]);
 
   const handleReRunAuditForCurrentJob = async () => {
-    if (!jobId || isReRunningAudit) return;
+    if (!jobId || isReRunningAudit || remediationCycleLock.inProgress) return;
     setIsReRunningAudit(true);
     try {
       await api.post(`/pdf/${encodeURIComponent(jobId)}/remediation/re-audit-current`);
@@ -901,7 +987,16 @@ export const PdfAuditResultsPage: React.FC = () => {
       await fetchAuditResult();
       await fetchJobFlags();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to re-run audit');
+      const lockDetails = getRemediationCycleLockDetails(err);
+      if (lockDetails) {
+        // Not fatal — a genuine click/poll race (should be rare, the button
+        // is pre-disabled once the lock is known). The status poll below
+        // updates remediationCycleLock so the button re-disables itself.
+        toast('A remediation cycle is already in progress. This page will update automatically.');
+      } else {
+        toast.error(getErrorMessage(err));
+      }
+      await refreshRemediationCycleLock();
     } finally {
       setIsReRunningAudit(false);
     }
@@ -921,6 +1016,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         const info = res.data.data;
         if (isMountedRef.current) {
           setAutoTagInfo(info);
+          applyRemediationCycleLock(jobId, info);
           setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
         setManualRemediationLastLoggedAt(prev => latestTimestamp(prev, info?.manualRemediationLastLoggedAt));
         }
@@ -940,13 +1036,12 @@ export const PdfAuditResultsPage: React.FC = () => {
         }
       }
     }, 5000);
-  }, [jobId, fetchAuditResult]);
+  }, [jobId, fetchAuditResult, applyRemediationCycleLock]);
 
   // After a successful bulk apply, refetch suggestions from the server instead
   // of patching aiSuggestions locally — apply-all's response only carries
   // aggregate counts, not which issues succeeded.
   const handleApplyAllSuccess = useCallback((result: ApplyAllAiSuggestionsResult) => {
-    setApplyAllRetryBlockedUntil(null);
     fetchAiSuggestions();
     pollPostRemediationStatus();
     recordBulkApply(result.applied);
@@ -1199,7 +1294,13 @@ export const PdfAuditResultsPage: React.FC = () => {
               <Share2 className="h-4 w-4 mr-1" />
               Share
             </Button>
-            <Button variant="outline" size="sm" onClick={handleReRunAuditForCurrentJob} disabled={isReRunningAudit}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleReRunAuditForCurrentJob}
+              disabled={isReRunningAudit || remediationCycleLock.inProgress}
+              title={remediationCycleLock.inProgress ? remediationCycleSourceMessage(remediationCycleLock.source) : undefined}
+            >
               {isReRunningAudit
                 ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Re-running…</>
                 : <><RotateCw className="h-4 w-4 mr-1" />Re-run Audit</>
@@ -1210,8 +1311,13 @@ export const PdfAuditResultsPage: React.FC = () => {
                 variant="outline"
                 size="sm"
                 onClick={handleRerunAiAnalysis}
-                disabled={isRerunningAiAnalysis || isAnalyzingAi || !hasLoadedAiStatus}
-                title={!hasLoadedAiStatus ? 'Loading AI analysis status…' : isAnalyzingAi ? 'AI analysis is already running' : undefined}
+                disabled={isRerunningAiAnalysis || isAnalyzingAi || !hasLoadedAiStatus || remediationCycleLock.inProgress}
+                title={
+                  !hasLoadedAiStatus ? 'Loading AI analysis status…'
+                    : isAnalyzingAi ? 'AI analysis is already running'
+                    : remediationCycleLock.inProgress ? remediationCycleSourceMessage(remediationCycleLock.source)
+                    : undefined
+                }
               >
                 {isRerunningAiAnalysis
                   ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Re-running…</>
@@ -1300,7 +1406,13 @@ export const PdfAuditResultsPage: React.FC = () => {
         }}
       />
 
-      <VerifyManualFixesCard jobId={jobId!} onReaudited={handleManualFixReaudited} />
+      <VerifyManualFixesCard
+        jobId={jobId!}
+        onReaudited={handleManualFixReaudited}
+        remediationCycleInProgress={remediationCycleLock.inProgress}
+        remediationCycleSource={remediationCycleLock.source}
+        onApplyError={() => { void refreshRemediationCycleLock(); }}
+      />
 
       {/* Matterhorn Summary */}
       <div className="px-6 py-4 bg-white border-b border-gray-200">
@@ -1417,6 +1529,8 @@ export const PdfAuditResultsPage: React.FC = () => {
                   variant="primary"
                   size="sm"
                   onClick={() => setShowApplyAllPanel(true)}
+                  disabled={remediationCycleLock.inProgress}
+                  title={remediationCycleLock.inProgress ? remediationCycleSourceMessage(remediationCycleLock.source) : undefined}
                 >
                   <Zap className="h-4 w-4 mr-1" />
                   Apply Fixes ({eligibleForApplyAll + pendingEligible})
@@ -1661,6 +1775,9 @@ export const PdfAuditResultsPage: React.FC = () => {
                     onClick={() => handleIssueSelect(issue)}
                     recordApplied={recordApplied}
                     recordSuggestionDecision={recordSuggestionDecision}
+                    remediationCycleInProgress={remediationCycleLock.inProgress}
+                    remediationCycleSource={remediationCycleLock.source}
+                    onApplyError={() => { void refreshRemediationCycleLock(); }}
                     onAiSuggestionChange={(updated) => {
                       setAiSuggestions((prev) => {
                         const next = new Map(prev);
@@ -1685,8 +1802,9 @@ export const PdfAuditResultsPage: React.FC = () => {
             pendingEligibleCount={pendingEligible}
             onApplied={handleApplyAllSuccess}
             onClose={() => setShowApplyAllPanel(false)}
-            retryBlockedUntil={applyAllRetryBlockedUntil}
-            onApplyError={() => setApplyAllRetryBlockedUntil(Date.now() + APPLY_ALL_RETRY_COOLDOWN_MS)}
+            remediationCycleInProgress={remediationCycleLock.inProgress}
+            remediationCycleSource={remediationCycleLock.source}
+            onApplyError={() => { void refreshRemediationCycleLock(); }}
           />
         </DialogContent>
       </Dialog>
