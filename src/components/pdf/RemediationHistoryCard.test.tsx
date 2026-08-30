@@ -109,4 +109,43 @@ describe('RemediationHistoryCard', () => {
     await waitFor(() => expect(mockService.getRemediationHistory).toHaveBeenCalled());
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('regression: refetches when refreshTrigger changes — covers local success paths (single-apply, an awaited-directly re-audit, a fast apply-all) that complete before this client ever observes an intermediate "in progress" poll response, so the lock-transition alone would miss them', async () => {
+    mockService.getRemediationHistory.mockResolvedValue(oneRun);
+    const { rerender } = render(<RemediationHistoryCard jobId="job-123" remediationCycleInProgress={false} refreshTrigger={0} />);
+
+    await waitFor(() => expect(mockService.getRemediationHistory).toHaveBeenCalledTimes(1));
+
+    // Same value — must not refetch.
+    rerender(<RemediationHistoryCard jobId="job-123" remediationCycleInProgress={false} refreshTrigger={0} />);
+    expect(mockService.getRemediationHistory).toHaveBeenCalledTimes(1);
+
+    // A local action succeeded — the caller bumps the trigger directly.
+    rerender(<RemediationHistoryCard jobId="job-123" remediationCycleInProgress={false} refreshTrigger={1} />);
+    await waitFor(() => expect(mockService.getRemediationHistory).toHaveBeenCalledTimes(2));
+  });
+
+  it('regression: a stale response for a job the user has navigated away from (jobId changed without a remount) cannot overwrite the current job\'s history, and the previous job\'s runs are cleared immediately rather than lingering until the new fetch resolves', async () => {
+    let resolveJobA!: (value: RemediationHistoryRun[]) => void;
+    mockService.getRemediationHistory.mockImplementationOnce(
+      () => new Promise((resolve) => { resolveJobA = resolve; })
+    );
+
+    const { rerender } = render(<RemediationHistoryCard jobId="job-A" remediationCycleInProgress={false} />);
+    await waitFor(() => expect(mockService.getRemediationHistory).toHaveBeenCalledWith('job-A'));
+
+    // Navigate to job B before job A's fetch resolves. Job A's stale runs
+    // must not linger on screen, and job B gets its own (empty, for this
+    // test) fetch.
+    mockService.getRemediationHistory.mockResolvedValueOnce([]);
+    rerender(<RemediationHistoryCard jobId="job-B" remediationCycleInProgress={false} />);
+    await waitFor(() => expect(mockService.getRemediationHistory).toHaveBeenCalledWith('job-B'));
+
+    // Job A's request finally resolves — must be discarded, not applied.
+    resolveJobA(oneRun);
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(screen.queryByText('Run 1')).not.toBeInTheDocument();
+    expect(screen.queryByText('Remediation History')).not.toBeInTheDocument();
+  });
 });

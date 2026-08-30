@@ -21,6 +21,13 @@ interface RemediationHistoryCardProps {
   jobId: string;
   /** Used only to detect the true -> false transition that means "a cycle just finished, refetch." */
   remediationCycleInProgress: boolean;
+  /**
+   * Bump this (e.g. an incrementing counter) after a local action succeeds
+   * that the lock-transition above wouldn't catch — see the effect that
+   * watches it for the full explanation. Any value change triggers a
+   * refetch; the initial value on mount does not (mount already fetches).
+   */
+  refreshTrigger?: number;
 }
 
 const ACTION_LABELS: Record<RemediationHistoryAction, string> = {
@@ -113,21 +120,41 @@ function RunSection({ run, label, defaultExpanded }: { run: RemediationHistoryRu
   );
 }
 
-export function RemediationHistoryCard({ jobId, remediationCycleInProgress }: RemediationHistoryCardProps) {
+export function RemediationHistoryCard({ jobId, remediationCycleInProgress, refreshTrigger }: RemediationHistoryCardProps) {
   const [runs, setRuns] = useState<RemediationHistoryRun[]>([]);
   const [hasLoaded, setHasLoaded] = useState(false);
   const wasInProgressRef = useRef(remediationCycleInProgress);
+  const prevRefreshTriggerRef = useRef(refreshTrigger);
+  // Compared against inside fetchHistory's response handler so a response
+  // for a job the user has since navigated away from (jobId changed
+  // without a remount) can't overwrite the current job's history with
+  // stale data — mirrors the same guard PdfAuditResultsPage uses for the
+  // remediation-cycle lock itself.
+  const activeJobIdRef = useRef(jobId);
+  useEffect(() => {
+    activeJobIdRef.current = jobId;
+  }, [jobId]);
+
+  // Clear stale data immediately on a job change too, not just once the new
+  // job's fetch resolves — otherwise the previous job's runs would stay
+  // visible for however long that fetch takes.
+  useEffect(() => {
+    setRuns([]);
+    setHasLoaded(false);
+  }, [jobId]);
 
   const fetchHistory = useCallback(async () => {
     if (!jobId) return;
+    const requestJobId = jobId;
     try {
       const result = await pdfRemediationService.getRemediationHistory(jobId);
+      if (requestJobId !== activeJobIdRef.current) return;
       setRuns(result);
     } catch {
       // Non-fatal — the card just won't reflect the latest history until
       // the next trigger (mount, or the next lock-clears transition).
     } finally {
-      setHasLoaded(true);
+      if (requestJobId === activeJobIdRef.current) setHasLoaded(true);
     }
   }, [jobId]);
 
@@ -141,6 +168,21 @@ export function RemediationHistoryCard({ jobId, remediationCycleInProgress }: Re
     }
     wasInProgressRef.current = remediationCycleInProgress;
   }, [remediationCycleInProgress, fetchHistory]);
+
+  // The lock-transition above only catches actions whose "in progress"
+  // state this client actually observed via polling. Several successful
+  // paths complete before that: upload/current-file re-audit are awaited
+  // directly (their own single request/response IS the whole cycle, so no
+  // intermediate poll ever sees it as "in progress"), a single-apply
+  // success doesn't touch the lock at all, and a fast apply-all can finish
+  // before the first 5s poll tick. The caller bumps refreshTrigger directly
+  // from each of those success handlers to cover this gap.
+  useEffect(() => {
+    if (refreshTrigger !== undefined && refreshTrigger !== prevRefreshTriggerRef.current) {
+      fetchHistory();
+    }
+    prevRefreshTriggerRef.current = refreshTrigger;
+  }, [refreshTrigger, fetchHistory]);
 
   // Nothing to show yet (still loading, or genuinely no history) — most
   // jobs won't have any until they go through a cycle after this feature
