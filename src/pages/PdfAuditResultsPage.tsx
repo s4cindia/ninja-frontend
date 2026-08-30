@@ -40,6 +40,7 @@ import { PdfStatsCards } from '@/components/pdf/PdfStatsCards';
 import { RemediationChecklist } from '@/components/pdf/RemediationChecklist';
 import { ManualRemediationTimeLog } from '@/components/pdf/ManualRemediationTimeLog';
 import { VerifyManualFixesCard } from '@/components/pdf/VerifyManualFixesCard';
+import { RemediationHistoryCard } from '@/components/pdf/RemediationHistoryCard';
 import type { ReauditComparisonResult } from '@/types/pdf-remediation.types';
 import type { GuidanceAcknowledgment } from '@/components/pdf/RemediationChecklist';
 import { IssueCard, AiAnalysis } from '@/components/remediation/IssueCard';
@@ -1412,6 +1413,11 @@ export const PdfAuditResultsPage: React.FC = () => {
         remediationCycleInProgress={remediationCycleLock.inProgress}
         remediationCycleSource={remediationCycleLock.source}
         onApplyError={() => { void refreshRemediationCycleLock(); }}
+      />
+
+      <RemediationHistoryCard
+        jobId={jobId!}
+        remediationCycleInProgress={remediationCycleLock.inProgress}
       />
 
       {/* Matterhorn Summary */}

@@ -12,6 +12,7 @@ import type {
   UpdateTaskStatusResponse,
   AutoRemediationResult,
   ReauditComparisonResult,
+  RemediationHistoryRun,
 } from '@/types/pdf-remediation.types';
 
 /**
@@ -123,6 +124,17 @@ async function reauditPdf(jobId: string, file: File): Promise<ReauditComparisonR
   return response.data.data;
 }
 
+/**
+ * Get the "Run 1 / Run 2 / ..." remediation-cycle history for a job.
+ * Runs come back sorted ascending by cycleNumber (the internal lock
+ * counter, which can have gaps — display order/position, not the literal
+ * number, as the "Run N" label).
+ */
+export async function getRemediationHistory(jobId: string): Promise<RemediationHistoryRun[]> {
+  const response = await api.get(`/pdf/${jobId}/remediation/history`);
+  return (response.data.data ?? response.data)?.runs ?? [];
+}
+
 export const pdfRemediationService = {
   createRemediationPlan,
   getRemediationPlan,
@@ -132,4 +144,5 @@ export const pdfRemediationService = {
   previewFix,
   applyQuickFix,
   reauditPdf,
+  getRemediationHistory,
 };

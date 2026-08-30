@@ -3,7 +3,7 @@ import { pdfRemediationService } from './pdf-remediation.service';
 import { api } from './api';
 
 vi.mock('./api', () => ({
-  api: { post: vi.fn() },
+  api: { post: vi.fn(), get: vi.fn() },
 }));
 
 const mockApi = api as Mocked<typeof api>;
@@ -50,5 +50,31 @@ describe('pdfRemediationService.reauditPdf', () => {
       expect.any(FormData),
       { headers: { 'Content-Type': 'multipart/form-data' } }
     );
+  });
+});
+
+describe('pdfRemediationService.getRemediationHistory', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('fetches the history endpoint and returns the runs array', async () => {
+    const runs = [
+      { cycleNumber: 1, events: [{ action: 'apply_fixes', source: 'apply_all', status: 'completed', startedAt: '2026-08-01T00:00:00Z' }] },
+    ];
+    mockApi.get.mockResolvedValueOnce({ data: { success: true, data: { runs } } });
+
+    const result = await pdfRemediationService.getRemediationHistory('job-123');
+
+    expect(mockApi.get).toHaveBeenCalledWith('/pdf/job-123/remediation/history');
+    expect(result).toEqual(runs);
+  });
+
+  it('returns an empty array when there are no runs yet', async () => {
+    mockApi.get.mockResolvedValueOnce({ data: { success: true, data: { runs: [] } } });
+
+    const result = await pdfRemediationService.getRemediationHistory('job-123');
+
+    expect(result).toEqual([]);
   });
 });
