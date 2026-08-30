@@ -290,6 +290,27 @@ describe('RemediationChecklist', () => {
     expect(step3Container).not.toHaveTextContent('Not started');
   });
 
+  it('regression: a manual "Re-run Audit" click before AI Analysis has EVER run must not falsely mark steps 2/3 Done — that button is deliberately always-available, so lastVerifiedAt (and hence verificationDone) can be truthy with aiAnalysisStatus still null. aiAnalyzedAt (the AI-analysis pass\'s own completion timestamp, never set by an unrelated re-audit) is what actually gates this, not verificationDone alone.', () => {
+    render(
+      <RemediationChecklist
+        {...baseProps}
+        aiAnalysisStatus={null}
+        aiAnalyzedAt={null}
+        postRemediationStatus={undefined}
+        lastVerifiedAt="2026-08-29T00:00:00.000Z" // a manual re-audit ran, unrelated to AI analysis
+      />
+    );
+
+    const step2Container = screen.getByText('2. Run AI Analysis').closest('div')!.parentElement!;
+    expect(step2Container).toHaveTextContent('Not started');
+    expect(step2Container).not.toHaveTextContent('Done');
+
+    const step3Container2 = screen.getByText('3. Apply AI-suggested fixes').closest('div')!.parentElement!;
+    expect(step3Container2).toHaveTextContent('Not started');
+    expect(step3Container2).not.toHaveTextContent('Done');
+    expect(step3Container2).not.toHaveTextContent('In progress');
+  });
+
   it('step 5 can also progress on a manual-only re-audit, with postRemediationStatus never set at all', () => {
     render(
       <RemediationChecklist

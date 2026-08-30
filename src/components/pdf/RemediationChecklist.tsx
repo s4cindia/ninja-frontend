@@ -215,21 +215,25 @@ export function RemediationChecklist({
   // source: 'analyze_job') — the instant step 5 kicks off a re-run, it moves
   // away from 'complete', which would make step2Done (and anything derived
   // from it) regress back to not-started/in-progress even though the FIRST
-  // analysis pass durably finished long ago. verificationDone can only be
-  // true after a completed analysis pass produced suggestions that were
-  // applied and then re-audited, so it's a reliable "this already happened"
-  // signal that survives a later re-run's live status — use it to make
-  // step 2/3 sticky. (Deliberately NOT folded into step2Done itself — step 6
-  // below is intentionally gated on strict step2Done, not verificationDone.)
-  const aiAnalysisEverCompleted = step2Done || verificationDone;
+  // analysis pass durably finished long ago. aiAnalyzedAt is the AI-analysis
+  // pass's own completion timestamp (from aiStats, which only updates when a
+  // response actually carries stats — i.e. on completion — and is never
+  // cleared when a new run starts), so unlike verificationDone it can't be
+  // set by an unrelated action: the manual "Re-run Audit"/upload-re-audit
+  // buttons are deliberately always-available, reachable before AI Analysis
+  // has ever run at all, which would otherwise make step 2/3 falsely read
+  // "Done" from a re-audit alone. (Deliberately NOT folded into step2Done
+  // itself — step 6 below is intentionally gated on strict step2Done.)
+  const aiAnalysisEverCompleted = step2Done || !!aiAnalyzedAt;
   const step3Done = aiAnalysisEverCompleted && pendingFixable.length === 0;
   // appliedFixableCount alone isn't reliable once a re-run has happened: a
   // fresh analysis pass can prune suggestion rows for issues that no longer
   // exist (because they were already fixed), silently resetting the current
   // snapshot's applied count to 0 even though real progress was verified
-  // before. verificationDone catches that the same way it does for step 3's
-  // "done" check above.
-  const step3Started = appliedFixableCount > 0 || verificationDone;
+  // before. Gated on aiAnalysisEverCompleted too, for the same reason as
+  // above — verificationDone alone could come from a re-audit that preceded
+  // any AI analysis ever running.
+  const step3Started = appliedFixableCount > 0 || (aiAnalysisEverCompleted && verificationDone);
 
   // Step 5: re-run AI Analysis (final check) — done once AI Analysis has
   // been re-run at least once since the most recent verification.
