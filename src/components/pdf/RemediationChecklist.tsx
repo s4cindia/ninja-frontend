@@ -199,8 +199,6 @@ export function RemediationChecklist({
   );
 
   const step2Done = aiAnalysisStatus === 'complete';
-  const step3Done = step2Done && pendingFixable.length === 0;
-  const step3Started = appliedFixableCount > 0;
 
   // Step 4: first re-audit.
   const automatedVerificationDone = postRemediationStatus === 'complete';
@@ -211,6 +209,31 @@ export function RemediationChecklist({
   // *display* purposes below — a fresh "pending" shouldn't read as done just
   // because an older manual verification happened to precede it.
   const verificationDone = automatedVerificationDone || !!lastVerifiedAt;
+
+  // aiAnalysisStatus is a single live flag shared by steps 2 AND 5 (there's
+  // only one "is AI analysis running" signal — the remediation-cycle lock,
+  // source: 'analyze_job') — the instant step 5 kicks off a re-run, it moves
+  // away from 'complete', which would make step2Done (and anything derived
+  // from it) regress back to not-started/in-progress even though the FIRST
+  // analysis pass durably finished long ago. aiAnalyzedAt is the AI-analysis
+  // pass's own completion timestamp (from aiStats, which only updates when a
+  // response actually carries stats — i.e. on completion — and is never
+  // cleared when a new run starts), so unlike verificationDone it can't be
+  // set by an unrelated action: the manual "Re-run Audit"/upload-re-audit
+  // buttons are deliberately always-available, reachable before AI Analysis
+  // has ever run at all, which would otherwise make step 2/3 falsely read
+  // "Done" from a re-audit alone. (Deliberately NOT folded into step2Done
+  // itself — step 6 below is intentionally gated on strict step2Done.)
+  const aiAnalysisEverCompleted = step2Done || !!aiAnalyzedAt;
+  const step3Done = aiAnalysisEverCompleted && pendingFixable.length === 0;
+  // appliedFixableCount alone isn't reliable once a re-run has happened: a
+  // fresh analysis pass can prune suggestion rows for issues that no longer
+  // exist (because they were already fixed), silently resetting the current
+  // snapshot's applied count to 0 even though real progress was verified
+  // before. Gated on aiAnalysisEverCompleted too, for the same reason as
+  // above — verificationDone alone could come from a re-audit that preceded
+  // any AI analysis ever running.
+  const step3Started = appliedFixableCount > 0 || (aiAnalysisEverCompleted && verificationDone);
 
   // Step 5: re-run AI Analysis (final check) — done once AI Analysis has
   // been re-run at least once since the most recent verification.
@@ -312,12 +335,17 @@ export function RemediationChecklist({
       {
         id: 2,
         label: 'Run AI Analysis',
-        status: step2Done ? 'done' : aiAnalysisStatus === 'processing' ? 'in-progress' : 'not-started',
+        // aiAnalysisEverCompleted (not step2Done) so this stays "Done" once
+        // analysis has ever finished, instead of regressing to "In progress"
+        // in lockstep with step 5 every time a re-run kicks off — the two
+        // steps share one live status flag, but only step 5 should reflect
+        // it once step 2 has genuinely already happened.
+        status: aiAnalysisEverCompleted ? 'done' : aiAnalysisStatus === 'processing' ? 'in-progress' : 'not-started',
       },
       {
         id: 3,
         label: 'Apply AI-suggested fixes',
-        status: !step2Done ? 'not-started' : step3Done ? 'done' : step3Started ? 'in-progress' : 'not-started',
+        status: !aiAnalysisEverCompleted ? 'not-started' : step3Done ? 'done' : step3Started ? 'in-progress' : 'not-started',
       },
       {
         id: 4,
@@ -449,7 +477,7 @@ export function RemediationChecklist({
 
     return list;
   }, [
-    aiAnalysisStatus, step2Done, step3Done, step3Started, guidanceFullyResolved, guidanceAcknowledgedFlag, guidanceAcknowledgmentStale, guidanceAcknowledgment,
+    aiAnalysisStatus, step2Done, aiAnalysisEverCompleted, step3Done, step3Started, guidanceFullyResolved, guidanceAcknowledgedFlag, guidanceAcknowledgmentStale, guidanceAcknowledgment,
     noteInput, isSubmittingAck, handleAcknowledge, pendingGuidance.length, pendingFixable.length,
     verificationDone, postRemediationStatus, reanalysisDone, reanalysisInProgress,
     guidanceResolved, secondReauditDone, artifactsStepDone, acrGenerated, pacReportGenerated,
