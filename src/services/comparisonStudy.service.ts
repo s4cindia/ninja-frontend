@@ -3,6 +3,7 @@ import type {
   ComparisonTrial,
   ComparisonTrialWithJob,
   ComparisonTrialContentType,
+  ComparisonTrialMode,
   TrialReport,
   AggregateReport,
 } from '@/types/comparisonStudy.types';
@@ -54,6 +55,13 @@ export const comparisonStudyService = {
 
   validateTrial: (id: string): Promise<ComparisonTrial> =>
     api.post(`${BASE}/trials/${encodeURIComponent(id)}/validate`).then((r) => r.data.data),
+
+  // 409 if mode is changed while autoStatus === 'running' — stop the run first.
+  updateAutoModeConfig: (
+    id: string,
+    data: { mode?: ComparisonTrialMode; autoMaxRounds?: number; autoCostLimitUsd?: number }
+  ): Promise<ComparisonTrial> =>
+    api.patch(`${BASE}/trials/${encodeURIComponent(id)}/auto-mode`, data).then((r) => r.data.data),
 
   getTrialReport: (id: string): Promise<TrialReport> =>
     api.get(`${BASE}/trials/${encodeURIComponent(id)}/report`).then((r) => r.data.data),

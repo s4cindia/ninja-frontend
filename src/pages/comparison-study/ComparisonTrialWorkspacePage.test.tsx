@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import ComparisonTrialWorkspacePage from './ComparisonTrialWorkspacePage';
@@ -49,6 +49,13 @@ const mockTrial = (overrides?: Partial<ComparisonTrialWithJob>): ComparisonTrial
   status: 'registered',
   createdAt: '2026-08-01T10:00:00Z',
   updatedAt: '2026-08-01T10:00:00Z',
+  mode: 'manual',
+  autoMaxRounds: 10,
+  autoCostLimitUsd: 2,
+  autoRoundsCompleted: 0,
+  autoCostSpentUsd: 0,
+  autoStatus: null,
+  autoStopReason: null,
   job: null,
   ...overrides,
 });
@@ -84,6 +91,7 @@ describe('ComparisonTrialWorkspacePage', () => {
     mockService.validateTrial.mockReset();
     mockService.getUploadUrl.mockReset();
     mockService.deleteTrial.mockReset();
+    mockService.updateAutoModeConfig.mockReset();
     mockStartPolling.mockReset();
     stubJobPolling(null);
     global.fetch = vi.fn();
@@ -320,6 +328,134 @@ describe('ComparisonTrialWorkspacePage', () => {
         expect(mockService.getTrial).toHaveBeenCalledTimes(2);
       });
       expect(await screen.findByRole('button', { name: 'View Ninja Results' })).toBeInTheDocument();
+    });
+  });
+
+  describe('Auto Remediation Mode config', () => {
+    it('defaults the number inputs to the trial\'s current autoMaxRounds/autoCostLimitUsd and only shows them once Auto is selected', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ mode: 'manual', autoMaxRounds: 5, autoCostLimitUsd: 1.5 }));
+      renderPage();
+
+      await screen.findByRole('radio', { name: 'Manual' });
+      expect(screen.queryByLabelText('Max rounds')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('radio', { name: 'Auto' }));
+
+      expect(screen.getByLabelText('Max rounds')).toHaveValue(5);
+      expect(screen.getByLabelText('Cost limit (USD)')).toHaveValue(1.5);
+    });
+
+    it('saves mode + rounds + cost limit via updateAutoModeConfig', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ mode: 'manual' }));
+      mockService.updateAutoModeConfig.mockResolvedValue(mockTrial({ mode: 'auto' }));
+      renderPage();
+
+      fireEvent.click(await screen.findByRole('radio', { name: 'Auto' }));
+      fireEvent.change(screen.getByLabelText('Max rounds'), { target: { value: '8' } });
+      fireEvent.change(screen.getByLabelText('Cost limit (USD)'), { target: { value: '3.5' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+      await waitFor(() => {
+        expect(mockService.updateAutoModeConfig).toHaveBeenCalledWith('trial-1', {
+          mode: 'auto',
+          autoMaxRounds: 8,
+          autoCostLimitUsd: 3.5,
+        });
+      });
+      expect(await screen.findByText('Saved.')).toBeInTheDocument();
+    });
+
+    it('disables the mode radios and Save button while a run is actively in progress', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ mode: 'auto', autoStatus: 'running' }));
+      renderPage();
+
+      expect(await screen.findByRole('radio', { name: 'Manual' })).toBeDisabled();
+      expect(screen.getByRole('radio', { name: 'Auto' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    });
+
+    it('regression: surfaces the real 409 message from a save that was rejected server-side (e.g. a run started between page load and clicking Save), instead of a generic failure', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ mode: 'manual', autoStatus: null }));
+      mockService.updateAutoModeConfig.mockRejectedValue({
+        isAxiosError: true,
+        response: { status: 409, data: { error: { message: 'Stop the current run before changing mode.' } } },
+      });
+      renderPage();
+
+      fireEvent.click(await screen.findByRole('radio', { name: 'Auto' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+      expect(await screen.findByText('Stop the current run before changing mode.')).toBeInTheDocument();
+    });
+
+    it('validates max rounds and cost limit are positive numbers before calling the API', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ mode: 'manual' }));
+      renderPage();
+
+      fireEvent.click(await screen.findByRole('radio', { name: 'Auto' }));
+      fireEvent.change(screen.getByLabelText('Max rounds'), { target: { value: '0' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+      expect(await screen.findByText(/max rounds must be a positive whole number/i)).toBeInTheDocument();
+      expect(mockService.updateAutoModeConfig).not.toHaveBeenCalled();
+    });
+
+    it('regression: rejects a non-integer max rounds (e.g. 1.5) instead of sending it to the API', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ mode: 'manual' }));
+      renderPage();
+
+      fireEvent.click(await screen.findByRole('radio', { name: 'Auto' }));
+      fireEvent.change(screen.getByLabelText('Max rounds'), { target: { value: '1.5' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+      expect(await screen.findByText(/max rounds must be a positive whole number/i)).toBeInTheDocument();
+      expect(mockService.updateAutoModeConfig).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Auto Mode status polling', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('re-fetches the trial every 5s while a run is active, so autoStatus/progress do not go stale on this page', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ mode: 'auto', autoStatus: 'running' }));
+      renderPage();
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(mockService.getTrial).toHaveBeenCalledTimes(1);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      expect(mockService.getTrial).toHaveBeenCalledTimes(2);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      expect(mockService.getTrial).toHaveBeenCalledTimes(3);
+    });
+
+    it('regression: does not poll when no run is active (autoStatus null)', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ mode: 'manual', autoStatus: null }));
+      renderPage();
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(mockService.getTrial).toHaveBeenCalledTimes(1);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(15000); });
+      expect(mockService.getTrial).toHaveBeenCalledTimes(1);
+    });
+
+    it('regression: stops polling once the run has stopped', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ mode: 'auto', autoStatus: 'stopped', autoStopReason: 'converged' }));
+      renderPage();
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(mockService.getTrial).toHaveBeenCalledTimes(1);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(15000); });
+      expect(mockService.getTrial).toHaveBeenCalledTimes(1);
     });
   });
 });

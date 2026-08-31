@@ -6,6 +6,9 @@ import userEvent from '@testing-library/user-event';
 import { PdfAuditResultsPage } from './PdfAuditResultsPage';
 import { api } from '@/services/api';
 import { pdfRemediationService } from '@/services/pdf-remediation.service';
+import { comparisonStudyService } from '@/services/comparisonStudy.service';
+import { pdfAutoModeService } from '@/services/pdfAutoMode.service';
+import type { ComparisonTrialWithJob } from '@/types/comparisonStudy.types';
 import type { PdfAuditResult, PdfAuditIssue, MatterhornSummary } from '@/types/pdf.types';
 
 // Mock dependencies. Keeps the real (pure) getErrorMessage/
@@ -22,6 +25,21 @@ vi.mock('@/services/api', async () => {
 });
 vi.mock('@/services/pdf-remediation.service', () => ({
   pdfRemediationService: { reauditPdf: vi.fn(), getRemediationHistory: vi.fn().mockResolvedValue([]) },
+}));
+vi.mock('@/services/comparisonStudy.service', () => ({
+  comparisonStudyService: { getTrial: vi.fn() },
+}));
+vi.mock('@/services/pdfAutoMode.service', () => ({
+  pdfAutoModeService: { startAutoMode: vi.fn(), getAutoModeStatus: vi.fn(), stopAutoMode: vi.fn() },
+}));
+// Has its own dedicated test file — stub here to keep these tests focused on
+// PdfAuditResultsPage's own mode-based button gating, not the card's polling.
+vi.mock('@/components/pdf/AutoModeStatusCard', () => ({
+  AutoModeStatusCard: ({ status }: { status: { autoStatus: string | null; autoRoundsCompleted: number; autoMaxRounds: number } }) => (
+    <div data-testid="auto-mode-status-card">
+      auto-mode-status:{status.autoStatus}:{status.autoRoundsCompleted}/{status.autoMaxRounds}
+    </div>
+  ),
 }));
 vi.mock('@/components/pdf/PdfPreviewPanel', () => ({
   PdfPreviewPanel: ({ pdfUrl, currentPage, onPageChange, onIssueSelect }: {
@@ -172,7 +190,7 @@ const createMockAuditResult = (overrides?: Partial<PdfAuditResult>): PdfAuditRes
   ...overrides,
 });
 
-const renderWithRouter = (jobId: string = 'job-123') => {
+const renderWithRouter = (jobId: string = 'job-123', queryString = '') => {
   // Create a new QueryClient for each test with retry disabled for stability
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -184,7 +202,7 @@ const renderWithRouter = (jobId: string = 'job-123') => {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[`/pdf/audit/${jobId}`]}>
+      <MemoryRouter initialEntries={[`/pdf/audit/${jobId}${queryString}`]}>
         <Routes>
           <Route path="/pdf/audit/:jobId" element={<PdfAuditResultsPage />} />
           <Route path="/pdf" element={<div>Upload page</div>} />
@@ -2106,6 +2124,173 @@ describe('PdfAuditResultsPage', () => {
       expect(uploadButton).toBeInTheDocument(); // sanity — didn't unmount mid-refresh
       expect(auditCallCount).toBe(2);
       expect(statusCallCount).toBe(2);
+    });
+  });
+
+  describe('Comparison Study Auto Mode', () => {
+    const jobId = 'job-123';
+    const trialId = 'trial-1';
+    const auditUrl = `/pdf/job/${jobId}/audit/result`;
+    const statusUrl = `/pdf/${jobId}/auto-tag/status`;
+    const aiUrl = `/pdf/${jobId}/ai-analysis`;
+    const mockGetTrial = comparisonStudyService.getTrial as ReturnType<typeof vi.fn>;
+    const mockStartAutoMode = pdfAutoModeService.startAutoMode as ReturnType<typeof vi.fn>;
+    const mockGetAutoModeStatus = pdfAutoModeService.getAutoModeStatus as ReturnType<typeof vi.fn>;
+
+    function mockTrial(overrides?: Partial<ComparisonTrialWithJob>): ComparisonTrialWithJob {
+      return {
+        id: trialId,
+        sourceFileName: 'sample.pdf',
+        sourceS3Path: 's3://bucket/sample.pdf',
+        contentType: 'text-dominant',
+        operatorId: 'op-1',
+        ninjaJobId: jobId,
+        ninjaActiveMs: null,
+        ninjaGpuCostUsd: null,
+        ninjaPacResult: null,
+        pdfxtS3Path: null,
+        pdfxtTimeMs: null,
+        pdfxtPageCount: null,
+        pdfxtCostUsd: null,
+        pdfxtPacResult: null,
+        status: 'registered',
+        createdAt: '2026-08-01T10:00:00Z',
+        updatedAt: '2026-08-01T10:00:00Z',
+        mode: 'auto',
+        autoMaxRounds: 10,
+        autoCostLimitUsd: 2,
+        autoRoundsCompleted: 0,
+        autoCostSpentUsd: 0,
+        autoStatus: null,
+        autoStopReason: null,
+        job: null,
+        ...overrides,
+      };
+    }
+
+    function mockCommonGets() {
+      const mockResult = createMockAuditResult();
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve({ data: { data: { suggestions: [], analyzed: 0, total: 0, status: 'complete' } } });
+        return Promise.resolve({ data: { data: {} } });
+      });
+      // No run has ever started by default — matches a fresh page load and
+      // keeps Start Auto Remediation enabled unless a test says otherwise.
+      mockGetAutoModeStatus.mockResolvedValue({
+        mode: 'auto',
+        autoStatus: null,
+        autoStopReason: null,
+        autoRoundsCompleted: 0,
+        autoMaxRounds: 10,
+        autoCostSpentUsd: 0,
+        autoCostLimitUsd: 2,
+      });
+    }
+
+    it('shows "Start Auto Remediation" instead of the manual Re-run Audit/Re-run AI Analysis controls, and renders the status card, when the trial is in auto mode', async () => {
+      mockCommonGets();
+      mockGetTrial.mockResolvedValue(mockTrial({ mode: 'auto' }));
+      mockGetAutoModeStatus.mockResolvedValue({
+        mode: 'auto',
+        autoStatus: 'running',
+        autoStopReason: null,
+        autoRoundsCompleted: 2,
+        autoMaxRounds: 10,
+        autoCostSpentUsd: 0.5,
+        autoCostLimitUsd: 2,
+      });
+
+      renderWithRouter(jobId, `?comparisonTrialId=${trialId}`);
+
+      expect(await screen.findByRole('button', { name: 'Start Auto Remediation' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Re-run Audit' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Re-run AI Analysis' })).not.toBeInTheDocument();
+      expect(await screen.findByTestId('auto-mode-status-card')).toHaveTextContent('running:2/10');
+    });
+
+    it('still shows the manual controls for a Comparison Study trial that is in manual mode (regression: must not hide them for every trial, only auto-mode ones)', async () => {
+      mockCommonGets();
+      mockGetTrial.mockResolvedValue(mockTrial({ mode: 'manual' }));
+
+      renderWithRouter(jobId, `?comparisonTrialId=${trialId}`);
+
+      expect(await screen.findByRole('button', { name: 'Re-run Audit' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Re-run AI Analysis' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Start Auto Remediation' })).not.toBeInTheDocument();
+      expect(screen.queryByTestId('auto-mode-status-card')).not.toBeInTheDocument();
+    });
+
+    it('calls startAutoMode when "Start Auto Remediation" is clicked, and disables the button while the request is in flight', async () => {
+      mockCommonGets();
+      mockGetTrial.mockResolvedValue(mockTrial({ mode: 'auto' }));
+      let resolveStart!: () => void;
+      mockStartAutoMode.mockImplementation(() => new Promise<void>((resolve) => { resolveStart = resolve; }));
+
+      renderWithRouter(jobId, `?comparisonTrialId=${trialId}`);
+
+      const startButton = await screen.findByRole('button', { name: 'Start Auto Remediation' });
+      fireEvent.click(startButton);
+
+      await waitFor(() => expect(mockStartAutoMode).toHaveBeenCalledWith(jobId));
+      expect(await screen.findByRole('button', { name: /Starting…/ })).toBeDisabled();
+
+      await act(async () => { resolveStart(); });
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Start Auto Remediation' })).not.toBeDisabled();
+      });
+    });
+
+    it('regression: shows neither the manual controls nor Start Auto Remediation while the trial lookup is still loading — a bare boolean would flash manual controls for a trial that turns out to be auto-mode', async () => {
+      mockCommonGets();
+      let resolveTrial!: (trial: ComparisonTrialWithJob) => void;
+      mockGetTrial.mockImplementation(() => new Promise((resolve) => { resolveTrial = resolve; }));
+
+      renderWithRouter(jobId, `?comparisonTrialId=${trialId}`);
+
+      // Give the audit-result fetch a chance to resolve so the header actually
+      // renders, while the trial lookup itself is still pending.
+      await screen.findByRole('button', { name: 'Share' });
+      expect(screen.queryByRole('button', { name: 'Start Auto Remediation' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Re-run Audit' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Re-run AI Analysis' })).not.toBeInTheDocument();
+
+      await act(async () => { resolveTrial(mockTrial({ mode: 'auto' })); });
+      expect(await screen.findByRole('button', { name: 'Start Auto Remediation' })).toBeInTheDocument();
+    });
+
+    it('regression: disables Start Auto Remediation when a run is already active (e.g. the page was reloaded mid-run)', async () => {
+      mockCommonGets();
+      mockGetTrial.mockResolvedValue(mockTrial({ mode: 'auto' }));
+      mockGetAutoModeStatus.mockResolvedValue({
+        mode: 'auto',
+        autoStatus: 'running',
+        autoStopReason: null,
+        autoRoundsCompleted: 1,
+        autoMaxRounds: 10,
+        autoCostSpentUsd: 0.1,
+        autoCostLimitUsd: 2,
+      });
+
+      renderWithRouter(jobId, `?comparisonTrialId=${trialId}`);
+
+      const startButton = await screen.findByRole('button', { name: 'Start Auto Remediation' });
+      await waitFor(() => expect(startButton).toBeDisabled());
+      expect(startButton).toHaveAttribute('title', expect.stringMatching(/already in progress/i));
+      expect(mockStartAutoMode).not.toHaveBeenCalled();
+    });
+
+    it('regression: does not default to manual controls when the trial lookup errors', async () => {
+      mockCommonGets();
+      mockGetTrial.mockRejectedValue(new Error('lookup failed'));
+
+      renderWithRouter(jobId, `?comparisonTrialId=${trialId}`);
+
+      await screen.findByRole('button', { name: 'Share' });
+      await waitFor(() => expect(mockGetTrial).toHaveBeenCalled());
+      expect(screen.queryByRole('button', { name: 'Re-run Audit' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Start Auto Remediation' })).not.toBeInTheDocument();
     });
   });
 });
