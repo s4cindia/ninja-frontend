@@ -2176,6 +2176,22 @@ describe('PdfAuditResultsPage', () => {
         if (url === aiUrl) return Promise.resolve({ data: { data: { suggestions: [], analyzed: 0, total: 0, status: 'complete' } } });
         return Promise.resolve({ data: { data: {} } });
       });
+      // No run has ever started by default — matches a fresh page load and
+      // keeps Start Auto Remediation enabled unless a test says otherwise.
+      mockGetAutoModeStatus.mockResolvedValue({
+        mode: 'auto',
+        autoStatus: null,
+        autoStopReason: null,
+        autoRoundsCompleted: 0,
+        autoMaxRounds: 10,
+        autoCostSpentUsd: 0,
+        autoCostLimitUsd: 2,
+      });
+    }
+
+    it('shows "Start Auto Remediation" instead of the manual Re-run Audit/Re-run AI Analysis controls, and renders the status card, when the trial is in auto mode', async () => {
+      mockCommonGets();
+      mockGetTrial.mockResolvedValue(mockTrial({ mode: 'auto' }));
       mockGetAutoModeStatus.mockResolvedValue({
         mode: 'auto',
         autoStatus: 'running',
@@ -2185,11 +2201,6 @@ describe('PdfAuditResultsPage', () => {
         autoCostSpentUsd: 0.5,
         autoCostLimitUsd: 2,
       });
-    }
-
-    it('shows "Start Auto Remediation" instead of the manual Re-run Audit/Re-run AI Analysis controls, and renders the status card, when the trial is in auto mode', async () => {
-      mockCommonGets();
-      mockGetTrial.mockResolvedValue(mockTrial({ mode: 'auto' }));
 
       renderWithRouter(jobId, `?comparisonTrialId=${trialId}`);
 
@@ -2247,6 +2258,27 @@ describe('PdfAuditResultsPage', () => {
 
       await act(async () => { resolveTrial(mockTrial({ mode: 'auto' })); });
       expect(await screen.findByRole('button', { name: 'Start Auto Remediation' })).toBeInTheDocument();
+    });
+
+    it('regression: disables Start Auto Remediation when a run is already active (e.g. the page was reloaded mid-run)', async () => {
+      mockCommonGets();
+      mockGetTrial.mockResolvedValue(mockTrial({ mode: 'auto' }));
+      mockGetAutoModeStatus.mockResolvedValue({
+        mode: 'auto',
+        autoStatus: 'running',
+        autoStopReason: null,
+        autoRoundsCompleted: 1,
+        autoMaxRounds: 10,
+        autoCostSpentUsd: 0.1,
+        autoCostLimitUsd: 2,
+      });
+
+      renderWithRouter(jobId, `?comparisonTrialId=${trialId}`);
+
+      const startButton = await screen.findByRole('button', { name: 'Start Auto Remediation' });
+      await waitFor(() => expect(startButton).toBeDisabled());
+      expect(startButton).toHaveAttribute('title', expect.stringMatching(/already in progress/i));
+      expect(mockStartAutoMode).not.toHaveBeenCalled();
     });
 
     it('regression: does not default to manual controls when the trial lookup errors', async () => {

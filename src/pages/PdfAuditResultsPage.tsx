@@ -1369,8 +1369,16 @@ export const PdfAuditResultsPage: React.FC = () => {
                 onClick={() => startAutoMode.mutate(undefined, {
                   onError: (err) => toast.error(getErrorMessage(err)),
                 })}
-                disabled={startAutoMode.isPending || remediationCycleLock.inProgress}
-                title={remediationCycleLock.inProgress ? remediationCycleSourceMessage(remediationCycleLock.source) : undefined}
+                disabled={
+                  startAutoMode.isPending ||
+                  remediationCycleLock.inProgress ||
+                  autoModeStatusQuery.data?.autoStatus === 'running'
+                }
+                title={
+                  autoModeStatusQuery.data?.autoStatus === 'running' ? 'A run is already in progress'
+                    : remediationCycleLock.inProgress ? remediationCycleSourceMessage(remediationCycleLock.source)
+                    : undefined
+                }
               >
                 {startAutoMode.isPending
                   ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Starting…</>
