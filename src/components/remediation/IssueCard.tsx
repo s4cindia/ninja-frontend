@@ -20,6 +20,8 @@ export interface AiAnalysis {
   applyMode: 'apply-to-pdf' | 'guidance-only' | 'auto-resolve';
   status: 'pending' | 'approved' | 'rejected' | 'applied';
   requiresManualReview?: boolean;
+  /** Who approved this suggestion — 'auto-mode' for Comparison Study auto-mode's own auto-approval, null/undefined for anything not yet approved or approved before this field existed. */
+  approvedBy?: 'operator' | 'auto-mode' | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -77,6 +79,16 @@ interface IssueCardProps {
   onApplyError?: () => void;
   /** True while a Comparison Study trial is running Auto Mode — the backend loop owns approve/apply/dismiss decisions, so per-issue manual actions are disabled to avoid racing it. */
   disableManualActions?: boolean;
+}
+
+/** Comparison Study Auto Mode auto-approved this suggestion — no operator reviewed it. */
+function AutoApprovedBadge({ approvedBy }: { approvedBy: AiAnalysis['approvedBy'] }) {
+  if (approvedBy !== 'auto-mode') return null;
+  return (
+    <span className="ml-1 px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] font-semibold">
+      Auto-approved
+    </span>
+  );
 }
 
 export function IssueCard({
@@ -415,6 +427,7 @@ export function IssueCard({
                 {aiSuggestion.status === 'applied' ? (
                   <span className="flex items-center gap-1 text-green-700 font-medium">
                     <CheckCircle size={12} /> Applied
+                    <AutoApprovedBadge approvedBy={aiSuggestion.approvedBy} />
                   </span>
                 ) : aiSuggestion.status === 'rejected' ? (
                   <span className="text-gray-500 italic">Dismissed</span>
@@ -423,6 +436,7 @@ export function IssueCard({
                     {aiSuggestion.status === 'approved' ? (
                       <span className="flex items-center gap-1 text-green-700 font-medium">
                         <CheckCircle size={12} /> Approved
+                        <AutoApprovedBadge approvedBy={aiSuggestion.approvedBy} />
                       </span>
                     ) : (
                       <button
