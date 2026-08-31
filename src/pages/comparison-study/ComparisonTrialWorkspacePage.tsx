@@ -3,10 +3,18 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
-import { useComparisonTrial, useLogPdfxtData, useValidateTrial, useDeleteTrial } from '@/hooks/useComparisonStudy';
+import {
+  useComparisonTrial,
+  useLogPdfxtData,
+  useValidateTrial,
+  useDeleteTrial,
+  useUpdateAutoModeConfig,
+} from '@/hooks/useComparisonStudy';
 import { comparisonStudyService } from '@/services/comparisonStudy.service';
+import { getErrorMessage } from '@/services/api';
 import { useJobPolling } from '@/hooks/useJobPolling';
 import { PdfJobProgressPanel } from '@/components/pdf/PdfJobProgressPanel';
+import type { ComparisonTrialMode } from '@/types/comparisonStudy.types';
 
 const CONTENT_TYPE_LABELS: Record<string, string> = {
   'text-dominant': 'Text Dominant',
@@ -76,6 +84,7 @@ export default function ComparisonTrialWorkspacePage() {
   const logPdfxt = useLogPdfxtData(id!);
   const validateTrial = useValidateTrial(id!);
   const deleteTrial = useDeleteTrial(id!);
+  const updateAutoModeConfig = useUpdateAutoModeConfig(id!);
 
   const { status: ninjaJobStatus, data: ninjaJobData, startPolling } = useJobPolling({ interval: 2000 });
 
@@ -99,6 +108,24 @@ export default function ComparisonTrialWorkspacePage() {
   const [pdfxtError, setPdfxtError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Config form state — synced from the trial once loaded (and again if the
+  // trial identity changes), not on every refetch, so it doesn't clobber
+  // an in-progress edit the moment a background poll refreshes trial data.
+  const [autoMode, setAutoMode] = useState<ComparisonTrialMode>('manual');
+  const [autoMaxRoundsInput, setAutoMaxRoundsInput] = useState('10');
+  const [autoCostLimitInput, setAutoCostLimitInput] = useState('2');
+  const [autoModeError, setAutoModeError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!trial) return;
+    setAutoMode(trial.mode);
+    setAutoMaxRoundsInput(String(trial.autoMaxRounds));
+    setAutoCostLimitInput(String(trial.autoCostLimitUsd));
+    // Deliberately keyed on trial.id alone — re-syncing on every trial
+    // field change (e.g. a background poll refetch) would clobber an
+    // in-progress edit the operator hasn't saved yet.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trial?.id]);
 
   if (isLoading) {
     return <div className="flex justify-center py-16"><Spinner size="lg" /></div>;
@@ -170,6 +197,29 @@ export default function ComparisonTrialWorkspacePage() {
     });
   };
 
+  const handleSaveAutoModeConfig = () => {
+    setAutoModeError(null);
+    const maxRounds = Number(autoMaxRoundsInput);
+    const costLimit = Number(autoCostLimitInput);
+    if (!Number.isFinite(maxRounds) || maxRounds <= 0) {
+      setAutoModeError('Max rounds must be a positive number.');
+      return;
+    }
+    if (!Number.isFinite(costLimit) || costLimit <= 0) {
+      setAutoModeError('Cost limit must be a positive number.');
+      return;
+    }
+    updateAutoModeConfig.mutate(
+      { mode: autoMode, autoMaxRounds: maxRounds, autoCostLimitUsd: costLimit },
+      {
+        // 409 when mode is changed while a run is actively in progress —
+        // surface the real backend message (e.g. "stop the run first")
+        // rather than a generic failure.
+        onError: (err) => setAutoModeError(getErrorMessage(err)),
+      }
+    );
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 p-6">
       <div className="flex items-center justify-between">
@@ -212,6 +262,83 @@ export default function ComparisonTrialWorkspacePage() {
           <div className="mt-4">
             <PdfJobProgressPanel jobData={ninjaJobData} progress={ninjaJobData?.progress ?? 0} />
           </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-sm font-semibold mb-1">Auto Remediation Mode</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Manual: drive each analyze/approve/apply/re-audit round by hand from the audit results page.
+          Auto: the backend loops on its own until no AI-actionable fixes remain, or a round/cost limit is hit.
+        </p>
+        <div className="flex items-center gap-4 mb-4">
+          <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+            <input
+              type="radio"
+              name="autoMode"
+              checked={autoMode === 'manual'}
+              onChange={() => setAutoMode('manual')}
+              disabled={trial.autoStatus === 'running'}
+            />
+            Manual
+          </label>
+          <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+            <input
+              type="radio"
+              name="autoMode"
+              checked={autoMode === 'auto'}
+              onChange={() => setAutoMode('auto')}
+              disabled={trial.autoStatus === 'running'}
+            />
+            Auto
+          </label>
+        </div>
+        {autoMode === 'auto' && (
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label htmlFor="auto-max-rounds" className="block text-xs font-medium text-gray-600 mb-1">Max rounds</label>
+              <input
+                id="auto-max-rounds"
+                type="number"
+                min={1}
+                value={autoMaxRoundsInput}
+                onChange={(e) => setAutoMaxRoundsInput(e.target.value)}
+                disabled={trial.autoStatus === 'running'}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-50"
+              />
+            </div>
+            <div>
+              <label htmlFor="auto-cost-limit" className="block text-xs font-medium text-gray-600 mb-1">Cost limit (USD)</label>
+              <input
+                id="auto-cost-limit"
+                type="number"
+                min={0}
+                step="0.01"
+                value={autoCostLimitInput}
+                onChange={(e) => setAutoCostLimitInput(e.target.value)}
+                disabled={trial.autoStatus === 'running'}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-50"
+              />
+            </div>
+          </div>
+        )}
+        {autoModeError && <p className="text-sm text-red-600 mb-3">{autoModeError}</p>}
+        <button
+          onClick={handleSaveAutoModeConfig}
+          disabled={updateAutoModeConfig.isPending || trial.autoStatus === 'running'}
+          title={trial.autoStatus === 'running' ? 'Stop the current run (from the audit results page) before changing config' : undefined}
+          className="px-4 py-2 text-sm font-medium rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+        >
+          {updateAutoModeConfig.isPending && <Loader2 className="animate-spin h-4 w-4" />}
+          Save
+        </button>
+        {updateAutoModeConfig.isSuccess && <p className="text-sm text-green-700 mt-2">Saved.</p>}
+        {trial.mode === 'auto' && trial.autoStatus && (
+          <p className="text-xs text-gray-500 mt-3">
+            {trial.autoStatus === 'running'
+              ? `Running — round ${trial.autoRoundsCompleted} of ${trial.autoMaxRounds}, $${trial.autoCostSpentUsd.toFixed(2)} of $${trial.autoCostLimitUsd.toFixed(2)} spent.`
+              : `Last run: ${trial.autoStopReason ?? 'stopped'} after ${trial.autoRoundsCompleted} round(s), $${trial.autoCostSpentUsd.toFixed(2)} spent.`}
+          </p>
         )}
       </div>
 

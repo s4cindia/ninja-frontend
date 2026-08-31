@@ -29,6 +29,13 @@ const mockTrial = (overrides?: Partial<ComparisonTrial>): ComparisonTrial => ({
   status: 'registered',
   createdAt: '2026-08-01T10:00:00Z',
   updatedAt: '2026-08-01T10:00:00Z',
+  mode: 'manual',
+  autoMaxRounds: 10,
+  autoCostLimitUsd: 2,
+  autoRoundsCompleted: 0,
+  autoCostSpentUsd: 0,
+  autoStatus: null,
+  autoStopReason: null,
   ...overrides,
 });
 

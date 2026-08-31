@@ -114,6 +114,9 @@ function normalizeCategory(category: string | undefined): string | undefined {
 import { cn } from '@/utils/cn';
 import { validateJobId } from '@/utils/validation';
 import { useCreateRemediationPlan } from '@/hooks/usePdfRemediation';
+import { useComparisonTrial } from '@/hooks/useComparisonStudy';
+import { useStartAutoMode } from '@/hooks/useAutoMode';
+import { AutoModeStatusCard } from '@/components/pdf/AutoModeStatusCard';
 import type { PdfAuditResult, PdfAuditIssue } from '@/types/pdf.types';
 import type { IssueSeverity } from '@/types/accessibility.types';
 import type { ScanLevel } from '@/types/scan-level.types';
@@ -189,6 +192,12 @@ export const PdfAuditResultsPage: React.FC = () => {
 
   // React Query hooks
   const createPlanMutation = useCreateRemediationPlan();
+  // Only fetched for Comparison Study trials — trial.mode decides whether
+  // this page shows the manual Apply Fixes/Re-run AI Analysis/Re-run Audit
+  // controls (existing behavior) or the auto-mode start/status/stop flow.
+  const { data: comparisonTrial } = useComparisonTrial(comparisonTrialId ?? undefined);
+  const isAutoModeTrial = comparisonTrial?.mode === 'auto';
+  const startAutoMode = useStartAutoMode(jobId);
 
   // State management
   const [auditResult, setAuditResult] = useState<PdfAuditResult | null>(null);
@@ -1306,54 +1315,71 @@ export const PdfAuditResultsPage: React.FC = () => {
               <Share2 className="h-4 w-4 mr-1" />
               Share
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleReRunAuditForCurrentJob}
-              disabled={isReRunningAudit || remediationCycleLock.inProgress}
-              title={remediationCycleLock.inProgress ? remediationCycleSourceMessage(remediationCycleLock.source) : undefined}
-            >
-              {isReRunningAudit
-                ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Re-running…</>
-                : <><RotateCw className="h-4 w-4 mr-1" />Re-run Audit</>
-              }
-            </Button>
-            <div className="flex items-center gap-2">
+            {isAutoModeTrial ? (
               <Button
-                variant="outline"
+                variant="primary"
                 size="sm"
-                onClick={handleRerunAiAnalysis}
-                disabled={isRerunningAiAnalysis || isAnalyzingAi || !hasLoadedAiStatus || remediationCycleLock.inProgress}
-                title={
-                  !hasLoadedAiStatus ? 'Loading AI analysis status…'
-                    : isAnalyzingAi ? 'AI analysis is already running'
-                    : remediationCycleLock.inProgress ? remediationCycleSourceMessage(remediationCycleLock.source)
-                    : undefined
-                }
+                onClick={() => startAutoMode.mutate()}
+                disabled={startAutoMode.isPending || remediationCycleLock.inProgress}
+                title={remediationCycleLock.inProgress ? remediationCycleSourceMessage(remediationCycleLock.source) : undefined}
               >
-                {isRerunningAiAnalysis
-                  ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Re-running…</>
-                  : <><Sparkles className="h-4 w-4 mr-1" />Re-run AI Analysis</>
+                {startAutoMode.isPending
+                  ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Starting…</>
+                  : <><Sparkles className="h-4 w-4 mr-1" />Start Auto Remediation</>
                 }
               </Button>
-              {/* A <div>, not <label> — <label> would auto-forward its click to the
-                  nested Checkbox <button> (buttons are labelable elements), which
-                  combined with this span's own onClick would double-toggle. */}
-              <div className="flex items-center gap-1.5 text-xs text-gray-600 select-none">
-                <Checkbox
-                  checked={includeColorContrastFix}
-                  onChange={setIncludeColorContrastFix}
-                  aria-label="Include color-contrast auto-fix on re-run"
-                />
-                <span
-                  className="cursor-pointer"
-                  onClick={() => setIncludeColorContrastFix(v => !v)}
-                  title="When checked, the system attempts to locate each contrast issue's text run on the page and, if confidently found, offers a real Apply-to-PDF fix instead of guidance only. Issues it can't confidently locate still fall back to guidance-only either way."
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReRunAuditForCurrentJob}
+                  disabled={isReRunningAudit || remediationCycleLock.inProgress}
+                  title={remediationCycleLock.inProgress ? remediationCycleSourceMessage(remediationCycleLock.source) : undefined}
                 >
-                  Include color-contrast auto-fix
-                </span>
-              </div>
-            </div>
+                  {isReRunningAudit
+                    ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Re-running…</>
+                    : <><RotateCw className="h-4 w-4 mr-1" />Re-run Audit</>
+                  }
+                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRerunAiAnalysis}
+                    disabled={isRerunningAiAnalysis || isAnalyzingAi || !hasLoadedAiStatus || remediationCycleLock.inProgress}
+                    title={
+                      !hasLoadedAiStatus ? 'Loading AI analysis status…'
+                        : isAnalyzingAi ? 'AI analysis is already running'
+                        : remediationCycleLock.inProgress ? remediationCycleSourceMessage(remediationCycleLock.source)
+                        : undefined
+                    }
+                  >
+                    {isRerunningAiAnalysis
+                      ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Re-running…</>
+                      : <><Sparkles className="h-4 w-4 mr-1" />Re-run AI Analysis</>
+                    }
+                  </Button>
+                  {/* A <div>, not <label> — <label> would auto-forward its click to the
+                      nested Checkbox <button> (buttons are labelable elements), which
+                      combined with this span's own onClick would double-toggle. */}
+                  <div className="flex items-center gap-1.5 text-xs text-gray-600 select-none">
+                    <Checkbox
+                      checked={includeColorContrastFix}
+                      onChange={setIncludeColorContrastFix}
+                      aria-label="Include color-contrast auto-fix on re-run"
+                    />
+                    <span
+                      className="cursor-pointer"
+                      onClick={() => setIncludeColorContrastFix(v => !v)}
+                      title="When checked, the system attempts to locate each contrast issue's text run on the page and, if confidently found, offers a real Apply-to-PDF fix instead of guidance only. Issues it can't confidently locate still fall back to guidance-only either way."
+                    >
+                      Include color-contrast auto-fix
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -1392,6 +1418,8 @@ export const PdfAuditResultsPage: React.FC = () => {
         isRetryingAutoTag={isRetryingAutoTag}
         jobId={jobId!}
       />
+
+      {isAutoModeTrial && <AutoModeStatusCard jobId={jobId!} />}
 
       <RemediationChecklist
         jobId={jobId!}
@@ -1542,7 +1570,7 @@ export const PdfAuditResultsPage: React.FC = () => {
                 >
                   {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                 </button>
-              {(eligibleForApplyAll + pendingEligible) > 0 && (
+              {!isAutoModeTrial && (eligibleForApplyAll + pendingEligible) > 0 && (
                 <Button
                   variant="primary"
                   size="sm"

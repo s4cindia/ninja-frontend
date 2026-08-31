@@ -1,6 +1,6 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { comparisonStudyService, uploadComparisonPdf } from '@/services/comparisonStudy.service';
-import type { ComparisonTrialContentType } from '@/types/comparisonStudy.types';
+import type { ComparisonTrialContentType, ComparisonTrialMode } from '@/types/comparisonStudy.types';
 
 const TRIALS_KEY = ['comparison-study', 'trials'] as const;
 
@@ -72,6 +72,19 @@ export function useLogPdfxtData(id: string) {
       pdfxtPageCount?: number;
       pdfxtCostUsd?: number;
     }) => comparisonStudyService.logPdfxtData(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEYS.trial(id) });
+      qc.invalidateQueries({ queryKey: TRIALS_KEY });
+    },
+  });
+}
+
+/** 409 if mode is changed while autoStatus === 'running' — surface that to the caller, don't swallow it. */
+export function useUpdateAutoModeConfig(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { mode?: ComparisonTrialMode; autoMaxRounds?: number; autoCostLimitUsd?: number }) =>
+      comparisonStudyService.updateAutoModeConfig(id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: KEYS.trial(id) });
       qc.invalidateQueries({ queryKey: TRIALS_KEY });
