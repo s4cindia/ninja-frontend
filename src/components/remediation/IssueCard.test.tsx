@@ -539,4 +539,70 @@ describe('IssueCard', () => {
       expect(screen.getByRole('button', { name: 'Dismiss' })).not.toBeDisabled();
     });
   });
+
+  describe('Auto-approved badge (Comparison Study Auto Mode)', () => {
+    const mockAiSuggestion: AiAnalysis = {
+      id: 'ai-1',
+      jobId: 'job-1',
+      issueId: 'pdf-issue-1',
+      suggestionType: 'alt-text',
+      value: 'A description',
+      guidance: null,
+      confidence: 0.92,
+      rationale: 'because',
+      model: 'gemini',
+      applyMode: 'apply-to-pdf',
+      status: 'approved',
+      createdAt: '2024-01-15T10:00:00Z',
+      updatedAt: '2024-01-15T10:00:00Z',
+    };
+
+    it('shows "Auto-approved" next to the Approved indicator when approvedBy is auto-mode', () => {
+      renderWithQuery(
+        <IssueCard
+          issue={mockPdfIssue}
+          jobId="job-1"
+          aiSuggestion={{ ...mockAiSuggestion, status: 'approved', approvedBy: 'auto-mode' }}
+        />
+      );
+
+      expect(screen.getByText('Approved')).toBeInTheDocument();
+      expect(screen.getByText('Auto-approved')).toBeInTheDocument();
+    });
+
+    it('shows "Auto-approved" next to the Applied indicator when approvedBy is auto-mode', () => {
+      renderWithQuery(
+        <IssueCard
+          issue={mockPdfIssue}
+          jobId="job-1"
+          aiSuggestion={{ ...mockAiSuggestion, status: 'applied', approvedBy: 'auto-mode' }}
+        />
+      );
+
+      expect(screen.getByText('Applied')).toBeInTheDocument();
+      expect(screen.getByText('Auto-approved')).toBeInTheDocument();
+    });
+
+    it('does not show the badge when approved by an operator', () => {
+      renderWithQuery(
+        <IssueCard
+          issue={mockPdfIssue}
+          jobId="job-1"
+          aiSuggestion={{ ...mockAiSuggestion, status: 'approved', approvedBy: 'operator' }}
+        />
+      );
+
+      expect(screen.getByText('Approved')).toBeInTheDocument();
+      expect(screen.queryByText('Auto-approved')).not.toBeInTheDocument();
+    });
+
+    it('does not show the badge when approvedBy is absent (suggestions created before this field existed)', () => {
+      renderWithQuery(
+        <IssueCard issue={mockPdfIssue} jobId="job-1" aiSuggestion={{ ...mockAiSuggestion, status: 'approved' }} />
+      );
+
+      expect(screen.getByText('Approved')).toBeInTheDocument();
+      expect(screen.queryByText('Auto-approved')).not.toBeInTheDocument();
+    });
+  });
 });
