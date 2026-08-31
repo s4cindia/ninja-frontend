@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import ComparisonTrialWorkspacePage from './ComparisonTrialWorkspacePage';
@@ -396,8 +396,66 @@ describe('ComparisonTrialWorkspacePage', () => {
       fireEvent.change(screen.getByLabelText('Max rounds'), { target: { value: '0' } });
       fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-      expect(await screen.findByText(/max rounds must be a positive number/i)).toBeInTheDocument();
+      expect(await screen.findByText(/max rounds must be a positive whole number/i)).toBeInTheDocument();
       expect(mockService.updateAutoModeConfig).not.toHaveBeenCalled();
+    });
+
+    it('regression: rejects a non-integer max rounds (e.g. 1.5) instead of sending it to the API', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ mode: 'manual' }));
+      renderPage();
+
+      fireEvent.click(await screen.findByRole('radio', { name: 'Auto' }));
+      fireEvent.change(screen.getByLabelText('Max rounds'), { target: { value: '1.5' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+      expect(await screen.findByText(/max rounds must be a positive whole number/i)).toBeInTheDocument();
+      expect(mockService.updateAutoModeConfig).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Auto Mode status polling', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('re-fetches the trial every 5s while a run is active, so autoStatus/progress do not go stale on this page', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ mode: 'auto', autoStatus: 'running' }));
+      renderPage();
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(mockService.getTrial).toHaveBeenCalledTimes(1);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      expect(mockService.getTrial).toHaveBeenCalledTimes(2);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      expect(mockService.getTrial).toHaveBeenCalledTimes(3);
+    });
+
+    it('regression: does not poll when no run is active (autoStatus null)', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ mode: 'manual', autoStatus: null }));
+      renderPage();
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(mockService.getTrial).toHaveBeenCalledTimes(1);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(15000); });
+      expect(mockService.getTrial).toHaveBeenCalledTimes(1);
+    });
+
+    it('regression: stops polling once the run has stopped', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ mode: 'auto', autoStatus: 'stopped', autoStopReason: 'converged' }));
+      renderPage();
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(mockService.getTrial).toHaveBeenCalledTimes(1);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(15000); });
+      expect(mockService.getTrial).toHaveBeenCalledTimes(1);
     });
   });
 });

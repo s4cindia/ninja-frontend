@@ -75,6 +75,8 @@ interface IssueCardProps {
   remediationCycleSource?: RemediationCycleSource | null;
   /** Fires when the apply request errors, so the caller can re-poll the lock state. */
   onApplyError?: () => void;
+  /** True while a Comparison Study trial is running Auto Mode — the backend loop owns approve/apply/dismiss decisions, so per-issue manual actions are disabled to avoid racing it. */
+  disableManualActions?: boolean;
 }
 
 export function IssueCard({
@@ -93,6 +95,7 @@ export function IssueCard({
   remediationCycleInProgress = false,
   remediationCycleSource = null,
   onApplyError,
+  disableManualActions = false,
 }: IssueCardProps) {
   const isPdf = isPdfIssue(issue);
   const [explanationOpen, setExplanationOpen] = useState(false);
@@ -425,7 +428,8 @@ export function IssueCard({
                       <button
                         type="button"
                         className="px-2 py-0.5 bg-white text-green-700 border border-green-300 rounded hover:bg-green-50 transition-colors disabled:opacity-50"
-                        disabled={!jobId || applyMutation.isPending || updateStatusMutation.isPending}
+                        disabled={!jobId || applyMutation.isPending || updateStatusMutation.isPending || disableManualActions}
+                        title={disableManualActions ? 'Auto Remediation is running — manual actions are disabled.' : undefined}
                         onClick={() => updateStatusMutation.mutate('approved')}
                       >
                         Approve
@@ -434,8 +438,12 @@ export function IssueCard({
                     <button
                       type="button"
                       className="px-2 py-0.5 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors disabled:opacity-50"
-                      disabled={!jobId || applyMutation.isPending || updateStatusMutation.isPending || remediationCycleInProgress}
-                      title={remediationCycleInProgress ? remediationCycleSourceMessage(remediationCycleSource) : undefined}
+                      disabled={!jobId || applyMutation.isPending || updateStatusMutation.isPending || remediationCycleInProgress || disableManualActions}
+                      title={
+                        disableManualActions ? 'Auto Remediation is running — manual actions are disabled.'
+                          : remediationCycleInProgress ? remediationCycleSourceMessage(remediationCycleSource)
+                          : undefined
+                      }
                       onClick={() => applyMutation.mutate()}
                     >
                       {applyMutation.isPending ? <><Loader2 size={11} className="animate-spin" /> Applying…</> : 'Apply'}
@@ -443,7 +451,8 @@ export function IssueCard({
                     <button
                       type="button"
                       className="px-2 py-0.5 bg-white text-gray-600 border border-gray-300 rounded hover:bg-gray-50 transition-colors disabled:opacity-50"
-                      disabled={!jobId || applyMutation.isPending || updateStatusMutation.isPending}
+                      disabled={!jobId || applyMutation.isPending || updateStatusMutation.isPending || disableManualActions}
+                      title={disableManualActions ? 'Auto Remediation is running — manual actions are disabled.' : undefined}
                       onClick={() => updateStatusMutation.mutate('rejected')}
                     >
                       Dismiss

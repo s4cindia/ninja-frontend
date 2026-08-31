@@ -115,8 +115,9 @@ import { cn } from '@/utils/cn';
 import { validateJobId } from '@/utils/validation';
 import { useCreateRemediationPlan } from '@/hooks/usePdfRemediation';
 import { useComparisonTrial } from '@/hooks/useComparisonStudy';
-import { useStartAutoMode } from '@/hooks/useAutoMode';
+import { useAutoModeStatus, useStartAutoMode, useStopAutoMode } from '@/hooks/useAutoMode';
 import { AutoModeStatusCard } from '@/components/pdf/AutoModeStatusCard';
+import type { ComparisonTrialMode } from '@/types/comparisonStudy.types';
 import type { PdfAuditResult, PdfAuditIssue } from '@/types/pdf.types';
 import type { IssueSeverity } from '@/types/accessibility.types';
 import type { ScanLevel } from '@/types/scan-level.types';
@@ -195,9 +196,30 @@ export const PdfAuditResultsPage: React.FC = () => {
   // Only fetched for Comparison Study trials — trial.mode decides whether
   // this page shows the manual Apply Fixes/Re-run AI Analysis/Re-run Audit
   // controls (existing behavior) or the auto-mode start/status/stop flow.
-  const { data: comparisonTrial } = useComparisonTrial(comparisonTrialId ?? undefined);
-  const isAutoModeTrial = comparisonTrial?.mode === 'auto';
+  const {
+    data: comparisonTrial,
+    isLoading: isComparisonTrialLoading,
+    isError: isComparisonTrialError,
+  } = useComparisonTrial(comparisonTrialId ?? undefined);
+  // Three states, not a boolean: while the trial lookup is loading or has
+  // failed, render NEITHER control set. A bare boolean would flash the
+  // manual controls for a trial that turns out to be auto-mode, or silently
+  // fall back to manual on a lookup error.
+  const trialMode: 'unknown' | ComparisonTrialMode = !comparisonTrialId
+    ? 'manual' // no linked trial at all — a plain (non-Comparison-Study) remediation session
+    : isComparisonTrialLoading || isComparisonTrialError || !comparisonTrial
+    ? 'unknown'
+    : comparisonTrial.mode;
+  const isAutoModeTrial = trialMode === 'auto';
+  // Approve/Apply/Dismiss and the bulk Apply Fixes action are all disabled
+  // whenever the trial isn't confirmed-manual — covers both auto mode (the
+  // backend loop owns those decisions) and the loading/error 'unknown' state.
+  const disableManualActions = trialMode !== 'manual';
   const startAutoMode = useStartAutoMode(jobId);
+  // Only polled for auto-mode trials — polling this for every manual
+  // session would hit a status endpoint that's permanently irrelevant.
+  const autoModeStatusQuery = useAutoModeStatus(isAutoModeTrial ? jobId : undefined);
+  const stopAutoMode = useStopAutoMode(jobId);
 
   // State management
   const [auditResult, setAuditResult] = useState<PdfAuditResult | null>(null);
@@ -929,6 +951,26 @@ export const PdfAuditResultsPage: React.FC = () => {
     fetchJobFlags();
   }, [jobId, auditResult, fetchJobFlags]);
 
+  // Auto Mode's backend loop applies fixes and re-audits entirely
+  // server-side, round by round — without this, the page's own audit/AI
+  // suggestion state would go stale until the operator manually reloads.
+  // Keyed on round-count + status together (not just round count) so a
+  // terminal transition at the same round count (e.g. an immediate error)
+  // still triggers a refresh.
+  const autoModeProgressKey = autoModeStatusQuery.data
+    ? `${autoModeStatusQuery.data.autoRoundsCompleted}:${autoModeStatusQuery.data.autoStatus}`
+    : null;
+  const lastRefreshedAutoModeKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isAutoModeTrial || autoModeProgressKey === null) return;
+    if (lastRefreshedAutoModeKeyRef.current === autoModeProgressKey) return;
+    lastRefreshedAutoModeKeyRef.current = autoModeProgressKey;
+    fetchAuditResult();
+    fetchAiSuggestions();
+    fetchJobFlags();
+    bumpHistoryRefreshTrigger();
+  }, [isAutoModeTrial, autoModeProgressKey, fetchAuditResult, fetchAiSuggestions, fetchJobFlags, bumpHistoryRefreshTrigger]);
+
   const handleRetryAutoTag = async () => {
     if (!jobId || isRetryingAutoTag) return;
     setIsRetryingAutoTag(true);
@@ -1315,11 +1357,18 @@ export const PdfAuditResultsPage: React.FC = () => {
               <Share2 className="h-4 w-4 mr-1" />
               Share
             </Button>
-            {isAutoModeTrial ? (
+            {trialMode === 'unknown' ? (
+              <Button variant="outline" size="sm" disabled title="Loading trial configuration…">
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                Loading…
+              </Button>
+            ) : isAutoModeTrial ? (
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => startAutoMode.mutate()}
+                onClick={() => startAutoMode.mutate(undefined, {
+                  onError: (err) => toast.error(getErrorMessage(err)),
+                })}
                 disabled={startAutoMode.isPending || remediationCycleLock.inProgress}
                 title={remediationCycleLock.inProgress ? remediationCycleSourceMessage(remediationCycleLock.source) : undefined}
               >
@@ -1419,7 +1468,15 @@ export const PdfAuditResultsPage: React.FC = () => {
         jobId={jobId!}
       />
 
-      {isAutoModeTrial && <AutoModeStatusCard jobId={jobId!} />}
+      {isAutoModeTrial && autoModeStatusQuery.data && (
+        <AutoModeStatusCard
+          status={autoModeStatusQuery.data}
+          onStop={() => stopAutoMode.mutate()}
+          isStopping={stopAutoMode.isPending}
+          stopError={stopAutoMode.isError ? stopAutoMode.error : undefined}
+          stopSucceeded={stopAutoMode.isSuccess}
+        />
+      )}
 
       <RemediationChecklist
         jobId={jobId!}
@@ -1570,7 +1627,7 @@ export const PdfAuditResultsPage: React.FC = () => {
                 >
                   {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                 </button>
-              {!isAutoModeTrial && (eligibleForApplyAll + pendingEligible) > 0 && (
+              {!disableManualActions && (eligibleForApplyAll + pendingEligible) > 0 && (
                 <Button
                   variant="primary"
                   size="sm"
@@ -1824,6 +1881,7 @@ export const PdfAuditResultsPage: React.FC = () => {
                     remediationCycleInProgress={remediationCycleLock.inProgress}
                     remediationCycleSource={remediationCycleLock.source}
                     onApplyError={() => { void refreshRemediationCycleLock(); }}
+                    disableManualActions={disableManualActions}
                     onAiSuggestionChange={(updated) => {
                       setAiSuggestions((prev) => {
                         const next = new Map(prev);

@@ -482,4 +482,61 @@ describe('IssueCard', () => {
       expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument();
     });
   });
+
+  describe('disableManualActions (Comparison Study Auto Mode)', () => {
+    const mockAiSuggestion: AiAnalysis = {
+      id: 'ai-1',
+      jobId: 'job-1',
+      issueId: 'pdf-issue-1',
+      suggestionType: 'alt-text',
+      value: 'A description',
+      guidance: null,
+      confidence: 0.92,
+      rationale: 'because',
+      model: 'gemini',
+      applyMode: 'apply-to-pdf',
+      status: 'pending',
+      createdAt: '2024-01-15T10:00:00Z',
+      updatedAt: '2024-01-15T10:00:00Z',
+    };
+
+    it('disables Approve, Apply, and Dismiss when disableManualActions is true, with an explanatory title', () => {
+      renderWithQuery(
+        <IssueCard issue={mockPdfIssue} jobId="job-1" aiSuggestion={mockAiSuggestion} disableManualActions={true} />
+      );
+
+      const approveButton = screen.getByRole('button', { name: 'Approve' });
+      const applyButton = screen.getByRole('button', { name: 'Apply' });
+      const dismissButton = screen.getByRole('button', { name: 'Dismiss' });
+
+      expect(approveButton).toBeDisabled();
+      expect(applyButton).toBeDisabled();
+      expect(dismissButton).toBeDisabled();
+      expect(approveButton).toHaveAttribute('title', expect.stringMatching(/Auto Remediation is running/));
+      expect(applyButton).toHaveAttribute('title', expect.stringMatching(/Auto Remediation is running/));
+      expect(dismissButton).toHaveAttribute('title', expect.stringMatching(/Auto Remediation is running/));
+    });
+
+    it('disables the already-approved state\'s Apply/Dismiss too, not just the pending Approve button', () => {
+      renderWithQuery(
+        <IssueCard
+          issue={mockPdfIssue}
+          jobId="job-1"
+          aiSuggestion={{ ...mockAiSuggestion, status: 'approved' }}
+          disableManualActions={true}
+        />
+      );
+
+      expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Dismiss' })).toBeDisabled();
+    });
+
+    it('leaves Approve, Apply, and Dismiss enabled when disableManualActions is false (default)', () => {
+      renderWithQuery(<IssueCard issue={mockPdfIssue} jobId="job-1" aiSuggestion={mockAiSuggestion} />);
+
+      expect(screen.getByRole('button', { name: 'Approve' })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Apply' })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Dismiss' })).not.toBeDisabled();
+    });
+  });
 });

@@ -100,6 +100,16 @@ export default function ComparisonTrialWorkspacePage() {
     }
   }, [ninjaJobStatus, refetchTrial]);
 
+  // Poll while an Auto Mode run is active so autoStatus/autoRoundsCompleted/
+  // autoCostSpentUsd don't go stale if the operator leaves this workspace
+  // page open during a run — mirrors the audit results page's own 5s poll
+  // for the same status, but this page has no other reason to refetch.
+  useEffect(() => {
+    if (trial?.autoStatus !== 'running') return;
+    const intervalId = setInterval(() => { refetchTrial(); }, 5000);
+    return () => clearInterval(intervalId);
+  }, [trial?.autoStatus, refetchTrial]);
+
   const [pdfxtTime, setPdfxtTime] = useState('');
   const [pdfxtPageCount, setPdfxtPageCount] = useState('');
   const [pdfxtCost, setPdfxtCost] = useState('');
@@ -201,8 +211,8 @@ export default function ComparisonTrialWorkspacePage() {
     setAutoModeError(null);
     const maxRounds = Number(autoMaxRoundsInput);
     const costLimit = Number(autoCostLimitInput);
-    if (!Number.isFinite(maxRounds) || maxRounds <= 0) {
-      setAutoModeError('Max rounds must be a positive number.');
+    if (!Number.isInteger(maxRounds) || maxRounds <= 0) {
+      setAutoModeError('Max rounds must be a positive whole number.');
       return;
     }
     if (!Number.isFinite(costLimit) || costLimit <= 0) {
