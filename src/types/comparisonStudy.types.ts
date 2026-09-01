@@ -18,6 +18,15 @@ export type AutoModeStopReason =
   | 'error'          // the loop itself failed
   | null;
 
+/**
+ * null means "not explicitly overridden for this trial" — the backend falls
+ * back to the tenant's own aiRemediation.colorContrastMode setting (or its
+ * own default if the tenant hasn't set one either). It is NOT the same as
+ * 'disabled' — don't render copy that asserts a definite behavior when this
+ * is null, since the true effective mode isn't visible to the frontend.
+ */
+export type AutoColorContrastMode = 'guidance-only' | 'disabled' | 'apply-to-pdf' | null;
+
 export interface VeraPdfFailure {
   ruleId: string;
   description: string;
@@ -54,6 +63,7 @@ export interface ComparisonTrial {
   autoCostSpentUsd: number;
   autoStatus: AutoModeStatus;
   autoStopReason: AutoModeStopReason;
+  autoColorContrastMode: AutoColorContrastMode;
   // autoStopRequested (internal cooperative-cancel flag) is intentionally
   // omitted — use the /stop endpoint, never read/write this directly.
 }

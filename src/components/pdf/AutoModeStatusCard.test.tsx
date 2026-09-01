@@ -12,6 +12,7 @@ function status(overrides?: Partial<AutoModeStatusResponse>): AutoModeStatusResp
     autoMaxRounds: 10,
     autoCostSpentUsd: 0.42,
     autoCostLimitUsd: 2,
+    autoColorContrastMode: null,
     ...overrides,
   };
 }
@@ -40,8 +41,25 @@ describe('AutoModeStatusCard', () => {
     renderCard({ autoRoundsCompleted: 3, autoMaxRounds: 10, autoCostSpentUsd: 0.42, autoCostLimitUsd: 2 });
 
     expect(screen.getByText(/round 3 of 10/i)).toBeInTheDocument();
-    expect(screen.getByText('$0.42 of $2.00 spent')).toBeInTheDocument();
+    expect(screen.getByText(/\$0\.42 of \$2\.00 spent/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /stop/i })).toBeInTheDocument();
+  });
+
+  it.each([
+    ['guidance-only' as const, /contrast: guidance only/i],
+    ['disabled' as const, /contrast: disabled/i],
+    ['apply-to-pdf' as const, /contrast: auto-apply/i],
+    [null, /contrast: inherited/i],
+  ])('labels an explicit autoColorContrastMode of %s correctly while running', (mode, expectedText) => {
+    renderCard({ autoColorContrastMode: mode });
+
+    expect(screen.getByText(expectedText)).toBeInTheDocument();
+  });
+
+  it('shows the contrast label on the terminal (stopped) summary too', () => {
+    renderCard({ autoStatus: 'stopped', autoStopReason: 'converged', autoColorContrastMode: 'apply-to-pdf' });
+
+    expect(screen.getByText(/contrast: auto-apply/i)).toBeInTheDocument();
   });
 
   it('calls onStop when Stop is clicked', () => {

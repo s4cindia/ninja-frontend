@@ -36,6 +36,7 @@ const mockTrial = (overrides?: Partial<ComparisonTrial>): ComparisonTrial => ({
   autoCostSpentUsd: 0,
   autoStatus: null,
   autoStopReason: null,
+  autoColorContrastMode: null,
   ...overrides,
 });
 
