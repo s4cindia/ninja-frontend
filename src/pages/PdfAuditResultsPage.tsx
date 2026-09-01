@@ -279,6 +279,13 @@ export const PdfAuditResultsPage: React.FC = () => {
   const activeJobIdRef = useRef<string | undefined>(undefined);
   const autoTagPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoTagFetchedJobRef = useRef<string | null>(null);
+  // Same monotonic-id guard as aiFetchRequestIdRef/aiFetchAppliedIdRef below —
+  // fetchAutoTagStatus is now called both by the one-shot mount effect and by
+  // Auto Mode's per-round progress effect, so two requests can be in flight
+  // at once; without this, a slower earlier response resolving after a
+  // faster later one would overwrite the fresher state it already applied.
+  const autoTagFetchRequestIdRef = useRef(0);
+  const autoTagFetchAppliedIdRef = useRef(0);
 
   // Auto-tag status state
   const [autoTagInfo, setAutoTagInfo] = useState<{
@@ -910,15 +917,26 @@ export const PdfAuditResultsPage: React.FC = () => {
   // Checklist steps 4-7 never advance while auto mode runs unattended.
   const fetchAutoTagStatus = useCallback(async () => {
     if (!jobId) return;
+    const requestId = ++autoTagFetchRequestIdRef.current;
+    const requestJobId = jobId;
     try {
       const res = await api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`);
-      if (!isMountedRef.current) return;
       const info = res.data.data;
-      setAutoTagInfo(info);
-      applyAutoTagStatus(info);
-      applyRemediationCycleLock(jobId, info);
-      setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
-      setManualRemediationLastLoggedAt(prev => latestTimestamp(prev, info?.manualRemediationLastLoggedAt));
+      // Discard a response that is either stale (an older request resolving
+      // after a newer one already applied) or for a job the user has since
+      // navigated away from — same guard as fetchAiSuggestions above.
+      if (
+        isMountedRef.current &&
+        requestJobId === activeJobIdRef.current &&
+        requestId > autoTagFetchAppliedIdRef.current
+      ) {
+        autoTagFetchAppliedIdRef.current = requestId;
+        setAutoTagInfo(info);
+        applyAutoTagStatus(info);
+        applyRemediationCycleLock(jobId, info);
+        setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
+        setManualRemediationLastLoggedAt(prev => latestTimestamp(prev, info?.manualRemediationLastLoggedAt));
+      }
     } catch {
       autoTagFetchedJobRef.current = null; // allow retry if the fetch itself failed
     }
