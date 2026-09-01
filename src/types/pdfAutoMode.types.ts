@@ -8,7 +8,7 @@
  * GET /pdf/:jobId/auto-mode/status endpoint.
  */
 
-import type { AutoModeStatus, AutoModeStopReason } from './comparisonStudy.types';
+import type { AutoColorContrastMode, AutoModeStatus, AutoModeStopReason } from './comparisonStudy.types';
 
 export interface AutoModeStatusResponse {
   mode: 'manual' | 'auto';
@@ -18,4 +18,5 @@ export interface AutoModeStatusResponse {
   autoMaxRounds: number;
   autoCostSpentUsd: number;
   autoCostLimitUsd: number;
+  autoColorContrastMode: AutoColorContrastMode;
 }

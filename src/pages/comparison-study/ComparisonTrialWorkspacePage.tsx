@@ -16,6 +16,8 @@ import { useJobPolling } from '@/hooks/useJobPolling';
 import { PdfJobProgressPanel } from '@/components/pdf/PdfJobProgressPanel';
 import type { ComparisonTrialMode } from '@/types/comparisonStudy.types';
 
+type AutoColorContrastModeInput = 'inherit' | 'guidance-only' | 'disabled' | 'apply-to-pdf';
+
 const CONTENT_TYPE_LABELS: Record<string, string> = {
   'text-dominant': 'Text Dominant',
   'table-heavy': 'Table Heavy',
@@ -125,12 +127,18 @@ export default function ComparisonTrialWorkspacePage() {
   const [autoMode, setAutoMode] = useState<ComparisonTrialMode>('manual');
   const [autoMaxRoundsInput, setAutoMaxRoundsInput] = useState('10');
   const [autoCostLimitInput, setAutoCostLimitInput] = useState('2');
+  // 'inherit' represents autoColorContrastMode === null (not explicitly
+  // overridden) — distinct from the three real modes, not an empty/unset
+  // string, since the backend treats an explicit null PATCH as "revert to
+  // inheriting the tenant default" rather than "leave unspecified."
+  const [autoColorContrastModeInput, setAutoColorContrastModeInput] = useState<AutoColorContrastModeInput>('inherit');
   const [autoModeError, setAutoModeError] = useState<string | null>(null);
   useEffect(() => {
     if (!trial) return;
     setAutoMode(trial.mode);
     setAutoMaxRoundsInput(String(trial.autoMaxRounds));
     setAutoCostLimitInput(String(trial.autoCostLimitUsd));
+    setAutoColorContrastModeInput(trial.autoColorContrastMode ?? 'inherit');
     // Deliberately keyed on trial.id alone — re-syncing on every trial
     // field change (e.g. a background poll refetch) would clobber an
     // in-progress edit the operator hasn't saved yet.
@@ -220,7 +228,12 @@ export default function ComparisonTrialWorkspacePage() {
       return;
     }
     updateAutoModeConfig.mutate(
-      { mode: autoMode, autoMaxRounds: maxRounds, autoCostLimitUsd: costLimit },
+      {
+        mode: autoMode,
+        autoMaxRounds: maxRounds,
+        autoCostLimitUsd: costLimit,
+        autoColorContrastMode: autoColorContrastModeInput === 'inherit' ? null : autoColorContrastModeInput,
+      },
       {
         // 409 when mode is changed while a run is actively in progress —
         // surface the real backend message (e.g. "stop the run first")
@@ -329,6 +342,21 @@ export default function ComparisonTrialWorkspacePage() {
                 disabled={trial.autoStatus === 'running'}
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-50"
               />
+            </div>
+            <div className="col-span-2">
+              <label htmlFor="auto-color-contrast-mode" className="block text-xs font-medium text-gray-600 mb-1">Color-contrast handling</label>
+              <select
+                id="auto-color-contrast-mode"
+                value={autoColorContrastModeInput}
+                onChange={(e) => setAutoColorContrastModeInput(e.target.value as AutoColorContrastModeInput)}
+                disabled={trial.autoStatus === 'running'}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-50"
+              >
+                <option value="inherit">Inherit tenant/default</option>
+                <option value="guidance-only">Guidance only — flag but never auto-apply</option>
+                <option value="disabled">Disabled — skip contrast entirely</option>
+                <option value="apply-to-pdf">Auto-apply — let auto mode fix contrast automatically</option>
+              </select>
             </div>
           </div>
         )}

@@ -56,6 +56,7 @@ const mockTrial = (overrides?: Partial<ComparisonTrialWithJob>): ComparisonTrial
   autoCostSpentUsd: 0,
   autoStatus: null,
   autoStopReason: null,
+  autoColorContrastMode: null,
   job: null,
   ...overrides,
 });
@@ -360,9 +361,48 @@ describe('ComparisonTrialWorkspacePage', () => {
           mode: 'auto',
           autoMaxRounds: 8,
           autoCostLimitUsd: 3.5,
+          autoColorContrastMode: null,
         });
       });
       expect(await screen.findByText('Saved.')).toBeInTheDocument();
+    });
+
+    it('defaults the color-contrast select to "Inherit" for a trial with no override, and saves an explicit choice as-is', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ mode: 'manual', autoColorContrastMode: null }));
+      mockService.updateAutoModeConfig.mockResolvedValue(mockTrial({ mode: 'auto' }));
+      renderPage();
+
+      fireEvent.click(await screen.findByRole('radio', { name: 'Auto' }));
+      expect(screen.getByLabelText('Color-contrast handling')).toHaveValue('inherit');
+
+      fireEvent.change(screen.getByLabelText('Color-contrast handling'), { target: { value: 'apply-to-pdf' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+      await waitFor(() => {
+        expect(mockService.updateAutoModeConfig).toHaveBeenCalledWith('trial-1', {
+          mode: 'auto',
+          autoMaxRounds: 10,
+          autoCostLimitUsd: 2,
+          autoColorContrastMode: 'apply-to-pdf',
+        });
+      });
+    });
+
+    it('regression: choosing "Inherit" again for a trial that had an explicit override sends an explicit null (a PATCH omitting the field would not revert it)', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ mode: 'auto', autoColorContrastMode: 'disabled' }));
+      mockService.updateAutoModeConfig.mockResolvedValue(mockTrial({ mode: 'auto' }));
+      renderPage();
+
+      expect(await screen.findByLabelText('Color-contrast handling')).toHaveValue('disabled');
+
+      fireEvent.change(screen.getByLabelText('Color-contrast handling'), { target: { value: 'inherit' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+      await waitFor(() => {
+        expect(mockService.updateAutoModeConfig).toHaveBeenCalledWith('trial-1', expect.objectContaining({
+          autoColorContrastMode: null,
+        }));
+      });
     });
 
     it('disables the mode radios and Save button while a run is actively in progress', async () => {
@@ -371,6 +411,7 @@ describe('ComparisonTrialWorkspacePage', () => {
 
       expect(await screen.findByRole('radio', { name: 'Manual' })).toBeDisabled();
       expect(screen.getByRole('radio', { name: 'Auto' })).toBeDisabled();
+      expect(screen.getByLabelText('Color-contrast handling')).toBeDisabled();
       expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
     });
 

@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/Button';
 import { Progress } from '@/components/ui/Progress';
 import { Alert } from '@/components/ui/Alert';
 import { getErrorMessage } from '@/services/api';
-import type { AutoModeStopReason } from '@/types/comparisonStudy.types';
+import type { AutoColorContrastMode, AutoModeStopReason } from '@/types/comparisonStudy.types';
 import type { AutoModeStatusResponse } from '@/types/pdfAutoMode.types';
 
 interface AutoModeStatusCardProps {
@@ -37,6 +37,19 @@ const STOP_REASON_CONFIG: Record<NonNullable<AutoModeStopReason>, { variant: 'su
   error: { variant: 'error', title: 'Stopped due to an error in the auto-remediation loop.' },
 };
 
+const CONTRAST_MODE_LABELS: Record<NonNullable<AutoColorContrastMode>, string> = {
+  'guidance-only': 'guidance only',
+  disabled: 'disabled',
+  'apply-to-pdf': 'auto-apply',
+};
+
+// null is the trial's own stored override, not the fully resolved effective
+// mode — the true behavior still depends on tenant config this component
+// can't see, so "inherited" is the only accurate label for it.
+function contrastModeLabel(mode: AutoColorContrastMode): string {
+  return mode ? CONTRAST_MODE_LABELS[mode] : 'inherited';
+}
+
 export function AutoModeStatusCard({ status, onStop, isStopping, stopError, stopSucceeded }: AutoModeStatusCardProps) {
   // Nothing to show before the first run ever starts — the header's Start
   // Auto Remediation button is the entry point, not this card.
@@ -47,7 +60,7 @@ export function AutoModeStatusCard({ status, onStop, isStopping, stopError, stop
     return (
       <div className="mx-6 mt-4">
         <Alert variant={config?.variant ?? 'info'} title={config?.title ?? 'Auto remediation stopped.'}>
-          Ran {status.autoRoundsCompleted} of {status.autoMaxRounds} rounds, ${status.autoCostSpentUsd.toFixed(2)} of ${status.autoCostLimitUsd.toFixed(2)} spent.
+          Ran {status.autoRoundsCompleted} of {status.autoMaxRounds} rounds, ${status.autoCostSpentUsd.toFixed(2)} of ${status.autoCostLimitUsd.toFixed(2)} spent · contrast: {contrastModeLabel(status.autoColorContrastMode)}.
         </Alert>
       </div>
     );
@@ -73,7 +86,7 @@ export function AutoModeStatusCard({ status, onStop, isStopping, stopError, stop
         </div>
         <Progress value={status.autoRoundsCompleted} max={status.autoMaxRounds} size="sm" />
         <p className="text-xs text-gray-500 mt-2">
-          ${status.autoCostSpentUsd.toFixed(2)} of ${status.autoCostLimitUsd.toFixed(2)} spent
+          ${status.autoCostSpentUsd.toFixed(2)} of ${status.autoCostLimitUsd.toFixed(2)} spent · contrast: {contrastModeLabel(status.autoColorContrastMode)}
         </p>
         {stopError !== undefined && (
           <p className="text-xs text-red-600 mt-2">{getErrorMessage(stopError)}</p>

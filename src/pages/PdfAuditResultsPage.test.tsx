@@ -2163,6 +2163,7 @@ describe('PdfAuditResultsPage', () => {
         autoCostSpentUsd: 0,
         autoStatus: null,
         autoStopReason: null,
+        autoColorContrastMode: null,
         job: null,
         ...overrides,
       };
