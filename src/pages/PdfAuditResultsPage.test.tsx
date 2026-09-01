@@ -2292,5 +2292,55 @@ describe('PdfAuditResultsPage', () => {
       expect(screen.queryByRole('button', { name: 'Re-run Audit' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Start Auto Remediation' })).not.toBeInTheDocument();
     });
+
+    it('regression: re-fetches /auto-tag/status as Auto Mode rounds complete, so Remediation Checklist steps 4-7 (driven by postRemediationStatus) do not go stale while it runs unattended', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        let statusCallCount = 0;
+        const mockResult = createMockAuditResult();
+        mockApi.get.mockImplementation((url: string) => {
+          if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+          if (url === statusUrl) {
+            statusCallCount += 1;
+            return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe', postRemediationStatus: 'pending' } } });
+          }
+          if (url === aiUrl) return Promise.resolve({ data: { data: { suggestions: [], analyzed: 0, total: 0, status: 'complete' } } });
+          return Promise.resolve({ data: { data: {} } });
+        });
+        mockGetTrial.mockResolvedValue(mockTrial({ mode: 'auto' }));
+        mockGetAutoModeStatus.mockResolvedValue({
+          mode: 'auto',
+          autoStatus: 'running',
+          autoStopReason: null,
+          autoRoundsCompleted: 1,
+          autoMaxRounds: 10,
+          autoCostSpentUsd: 0.1,
+          autoCostLimitUsd: 2,
+        });
+
+        renderWithRouter(jobId, `?comparisonTrialId=${trialId}`);
+        await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+        await screen.findByTestId('auto-mode-status-card');
+        const callsAfterMount = statusCallCount;
+        expect(callsAfterMount).toBeGreaterThanOrEqual(1);
+
+        // Round advances 1 -> 2 (autoModeProgressKey changes) — the fix re-fetches
+        // /auto-tag/status here; without it, statusCallCount would never grow again.
+        mockGetAutoModeStatus.mockResolvedValue({
+          mode: 'auto',
+          autoStatus: 'running',
+          autoStopReason: null,
+          autoRoundsCompleted: 2,
+          autoMaxRounds: 10,
+          autoCostSpentUsd: 0.2,
+          autoCostLimitUsd: 2,
+        });
+        await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+
+        expect(statusCallCount).toBeGreaterThan(callsAfterMount);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });

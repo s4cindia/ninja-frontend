@@ -902,24 +902,34 @@ export const PdfAuditResultsPage: React.FC = () => {
     } : prev);
   }, []);
 
+  // Fetches /auto-tag/status and merges the result everywhere it's consumed
+  // (autoTagInfo, the header badge, the remediation-cycle lock, manual-time
+  // totals). Used both for the one-shot mount fetch below and by Auto Mode's
+  // own progress effect, which needs this re-run every round — otherwise
+  // postRemediationStatus/postRemediationAudit go stale and Remediation
+  // Checklist steps 4-7 never advance while auto mode runs unattended.
+  const fetchAutoTagStatus = useCallback(async () => {
+    if (!jobId) return;
+    try {
+      const res = await api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`);
+      if (!isMountedRef.current) return;
+      const info = res.data.data;
+      setAutoTagInfo(info);
+      applyAutoTagStatus(info);
+      applyRemediationCycleLock(jobId, info);
+      setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
+      setManualRemediationLastLoggedAt(prev => latestTimestamp(prev, info?.manualRemediationLastLoggedAt));
+    } catch {
+      autoTagFetchedJobRef.current = null; // allow retry if the fetch itself failed
+    }
+  }, [jobId, applyAutoTagStatus, applyRemediationCycleLock]);
+
   // Fetch auto-tag status after audit result loads
   useEffect(() => {
     if (!jobId || !auditResult || autoTagFetchedJobRef.current === jobId) return;
     autoTagFetchedJobRef.current = jobId;
-    api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`)
-      .then(res => {
-        if (!isMountedRef.current) return;
-        const info = res.data.data;
-        setAutoTagInfo(info);
-        applyAutoTagStatus(info);
-        applyRemediationCycleLock(jobId, info);
-        setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
-        setManualRemediationLastLoggedAt(prev => latestTimestamp(prev, info?.manualRemediationLastLoggedAt));
-      })
-      .catch(() => {
-        autoTagFetchedJobRef.current = null; // allow retry if the fetch itself failed
-      });
-  }, [jobId, auditResult, applyAutoTagStatus, applyRemediationCycleLock]);
+    fetchAutoTagStatus();
+  }, [jobId, auditResult, fetchAutoTagStatus]);
 
   // Whether ACR/PAC have already been generated for this job, plus the
   // last manual re-audit time — all three live on job.output, which no
@@ -968,8 +978,9 @@ export const PdfAuditResultsPage: React.FC = () => {
     fetchAuditResult();
     fetchAiSuggestions();
     fetchJobFlags();
+    fetchAutoTagStatus();
     bumpHistoryRefreshTrigger();
-  }, [isAutoModeTrial, autoModeProgressKey, fetchAuditResult, fetchAiSuggestions, fetchJobFlags, bumpHistoryRefreshTrigger]);
+  }, [isAutoModeTrial, autoModeProgressKey, fetchAuditResult, fetchAiSuggestions, fetchJobFlags, fetchAutoTagStatus, bumpHistoryRefreshTrigger]);
 
   const handleRetryAutoTag = async () => {
     if (!jobId || isRetryingAutoTag) return;
