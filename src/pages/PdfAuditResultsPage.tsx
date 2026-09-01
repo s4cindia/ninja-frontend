@@ -279,6 +279,13 @@ export const PdfAuditResultsPage: React.FC = () => {
   const activeJobIdRef = useRef<string | undefined>(undefined);
   const autoTagPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoTagFetchedJobRef = useRef<string | null>(null);
+  // Same monotonic-id guard as aiFetchRequestIdRef/aiFetchAppliedIdRef below —
+  // fetchAutoTagStatus is now called both by the one-shot mount effect and by
+  // Auto Mode's per-round progress effect, so two requests can be in flight
+  // at once; without this, a slower earlier response resolving after a
+  // faster later one would overwrite the fresher state it already applied.
+  const autoTagFetchRequestIdRef = useRef(0);
+  const autoTagFetchAppliedIdRef = useRef(0);
 
   // Auto-tag status state
   const [autoTagInfo, setAutoTagInfo] = useState<{
@@ -902,24 +909,45 @@ export const PdfAuditResultsPage: React.FC = () => {
     } : prev);
   }, []);
 
-  // Fetch auto-tag status after audit result loads
-  useEffect(() => {
-    if (!jobId || !auditResult || autoTagFetchedJobRef.current === jobId) return;
-    autoTagFetchedJobRef.current = jobId;
-    api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`)
-      .then(res => {
-        if (!isMountedRef.current) return;
-        const info = res.data.data;
+  // Fetches /auto-tag/status and merges the result everywhere it's consumed
+  // (autoTagInfo, the header badge, the remediation-cycle lock, manual-time
+  // totals). Used both for the one-shot mount fetch below and by Auto Mode's
+  // own progress effect, which needs this re-run every round — otherwise
+  // postRemediationStatus/postRemediationAudit go stale and Remediation
+  // Checklist steps 4-7 never advance while auto mode runs unattended.
+  const fetchAutoTagStatus = useCallback(async () => {
+    if (!jobId) return;
+    const requestId = ++autoTagFetchRequestIdRef.current;
+    const requestJobId = jobId;
+    try {
+      const res = await api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`);
+      const info = res.data.data;
+      // Discard a response that is either stale (an older request resolving
+      // after a newer one already applied) or for a job the user has since
+      // navigated away from — same guard as fetchAiSuggestions above.
+      if (
+        isMountedRef.current &&
+        requestJobId === activeJobIdRef.current &&
+        requestId > autoTagFetchAppliedIdRef.current
+      ) {
+        autoTagFetchAppliedIdRef.current = requestId;
         setAutoTagInfo(info);
         applyAutoTagStatus(info);
         applyRemediationCycleLock(jobId, info);
         setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
         setManualRemediationLastLoggedAt(prev => latestTimestamp(prev, info?.manualRemediationLastLoggedAt));
-      })
-      .catch(() => {
-        autoTagFetchedJobRef.current = null; // allow retry if the fetch itself failed
-      });
-  }, [jobId, auditResult, applyAutoTagStatus, applyRemediationCycleLock]);
+      }
+    } catch {
+      autoTagFetchedJobRef.current = null; // allow retry if the fetch itself failed
+    }
+  }, [jobId, applyAutoTagStatus, applyRemediationCycleLock]);
+
+  // Fetch auto-tag status after audit result loads
+  useEffect(() => {
+    if (!jobId || !auditResult || autoTagFetchedJobRef.current === jobId) return;
+    autoTagFetchedJobRef.current = jobId;
+    fetchAutoTagStatus();
+  }, [jobId, auditResult, fetchAutoTagStatus]);
 
   // Whether ACR/PAC have already been generated for this job, plus the
   // last manual re-audit time — all three live on job.output, which no
@@ -968,8 +996,9 @@ export const PdfAuditResultsPage: React.FC = () => {
     fetchAuditResult();
     fetchAiSuggestions();
     fetchJobFlags();
+    fetchAutoTagStatus();
     bumpHistoryRefreshTrigger();
-  }, [isAutoModeTrial, autoModeProgressKey, fetchAuditResult, fetchAiSuggestions, fetchJobFlags, bumpHistoryRefreshTrigger]);
+  }, [isAutoModeTrial, autoModeProgressKey, fetchAuditResult, fetchAiSuggestions, fetchJobFlags, fetchAutoTagStatus, bumpHistoryRefreshTrigger]);
 
   const handleRetryAutoTag = async () => {
     if (!jobId || isRetryingAutoTag) return;
