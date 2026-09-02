@@ -753,4 +753,33 @@ describe('RemediationChecklist', () => {
     const step1Container = screen.getByText('1. Initial audit complete').closest('div')!.parentElement!;
     expect(step1Container).not.toHaveTextContent('Recommended next');
   });
+
+  describe('autoModeActive (Comparison Study Auto Mode)', () => {
+    it('shows a note and suppresses "Recommended next" while auto mode is active — it would otherwise nudge a manual action that conflicts with the running loop', () => {
+      render(<RemediationChecklist {...baseProps} aiAnalysisStatus={null} autoModeActive={true} />);
+
+      expect(screen.getByText('Auto mode is handling remediation — see status above.')).toBeInTheDocument();
+      expect(screen.queryByText('Recommended next')).not.toBeInTheDocument();
+    });
+
+    it('still shows accurate step statuses while auto mode is active — muted, not hidden', () => {
+      render(
+        <RemediationChecklist
+          {...baseProps}
+          aiAnalysisStatus="complete"
+          autoModeActive={true}
+        />
+      );
+
+      expect(screen.getByText('1. Initial audit complete')).toBeInTheDocument();
+      expect(screen.getByText('2. Run AI Analysis')).toBeInTheDocument();
+    });
+
+    it('regression: shows "Recommended next" normally when autoModeActive is false (default)', () => {
+      render(<RemediationChecklist {...baseProps} aiAnalysisStatus={null} />);
+
+      expect(screen.getByText('Recommended next')).toBeInTheDocument();
+      expect(screen.queryByText('Auto mode is handling remediation — see status above.')).not.toBeInTheDocument();
+    });
+  });
 });

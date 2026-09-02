@@ -72,7 +72,14 @@ export function AutoModeStatusCard({ status, onStop, isStopping, stopError, stop
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
             <Loader2 className="h-4 w-4 animate-spin text-primary-600" />
-            Auto remediation running — round {status.autoRoundsCompleted} of {status.autoMaxRounds}
+            {/* autoRoundsCompleted only increments once a round's apply+re-audit
+                both finish — showing it as "round X of N" during that window
+                (which can run 10-15+ min on a large document) reads as frozen,
+                even though the backend is actively working. "in progress"
+                instead of the static "of N" phrasing makes clear a round is
+                live; the static phrasing only applies once autoStatus leaves
+                'running' (see the 'stopped' branch above). */}
+            Auto remediation running — round {status.autoRoundsCompleted + 1} in progress
           </div>
           <Button
             size="sm"
