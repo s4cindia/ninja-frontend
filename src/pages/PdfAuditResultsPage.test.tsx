@@ -2429,7 +2429,13 @@ describe('PdfAuditResultsPage', () => {
 
         renderWithRouter(jobId, `?comparisonTrialId=${trialId}`);
 
-        expect(await screen.findByText('2. Run AI Analysis')).toBeInTheDocument();
+        // Wait for the resolved (not the transient pre-load undefined) auto-mode
+        // status before asserting — otherwise this could pass on the initial
+        // unmuted render even if a later-resolved null/stopped value muted it.
+        // React renders a null child as nothing, so the stub's {status.autoStatus}
+        // interpolation produces no "null" text — the colons sit adjacent.
+        expect(await screen.findByTestId('auto-mode-status-card')).toHaveTextContent('auto-mode-status::0/10');
+        expect(screen.getByText('2. Run AI Analysis')).toBeInTheDocument();
         expect(screen.getByText('Recommended next')).toBeInTheDocument();
         expect(screen.queryByText('Auto mode is handling remediation — see status above.')).not.toBeInTheDocument();
       });
@@ -2449,7 +2455,8 @@ describe('PdfAuditResultsPage', () => {
 
         renderWithRouter(jobId, `?comparisonTrialId=${trialId}`);
 
-        expect(await screen.findByText('2. Run AI Analysis')).toBeInTheDocument();
+        expect(await screen.findByTestId('auto-mode-status-card')).toHaveTextContent('auto-mode-status:stopped:4/10');
+        expect(screen.getByText('2. Run AI Analysis')).toBeInTheDocument();
         expect(screen.getByText('Recommended next')).toBeInTheDocument();
         expect(screen.queryByText('Auto mode is handling remediation — see status above.')).not.toBeInTheDocument();
       });
