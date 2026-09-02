@@ -1529,6 +1529,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         pacReportGenerated={jobFlags?.pacReportGenerated ?? false}
         comparisonTrialId={autoTagInfo?.comparisonTrialId}
         userRole={currentUser?.role}
+        autoModeActive={autoModeStatusQuery.data?.autoStatus === 'running'}
       />
 
       <ManualRemediationTimeLog

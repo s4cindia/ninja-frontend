@@ -56,6 +56,15 @@ interface RemediationChecklistProps {
   pacReportGenerated: boolean;
   comparisonTrialId?: string | null;
   userRole?: string;
+  /**
+   * True for a Comparison Study trial running Auto Mode — the backend loop
+   * is already doing what this checklist's manual steps recommend (apply
+   * fixes, re-audit, ...), so nudging the operator to do them by hand would
+   * actively conflict with what's running. Mutes the steps and suppresses
+   * the "Recommended next" nudge instead of hiding the checklist outright —
+   * the step statuses themselves stay accurate and worth seeing.
+   */
+  autoModeActive?: boolean;
 }
 
 const STATUS_LABEL: Record<StepStatus, string> = {
@@ -147,6 +156,7 @@ export function RemediationChecklist({
   pacReportGenerated,
   comparisonTrialId,
   userRole,
+  autoModeActive = false,
 }: RemediationChecklistProps) {
   const [noteInput, setNoteInput] = useState('');
   const [isSubmittingAck, setIsSubmittingAck] = useState(false);
@@ -484,9 +494,12 @@ export function RemediationChecklist({
     trialStepApplicable, trialStepDone, isValidatingTrial, isLoadingTrial, canValidateTrial, needsPdfxtData, handleValidateTrial,
   ]);
 
+  // Suppressed while auto mode is active — recommending a manual next step
+  // (e.g. "Apply AI-suggested fixes") would conflict with what the backend
+  // loop is already doing on its own.
   const recommendedNextId = useMemo(
-    () => steps.find(s => s.status !== 'done' && s.status !== 'skipped')?.id,
-    [steps]
+    () => (autoModeActive ? undefined : steps.find(s => s.status !== 'done' && s.status !== 'skipped')?.id),
+    [steps, autoModeActive]
   );
 
   return (
@@ -498,9 +511,16 @@ export function RemediationChecklist({
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-0 space-y-1">
-        {steps.map(step => (
-          <StepRow key={step.id} step={step} isRecommendedNext={step.id === recommendedNextId} />
-        ))}
+        {autoModeActive && (
+          <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-3 py-2 mb-2">
+            Auto mode is handling remediation — see status above.
+          </p>
+        )}
+        <div className={cn(autoModeActive && 'opacity-60', 'space-y-1')}>
+          {steps.map(step => (
+            <StepRow key={step.id} step={step} isRecommendedNext={step.id === recommendedNextId} />
+          ))}
+        </div>
       </CardContent>
     </Card>
   );

@@ -40,9 +40,16 @@ describe('AutoModeStatusCard', () => {
   it('shows round progress, cost spent, and a Stop button while running', () => {
     renderCard({ autoRoundsCompleted: 3, autoMaxRounds: 10, autoCostSpentUsd: 0.42, autoCostLimitUsd: 2 });
 
-    expect(screen.getByText(/round 3 of 10/i)).toBeInTheDocument();
+    expect(screen.getByText(/round 4 in progress/i)).toBeInTheDocument();
     expect(screen.getByText(/\$0\.42 of \$2\.00 spent/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /stop/i })).toBeInTheDocument();
+  });
+
+  it('regression: labels round 1 as "in progress" while running, not "round 0 of N" — a raw autoRoundsCompleted of 0 (no round finished yet) reads as stuck otherwise', () => {
+    renderCard({ autoRoundsCompleted: 0, autoMaxRounds: 10 });
+
+    expect(screen.getByText(/round 1 in progress/i)).toBeInTheDocument();
+    expect(screen.queryByText(/round 0 of/i)).not.toBeInTheDocument();
   });
 
   it.each([
