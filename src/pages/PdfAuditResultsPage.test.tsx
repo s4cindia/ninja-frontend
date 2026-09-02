@@ -2412,5 +2412,66 @@ describe('PdfAuditResultsPage', () => {
         vi.useRealTimers();
       }
     });
+
+    describe('Remediation Checklist muting (only while a run is actively active)', () => {
+      it('regression: does NOT mute the checklist for an auto-mode trial that has never started a run — isAutoModeTrial alone (trial.mode) is not the same as an active run', async () => {
+        mockCommonGets();
+        mockGetTrial.mockResolvedValue(mockTrial({ mode: 'auto' }));
+        mockGetAutoModeStatus.mockResolvedValue({
+          mode: 'auto',
+          autoStatus: null,
+          autoStopReason: null,
+          autoRoundsCompleted: 0,
+          autoMaxRounds: 10,
+          autoCostSpentUsd: 0,
+          autoCostLimitUsd: 2,
+        });
+
+        renderWithRouter(jobId, `?comparisonTrialId=${trialId}`);
+
+        expect(await screen.findByText('2. Run AI Analysis')).toBeInTheDocument();
+        expect(screen.getByText('Recommended next')).toBeInTheDocument();
+        expect(screen.queryByText('Auto mode is handling remediation — see status above.')).not.toBeInTheDocument();
+      });
+
+      it('regression: does NOT mute the checklist once a run has stopped — the operator may need to take manual next steps again', async () => {
+        mockCommonGets();
+        mockGetTrial.mockResolvedValue(mockTrial({ mode: 'auto' }));
+        mockGetAutoModeStatus.mockResolvedValue({
+          mode: 'auto',
+          autoStatus: 'stopped',
+          autoStopReason: 'converged',
+          autoRoundsCompleted: 4,
+          autoMaxRounds: 10,
+          autoCostSpentUsd: 0.8,
+          autoCostLimitUsd: 2,
+        });
+
+        renderWithRouter(jobId, `?comparisonTrialId=${trialId}`);
+
+        expect(await screen.findByText('2. Run AI Analysis')).toBeInTheDocument();
+        expect(screen.getByText('Recommended next')).toBeInTheDocument();
+        expect(screen.queryByText('Auto mode is handling remediation — see status above.')).not.toBeInTheDocument();
+      });
+
+      it('mutes the checklist while a run is actively running', async () => {
+        mockCommonGets();
+        mockGetTrial.mockResolvedValue(mockTrial({ mode: 'auto' }));
+        mockGetAutoModeStatus.mockResolvedValue({
+          mode: 'auto',
+          autoStatus: 'running',
+          autoStopReason: null,
+          autoRoundsCompleted: 1,
+          autoMaxRounds: 10,
+          autoCostSpentUsd: 0.1,
+          autoCostLimitUsd: 2,
+        });
+
+        renderWithRouter(jobId, `?comparisonTrialId=${trialId}`);
+
+        expect(await screen.findByText('Auto mode is handling remediation — see status above.')).toBeInTheDocument();
+        expect(screen.queryByText('Recommended next')).not.toBeInTheDocument();
+      });
+    });
   });
 });
