@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { PdfStatsCards, type AutoTagInfo } from './PdfStatsCards';
+import { isMatterhornIssue } from '@/utils/matterhorn';
 import type { PdfAuditResult, PdfAuditIssue } from '@/types/pdf.types';
 import type { AiAnalysis } from '@/components/remediation/IssueCard';
 
@@ -326,5 +327,70 @@ describe('PdfStatsCards — AI coverage stats (stale-suggestion filtering)', () 
 
     expect(screen.queryByText(/\d+% AI coverage/)).not.toBeInTheDocument();
     expect(screen.queryByText('AI suggestions')).not.toBeInTheDocument();
+  });
+});
+
+describe('PdfStatsCards — Matterhorn count vs AI Fixes count consistency', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('regression: an issue matched only via category (no matching code prefix, no matterhornCheckpoint) is counted as Matterhorn and its AI fix is attributed there too — not split across the Matterhorn header count and the Others AI-fix bucket', () => {
+    // This issue is exactly the case that used to divide the codebase's three
+    // independent Matterhorn classifiers: no matterhornCheckpoint, no code
+    // prefix match, only a category match. matterhornIssueCount is computed
+    // here the same way PdfAuditResultsPage now computes it — via the shared
+    // classifier — which is the only way these two numbers can ever agree.
+    const categoryOnlyIssue: PdfAuditIssue & { category: string } = {
+      ...issue({ id: 'issue-cat', ruleId: 'RULE-CAT-1' }),
+      category: 'headings',
+    };
+
+    renderCoverageCard({
+      issues: [categoryOnlyIssue],
+      aiSuggestions: new Map([
+        ['issue-cat', suggestion({ issueId: 'issue-cat', applyMode: 'apply-to-pdf' })],
+      ]),
+      matterhornIssueCount: [categoryOnlyIssue].filter(isMatterhornIssue).length,
+    });
+
+    expect(screen.getByText('Matterhorn (1)')).toBeInTheDocument();
+    expect(screen.getByText('Others (0)')).toBeInTheDocument();
+
+    const matterhornSection = screen.getByText('Matterhorn (1)').parentElement!;
+    const aiFixesLabel = within(matterhornSection).getByText('AI Fixes');
+    expect(aiFixesLabel.nextElementSibling).toHaveTextContent('1');
+
+    const othersSection = screen.getByText('Others (0)').parentElement!;
+    expect(within(othersSection).getByText('No AI coverage')).toBeInTheDocument();
+    expect(within(othersSection).queryByText('AI Fixes')).not.toBeInTheDocument();
+  });
+
+  it('regression: reproduces the pre-fix mismatch when the caller passes a narrower count than the card would classify internally — proves the assertions above actually exercise real drift, not a tautology', () => {
+    // Simulates the OLD, pre-fix PdfAuditResultsPage: it never checked
+    // category, so it would have passed 0 here for this issue even though
+    // the card's own (already category-aware) internal classifier counts it
+    // as Matterhorn. This is the exact "Matterhorn count vs AI Fixes count"
+    // mismatch symptom — the fix's job was to make this scenario impossible
+    // by construction, not just to pass in isolation.
+    const categoryOnlyIssue: PdfAuditIssue & { category: string } = {
+      ...issue({ id: 'issue-cat', ruleId: 'RULE-CAT-1' }),
+      category: 'headings',
+    };
+
+    renderCoverageCard({
+      issues: [categoryOnlyIssue],
+      aiSuggestions: new Map([
+        ['issue-cat', suggestion({ issueId: 'issue-cat', applyMode: 'apply-to-pdf' })],
+      ]),
+      matterhornIssueCount: 0,
+    });
+
+    // Header count says 0 Matterhorn issues, yet the fix still lands in the
+    // Matterhorn bucket internally — the exact inconsistency a caller must
+    // never be able to produce once it uses the shared classifier.
+    expect(screen.getByText('Matterhorn (0)')).toBeInTheDocument();
+    const matterhornSection = screen.getByText('Matterhorn (0)').parentElement!;
+    expect(within(matterhornSection).getByText('AI Fixes')).toBeInTheDocument();
   });
 });

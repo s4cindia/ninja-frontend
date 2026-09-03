@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mocked } from 'vitest';
-import { render, screen, fireEvent, waitFor, cleanup, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, cleanup, act, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
@@ -2514,6 +2514,75 @@ describe('PdfAuditResultsPage', () => {
 
         expect(await screen.findByText('Auto mode is handling remediation — see status above.')).toBeInTheDocument();
         expect(screen.queryByText('Recommended next')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Matterhorn classification consistency (end-to-end)', () => {
+    const jobId = 'job-123';
+    const auditUrl = `/pdf/job/${jobId}/audit/result`;
+    const statusUrl = `/pdf/${jobId}/auto-tag/status`;
+    const aiUrl = `/pdf/${jobId}/ai-analysis`;
+
+    it('regression: an issue matched only via category (no matching code prefix, no matterhornCheckpoint) is included in the page\'s "Matterhorn-Related" count AND has its AI fix attributed to the Matterhorn bucket in the stats card below it — the page and card can no longer disagree on classification', async () => {
+      const categoryOnlyIssue = {
+        id: 'issue-cat',
+        ruleId: 'RULE-CAT-1',
+        severity: 'moderate',
+        message: 'Heading skips a level',
+        description: 'Heading skips a level',
+        pageNumber: 1,
+        category: 'headings',
+      } as unknown as PdfAuditIssue;
+
+      const mockResult = createMockAuditResult({ issues: [categoryOnlyIssue] });
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) {
+          return Promise.resolve({
+            data: {
+              data: {
+                suggestions: [{
+                  id: 'sugg-issue-cat',
+                  jobId,
+                  issueId: 'issue-cat',
+                  suggestionType: 'alt-text',
+                  value: 'A description',
+                  guidance: null,
+                  confidence: 0.9,
+                  rationale: 'because',
+                  model: 'gemini',
+                  applyMode: 'apply-to-pdf',
+                  status: 'pending',
+                  createdAt: '2024-01-15T10:00:00Z',
+                  updatedAt: '2024-01-15T10:00:00Z',
+                }],
+                analyzed: 1,
+                total: 1,
+                status: 'complete',
+              },
+            },
+          });
+        }
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+      await screen.findByText('test-document.pdf');
+
+      expect(await screen.findByRole('button', { name: 'Matterhorn-Related (1)' })).toBeInTheDocument();
+
+      const matterhornSection = screen.getByText('Matterhorn (1)').parentElement!;
+      const aiFixesLabel = within(matterhornSection).getByText('AI Fixes');
+      expect(aiFixesLabel.nextElementSibling).toHaveTextContent('1');
+
+      // Clicking the toggle actually filters to this issue too — the
+      // showMatterhornOnly filter used to be a fourth, separately-drifted
+      // copy of this same classification.
+      fireEvent.click(screen.getByRole('button', { name: 'Matterhorn-Related (1)' }));
+      await waitFor(() => {
+        expect(screen.getByTestId('issue-card-issue-cat')).toBeInTheDocument();
       });
     });
   });

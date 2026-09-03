@@ -5,7 +5,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { api } from '@/services/api';
-import type { PdfAuditResult, PdfAuditIssue } from '@/types/pdf.types';
+import { isMatterhornIssue } from '@/utils/matterhorn';
+import type { PdfAuditResult } from '@/types/pdf.types';
 import type { AiAnalysis } from '@/components/remediation/IssueCard';
 
 // ─── localStorage persistence ─────────────────────────────────────────────────
@@ -25,18 +26,6 @@ function readStorage(): CardState {
 function writeStorage(s: CardState): void {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch { /* quota */ }
 }
-
-// ─── Matterhorn detection (mirrors PdfAuditResultsPage) ──────────────────────
-
-const CAT_MAP: Record<string, string> = {
-  structure: '01', metadata: '07', language: '16', headings: '06',
-  'reading-order': '09', lists: '04', tables: '11',
-  'table-structure': '11', 'table-headers': '11',
-};
-const MATTERHORN_PREFIXES = [
-  'TABLE-', 'ALT-TEXT-', 'LIST-',
-  'PDF-LOW-CONTRAST', 'PDF-UNTAGGED', 'PDF-NO-LANGUAGE',
-];
 
 // ─── Auto-tag element count labels (Adobe's shape + Seam-C's 11 canonical zone types) ─
 
@@ -64,16 +53,6 @@ function elementLabel(key: string, variant: 'short' | 'full'): string {
   const entry = ELEMENT_LABELS[key];
   if (entry) return entry[variant];
   return key.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-type AugIssue = PdfAuditIssue & { category?: string; code?: string };
-
-function isMatterhorn(issue: AugIssue): boolean {
-  if (issue.matterhornCheckpoint) return true;
-  if (issue.category && CAT_MAP[issue.category]) return true;
-  const code = ((issue as { code?: string }).code || issue.ruleId || '').toUpperCase();
-  if (/^MATTERHORN-\d{2}-/.test(code)) return true;
-  return MATTERHORN_PREFIXES.some(p => code.startsWith(p));
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -259,7 +238,7 @@ export function PdfStatsCards({
 
     const mattIds = new Set<string>();
     for (const issue of issues) {
-      if (isMatterhorn(issue as AugIssue)) mattIds.add(issue.id);
+      if (isMatterhornIssue(issue)) mattIds.add(issue.id);
     }
 
     const mattSugs = sugs.filter(s => mattIds.has(s.issueId));

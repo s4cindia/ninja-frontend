@@ -56,39 +56,7 @@ import {
   type RemediationCycleSource,
 } from '@/services/api';
 import { useAuthStore } from '@/stores/auth.store';
-
-/**
- * Maps backend issue category/code fields to Matterhorn category IDs used in the UI filter.
- * Backend issues don't populate matterhornCheckpoint directly, so we derive it here.
- */
-const CATEGORY_TO_MATTERHORN: Record<string, string> = {
-  // Structure validator categories
-  structure: '01',
-  metadata: '07',
-  language: '16',
-  headings: '06',
-  'reading-order': '09',
-  lists: '04',
-  tables: '11',
-  // Table validator categories
-  'table-structure': '11',
-  'table-headers': '11',
-  'table-summary': '11',
-  'layout-table': '11',
-  // Alt-text validator categories
-  'alt-text': '13',
-};
-
-/** Derive Matterhorn category ID from an issue, regardless of which field is populated. */
-function getIssueCheckpoint(issue: PdfAuditIssue & { category?: string; code?: string }): string | undefined {
-  if (issue.matterhornCheckpoint) return issue.matterhornCheckpoint;
-  if (issue.category && CATEGORY_TO_MATTERHORN[issue.category]) return CATEGORY_TO_MATTERHORN[issue.category];
-  // Fallback: extract from code like "MATTERHORN-11-001" → "11"
-  const code = issue.code || issue.ruleId || '';
-  const match = code.match(/^MATTERHORN-(\d{2})-/);
-  if (match) return match[1];
-  return undefined;
-}
+import { isMatterhornIssue, getMatterhornCheckpoint } from '@/utils/matterhorn';
 
 const CATEGORY_LABELS: Record<string, string> = {
   structure: 'Structure',
@@ -600,7 +568,7 @@ export const PdfAuditResultsPage: React.FC = () => {
     // Filter by Matterhorn category
     if (filters.matterhornCategory !== 'all') {
       issues = issues.filter((issue) => {
-        const checkpoint = getIssueCheckpoint(issue as PdfAuditIssue & { category?: string; code?: string });
+        const checkpoint = getMatterhornCheckpoint(issue);
         return checkpoint?.startsWith(filters.matterhornCategory);
       });
     }
@@ -651,50 +619,17 @@ export const PdfAuditResultsPage: React.FC = () => {
 
     // Filter by Matterhorn mapping only
     if (filters.showMatterhornOnly) {
-      issues = issues.filter((issue) => {
-        const issueWithCode = issue as typeof issue & { code?: string };
-        const code = (issueWithCode.code || issue.ruleId || '').toUpperCase();
-        return (
-          (issue.matterhornCheckpoint != null && issue.matterhornCheckpoint !== '') ||
-          code.startsWith('MATTERHORN-') ||
-          // Include related codes that map to Matterhorn checkpoints
-          code.startsWith('TABLE-') ||
-          code.startsWith('ALT-TEXT-') ||
-          code.startsWith('LIST-') ||
-          code.startsWith('PDF-LOW-CONTRAST') ||
-          code.startsWith('PDF-UNTAGGED') ||
-          code.startsWith('PDF-NO-LANGUAGE')
-        );
-      });
+      issues = issues.filter(isMatterhornIssue);
     }
 
     return issues;
   }, [auditResult, filters, aiSuggestions]);
 
-  // Count Matterhorn-related issues
-  // Includes issues with explicit MATTERHORN codes and related codes that map to Matterhorn checkpoints
+  // Count Matterhorn-related issues (shared classifier — keeps this count in
+  // sync with PdfStatsCards, which consumes the same function)
   const matterhornIssueCount = useMemo(() => {
     if (!auditResult || !auditResult.issues) return 0;
-    return auditResult.issues.filter(
-      (issue) => {
-        const issueWithCode = issue as typeof issue & { code?: string };
-        const code = (issueWithCode.code || issue.ruleId || '').toUpperCase();
-        return (
-          (issue.matterhornCheckpoint != null && issue.matterhornCheckpoint !== '') ||
-          code.startsWith('MATTERHORN-') ||
-          // Table-related codes (map to Matterhorn 15)
-          code.startsWith('TABLE-') ||
-          // Alt text codes (map to Matterhorn 13)
-          code.startsWith('ALT-TEXT-') ||
-          // List codes (map to Matterhorn structure)
-          code.startsWith('LIST-') ||
-          // PDF structure codes
-          code.startsWith('PDF-LOW-CONTRAST') ||
-          code.startsWith('PDF-UNTAGGED') ||
-          code.startsWith('PDF-NO-LANGUAGE')
-        );
-      }
-    ).length;
+    return auditResult.issues.filter(isMatterhornIssue).length;
   }, [auditResult]);
 
   // Get unique WCAG criteria
