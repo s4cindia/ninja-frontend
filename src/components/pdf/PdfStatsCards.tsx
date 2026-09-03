@@ -243,7 +243,19 @@ export function PdfStatsCards({
   const issues = useMemo(() => auditResult.issues ?? [], [auditResult.issues]);
 
   const derived = useMemo(() => {
-    const sugs = Array.from(aiSuggestions.values());
+    // auditResult and aiSuggestions are fetched independently (separate
+    // polls/effects in PdfAuditResultsPage) — during an actively-running
+    // Comparison Study Auto Mode loop they can transiently reflect different
+    // rounds (e.g. aiSuggestions already showing a fresh re-analysis pass
+    // while auditResult still reflects the previous round's audit, or vice
+    // versa). A stale suggestion whose issueId no longer exists in the
+    // CURRENT issue set would otherwise inflate every count/ratio below past
+    // what the current issue count could support — seen live as "122% AI
+    // coverage" and fix counts exceeding the issue count they're supposedly
+    // a subset of. Filtering once here, before any derived stat is computed,
+    // keeps all of them internally consistent regardless of that timing.
+    const currentIssueIds = new Set(issues.map(i => i.id));
+    const sugs = Array.from(aiSuggestions.values()).filter(s => currentIssueIds.has(s.issueId));
 
     const mattIds = new Set<string>();
     for (const issue of issues) {

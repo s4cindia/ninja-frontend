@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { PdfStatsCards, type AutoTagInfo } from './PdfStatsCards';
-import type { PdfAuditResult } from '@/types/pdf.types';
+import type { PdfAuditResult, PdfAuditIssue } from '@/types/pdf.types';
+import type { AiAnalysis } from '@/components/remediation/IssueCard';
 
 const mockAuditResult = { issues: [] } as unknown as PdfAuditResult;
 
@@ -13,6 +14,52 @@ function renderCard(autoTagInfo: AutoTagInfo | null) {
       aiSuggestions={new Map()}
       aiStats={null}
       matterhornIssueCount={0}
+      isAnalyzingAi={false}
+      aiProgress={null}
+      onViewAutoTagReport={vi.fn()}
+      onRetryAutoTag={vi.fn()}
+      isRetryingAutoTag={false}
+      jobId="job-1"
+    />
+  );
+}
+
+function issue(overrides: Partial<PdfAuditIssue> & { id: string }): PdfAuditIssue {
+  return {
+    ruleId: 'PDF-GENERIC-001',
+    severity: 'moderate',
+    message: 'Generic issue',
+    description: 'Generic issue description',
+    ...overrides,
+  };
+}
+
+function suggestion(overrides: Partial<AiAnalysis> & { issueId: string }): AiAnalysis {
+  return {
+    id: `ai-${overrides.issueId}`,
+    jobId: 'job-1',
+    suggestionType: 'alt-text',
+    value: 'a description',
+    guidance: null,
+    confidence: 0.9,
+    rationale: 'because',
+    model: 'gemini',
+    applyMode: 'apply-to-pdf',
+    status: 'pending',
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function renderCoverageCard(opts: { issues: PdfAuditIssue[]; aiSuggestions: Map<string, AiAnalysis>; matterhornIssueCount?: number }) {
+  return render(
+    <PdfStatsCards
+      autoTagInfo={null}
+      auditResult={{ issues: opts.issues } as unknown as PdfAuditResult}
+      aiSuggestions={opts.aiSuggestions}
+      aiStats={null}
+      matterhornIssueCount={opts.matterhornIssueCount ?? 0}
       isAnalyzingAi={false}
       aiProgress={null}
       onViewAutoTagReport={vi.fn()}
@@ -214,5 +261,70 @@ describe('PdfStatsCards — post-fix validation resolution rate', () => {
     });
 
     expect(screen.getByText('Validating fixes…')).toBeInTheDocument();
+  });
+});
+
+describe('PdfStatsCards — AI coverage stats (stale-suggestion filtering)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('regression: does not exceed 100% AI coverage when aiSuggestions contains a stale entry whose issueId no longer exists in the current issue set (e.g. auditResult and aiSuggestions reflecting different Auto Mode rounds)', () => {
+    renderCoverageCard({
+      issues: [issue({ id: 'issue-1' }), issue({ id: 'issue-2' })],
+      aiSuggestions: new Map([
+        ['issue-1', suggestion({ issueId: 'issue-1' })],
+        ['issue-2', suggestion({ issueId: 'issue-2' })],
+        // Stale — from a round whose issue set has since shrunk; issue-3 no
+        // longer exists in the current auditResult.
+        ['issue-3', suggestion({ issueId: 'issue-3' })],
+        ['issue-4', suggestion({ issueId: 'issue-4' })],
+      ]),
+    });
+
+    // 2 current issues, 2 of the 4 suggestions match them -> 100%, not 200%.
+    expect(screen.getByText('100% AI coverage')).toBeInTheDocument();
+    expect(screen.queryByText(/200% AI coverage/)).not.toBeInTheDocument();
+  });
+
+  it('regression: excludes a stale suggestion from the AI suggestions summary count entirely, not just from the percentage', () => {
+    renderCoverageCard({
+      issues: [issue({ id: 'issue-1' })],
+      aiSuggestions: new Map([
+        ['issue-1', suggestion({ issueId: 'issue-1' })],
+        ['issue-stale', suggestion({ issueId: 'issue-stale' })],
+      ]),
+    });
+
+    // The Issues card is expanded by default — collapse it to see the
+    // "N AI suggestions" summary metric (only shown collapsed).
+    fireEvent.click(screen.getByRole('button', { name: /Issues/ }));
+
+    const label = screen.getByText('AI suggestions');
+    expect(label.previousElementSibling).toHaveTextContent('1');
+  });
+
+  it('counts a suggestion normally when its issueId matches a current issue — no false negative from the filter', () => {
+    renderCoverageCard({
+      issues: [issue({ id: 'issue-1' }), issue({ id: 'issue-2' })],
+      aiSuggestions: new Map([
+        ['issue-1', suggestion({ issueId: 'issue-1', applyMode: 'apply-to-pdf' })],
+      ]),
+    });
+
+    expect(screen.getByText('50% AI coverage')).toBeInTheDocument();
+  });
+
+  it('a fully stale suggestion set (no overlap with current issues at all) shows 0% coverage, not a crash or a nonsensical ratio', () => {
+    renderCoverageCard({
+      issues: [issue({ id: 'issue-1' })],
+      aiSuggestions: new Map([
+        ['issue-old-1', suggestion({ issueId: 'issue-old-1' })],
+        ['issue-old-2', suggestion({ issueId: 'issue-old-2' })],
+      ]),
+    });
+
+    expect(screen.queryByText(/\d+% AI coverage/)).not.toBeInTheDocument();
+    expect(screen.queryByText('AI suggestions')).not.toBeInTheDocument();
   });
 });
