@@ -9,7 +9,7 @@
  * toggling never refetches.
  */
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Table2, LineChart } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Badge } from '@/components/ui/Badge';
@@ -85,10 +85,21 @@ function RoundTable({ rounds }: { rounds: AutoModeRound[] }) {
   );
 }
 
+function chartSummary(rounds: AutoModeRound[]): string {
+  return rounds
+    .map(r => {
+      const remaining = r.remaining == null ? 'remaining unavailable' : `${r.remaining} remaining`;
+      const regressions = r.regressions ? `, ${r.regressions} regression${r.regressions === 1 ? '' : 's'}` : '';
+      return `Round ${r.round}: ${remaining}${regressions}`;
+    })
+    .join('; ');
+}
+
 function RoundChart({ rounds }: { rounds: AutoModeRound[] }) {
   const width = 240;
   const height = 60;
-  const { points, regressionDots } = buildSparklinePath(rounds, width, height);
+  const { points, regressionDots, unavailableMarkers } = buildSparklinePath(rounds, width, height);
+  const descId = useId();
 
   return (
     <div>
@@ -97,13 +108,21 @@ function RoundChart({ rounds }: { rounds: AutoModeRound[] }) {
         className="w-full h-16 text-primary-600"
         role="img"
         aria-label="Remaining issues per round"
+        aria-describedby={descId}
       >
         <polyline points={points} fill="none" stroke="currentColor" strokeWidth={1.5} />
         {regressionDots.map((dot, idx) => (
-          <circle key={idx} cx={dot.x} cy={dot.y} r={2.5} className="fill-amber-500" />
+          <circle key={`regression-${idx}`} cx={dot.x} cy={dot.y} r={2.5} className="fill-amber-500" />
+        ))}
+        {unavailableMarkers.map((dot, idx) => (
+          <circle key={`unavailable-${idx}`} cx={dot.x} cy={height / 2} r={2} className="fill-gray-300" />
         ))}
       </svg>
-      <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
+      {/* The SVG conveys the trend visually only — this exposes the same
+          per-round data (RoundTable, unmounted in this view, already shows
+          it visually) to assistive tech via the svg's aria-describedby. */}
+      <p id={descId} className="sr-only">{chartSummary(rounds)}</p>
+      <div className="flex justify-between text-[10px] text-gray-400 mt-0.5" aria-hidden="true">
         {rounds.map(r => <span key={r.round}>{r.round}</span>)}
       </div>
     </div>

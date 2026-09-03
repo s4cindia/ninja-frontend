@@ -46,21 +46,35 @@ export interface AutoModeRound {
 /**
  * Round-by-round trend for a Comparison Study Auto Mode run, derived from
  * the same GET /pdf/:jobId/remediation/history data RemediationHistoryCard
- * shows generically — filtered here to this job's auto_loop-sourced rounds
- * only (pairing each round's apply_fixes and reaudit events by cycleNumber).
- * A round with no auto_loop reaudit event (e.g. one an operator's own manual
- * action produced) is excluded entirely, not shown as a gap.
+ * shows generically — filtered here to this job's auto_loop-sourced,
+ * successfully-completed rounds only (pairing each round's apply_fixes and
+ * reaudit events by cycleNumber). A round with no *completed* auto_loop
+ * reaudit event (no auto_loop reaudit at all, or one that failed) is
+ * excluded entirely, not shown as a gap or a phantom dashes-only row.
+ *
+ * The history endpoint is job-wide, not scoped to "this Auto Mode
+ * invocation" — if the operator starts a second run after a prior one
+ * stopped, it still returns the earlier run's rounds too. Since cycleNumber
+ * only increases over time, the current run's own rounds are always the
+ * chronologically-last `completedRounds` of them (autoRoundsCompleted from
+ * useAutoModeStatus), so trim to just those.
  */
-export function useAutoModeRoundHistory(jobId: string | undefined, opts: { enabled: boolean; isRunning: boolean }) {
+export function useAutoModeRoundHistory(
+  jobId: string | undefined,
+  opts: { enabled: boolean; isRunning: boolean; completedRounds: number }
+) {
   return useQuery({
     queryKey: ROUND_HISTORY_KEY(jobId ?? ''),
     queryFn: async (): Promise<AutoModeRound[]> => {
       const runs = await pdfRemediationService.getRemediationHistory(jobId!);
-      return runs
-        .filter(run => run.events.some(e => e.action === 'reaudit' && e.source === 'auto_loop'))
+      const isCompletedAutoLoopReaudit = (e: { action: string; source: string; status: string }) =>
+        e.action === 'reaudit' && e.source === 'auto_loop' && e.status === 'completed';
+
+      const allRounds = runs
+        .filter(run => run.events.some(isCompletedAutoLoopReaudit))
         .sort((a, b) => a.cycleNumber - b.cycleNumber)
         .map((run, idx): AutoModeRound => {
-          const reaudit = run.events.find(e => e.action === 'reaudit' && e.source === 'auto_loop')!;
+          const reaudit = run.events.find(isCompletedAutoLoopReaudit)!;
           const apply = run.events.find(e => e.action === 'apply_fixes' && e.source === 'auto_loop');
           return {
             round: idx + 1,
@@ -73,11 +87,23 @@ export function useAutoModeRoundHistory(jobId: string | undefined, opts: { enabl
             completedAt: reaudit.completedAt ?? null,
           };
         });
+
+      // array.slice(-0) returns the WHOLE array in JS, not an empty one —
+      // guard the 0 case explicitly rather than relying on slice's own
+      // negative-index behavior.
+      const currentRunRounds = opts.completedRounds > 0 ? allRounds.slice(-opts.completedRounds) : [];
+      // Renumber 1..N within the current run only, now that any prior run's
+      // rounds have been trimmed off.
+      return currentRunRounds.map((r, idx) => ({ ...r, round: idx + 1 }));
     },
     enabled: !!jobId && opts.enabled,
     // Mirrors useAutoModeStatus's own "poll only while running" cadence —
     // driven from the caller's live status rather than this query's own
     // data (round history has no autoStatus field to self-check against).
+    // The caller additionally refetches this query directly on the
+    // running -> terminal transition (see PdfAuditResultsPage's
+    // autoModeProgressKey effect) so the final round isn't missed if it
+    // lands between this interval's own ticks.
     refetchInterval: opts.isRunning ? 5000 : false,
   });
 }

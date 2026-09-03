@@ -230,7 +230,16 @@ export const PdfAuditResultsPage: React.FC = () => {
       (autoModeStatusQuery.data?.autoRoundsCompleted ?? 0) > 0
     ),
     isRunning: autoModeStatusQuery.data?.autoStatus === 'running',
+    // Also trims off any earlier Auto Mode run's rounds still returned by
+    // the job-wide history endpoint — see useAutoModeRoundHistory's own doc
+    // comment.
+    completedRounds: autoModeStatusQuery.data?.autoRoundsCompleted ?? 0,
   });
+  // Named separately so the autoModeProgressKey effect below can list a
+  // plain, stable-looking identifier in its dependency array instead of a
+  // member expression (react-hooks/exhaustive-deps wants the whole object
+  // otherwise, which would re-run that effect on every query state change).
+  const refetchAutoModeRoundHistory = autoModeRoundHistoryQuery.refetch;
 
   // State management
   const [auditResult, setAuditResult] = useState<PdfAuditResult | null>(null);
@@ -1009,7 +1018,15 @@ export const PdfAuditResultsPage: React.FC = () => {
     fetchJobFlags();
     fetchAutoTagStatus();
     bumpHistoryRefreshTrigger();
-  }, [isAutoModeTrial, autoModeProgressKey, fetchAuditResult, fetchAiSuggestions, fetchJobFlags, fetchAutoTagStatus, bumpHistoryRefreshTrigger]);
+    // Explicit refetch rather than relying solely on the round-history
+    // query's own 5s interval — that interval isn't synchronized with this
+    // one, so without this the just-finished final round (or any round,
+    // really) could sit unfetched until its own next independent tick.
+    refetchAutoModeRoundHistory();
+  }, [
+    isAutoModeTrial, autoModeProgressKey, fetchAuditResult, fetchAiSuggestions, fetchJobFlags, fetchAutoTagStatus,
+    bumpHistoryRefreshTrigger, refetchAutoModeRoundHistory,
+  ]);
 
   const handleRetryAutoTag = async () => {
     if (!jobId || isRetryingAutoTag) return;
