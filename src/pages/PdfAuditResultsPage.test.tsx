@@ -35,9 +35,12 @@ vi.mock('@/services/pdfAutoMode.service', () => ({
 // Has its own dedicated test file — stub here to keep these tests focused on
 // PdfAuditResultsPage's own mode-based button gating, not the card's polling.
 vi.mock('@/components/pdf/AutoModeStatusCard', () => ({
-  AutoModeStatusCard: ({ status }: { status: { autoStatus: string | null; autoRoundsCompleted: number; autoMaxRounds: number } }) => (
+  AutoModeStatusCard: ({ status, rounds }: {
+    status: { autoStatus: string | null; autoRoundsCompleted: number; autoMaxRounds: number };
+    rounds: Array<{ round: number }>;
+  }) => (
     <div data-testid="auto-mode-status-card">
-      auto-mode-status:{status.autoStatus}:{status.autoRoundsCompleted}/{status.autoMaxRounds}
+      auto-mode-status:{status.autoStatus}:{status.autoRoundsCompleted}/{status.autoMaxRounds}:rounds={rounds.length}
     </div>
   ),
 }));
@@ -2411,6 +2414,39 @@ describe('PdfAuditResultsPage', () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+
+    it('derives round history from remediation history and passes it to AutoModeStatusCard', async () => {
+      mockCommonGets();
+      mockGetTrial.mockResolvedValue(mockTrial({ mode: 'auto' }));
+      mockGetAutoModeStatus.mockResolvedValue({
+        mode: 'auto',
+        autoStatus: 'running',
+        autoStopReason: null,
+        autoRoundsCompleted: 2,
+        autoMaxRounds: 10,
+        autoCostSpentUsd: 0.4,
+        autoCostLimitUsd: 2,
+      });
+      const mockGetHistory = pdfRemediationService.getRemediationHistory as Mocked<typeof pdfRemediationService>['getRemediationHistory'];
+      mockGetHistory.mockResolvedValue([
+        {
+          cycleNumber: 1,
+          events: [
+            { action: 'reaudit', source: 'auto_loop', status: 'completed', remainingCount: 40, startedAt: '2026-08-30T00:00:00Z' },
+          ],
+        },
+        {
+          cycleNumber: 2,
+          events: [
+            { action: 'reaudit', source: 'auto_loop', status: 'completed', remainingCount: 30, startedAt: '2026-08-30T00:10:00Z' },
+          ],
+        },
+      ]);
+
+      renderWithRouter(jobId, `?comparisonTrialId=${trialId}`);
+
+      expect(await screen.findByTestId('auto-mode-status-card')).toHaveTextContent('rounds=2');
     });
 
     describe('Remediation Checklist muting (only while a run is actively active)', () => {

@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { AutoModeStatusCard } from './AutoModeStatusCard';
 import type { AutoModeStatusResponse } from '@/types/pdfAutoMode.types';
+import type { AutoModeRound } from '@/hooks/useAutoMode';
 
 function status(overrides?: Partial<AutoModeStatusResponse>): AutoModeStatusResponse {
   return {
@@ -17,7 +18,10 @@ function status(overrides?: Partial<AutoModeStatusResponse>): AutoModeStatusResp
   };
 }
 
-function renderCard(overrides?: Partial<AutoModeStatusResponse>, props?: { isStopping?: boolean; stopError?: unknown; stopSucceeded?: boolean }) {
+function renderCard(
+  overrides?: Partial<AutoModeStatusResponse>,
+  props?: { isStopping?: boolean; stopError?: unknown; stopSucceeded?: boolean; rounds?: AutoModeRound[] }
+) {
   const onStop = vi.fn();
   const utils = render(
     <AutoModeStatusCard
@@ -26,6 +30,7 @@ function renderCard(overrides?: Partial<AutoModeStatusResponse>, props?: { isSto
       isStopping={props?.isStopping ?? false}
       stopError={props?.stopError}
       stopSucceeded={props?.stopSucceeded}
+      rounds={props?.rounds ?? []}
     />
   );
   return { onStop, ...utils };
@@ -112,5 +117,31 @@ describe('AutoModeStatusCard', () => {
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent(/stopped by the operator/i);
     expect(alert.className).toMatch(/red/);
+  });
+
+  it('renders the round-by-round history while running when rounds are provided', () => {
+    renderCard(undefined, {
+      rounds: [
+        { round: 1, applied: 12, failed: 0, resolved: 10, remaining: 40, regressions: 0, resolutionRate: 20, completedAt: null },
+      ],
+    });
+
+    expect(screen.getByText('Round-by-round')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Round' })).toBeInTheDocument();
+  });
+
+  it('renders the round-by-round history on the terminal (stopped) summary too', () => {
+    renderCard(
+      { autoStatus: 'stopped', autoStopReason: 'converged' },
+      { rounds: [{ round: 1, applied: 12, failed: 0, resolved: 10, remaining: 40, regressions: 0, resolutionRate: 20, completedAt: null }] }
+    );
+
+    expect(screen.getByText('Round-by-round')).toBeInTheDocument();
+  });
+
+  it('does not render the round history section when no rounds have completed yet', () => {
+    renderCard();
+
+    expect(screen.queryByText('Round-by-round')).not.toBeInTheDocument();
   });
 });

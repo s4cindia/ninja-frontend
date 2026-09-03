@@ -115,7 +115,7 @@ import { cn } from '@/utils/cn';
 import { validateJobId } from '@/utils/validation';
 import { useCreateRemediationPlan } from '@/hooks/usePdfRemediation';
 import { useComparisonTrial } from '@/hooks/useComparisonStudy';
-import { useAutoModeStatus, useStartAutoMode, useStopAutoMode } from '@/hooks/useAutoMode';
+import { useAutoModeStatus, useAutoModeRoundHistory, useStartAutoMode, useStopAutoMode } from '@/hooks/useAutoMode';
 import { AutoModeStatusCard } from '@/components/pdf/AutoModeStatusCard';
 import type { ComparisonTrialMode } from '@/types/comparisonStudy.types';
 import type { PdfAuditResult, PdfAuditIssue } from '@/types/pdf.types';
@@ -220,6 +220,17 @@ export const PdfAuditResultsPage: React.FC = () => {
   // session would hit a status endpoint that's permanently irrelevant.
   const autoModeStatusQuery = useAutoModeStatus(isAutoModeTrial ? jobId : undefined);
   const stopAutoMode = useStopAutoMode(jobId);
+  // Loads once a run has produced at least one completed round (or is
+  // actively running one), even for a trial being reviewed after the fact —
+  // not gated on isAutoModeTrial alone, since a stopped run's history is
+  // still worth seeing.
+  const autoModeRoundHistoryQuery = useAutoModeRoundHistory(jobId, {
+    enabled: isAutoModeTrial && (
+      autoModeStatusQuery.data?.autoStatus === 'running' ||
+      (autoModeStatusQuery.data?.autoRoundsCompleted ?? 0) > 0
+    ),
+    isRunning: autoModeStatusQuery.data?.autoStatus === 'running',
+  });
 
   // State management
   const [auditResult, setAuditResult] = useState<PdfAuditResult | null>(null);
@@ -1512,6 +1523,7 @@ export const PdfAuditResultsPage: React.FC = () => {
           isStopping={stopAutoMode.isPending}
           stopError={stopAutoMode.isError ? stopAutoMode.error : undefined}
           stopSucceeded={stopAutoMode.isSuccess}
+          rounds={autoModeRoundHistoryQuery.data ?? []}
         />
       )}
 
