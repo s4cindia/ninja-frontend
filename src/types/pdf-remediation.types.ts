@@ -279,12 +279,18 @@ export interface Issue {
 /** What kind of action a remediation-history event records. */
 export type RemediationHistoryAction = 'apply_fixes' | 'reaudit' | 'ai_analysis';
 
-/** Same source values as the remediation-cycle lock (RemediationCycleSource in services/api.ts) — the event records what acquired the lock. */
+/**
+ * Same source values as the remediation-cycle lock (RemediationCycleSource in
+ * services/api.ts), plus 'auto_loop' — Comparison Study Auto Mode's own
+ * unattended analyze/apply/re-audit loop acquires the same lock, but wasn't
+ * reflected here yet.
+ */
 export type RemediationHistoryEventSource =
   | 'apply_all'
   | 'apply_single'
   | 'reaudit_pdf_upload'
   | 'reaudit_current_file'
+  | 'auto_loop'
   | 'analyze_job';
 
 /**
