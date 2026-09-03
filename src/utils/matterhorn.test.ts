@@ -29,6 +29,10 @@ describe('isMatterhornIssue', () => {
     expect(isMatterhornIssue(issue({ code: 'MATTERHORN-11-003' }))).toBe(true);
   });
 
+  it('matches any MATTERHORN- code, not just the numeric MATTERHORN-NN- form (e.g. the MATTERHORN-ALT- family PdfPreviewPanel already recognizes)', () => {
+    expect(isMatterhornIssue(issue({ code: 'MATTERHORN-ALT-MISSING' }))).toBe(true);
+  });
+
   it('matches on each known related code prefix', () => {
     for (const code of ['TABLE-MISSING-HEADER', 'ALT-TEXT-MISSING', 'LIST-STRUCTURE', 'PDF-LOW-CONTRAST-TEXT', 'PDF-UNTAGGED-CONTENT', 'PDF-NO-LANGUAGE-SET']) {
       expect(isMatterhornIssue(issue({ code }))).toBe(true);
@@ -61,6 +65,10 @@ describe('getMatterhornCheckpoint', () => {
 
   it('derives the checkpoint from a MATTERHORN-NN- code as a last resort', () => {
     expect(getMatterhornCheckpoint(issue({ code: 'MATTERHORN-06-002' }))).toBe('06');
+  });
+
+  it('matches a lowercase MATTERHORN-NN- code — case must not disagree with isMatterhornIssue, which already normalizes to uppercase', () => {
+    expect(getMatterhornCheckpoint(issue({ code: 'matterhorn-06-002' }))).toBe('06');
   });
 
   it('returns undefined when nothing identifies a checkpoint', () => {

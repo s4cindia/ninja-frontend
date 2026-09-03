@@ -52,7 +52,12 @@ export function isMatterhornIssue(issue: PdfAuditIssue): boolean {
   const { category, code: rawCode } = issue as ClassifiableIssue;
   if (category && MATTERHORN_CATEGORY_MAP[category]) return true;
   const code = (rawCode || issue.ruleId || '').toUpperCase();
-  if (/^MATTERHORN-\d{2}-/.test(code)) return true;
+  // Any MATTERHORN- code counts, not just the numeric MATTERHORN-NN- form —
+  // non-numeric variants like MATTERHORN-ALT- exist in the data (see
+  // PdfPreviewPanel's RULE_CATEGORIES) and the page's old broader check
+  // already covered them; only getMatterhornCheckpoint needs the numeric
+  // form specifically, to extract a checkpoint number.
+  if (code.startsWith('MATTERHORN-')) return true;
   return MATTERHORN_CODE_PREFIXES.some(p => code.startsWith(p));
 }
 
@@ -65,7 +70,7 @@ export function getMatterhornCheckpoint(issue: PdfAuditIssue): string | undefine
   const { matterhornCheckpoint, category, code: rawCode } = issue as ClassifiableIssue;
   if (matterhornCheckpoint) return matterhornCheckpoint;
   if (category && MATTERHORN_CATEGORY_MAP[category]) return MATTERHORN_CATEGORY_MAP[category];
-  const code = rawCode || issue.ruleId || '';
+  const code = (rawCode || issue.ruleId || '').toUpperCase();
   const match = code.match(/^MATTERHORN-(\d{2})-/);
   return match ? match[1] : undefined;
 }
