@@ -24,7 +24,7 @@ export interface PacConditionResult {
   how: 'M' | 'H' | '--';
   status: PacConditionStatus;
   issueIds?: string[];
-  source?: 'ninja' | 'verapdf';
+  source?: 'ninja' | 'verapdf' | 'pdfa11y';
 }
 
 export interface PacCheckpointResult {

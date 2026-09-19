@@ -25,6 +25,7 @@ import type {
   PacCheckpointStatus,
   PacConditionStatus,
 } from '../../services/pac-report.service';
+import { SourceBadge } from '../audit';
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
 
@@ -92,6 +93,9 @@ function CheckpointRow({ cp }: { cp: PacCheckpointResult }) {
               <span className={`flex-1 ${CONDITION_COLORS[cond.status]}`}>
                 {cond.description}
               </span>
+              {cond.source && (
+                <SourceBadge source={cond.source} className="flex-shrink-0" />
+              )}
               <span className={`font-mono flex-shrink-0 ${CONDITION_COLORS[cond.status]}`}>
                 {statusLabel(cond.status)}
               </span>
