@@ -68,6 +68,12 @@ const SOURCE_CONFIG: Record<string, { label: string; colors: string }> = {
 };
 
 export const SourceBadge: React.FC<SourceBadgeProps> = ({ source, className }) => {
+  // `source` ultimately comes from an unvalidated API response (PdfAuditIssue
+  // and PacConditionResult are cast, not runtime-checked) — a malformed
+  // non-string value must not reach `config.label` below, or React throws
+  // trying to render it as a child.
+  if (typeof source !== 'string') return null;
+
   const config = SOURCE_CONFIG[source] || {
     label: source || 'Unknown',
     colors: 'bg-gray-100 text-gray-700',

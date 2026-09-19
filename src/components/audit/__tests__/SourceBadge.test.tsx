@@ -29,4 +29,11 @@ describe('SourceBadge', () => {
     const badge = screen.getByText('something-new');
     expect(badge.className).toMatch(/bg-gray-100/);
   });
+
+  it('renders nothing rather than throwing when source is a non-string value (CodeRabbit finding — an unvalidated API payload could hand this an object)', () => {
+    const { container } = render(
+      <SourceBadge source={{ malformed: true } as unknown as string} />
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
 });
