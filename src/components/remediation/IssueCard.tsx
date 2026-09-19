@@ -4,6 +4,7 @@ import { Zap, CheckCircle, AlertTriangle, FileText, ExternalLink, ChevronDown, C
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/utils/cn';
 import { Tooltip } from '../ui/Tooltip';
+import { SourceBadge } from '../audit';
 import { api, getErrorMessage, getRemediationCycleLockDetails, remediationCycleSourceMessage, type RemediationCycleSource } from '@/services/api';
 import type { PdfAuditIssue } from '@/types/pdf.types';
 
@@ -307,6 +308,13 @@ export function IssueCard({
             )}>
               {issue.severity}
             </span>
+
+            {/* Provenance Badge — which engine found this (Ninja's own checks vs. the
+                external veraPDF/pdfa11y validators). Purely informational, not shown
+                at all when the backend hasn't populated `source` (older audits). */}
+            {isPdf && (issue as PdfAuditIssue).source && (
+              <SourceBadge source={(issue as PdfAuditIssue).source!} />
+            )}
 
             {/* Matterhorn Checkpoint Badge */}
             {isPdf && showMatterhorn && (issue as PdfAuditIssue).matterhornCheckpoint && (

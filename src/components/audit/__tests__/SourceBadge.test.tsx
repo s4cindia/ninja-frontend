@@ -8,6 +8,12 @@ describe('SourceBadge', () => {
     ['ace', 'ACE', /bg-purple-100/],
     ['js-auditor', 'JS Auditor', /bg-green-100/],
     ['prh-uk', 'PRH UK', /bg-teal-100/],
+    ['ninja', 'Ninja', /bg-indigo-100/],
+    ['pdf-structure', 'Ninja', /bg-indigo-100/],
+    ['contrast-validator', 'Ninja', /bg-indigo-100/],
+    ['alt-text-validator', 'Ninja', /bg-indigo-100/],
+    ['verapdf', 'veraPDF', /bg-slate-100/],
+    ['pdfa11y', 'pdfa11y', /bg-cyan-100/],
   ] as const)(
     'renders the %s source with the expected label and theme class',
     (source, label, classRe) => {

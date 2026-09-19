@@ -111,6 +111,8 @@ export interface PdfAuditIssue {
   wcagCriteria?: string[];
   /** Associated Matterhorn Protocol checkpoint ID */
   matterhornCheckpoint?: string;
+  /** Which check engine found this issue, e.g. 'pdf-structure' (Ninja's own checks), 'verapdf', or 'pdfa11y'. Not set on issues audited before the external validators shipped. */
+  source?: string;
   /** Recommended remediation action */
   suggestedFix?: string;
   /**

@@ -1,7 +1,10 @@
 import React from 'react';
 import { cn } from '@/utils/cn';
 
-export type IssueSource = 'epubcheck' | 'ace' | 'js-auditor' | 'prh-uk';
+export type IssueSource =
+  | 'epubcheck' | 'ace' | 'js-auditor' | 'prh-uk'
+  | 'ninja' | 'pdf-structure' | 'contrast-validator' | 'alt-text-validator'
+  | 'verapdf' | 'pdfa11y';
 
 interface SourceBadgeProps {
   source: IssueSource | string;
@@ -30,6 +33,37 @@ const SOURCE_CONFIG: Record<string, { label: string; colors: string }> = {
   manual: {
     label: 'Manual',
     colors: 'bg-gray-100 text-gray-800',
+  },
+  // PDF/UA validation now blends Ninja's own checks with two external
+  // engines (veraPDF, pdfa11y) — this is purely a provenance label, not a
+  // trust ranking, so all three get distinct-but-neutral colors rather than
+  // a "good/bad" gradient. 'pdf-structure'/'contrast-validator'/
+  // 'alt-text-validator' are Ninja's own PDF check sources (mirrors how
+  // 'epubcheck'/'ace'/'js-auditor' are EPUB's); 'ninja' covers the PAC
+  // report's own already-normalized source field.
+  ninja: {
+    label: 'Ninja',
+    colors: 'bg-indigo-100 text-indigo-800',
+  },
+  'pdf-structure': {
+    label: 'Ninja',
+    colors: 'bg-indigo-100 text-indigo-800',
+  },
+  'contrast-validator': {
+    label: 'Ninja',
+    colors: 'bg-indigo-100 text-indigo-800',
+  },
+  'alt-text-validator': {
+    label: 'Ninja',
+    colors: 'bg-indigo-100 text-indigo-800',
+  },
+  verapdf: {
+    label: 'veraPDF',
+    colors: 'bg-slate-100 text-slate-800',
+  },
+  pdfa11y: {
+    label: 'pdfa11y',
+    colors: 'bg-cyan-100 text-cyan-800',
   },
 };
 

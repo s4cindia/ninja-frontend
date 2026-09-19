@@ -194,6 +194,28 @@ describe('IssueCard', () => {
       expect(screen.queryByText(/01-003/)).not.toBeInTheDocument();
     });
 
+    it('shows a provenance badge for an issue from an external validator', () => {
+      const veraPdfIssue = { ...mockPdfIssue, source: 'verapdf' };
+      renderWithQuery(<IssueCard issue={veraPdfIssue} />);
+
+      expect(screen.getByText('veraPDF')).toBeInTheDocument();
+    });
+
+    it('shows a provenance badge for an issue from Ninja\'s own checks', () => {
+      const ninjaIssue = { ...mockPdfIssue, source: 'alt-text-validator' };
+      renderWithQuery(<IssueCard issue={ninjaIssue} />);
+
+      expect(screen.getByText('Ninja')).toBeInTheDocument();
+    });
+
+    it('does not show a provenance badge when source is absent (issues audited before external validators shipped)', () => {
+      renderWithQuery(<IssueCard issue={mockPdfIssue} />);
+
+      expect(screen.queryByText('Ninja')).not.toBeInTheDocument();
+      expect(screen.queryByText('veraPDF')).not.toBeInTheDocument();
+      expect(screen.queryByText('pdfa11y')).not.toBeInTheDocument();
+    });
+
     it('stops event propagation when page badge is clicked', () => {
       const onClick = vi.fn();
       const onPageClick = vi.fn();
