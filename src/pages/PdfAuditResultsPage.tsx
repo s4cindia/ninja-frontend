@@ -826,8 +826,18 @@ export const PdfAuditResultsPage: React.FC = () => {
   // fetchAiSuggestions again with a stale closure. Declared before the
   // "load on mount" effect below so its cleanup (for the OLD jobId) runs
   // before that effect re-fires fetchAiSuggestions for the NEW jobId.
+  //
+  // Also resets aiSuggestions/hasRemediatedFile here: the route
+  // (/pdf/audit/:jobId) has no key={jobId}, so navigating between jobs
+  // reuses this same component instance rather than remounting it. Without
+  // this reset, the PREVIOUS job's suggestions/remediated-file state would
+  // stay visible — and could show the Download AI-Fixed PDF button for a
+  // job that hasn't actually been checked yet — until this job's own
+  // fetchAiSuggestions resolves.
   useEffect(() => {
     activeJobIdRef.current = jobId;
+    setAiSuggestions(new Map());
+    setHasRemediatedFile(false);
     return () => {
       if (aiPollingRef.current) {
         clearInterval(aiPollingRef.current);
