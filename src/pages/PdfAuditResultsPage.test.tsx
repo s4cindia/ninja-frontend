@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mocked } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup, act, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import { PdfAuditResultsPage } from './PdfAuditResultsPage';
@@ -967,6 +967,180 @@ describe('PdfAuditResultsPage', () => {
         expect(screen.getByText('test-document.pdf')).toBeInTheDocument();
       });
       expect(screen.queryByRole('button', { name: /Apply Fixes/ })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Download AI-Fixed PDF button visibility', () => {
+    const jobId = 'job-123';
+    const auditUrl = `/pdf/job/${jobId}/audit/result`;
+    const statusUrl = `/pdf/${jobId}/auto-tag/status`;
+    const aiUrl = `/pdf/${jobId}/ai-analysis`;
+
+    const mockAiResponse = (
+      suggestions: Array<{ issueId: string; applyMode: string; status: string }>,
+      hasRemediatedFile?: boolean
+    ) => ({
+      data: {
+        data: {
+          suggestions: suggestions.map((s, i) => ({
+            id: `sugg-${i}`,
+            jobId,
+            issueId: s.issueId,
+            suggestionType: 'alt-text',
+            value: 'A description',
+            guidance: null,
+            confidence: 0.9,
+            rationale: 'because',
+            model: 'gemini',
+            applyMode: s.applyMode,
+            status: s.status,
+            createdAt: '2024-01-15T10:00:00Z',
+            updatedAt: '2024-01-15T10:00:00Z',
+          })),
+          analyzed: suggestions.length,
+          total: suggestions.length,
+          status: 'complete',
+          hasRemediatedFile,
+        },
+      },
+    });
+
+    it('shows the button when an "applied" suggestion is present, even before hasRemediatedFile is known', async () => {
+      const mockResult = createMockAuditResult();
+
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve(mockAiResponse([
+          { issueId: '1', applyMode: 'apply-to-pdf', status: 'applied' },
+        ]));
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      expect(await screen.findByRole('button', { name: /Download AI-Fixed PDF/ })).toBeInTheDocument();
+    });
+
+    it('regression: shows the button via hasRemediatedFile even when Auto Mode has pruned away every "applied" suggestion for the fixed issues (the reported bug)', async () => {
+      const mockResult = createMockAuditResult();
+
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        // No suggestions at all — analyzeJob pruned every AiAnalysis row for
+        // issues that no longer appear in the latest (fully-fixed) audit.
+        if (url === aiUrl) return Promise.resolve(mockAiResponse([], true));
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      expect(await screen.findByRole('button', { name: /Download AI-Fixed PDF/ })).toBeInTheDocument();
+    });
+
+    it('hides the button when there is neither an "applied" suggestion nor a remediated file', async () => {
+      const mockResult = createMockAuditResult();
+
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve(mockAiResponse([
+          { issueId: '1', applyMode: 'apply-to-pdf', status: 'pending' },
+        ], false));
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      await waitFor(() => {
+        expect(screen.getByText('test-document.pdf')).toBeInTheDocument();
+      });
+      expect(screen.queryByRole('button', { name: /Download AI-Fixed PDF/ })).not.toBeInTheDocument();
+    });
+
+    it('hides the button when hasRemediatedFile is absent from the response (older backend before this field shipped) and nothing is applied', async () => {
+      const mockResult = createMockAuditResult();
+
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve(mockAiResponse([]));
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      await waitFor(() => {
+        expect(screen.getByText('test-document.pdf')).toBeInTheDocument();
+      });
+      expect(screen.queryByRole('button', { name: /Download AI-Fixed PDF/ })).not.toBeInTheDocument();
+    });
+
+    it('regression: does not show a stale Download button for a newly-navigated-to job before ITS OWN AI suggestions have loaded (CodeRabbit finding — the route has no key={jobId}, so this component instance is reused across job navigations)', async () => {
+      const jobA = 'job-123';
+      const jobB = 'job-456';
+      const auditUrlA = `/pdf/job/${jobA}/audit/result`;
+      const statusUrlA = `/pdf/${jobA}/auto-tag/status`;
+      const aiUrlAJobScoped = `/pdf/${jobA}/ai-analysis`;
+      const auditUrlB = `/pdf/job/${jobB}/audit/result`;
+      const statusUrlB = `/pdf/${jobB}/auto-tag/status`;
+      const aiUrlB = `/pdf/${jobB}/ai-analysis`;
+
+      const resultA = createMockAuditResult({ fileName: 'job-a.pdf' });
+      const resultB = createMockAuditResult({ fileName: 'job-b.pdf' });
+
+      // Held open deliberately — simulates the window between navigating to
+      // job B and job B's own fetchAiSuggestions resolving.
+      let resolveAiB!: (value: unknown) => void;
+      const aiBPromise = new Promise((resolve) => { resolveAiB = resolve; });
+
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrlA) return Promise.resolve({ data: { data: resultA } });
+        if (url === statusUrlA) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrlAJobScoped) return Promise.resolve(mockAiResponse([], true)); // job A has a remediated file
+        if (url === auditUrlB) return Promise.resolve({ data: { data: resultB } });
+        if (url === statusUrlB) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrlB) return aiBPromise;
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      function Harness() {
+        const navigate = useNavigate();
+        return (
+          <>
+            <button onClick={() => navigate(`/pdf/audit/${jobB}`)}>go-to-job-b</button>
+            <Routes>
+              <Route path="/pdf/audit/:jobId" element={<PdfAuditResultsPage />} />
+            </Routes>
+          </>
+        );
+      }
+
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={[`/pdf/audit/${jobA}`]}>
+            <Harness />
+          </MemoryRouter>
+        </QueryClientProvider>
+      );
+
+      // Job A: button visible via hasRemediatedFile.
+      expect(await screen.findByRole('button', { name: /Download AI-Fixed PDF/ })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'go-to-job-b' }));
+
+      // Job B's own audit result has loaded (the page now shows job B's
+      // content), but its AI suggestions fetch is still pending — the
+      // button must not still show job A's stale state.
+      await screen.findByText('job-b.pdf');
+      expect(screen.queryByRole('button', { name: /Download AI-Fixed PDF/ })).not.toBeInTheDocument();
+
+      resolveAiB(mockAiResponse([], false));
+      await waitFor(() => {
+        expect(screen.queryByRole('button', { name: /Download AI-Fixed PDF/ })).not.toBeInTheDocument();
+      });
     });
   });
 

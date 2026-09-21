@@ -225,6 +225,11 @@ export const PdfAuditResultsPage: React.FC = () => {
 
   // AI analysis state
   const [aiSuggestions, setAiSuggestions] = useState<Map<string, AiAnalysis>>(new Map());
+  // A remediated file surviving in S3 storage — unlike aiSuggestions, this
+  // isn't pruned when analyzeJob drops AiAnalysis rows for issues no longer
+  // in the latest audit, so it stays true through Auto Mode's later rounds
+  // even after every 'applied' suggestion for a since-fixed issue is gone.
+  const [hasRemediatedFile, setHasRemediatedFile] = useState(false);
   const [isAnalyzingAi, setIsAnalyzingAi] = useState(false);
   const [aiProgress, setAiProgress] = useState<{ analyzed: number; total: number } | null>(null);
   const [isRerunningAiAnalysis, setIsRerunningAiAnalysis] = useState(false);
@@ -735,9 +740,10 @@ export const PdfAuditResultsPage: React.FC = () => {
             analyzedAt?: string;
           } | null;
           guidanceAcknowledgment?: GuidanceAcknowledgment | null;
+          hasRemediatedFile?: boolean;
         };
       }>(`/pdf/${encodeURIComponent(jobId)}/ai-analysis`);
-      const { suggestions, analyzed, total, status, stats, guidanceAcknowledgment: ack } = res.data.data;
+      const { suggestions, analyzed, total, status, stats, guidanceAcknowledgment: ack, hasRemediatedFile: remediatedFileExists } = res.data.data;
       const map = new Map<string, AiAnalysis>();
       suggestions.forEach((s) => map.set(s.issueId, s));
       // Discard a response that is either stale (an older request resolving
@@ -755,6 +761,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         setAiProgress({ analyzed, total });
         setAiAnalysisStatus(status);
         setGuidanceAcknowledgment(ack ?? null);
+        setHasRemediatedFile(remediatedFileExists ?? false);
         setHasLoadedAiStatus(true);
         if (stats) setAiStats(stats);
         if (status === 'complete') {
@@ -819,8 +826,18 @@ export const PdfAuditResultsPage: React.FC = () => {
   // fetchAiSuggestions again with a stale closure. Declared before the
   // "load on mount" effect below so its cleanup (for the OLD jobId) runs
   // before that effect re-fires fetchAiSuggestions for the NEW jobId.
+  //
+  // Also resets aiSuggestions/hasRemediatedFile here: the route
+  // (/pdf/audit/:jobId) has no key={jobId}, so navigating between jobs
+  // reuses this same component instance rather than remounting it. Without
+  // this reset, the PREVIOUS job's suggestions/remediated-file state would
+  // stay visible — and could show the Download AI-Fixed PDF button for a
+  // job that hasn't actually been checked yet — until this job's own
+  // fetchAiSuggestions resolves.
   useEffect(() => {
     activeJobIdRef.current = jobId;
+    setAiSuggestions(new Map());
+    setHasRemediatedFile(false);
     return () => {
       if (aiPollingRef.current) {
         clearInterval(aiPollingRef.current);
@@ -1332,7 +1349,7 @@ export const PdfAuditResultsPage: React.FC = () => {
               <Download className="h-4 w-4 mr-1" />
               Download Report
             </Button>
-            {Array.from(aiSuggestions.values()).some(s => s.status === 'applied') && (
+            {(hasRemediatedFile || Array.from(aiSuggestions.values()).some(s => s.status === 'applied')) && (
               <Button
                 variant="outline"
                 size="sm"
