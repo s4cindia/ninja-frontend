@@ -317,6 +317,19 @@ export const PdfAuditResultsPage: React.FC = () => {
     lockedBy: string | null;
     source: RemediationCycleSource | null;
   }>({ inProgress: false, lockedAt: null, lockedBy: null, source: null });
+  // remediationCycleLock is a snapshot from /auto-tag/status — nothing
+  // re-polls that endpoint while AI Analysis's own 3s poll (fetchAiSuggestions)
+  // is what's actually running, so remediationCycleLock.inProgress can stay
+  // stale/false for the entire span of an AI Analysis run (e.g. it just
+  // started via Re-run AI Analysis, or was already in flight on page load
+  // before the lock had been observed). isAnalyzingAi is that same run's own
+  // live signal and doesn't have this gap, so every lock-gated action below
+  // ORs it in rather than trusting remediationCycleLock.inProgress alone —
+  // otherwise those actions stay clickable during AI Analysis and 409
+  // (REMEDIATION_CYCLE_IN_PROGRESS, source 'analyze_job') on click.
+  const remediationCycleActive = remediationCycleLock.inProgress || isAnalyzingAi;
+  const remediationCycleActiveSource: RemediationCycleSource | null =
+    remediationCycleLock.source ?? (isAnalyzingAi ? 'analyze_job' : null);
   // Bumped after a local action succeeds via a path RemediationHistoryCard's
   // own lock-transition detection can't see (upload/current-file re-audit
   // are awaited directly — their one request/response IS the whole cycle,
@@ -1049,7 +1062,7 @@ export const PdfAuditResultsPage: React.FC = () => {
   }, [jobId, fetchAuditResult, applyAutoTagStatus, applyRemediationCycleLock, bumpHistoryRefreshTrigger]);
 
   const handleReRunAuditForCurrentJob = async () => {
-    if (!jobId || isReRunningAudit || remediationCycleLock.inProgress) return;
+    if (!jobId || isReRunningAudit || remediationCycleActive) return;
     setIsReRunningAudit(true);
     try {
       await api.post(`/pdf/${encodeURIComponent(jobId)}/remediation/re-audit-current`);
@@ -1380,12 +1393,12 @@ export const PdfAuditResultsPage: React.FC = () => {
                 })}
                 disabled={
                   startAutoMode.isPending ||
-                  remediationCycleLock.inProgress ||
+                  remediationCycleActive ||
                   autoModeStatusQuery.data?.autoStatus === 'running'
                 }
                 title={
                   autoModeStatusQuery.data?.autoStatus === 'running' ? 'A run is already in progress'
-                    : remediationCycleLock.inProgress ? remediationCycleSourceMessage(remediationCycleLock.source)
+                    : remediationCycleActive ? remediationCycleSourceMessage(remediationCycleActiveSource)
                     : undefined
                 }
               >
@@ -1400,8 +1413,8 @@ export const PdfAuditResultsPage: React.FC = () => {
                   variant="outline"
                   size="sm"
                   onClick={handleReRunAuditForCurrentJob}
-                  disabled={isReRunningAudit || remediationCycleLock.inProgress}
-                  title={remediationCycleLock.inProgress ? remediationCycleSourceMessage(remediationCycleLock.source) : undefined}
+                  disabled={isReRunningAudit || remediationCycleActive}
+                  title={remediationCycleActive ? remediationCycleSourceMessage(remediationCycleActiveSource) : undefined}
                 >
                   {isReRunningAudit
                     ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Re-running…</>
@@ -1525,14 +1538,14 @@ export const PdfAuditResultsPage: React.FC = () => {
       <VerifyManualFixesCard
         jobId={jobId!}
         onReaudited={handleManualFixReaudited}
-        remediationCycleInProgress={remediationCycleLock.inProgress}
-        remediationCycleSource={remediationCycleLock.source}
+        remediationCycleInProgress={remediationCycleActive}
+        remediationCycleSource={remediationCycleActiveSource}
         onApplyError={() => { void refreshRemediationCycleLock(); }}
       />
 
       <RemediationHistoryCard
         jobId={jobId!}
-        remediationCycleInProgress={remediationCycleLock.inProgress}
+        remediationCycleInProgress={remediationCycleActive}
         refreshTrigger={historyRefreshTrigger}
       />
 
@@ -1651,8 +1664,8 @@ export const PdfAuditResultsPage: React.FC = () => {
                   variant="primary"
                   size="sm"
                   onClick={() => setShowApplyAllPanel(true)}
-                  disabled={remediationCycleLock.inProgress}
-                  title={remediationCycleLock.inProgress ? remediationCycleSourceMessage(remediationCycleLock.source) : undefined}
+                  disabled={remediationCycleActive}
+                  title={remediationCycleActive ? remediationCycleSourceMessage(remediationCycleActiveSource) : undefined}
                 >
                   <Zap className="h-4 w-4 mr-1" />
                   Apply Fixes ({eligibleForApplyAll + pendingEligible})
@@ -1897,8 +1910,8 @@ export const PdfAuditResultsPage: React.FC = () => {
                     onClick={() => handleIssueSelect(issue)}
                     recordApplied={recordApplied}
                     recordSuggestionDecision={recordSuggestionDecision}
-                    remediationCycleInProgress={remediationCycleLock.inProgress}
-                    remediationCycleSource={remediationCycleLock.source}
+                    remediationCycleInProgress={remediationCycleActive}
+                    remediationCycleSource={remediationCycleActiveSource}
                     onApplyError={() => { void refreshRemediationCycleLock(); }}
                     disableManualActions={disableManualActions}
                     onAiSuggestionChange={(updated) => {
@@ -1931,8 +1944,8 @@ export const PdfAuditResultsPage: React.FC = () => {
             pendingEligibleCount={pendingEligible}
             onApplied={handleApplyAllSuccess}
             onClose={() => setShowApplyAllPanel(false)}
-            remediationCycleInProgress={remediationCycleLock.inProgress}
-            remediationCycleSource={remediationCycleLock.source}
+            remediationCycleInProgress={remediationCycleActive}
+            remediationCycleSource={remediationCycleActiveSource}
             onApplyError={() => { void refreshRemediationCycleLock(); }}
           />
         </DialogContent>
