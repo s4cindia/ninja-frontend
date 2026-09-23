@@ -87,11 +87,12 @@ vi.mock('@/components/pdf/MatterhornSummary', () => ({
 }));
 
 vi.mock('@/components/remediation/IssueCard', () => ({
-  IssueCard: ({ issue, onPageClick }: {
+  IssueCard: ({ issue, onPageClick, remediationCycleInProgress }: {
     issue: { id: string; message: string; pageNumber?: number };
     onPageClick?: (page: number) => void;
+    remediationCycleInProgress?: boolean;
   }) => (
-    <div data-testid={`issue-card-${issue.id}`}>
+    <div data-testid={`issue-card-${issue.id}`} data-remediation-cycle-in-progress={String(!!remediationCycleInProgress)}>
       <div>{issue.message}</div>
       <button onClick={() => onPageClick && onPageClick(issue.pageNumber!)}>
         Go to Page {issue.pageNumber}
@@ -101,10 +102,11 @@ vi.mock('@/components/remediation/IssueCard', () => ({
 }));
 
 vi.mock('@/components/remediation/ApplyAllSuggestionsPanel', () => ({
-  ApplyAllSuggestionsPanel: ({ onApplied }: {
+  ApplyAllSuggestionsPanel: ({ onApplied, remediationCycleInProgress }: {
     onApplied: (result: { applied: number; failed: number }) => void;
+    remediationCycleInProgress?: boolean;
   }) => (
-    <button onClick={() => onApplied({ applied: 1, failed: 0 })}>
+    <button onClick={() => onApplied({ applied: 1, failed: 0 })} disabled={!!remediationCycleInProgress}>
       Mock Apply All
     </button>
   ),
@@ -967,6 +969,65 @@ describe('PdfAuditResultsPage', () => {
         expect(screen.getByText('test-document.pdf')).toBeInTheDocument();
       });
       expect(screen.queryByRole('button', { name: /Apply Fixes/ })).not.toBeInTheDocument();
+    });
+
+    it('regression: disables the Apply Fixes button while AI Analysis is running, even with eligible suggestions left over from a previous pass (the reported bug — remediationCycleLock does not reflect an in-flight AI Analysis run)', async () => {
+      const mockResult = createMockAuditResult();
+
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve({
+          data: {
+            data: {
+              suggestions: [{
+                id: 'sugg-0', jobId, issueId: '1', suggestionType: 'alt-text', value: 'A description',
+                guidance: null, confidence: 0.9, rationale: 'because', model: 'gemini',
+                applyMode: 'apply-to-pdf', status: 'pending',
+                createdAt: '2024-01-15T10:00:00Z', updatedAt: '2024-01-15T10:00:00Z',
+              }],
+              analyzed: 1, total: 5, status: 'processing',
+            },
+          },
+        });
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      const applyFixesButton = await screen.findByRole('button', { name: /Apply Fixes \(1\)/ });
+      await waitFor(() => expect(applyFixesButton).toBeDisabled());
+      expect(applyFixesButton).toHaveAttribute('title', expect.stringMatching(/AI analysis is running/));
+    });
+
+    it('regression (CodeRabbit): IssueCard and an already-open ApplyAllSuggestionsPanel both receive remediationCycleInProgress once AI Analysis starts — the toolbar button being disabled is not, by itself, proof the props threaded into these two children are still correct', async () => {
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: createMockAuditResult() } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve(mockAiResponse([
+          { issueId: '1', applyMode: 'apply-to-pdf', status: 'pending' },
+        ]));
+        return Promise.resolve({ data: { data: {} } });
+      });
+      mockApi.post.mockResolvedValue({ data: { data: { status: 'processing', total: 5, message: 'started' } } });
+
+      renderWithRouter(jobId);
+
+      // Baseline: nothing running yet, so both children report not-in-progress.
+      const issueCard = await screen.findByTestId('issue-card-1');
+      expect(issueCard).toHaveAttribute('data-remediation-cycle-in-progress', 'false');
+
+      fireEvent.click(await screen.findByRole('button', { name: /Apply Fixes \(1\)/ }));
+      expect(await screen.findByRole('button', { name: 'Mock Apply All' })).not.toBeDisabled();
+
+      // Start AI Analysis (still reachable — the toolbar isn't unmounted by
+      // the dialog) and confirm BOTH already-rendered children pick it up.
+      fireEvent.click(screen.getByRole('button', { name: 'Re-run AI Analysis' }));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('issue-card-1')).toHaveAttribute('data-remediation-cycle-in-progress', 'true');
+      });
+      expect(screen.getByRole('button', { name: 'Mock Apply All' })).toBeDisabled();
     });
   });
 
@@ -2103,6 +2164,22 @@ describe('PdfAuditResultsPage', () => {
       expect(reRunButton).toHaveAttribute('title', expect.stringMatching(/AI analysis is running/));
     });
 
+    it('regression: disables Re-run Audit while AI Analysis is running, even when /auto-tag/status itself reports nothing in progress (the reported bug — remediationCycleLock does not get refreshed during an AI Analysis run since nothing re-polls /auto-tag/status while only the AI-suggestions poll is active)', async () => {
+      const mockResult = createMockAuditResult();
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve({ data: { data: { suggestions: [], analyzed: 0, total: 5, status: 'processing' } } });
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      const reRunButton = await screen.findByRole('button', { name: 'Re-run Audit' });
+      await waitFor(() => expect(reRunButton).toBeDisabled());
+      expect(reRunButton).toHaveAttribute('title', expect.stringMatching(/AI analysis is running/));
+    });
+
     it('regression: a 409 REMEDIATION_CYCLE_IN_PROGRESS response immediately re-polls /auto-tag/status instead of waiting for the next regular tick', async () => {
       const mockResult = createMockAuditResult();
       mockApi.get.mockImplementation((url: string) => {
@@ -2456,6 +2533,36 @@ describe('PdfAuditResultsPage', () => {
       const startButton = await screen.findByRole('button', { name: 'Start Auto Remediation' });
       await waitFor(() => expect(startButton).toBeDisabled());
       expect(startButton).toHaveAttribute('title', expect.stringMatching(/already in progress/i));
+      expect(mockStartAutoMode).not.toHaveBeenCalled();
+    });
+
+    it('regression: disables Start Auto Remediation while AI Analysis is running, even though remediationCycleLock itself is stale (nothing re-polls /auto-tag/status while only the AI-suggestions poll is active — clicking it would 409 REMEDIATION_CYCLE_IN_PROGRESS since analyze_job holds the same lock)', async () => {
+      const mockResult = createMockAuditResult();
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        // remediationCycleLock's own source of truth reports nothing in
+        // progress — it's only isAnalyzingAi (from the ai-analysis response
+        // below) that reveals AI Analysis is actually running server-side.
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve({ data: { data: { suggestions: [], analyzed: 0, total: 5, status: 'processing' } } });
+        return Promise.resolve({ data: { data: {} } });
+      });
+      mockGetTrial.mockResolvedValue(mockTrial({ mode: 'auto' }));
+      mockGetAutoModeStatus.mockResolvedValue({
+        mode: 'auto',
+        autoStatus: null,
+        autoStopReason: null,
+        autoRoundsCompleted: 0,
+        autoMaxRounds: 10,
+        autoCostSpentUsd: 0,
+        autoCostLimitUsd: 2,
+      });
+
+      renderWithRouter(jobId, `?comparisonTrialId=${trialId}`);
+
+      const startButton = await screen.findByRole('button', { name: 'Start Auto Remediation' });
+      await waitFor(() => expect(startButton).toBeDisabled());
+      expect(startButton).toHaveAttribute('title', expect.stringMatching(/AI analysis/i));
       expect(mockStartAutoMode).not.toHaveBeenCalled();
     });
 
