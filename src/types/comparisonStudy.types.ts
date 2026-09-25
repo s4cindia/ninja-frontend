@@ -45,6 +45,10 @@ export interface VeraPdfResult {
   failures: VeraPdfFailure[];
 }
 
+/** null = no tagger ran yet (or none configured) for this trial's Ninja job. */
+export type ComparisonTaggerSource = 'seam-c' | 'adobe' | null;
+export type ComparisonAutoTagStatus = 'complete' | 'skipped' | 'failed' | null;
+
 export interface ComparisonTrial {
   id: string;
   sourceFileName: string;
@@ -82,6 +86,31 @@ export interface ComparisonTrial {
   autoStartedAt: string | null;
   /** When the current/last auto-mode run stopped (see autoStopReason for why). Null while a run is still active, or if auto mode has never run. */
   autoStoppedAt: string | null;
+
+  taggerSource: ComparisonTaggerSource;
+  autoTagStatus: ComparisonAutoTagStatus;
+  aiFixesAppliedCount: number;
+  manualFixesRequiredCount: number;
+}
+
+/**
+ * A single issue still requiring manual remediation, as listed in the
+ * Manual Fixes Required modal. code/message/wcagCriteria/location/
+ * pageNumber/matterhornCheckpoint can be null (a later re-audit reassigned
+ * the underlying issue id) — guidance/rationale are always populated, so
+ * the modal stays useful even when the WCAG-code detail is missing.
+ */
+export interface ManualFixItem {
+  id: string;
+  code: string | null;
+  message: string | null;
+  wcagCriteria: string[] | null;
+  location: string | null;
+  pageNumber: number | null;
+  matterhornCheckpoint: string | null;
+  suggestionType: string;
+  guidance: string | null;
+  rationale: string;
 }
 
 export interface ComparisonTrialWithJob extends ComparisonTrial {
@@ -134,6 +163,10 @@ export interface TrialReport {
     costUsd: number | null;
     pacFailureCount: number | null;
     pagesPerHour: number | null;
+    taggerSource: ComparisonTaggerSource;
+    autoTagStatus: ComparisonAutoTagStatus;
+    aiFixesAppliedCount: number;
+    manualFixesRequiredCount: number;
   };
   pdfxt: {
     timeMs: number | null;

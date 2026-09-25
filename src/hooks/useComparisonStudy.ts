@@ -10,6 +10,7 @@ const KEYS = {
   report: (id: string) => ['comparison-study', 'report', id] as const,
   aggregate: () => ['comparison-study', 'aggregate-report'] as const,
   pacReport: (trialId: string) => ['comparison-study', 'pac-report', trialId] as const,
+  manualFixes: (trialId: string) => ['comparison-study', 'manual-fixes', trialId] as const,
 };
 
 const PAGE_SIZE = 20;
@@ -167,5 +168,14 @@ export function useDeleteExternalPacReport(trialId: string) {
       qc.setQueryData(KEYS.pacReport(trialId), null);
       qc.invalidateQueries({ queryKey: KEYS.pacReport(trialId) });
     },
+  });
+}
+
+/** Lazy — only fetches once `enabled` (the modal being open), not on every report-page load. */
+export function useManualFixes(trialId: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: KEYS.manualFixes(trialId ?? ''),
+    queryFn: () => comparisonStudyService.getManualFixes(trialId!),
+    enabled: enabled && !!trialId,
   });
 }

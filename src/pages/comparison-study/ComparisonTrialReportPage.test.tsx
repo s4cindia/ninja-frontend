@@ -4,7 +4,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import ComparisonTrialReportPage from './ComparisonTrialReportPage';
 import { comparisonStudyService, uploadExternalPacReportFile } from '@/services/comparisonStudy.service';
-import type { TrialReport, ComparisonTrialWithJob, ExternalPacReport } from '@/types/comparisonStudy.types';
+import type { TrialReport, ComparisonTrialWithJob, ExternalPacReport, ManualFixItem } from '@/types/comparisonStudy.types';
 
 vi.mock('@/services/comparisonStudy.service');
 
@@ -39,6 +39,10 @@ const mockTrial = (overrides?: Partial<ComparisonTrialWithJob>): ComparisonTrial
   autoColorContrastMode: null,
   autoStartedAt: null,
   autoStoppedAt: null,
+  taggerSource: null,
+  autoTagStatus: null,
+  aiFixesAppliedCount: 0,
+  manualFixesRequiredCount: 0,
   job: null,
   ...overrides,
 });
@@ -58,6 +62,20 @@ const mockPacReport = (overrides?: Partial<ExternalPacReport>): ExternalPacRepor
   uploadedById: 'op-1',
   createdAt: '2026-08-01T11:00:00Z',
   downloadUrl: 'https://s3.example/presigned-get',
+  ...overrides,
+});
+
+const mockManualFixItem = (overrides?: Partial<ManualFixItem>): ManualFixItem => ({
+  id: 'fix-1',
+  code: 'MATTERHORN-13-001',
+  message: 'Image is missing alternative text.',
+  wcagCriteria: ['1.1.1'],
+  location: '/Document/Page[3]/Figure[1]',
+  pageNumber: 3,
+  matterhornCheckpoint: '13',
+  suggestionType: 'alt-text',
+  guidance: 'Add a concise, descriptive alt attribute to this figure.',
+  rationale: 'The AI could not confidently generate alt text for this decorative-looking image.',
   ...overrides,
 });
 
@@ -81,6 +99,7 @@ describe('ComparisonTrialReportPage', () => {
     mockService.getExternalPacReport.mockReset().mockResolvedValue(null);
     mockService.confirmExternalPacReportUpload.mockReset();
     mockService.deleteExternalPacReport.mockReset();
+    mockService.getManualFixes.mockReset();
     mockUploadFile.mockReset();
   });
 
@@ -90,7 +109,10 @@ describe('ComparisonTrialReportPage', () => {
       sourceFileName: 'sample.pdf',
       contentType: 'text-dominant',
       pageCount: 42,
-      ninja: { activeMs: 90000, costUsd: 1.23, pacFailureCount: 2, pagesPerHour: 28 },
+      ninja: {
+        activeMs: 90000, costUsd: 1.23, pacFailureCount: 2, pagesPerHour: 28,
+        taggerSource: 'seam-c', autoTagStatus: 'complete', aiFixesAppliedCount: 4, manualFixesRequiredCount: 1,
+      },
       pdfxt: { timeMs: 300000, costUsd: 4.56, pacFailureCount: 5, pagesPerHour: 8.4 },
     };
     mockService.getTrialReport.mockResolvedValue(report);
@@ -110,7 +132,10 @@ describe('ComparisonTrialReportPage', () => {
       sourceFileName: 'sample.pdf',
       contentType: 'text-dominant',
       pageCount: null,
-      ninja: { activeMs: null, costUsd: null, pacFailureCount: null, pagesPerHour: null },
+      ninja: {
+        activeMs: null, costUsd: null, pacFailureCount: null, pagesPerHour: null,
+        taggerSource: null, autoTagStatus: null, aiFixesAppliedCount: 0, manualFixesRequiredCount: 0,
+      },
       pdfxt: { timeMs: null, costUsd: null, pacFailureCount: null, pagesPerHour: null },
     };
     mockService.getTrialReport.mockResolvedValue(report);
@@ -309,6 +334,98 @@ describe('ComparisonTrialReportPage', () => {
       await waitFor(() => {
         expect(mockService.getExternalPacReport.mock.calls.length).toBeGreaterThan(getCallsBefore);
       });
+    });
+  });
+
+  describe('Tagger / AI Fixes Applied / Manual Fixes Required', () => {
+    beforeEach(() => {
+      mockService.getTrialReport.mockRejectedValue(new Error('404'));
+    });
+
+    it.each([
+      ['seam-c' as const, null, 'Seam-C'],
+      ['adobe' as const, null, 'Adobe'],
+      [null, 'failed' as const, 'Tagging failed'],
+      [null, 'skipped' as const, 'Tagging skipped'],
+      [null, null, 'Not yet tagged'],
+    ])('shows the tagger tile as %s', async (taggerSource, autoTagStatus, expectedLabel) => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ taggerSource, autoTagStatus }));
+
+      renderPage();
+
+      expect(await screen.findByText('Tagger')).toBeInTheDocument();
+      expect(screen.getByText(expectedLabel)).toBeInTheDocument();
+    });
+
+    it('shows the AI Fixes Applied count', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ aiFixesAppliedCount: 7 }));
+
+      renderPage();
+
+      expect(await screen.findByText('AI Fixes Applied')).toBeInTheDocument();
+      expect(screen.getByText('7')).toBeInTheDocument();
+    });
+
+    it('renders Manual Fixes Required as a plain (non-clickable) tile when the count is zero', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ manualFixesRequiredCount: 0 }));
+
+      renderPage();
+
+      await screen.findByText('Manual Fixes Required');
+      expect(screen.queryByRole('button', { name: /Manual Fixes Required/ })).not.toBeInTheDocument();
+    });
+
+    it('opens the modal and lazily fetches manual fixes when the count tile is clicked', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ manualFixesRequiredCount: 2 }));
+      mockService.getManualFixes.mockResolvedValue({
+        items: [
+          mockManualFixItem({ id: 'fix-1' }),
+          mockManualFixItem({
+            id: 'fix-2',
+            code: null,
+            message: null,
+            wcagCriteria: null,
+            location: null,
+            pageNumber: null,
+            matterhornCheckpoint: null,
+            guidance: 'Manually verify the reading order for this section.',
+            rationale: 'Reading order could not be automatically confirmed.',
+          }),
+        ],
+      });
+
+      renderPage();
+
+      const tile = await screen.findByRole('button', { name: /Manual Fixes Required/ });
+      expect(mockService.getManualFixes).not.toHaveBeenCalled();
+
+      fireEvent.click(tile);
+
+      await waitFor(() => {
+        expect(mockService.getManualFixes).toHaveBeenCalledWith('trial-1');
+      });
+      expect(await screen.findByText('MATTERHORN-13-001')).toBeInTheDocument();
+      expect(screen.getByText('Image is missing alternative text.')).toBeInTheDocument();
+      expect(screen.getByText(/Add a concise, descriptive alt attribute/)).toBeInTheDocument();
+      // The code/message-less item still renders usefully via guidance/rationale.
+      expect(screen.getByText(/Manually verify the reading order/)).toBeInTheDocument();
+      expect(screen.getByText(/Reading order could not be automatically confirmed/)).toBeInTheDocument();
+    });
+
+    it('shows an error state with retry when the manual-fixes fetch fails', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ manualFixesRequiredCount: 1 }));
+      mockService.getManualFixes.mockRejectedValueOnce(new Error('500'));
+
+      renderPage();
+
+      fireEvent.click(await screen.findByRole('button', { name: /Manual Fixes Required/ }));
+
+      expect(await screen.findByText('Could not load manual fixes.')).toBeInTheDocument();
+
+      mockService.getManualFixes.mockResolvedValueOnce({ items: [mockManualFixItem()] });
+      fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+      expect(await screen.findByText('MATTERHORN-13-001')).toBeInTheDocument();
     });
   });
 });

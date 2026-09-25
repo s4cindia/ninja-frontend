@@ -39,6 +39,10 @@ const mockTrial = (overrides?: Partial<ComparisonTrial>): ComparisonTrial => ({
   autoColorContrastMode: null,
   autoStartedAt: null,
   autoStoppedAt: null,
+  taggerSource: null,
+  autoTagStatus: null,
+  aiFixesAppliedCount: 0,
+  manualFixesRequiredCount: 0,
   ...overrides,
 });
 
@@ -107,6 +111,27 @@ describe('ComparisonStudyConsolePage', () => {
     expect(screen.getByText('~$0.45')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
     expect(await screen.findByText('Attached')).toBeInTheDocument();
+  });
+
+  it('shows the tagger source and AI/manual fix counts per row', async () => {
+    mockService.listTrials.mockResolvedValue({
+      trials: [
+        mockTrial({ taggerSource: 'seam-c', aiFixesAppliedCount: 6, manualFixesRequiredCount: 2 }),
+        mockTrial({ id: 'trial-2', sourceFileName: 'other.pdf', taggerSource: null, autoTagStatus: 'skipped', aiFixesAppliedCount: 0, manualFixesRequiredCount: 0 }),
+      ],
+      nextCursor: null,
+    });
+
+    renderPage();
+
+    await screen.findByText('sample.pdf');
+    const row1 = screen.getByText('sample.pdf').closest('tr')!;
+    expect(within(row1).getByText('Seam-C')).toBeInTheDocument();
+    expect(within(row1).getByText('6')).toBeInTheDocument();
+    expect(within(row1).getByText('2')).toBeInTheDocument();
+
+    const row2 = screen.getByText('other.pdf').closest('tr')!;
+    expect(within(row2).getByText('Skipped')).toBeInTheDocument();
   });
 
   it('shows dashes for time-to-convergence/AWS cost/PAC failures and no attachment badge text when the underlying data is absent', async () => {
