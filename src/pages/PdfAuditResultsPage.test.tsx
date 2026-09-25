@@ -2447,6 +2447,8 @@ describe('PdfAuditResultsPage', () => {
         autoStatus: null,
         autoStopReason: null,
         autoColorContrastMode: null,
+        autoStartedAt: null,
+        autoStoppedAt: null,
         job: null,
         ...overrides,
       };

@@ -34,6 +34,17 @@ export interface VeraPdfFailure {
   context?: string;
 }
 
+/**
+ * `ran: false` means veraPDF wasn't run (or hasn't finished) for this side —
+ * distinct from `ran: true` with an empty `failures` array, which is a real
+ * zero-failures pass. Always gate on `ran` before reading `failures.length`;
+ * don't read `.length` off this directly.
+ */
+export interface VeraPdfResult {
+  ran: boolean;
+  failures: VeraPdfFailure[];
+}
+
 export interface ComparisonTrial {
   id: string;
   sourceFileName: string;
@@ -44,13 +55,13 @@ export interface ComparisonTrial {
   ninjaJobId: string | null;
   ninjaActiveMs: number | null;
   ninjaGpuCostUsd: number | null;
-  ninjaPacResult: VeraPdfFailure[] | null;
+  ninjaPacResult: VeraPdfResult | null;
 
   pdfxtS3Path: string | null;
   pdfxtTimeMs: number | null;
   pdfxtPageCount: number | null;
   pdfxtCostUsd: number | null;
-  pdfxtPacResult: VeraPdfFailure[] | null;
+  pdfxtPacResult: VeraPdfResult | null;
 
   status: ComparisonTrialStatus;
   createdAt: string;
@@ -66,10 +77,49 @@ export interface ComparisonTrial {
   autoColorContrastMode: AutoColorContrastMode;
   // autoStopRequested (internal cooperative-cancel flag) is intentionally
   // omitted — use the /stop endpoint, never read/write this directly.
+
+  /** When the current/last auto-mode run started. Null if auto mode has never run for this trial. */
+  autoStartedAt: string | null;
+  /** When the current/last auto-mode run stopped (see autoStopReason for why). Null while a run is still active, or if auto mode has never run. */
+  autoStoppedAt: string | null;
 }
 
 export interface ComparisonTrialWithJob extends ComparisonTrial {
   job: { id: string; status: string; output: unknown } | null;
+}
+
+/**
+ * A real, external PAC-tool report file the operator uploads by hand for a
+ * trial. Distinct from BOTH of the other things this codebase also calls a
+ * "PAC report": Ninja's own self-generated Matterhorn emulation
+ * (pac-report.service.ts / PacReportModal.tsx) and the veraPDF
+ * ninjaPacResult/pdfxtPacResult failure-count blob above. Always say
+ * "External PAC Report" / "Uploaded PAC Report" in UI copy — bare "PAC
+ * Report" is already claimed by PacReportModal's UI.
+ */
+export interface ExternalPacReport {
+  id: string;
+  trialId: string;
+  s3Key: string;
+  originalFileName: string;
+  mimeType: string;
+  size: number;
+  pass: number | null;
+  fail: number | null;
+  untested: number | null;
+  humanRequired: number | null;
+  notApplicable: number | null;
+  uploadedById: string;
+  createdAt: string;
+}
+
+/** Operator-typed summary counts from a real PAC-tool export — there's no parser for the actual file, so these are hand-entered alongside the upload. */
+export interface ExternalPacReportSummary {
+  pass?: number;
+  fail?: number;
+  untested?: number;
+  humanRequired?: number;
+  notApplicable?: number;
 }
 
 export interface TrialReport {
