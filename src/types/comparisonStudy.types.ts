@@ -63,9 +63,50 @@ export interface ComparisonTrial {
   autoCostSpentUsd: number;
   autoStatus: AutoModeStatus;
   autoStopReason: AutoModeStopReason;
+  /** Wall-clock start/stop of the current/last auto-mode run — a real "time to convergence" figure. autoStoppedAt is null while autoStatus is 'running'. */
+  autoStartedAt: string | null;
+  autoStoppedAt: string | null;
   autoColorContrastMode: AutoColorContrastMode;
   // autoStopRequested (internal cooperative-cancel flag) is intentionally
   // omitted — use the /stop endpoint, never read/write this directly.
+  /** Only populated by listTrials — whether an ExternalPacReport exists for this trial, without an N+1 fetch per row. */
+  hasPacReport?: boolean;
+}
+
+/**
+ * A real, external PAC-tool report file uploaded by an operator — distinct
+ * from BOTH ninjaPacResult/pdfxtPacResult above (a veraPDF failure-count
+ * blob) and the separately self-generated Matterhorn-protocol "PAC report"
+ * (pac-report.service.ts/PacReportModal.tsx). Nothing parses real PAC
+ * export files, so pass/fail/etc. are entered manually by the uploading
+ * operator, not derived from the file's own contents.
+ */
+export interface ExternalPacReport {
+  id: string;
+  trialId: string;
+  s3Key: string;
+  originalFileName: string;
+  mimeType: string;
+  size: number;
+  pass: number | null;
+  fail: number | null;
+  untested: number | null;
+  humanRequired: number | null;
+  notApplicable: number | null;
+  uploadedById: string;
+  createdAt: string;
+}
+
+export interface ExternalPacReportWithDownloadUrl extends ExternalPacReport {
+  downloadUrl: string;
+}
+
+export interface PacReportSummaryInput {
+  pass?: number;
+  fail?: number;
+  untested?: number;
+  humanRequired?: number;
+  notApplicable?: number;
 }
 
 export interface ComparisonTrialWithJob extends ComparisonTrial {

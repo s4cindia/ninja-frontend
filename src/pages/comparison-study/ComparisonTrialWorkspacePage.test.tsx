@@ -3,9 +3,9 @@ import { render, screen, fireEvent, waitFor, within, act } from '@testing-librar
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import ComparisonTrialWorkspacePage from './ComparisonTrialWorkspacePage';
-import { comparisonStudyService } from '@/services/comparisonStudy.service';
+import { comparisonStudyService, uploadPacReport } from '@/services/comparisonStudy.service';
 import { useJobPolling } from '@/hooks/useJobPolling';
-import type { ComparisonTrialWithJob } from '@/types/comparisonStudy.types';
+import type { ComparisonTrialWithJob, ExternalPacReportWithDownloadUrl } from '@/types/comparisonStudy.types';
 
 vi.mock('@/services/comparisonStudy.service');
 vi.mock('@/hooks/useJobPolling');
@@ -16,8 +16,27 @@ vi.mock('@/components/pdf/PdfJobProgressPanel', () => ({
 }));
 
 const mockService = vi.mocked(comparisonStudyService);
+const mockUploadPacReport = vi.mocked(uploadPacReport);
 const mockUseJobPolling = vi.mocked(useJobPolling);
 const mockStartPolling = vi.fn();
+
+const mockPacReport = (overrides?: Partial<ExternalPacReportWithDownloadUrl>): ExternalPacReportWithDownloadUrl => ({
+  id: 'pac-1',
+  trialId: 'trial-1',
+  s3Key: 'comparison-study/pac-reports/trial-1/report.pdf',
+  originalFileName: 'report.pdf',
+  mimeType: 'application/pdf',
+  size: 1234,
+  pass: 40,
+  fail: 2,
+  untested: 1,
+  humanRequired: 3,
+  notApplicable: 0,
+  uploadedById: 'op-1',
+  createdAt: '2026-08-01T10:00:00Z',
+  downloadUrl: 'https://s3.example.com/report.pdf?signed',
+  ...overrides,
+});
 
 function stubJobPolling(status: 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | null, progress = 0) {
   mockUseJobPolling.mockReturnValue({
@@ -56,6 +75,8 @@ const mockTrial = (overrides?: Partial<ComparisonTrialWithJob>): ComparisonTrial
   autoCostSpentUsd: 0,
   autoStatus: null,
   autoStopReason: null,
+  autoStartedAt: null,
+  autoStoppedAt: null,
   autoColorContrastMode: null,
   job: null,
   ...overrides,
@@ -93,6 +114,10 @@ describe('ComparisonTrialWorkspacePage', () => {
     mockService.getUploadUrl.mockReset();
     mockService.deleteTrial.mockReset();
     mockService.updateAutoModeConfig.mockReset();
+    mockService.getPacReport.mockReset();
+    mockService.getPacReport.mockResolvedValue(null);
+    mockService.deletePacReport.mockReset();
+    mockUploadPacReport.mockReset();
     mockStartPolling.mockReset();
     stubJobPolling(null);
     global.fetch = vi.fn();
@@ -169,6 +194,64 @@ describe('ComparisonTrialWorkspacePage', () => {
     fireEvent.click(await screen.findByRole('link', { name: /View Report/ }));
 
     expect(await screen.findByText('Report page')).toBeInTheDocument();
+  });
+
+  describe('PAC Report', () => {
+    it('uploads a PAC report file with manually-entered summary counts', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial());
+      mockService.getPacReport.mockResolvedValue(null);
+      mockUploadPacReport.mockResolvedValue(mockPacReport());
+
+      renderPage();
+
+      await screen.findByLabelText('PAC Report File');
+      const file = new File(['pac'], 'report.pdf', { type: 'application/pdf' });
+      fireEvent.change(screen.getByLabelText('PAC Report File'), { target: { files: [file] } });
+      fireEvent.change(screen.getByLabelText('Pass'), { target: { value: '40' } });
+      fireEvent.change(screen.getByLabelText('Fail'), { target: { value: '2' } });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Upload PAC Report' }));
+
+      await waitFor(() => {
+        expect(mockUploadPacReport).toHaveBeenCalledWith('trial-1', file, {
+          pass: 40,
+          fail: 2,
+          untested: undefined,
+          humanRequired: undefined,
+          notApplicable: undefined,
+        });
+      });
+    });
+
+    it('shows an inline error instead of uploading when no file is chosen', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial());
+      mockService.getPacReport.mockResolvedValue(null);
+
+      renderPage();
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Upload PAC Report' }));
+
+      expect(await screen.findByText('Choose a PAC report file first.')).toBeInTheDocument();
+      expect(mockUploadPacReport).not.toHaveBeenCalled();
+    });
+
+    it('shows the summary counts and a download link once a report exists, and can remove it', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial());
+      mockService.getPacReport.mockResolvedValue(mockPacReport());
+      mockService.deletePacReport.mockResolvedValue({ trialId: 'trial-1' });
+
+      renderPage();
+
+      expect(await screen.findByText('report.pdf')).toBeInTheDocument();
+      expect(screen.getByText('40')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /Download/ })).toHaveAttribute('href', 'https://s3.example.com/report.pdf?signed');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+
+      await waitFor(() => {
+        expect(mockService.deletePacReport).toHaveBeenCalledWith('trial-1');
+      });
+    });
   });
 
   it('shows a not-found state for a missing trial without crashing', async () => {

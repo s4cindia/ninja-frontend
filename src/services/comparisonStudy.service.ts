@@ -7,6 +7,8 @@ import type {
   AutoColorContrastMode,
   TrialReport,
   AggregateReport,
+  ExternalPacReportWithDownloadUrl,
+  PacReportSummaryInput,
 } from '@/types/comparisonStudy.types';
 
 // Routes are mounted under /admin, not bare /comparison-study.
@@ -77,6 +79,26 @@ export const comparisonStudyService = {
 
   deleteTrial: (id: string): Promise<{ id: string }> =>
     api.delete(`${BASE}/trials/${encodeURIComponent(id)}`).then((r) => r.data.data),
+
+  getPacReportUploadUrl: (
+    id: string,
+    filename: string,
+    contentType = 'application/pdf'
+  ): Promise<{ uploadUrl: string; expiresIn: number }> =>
+    api.post(`${BASE}/trials/${encodeURIComponent(id)}/pac-report-upload-url`, { filename, contentType })
+      .then((r) => r.data.data),
+
+  confirmPacReportUpload: (
+    id: string,
+    data: { originalFileName: string; mimeType: string; summary: PacReportSummaryInput }
+  ): Promise<ExternalPacReportWithDownloadUrl> =>
+    api.post(`${BASE}/trials/${encodeURIComponent(id)}/pac-report-confirm`, data).then((r) => r.data.data),
+
+  getPacReport: (id: string): Promise<ExternalPacReportWithDownloadUrl | null> =>
+    api.get(`${BASE}/trials/${encodeURIComponent(id)}/pac-report`).then((r) => r.data.data),
+
+  deletePacReport: (id: string): Promise<{ trialId: string }> =>
+    api.delete(`${BASE}/trials/${encodeURIComponent(id)}/pac-report`).then((r) => r.data.data),
 };
 
 /**
@@ -98,4 +120,32 @@ export async function uploadComparisonPdf(file: File): Promise<string> {
     throw new Error(`S3 upload failed: ${s3Res.status}`);
   }
   return s3Key;
+}
+
+/**
+ * Upload a real, external PAC-tool report against a trial: presign -> PUT
+ * directly to S3 (same WAF-bypass reasoning as uploadComparisonPdf above)
+ * -> confirm with the manually-entered summary counts. Returns the
+ * confirmed report record (with a fresh presigned download URL).
+ */
+export async function uploadPacReport(
+  trialId: string,
+  file: File,
+  summary: PacReportSummaryInput
+): Promise<ExternalPacReportWithDownloadUrl> {
+  const contentType = file.type || 'application/octet-stream';
+  const { uploadUrl } = await comparisonStudyService.getPacReportUploadUrl(trialId, file.name, contentType);
+  const s3Res = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': contentType },
+    body: file,
+  });
+  if (!s3Res.ok) {
+    throw new Error(`S3 upload failed: ${s3Res.status}`);
+  }
+  return comparisonStudyService.confirmPacReportUpload(trialId, {
+    originalFileName: file.name,
+    mimeType: contentType,
+    summary,
+  });
 }

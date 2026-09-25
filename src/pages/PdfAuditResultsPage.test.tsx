@@ -2446,6 +2446,8 @@ describe('PdfAuditResultsPage', () => {
         autoCostSpentUsd: 0,
         autoStatus: null,
         autoStopReason: null,
+        autoStartedAt: null,
+        autoStoppedAt: null,
         autoColorContrastMode: null,
         job: null,
         ...overrides,

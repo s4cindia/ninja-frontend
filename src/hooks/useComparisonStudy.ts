@@ -1,6 +1,6 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { comparisonStudyService, uploadComparisonPdf } from '@/services/comparisonStudy.service';
-import type { ComparisonTrialContentType, ComparisonTrialMode, AutoColorContrastMode } from '@/types/comparisonStudy.types';
+import { comparisonStudyService, uploadComparisonPdf, uploadPacReport } from '@/services/comparisonStudy.service';
+import type { ComparisonTrialContentType, ComparisonTrialMode, AutoColorContrastMode, PacReportSummaryInput } from '@/types/comparisonStudy.types';
 
 const TRIALS_KEY = ['comparison-study', 'trials'] as const;
 
@@ -9,6 +9,7 @@ const KEYS = {
   trial: (id: string) => ['comparison-study', 'trial', id] as const,
   report: (id: string) => ['comparison-study', 'report', id] as const,
   aggregate: () => ['comparison-study', 'aggregate-report'] as const,
+  pacReport: (id: string) => ['comparison-study', 'pac-report', id] as const,
 };
 
 const PAGE_SIZE = 20;
@@ -114,6 +115,37 @@ export function useDeleteTrial(id: string) {
   return useMutation({
     mutationFn: () => comparisonStudyService.deleteTrial(id),
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: TRIALS_KEY });
+    },
+  });
+}
+
+export function usePacReport(id: string | undefined) {
+  return useQuery({
+    queryKey: KEYS.pacReport(id ?? ''),
+    queryFn: () => comparisonStudyService.getPacReport(id!),
+    enabled: !!id,
+  });
+}
+
+export function useUploadPacReport(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ file, summary }: { file: File; summary: PacReportSummaryInput }) =>
+      uploadPacReport(id, file, summary),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEYS.pacReport(id) });
+      qc.invalidateQueries({ queryKey: TRIALS_KEY });
+    },
+  });
+}
+
+export function useDeletePacReport(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => comparisonStudyService.deletePacReport(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEYS.pacReport(id) });
       qc.invalidateQueries({ queryKey: TRIALS_KEY });
     },
   });

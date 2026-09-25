@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { Loader2, FileCheck2 } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { useComparisonTrialsInfinite, useRegisterTrial } from '@/hooks/useComparisonStudy';
-import type { ComparisonTrialContentType } from '@/types/comparisonStudy.types';
+import { formatDuration } from '@/utils/format';
+import type { ComparisonTrialContentType, ComparisonTrial } from '@/types/comparisonStudy.types';
 
 const CONTENT_TYPE_OPTIONS: { value: ComparisonTrialContentType; label: string }[] = [
   { value: 'text-dominant', label: 'Text Dominant' },
@@ -29,6 +30,17 @@ function StatusBadge({ status }: { status: string }) {
 
 function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function fmtUsd(v: number | null | undefined): string {
+  if (v == null) return '--';
+  return `$${v.toFixed(2)}`;
+}
+
+/** Time to convergence — only meaningful for a completed (non-running) auto-mode run. */
+function convergenceTime(trial: ComparisonTrial): string {
+  if (trial.mode !== 'auto' || trial.autoStatus === 'running') return '--';
+  return formatDuration(trial.autoStartedAt, trial.autoStoppedAt) ?? '--';
 }
 
 function RegisterTrialForm({ onClose }: { onClose: () => void }) {
@@ -156,6 +168,11 @@ export default function ComparisonStudyConsolePage() {
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Filename</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Content Type</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Convergence</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AI Cost</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AWS Cost (Est.)</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PAC Failures</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PAC Report</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
               </tr>
             </thead>
@@ -163,7 +180,7 @@ export default function ComparisonStudyConsolePage() {
               {isLoading ? (
                 Array.from({ length: 5 }, (_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: 4 }, (_, j) => (
+                    {Array.from({ length: 9 }, (_, j) => (
                       <td key={j} className="px-6 py-4">
                         <div className="h-4 bg-gray-200 rounded animate-pulse" />
                       </td>
@@ -172,7 +189,7 @@ export default function ComparisonStudyConsolePage() {
                 ))
               ) : trials.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-12 text-center text-sm text-gray-400">
+                  <td colSpan={9} className="px-6 py-12 text-center text-sm text-gray-400">
                     No trials registered yet
                   </td>
                 </tr>
@@ -191,6 +208,27 @@ export default function ComparisonStudyConsolePage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <StatusBadge status={trial.status} />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {convergenceTime(trial)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {fmtUsd(trial.autoCostSpentUsd)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {fmtUsd(trial.ninjaGpuCostUsd)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {trial.ninjaPacResult?.length ?? '--'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {trial.hasPacReport ? (
+                        <span title="PAC report uploaded" className="inline-flex items-center text-[#1A7A3C]">
+                          <FileCheck2 className="h-4 w-4" />
+                        </span>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {fmtDate(trial.createdAt)}

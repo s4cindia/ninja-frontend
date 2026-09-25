@@ -9,11 +9,15 @@ import {
   useValidateTrial,
   useDeleteTrial,
   useUpdateAutoModeConfig,
+  usePacReport,
+  useUploadPacReport,
+  useDeletePacReport,
 } from '@/hooks/useComparisonStudy';
 import { comparisonStudyService } from '@/services/comparisonStudy.service';
 import { getErrorMessage } from '@/services/api';
 import { useJobPolling } from '@/hooks/useJobPolling';
 import { PdfJobProgressPanel } from '@/components/pdf/PdfJobProgressPanel';
+import { formatDuration } from '@/utils/format';
 import type { ComparisonTrialMode } from '@/types/comparisonStudy.types';
 
 type AutoColorContrastModeInput = 'inherit' | 'guidance-only' | 'disabled' | 'apply-to-pdf';
@@ -24,6 +28,11 @@ const CONTENT_TYPE_LABELS: Record<string, string> = {
   'figure-heavy': 'Figure Heavy',
   mixed: 'Mixed',
 };
+
+function fmtUsd(v: number | null | undefined): string {
+  if (v == null) return '--';
+  return `$${v.toFixed(2)}`;
+}
 
 /** Accepts "mm:ss", "h:mm:ss", or a plain number of seconds (a raw stopwatch reading). */
 function parseTimeToMs(input: string): number | null {
@@ -75,6 +84,185 @@ function DeleteTrialDialog({
           Cancel
         </button>
       </div>
+    </div>
+  );
+}
+
+function PacReportCard({ trialId }: { trialId: string }) {
+  const { data: pacReport, isLoading: isLoadingReport } = usePacReport(trialId);
+  const uploadPacReport = useUploadPacReport(trialId);
+  const deletePacReport = useDeletePacReport(trialId);
+
+  const [file, setFile] = useState<File | null>(null);
+  const [pass, setPass] = useState('');
+  const [fail, setFail] = useState('');
+  const [untested, setUntested] = useState('');
+  const [humanRequired, setHumanRequired] = useState('');
+  const [notApplicable, setNotApplicable] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const handleUpload = () => {
+    setError(null);
+    if (!file) {
+      setError('Choose a PAC report file first.');
+      return;
+    }
+    const toNum = (s: string) => (s.trim() ? Number(s) : undefined);
+    uploadPacReport.mutate(
+      {
+        file,
+        summary: {
+          pass: toNum(pass),
+          fail: toNum(fail),
+          untested: toNum(untested),
+          humanRequired: toNum(humanRequired),
+          notApplicable: toNum(notApplicable),
+        },
+      },
+      {
+        onSuccess: () => {
+          setFile(null);
+          setPass('');
+          setFail('');
+          setUntested('');
+          setHumanRequired('');
+          setNotApplicable('');
+        },
+        onError: () => setError('Upload failed — please retry.'),
+      }
+    );
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow p-6">
+      <h3 className="text-sm font-semibold mb-1">PAC Report</h3>
+      <p className="text-sm text-gray-500 mb-4">
+        The final, external PAC-tool report for this file, with its summary counts entered manually.
+      </p>
+      {isLoadingReport ? (
+        <Spinner size="sm" />
+      ) : pacReport ? (
+        <div>
+          <p className="text-sm text-gray-900 font-medium">{pacReport.originalFileName}</p>
+          <div className="grid grid-cols-5 gap-3 my-3 text-center">
+            <div>
+              <p className="text-lg font-semibold text-green-700">{pacReport.pass ?? '—'}</p>
+              <p className="text-xs text-gray-500">Pass</p>
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-red-700">{pacReport.fail ?? '—'}</p>
+              <p className="text-xs text-gray-500">Fail</p>
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-gray-700">{pacReport.untested ?? '—'}</p>
+              <p className="text-xs text-gray-500">Untested</p>
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-amber-700">{pacReport.humanRequired ?? '—'}</p>
+              <p className="text-xs text-gray-500">Human Req.</p>
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-gray-700">{pacReport.notApplicable ?? '—'}</p>
+              <p className="text-xs text-gray-500">N/A</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <a
+              href={pacReport.downloadUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm font-medium text-teal-700 hover:text-teal-900 hover:underline"
+            >
+              Download &rarr;
+            </a>
+            <button
+              onClick={() => deletePacReport.mutate()}
+              disabled={deletePacReport.isPending}
+              className="text-xs text-red-600 hover:text-red-800 hover:underline disabled:opacity-50"
+            >
+              {deletePacReport.isPending ? 'Removing…' : 'Remove'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <div className="mb-4">
+            <label htmlFor="pac-report-file" className="block text-xs font-medium text-gray-600 mb-1">PAC Report File</label>
+            <input
+              id="pac-report-file"
+              type="file"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm text-gray-600 file:mr-3 file:py-1 file:px-2 file:rounded file:border file:border-gray-300 file:text-xs file:bg-white hover:file:bg-gray-50"
+            />
+          </div>
+          <div className="grid grid-cols-5 gap-3 mb-4">
+            <div>
+              <label htmlFor="pac-pass" className="block text-xs font-medium text-gray-600 mb-1">Pass</label>
+              <input
+                id="pac-pass"
+                type="number"
+                min={0}
+                value={pass}
+                onChange={(e) => setPass(e.target.value)}
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div>
+              <label htmlFor="pac-fail" className="block text-xs font-medium text-gray-600 mb-1">Fail</label>
+              <input
+                id="pac-fail"
+                type="number"
+                min={0}
+                value={fail}
+                onChange={(e) => setFail(e.target.value)}
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div>
+              <label htmlFor="pac-untested" className="block text-xs font-medium text-gray-600 mb-1">Untested</label>
+              <input
+                id="pac-untested"
+                type="number"
+                min={0}
+                value={untested}
+                onChange={(e) => setUntested(e.target.value)}
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div>
+              <label htmlFor="pac-human-required" className="block text-xs font-medium text-gray-600 mb-1">Human Req.</label>
+              <input
+                id="pac-human-required"
+                type="number"
+                min={0}
+                value={humanRequired}
+                onChange={(e) => setHumanRequired(e.target.value)}
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div>
+              <label htmlFor="pac-not-applicable" className="block text-xs font-medium text-gray-600 mb-1">N/A</label>
+              <input
+                id="pac-not-applicable"
+                type="number"
+                min={0}
+                value={notApplicable}
+                onChange={(e) => setNotApplicable(e.target.value)}
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+          </div>
+          {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
+          <button
+            onClick={handleUpload}
+            disabled={uploadPacReport.isPending}
+            className="px-4 py-2 text-sm font-medium rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+          >
+            {uploadPacReport.isPending && <Loader2 className="animate-spin h-4 w-4" />}
+            Upload PAC Report
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -286,6 +474,13 @@ export default function ComparisonTrialWorkspacePage() {
             <PdfJobProgressPanel jobData={ninjaJobData} progress={ninjaJobData?.progress ?? 0} />
           </div>
         )}
+        {(trial.ninjaActiveMs != null || trial.ninjaGpuCostUsd != null) && (
+          <p className="text-xs text-gray-500 mt-3">
+            {trial.ninjaActiveMs != null && `Ninja active time: ${(trial.ninjaActiveMs / 1000).toFixed(1)}s`}
+            {trial.ninjaActiveMs != null && trial.ninjaGpuCostUsd != null && ' · '}
+            {trial.ninjaGpuCostUsd != null && `AWS cost (est.): ${fmtUsd(trial.ninjaGpuCostUsd)}`}
+          </p>
+        )}
       </div>
 
       <div className="bg-white rounded-lg shadow p-6">
@@ -375,7 +570,10 @@ export default function ComparisonTrialWorkspacePage() {
           <p className="text-xs text-gray-500 mt-3">
             {trial.autoStatus === 'running'
               ? `Running — round ${trial.autoRoundsCompleted} of ${trial.autoMaxRounds}, $${trial.autoCostSpentUsd.toFixed(2)} of $${trial.autoCostLimitUsd.toFixed(2)} spent.`
-              : `Last run: ${trial.autoStopReason ?? 'stopped'} after ${trial.autoRoundsCompleted} round(s), $${trial.autoCostSpentUsd.toFixed(2)} spent.`}
+              : (() => {
+                  const elapsed = formatDuration(trial.autoStartedAt, trial.autoStoppedAt);
+                  return `Last run: ${trial.autoStopReason ?? 'stopped'} after ${trial.autoRoundsCompleted} round(s)${elapsed ? ` in ${elapsed}` : ''}, $${trial.autoCostSpentUsd.toFixed(2)} spent.`;
+                })()}
           </p>
         )}
       </div>
@@ -464,6 +662,8 @@ export default function ComparisonTrialWorkspacePage() {
           <p className="text-sm text-red-600 mt-3">Validation failed — please retry.</p>
         )}
       </div>
+
+      <PacReportCard trialId={trial.id} />
 
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <DialogContent className="max-w-md">

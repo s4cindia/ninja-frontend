@@ -36,6 +36,8 @@ const mockTrial = (overrides?: Partial<ComparisonTrial>): ComparisonTrial => ({
   autoCostSpentUsd: 0,
   autoStatus: null,
   autoStopReason: null,
+  autoStartedAt: null,
+  autoStoppedAt: null,
   autoColorContrastMode: null,
   ...overrides,
 });
@@ -73,6 +75,58 @@ describe('ComparisonStudyConsolePage', () => {
     expect(screen.getByText('other.pdf')).toBeInTheDocument();
     expect(screen.getByText('Registered')).toBeInTheDocument();
     expect(screen.getByText('Validated')).toBeInTheDocument();
+  });
+
+  it('shows convergence time, AI/AWS costs, PAC failure count, and a PAC-report indicator for a completed auto-mode trial', async () => {
+    mockService.listTrials.mockResolvedValue({
+      trials: [
+        mockTrial({
+          mode: 'auto',
+          autoStatus: 'stopped',
+          autoStartedAt: '2026-08-01T10:00:00Z',
+          autoStoppedAt: '2026-08-01T10:04:12Z',
+          autoCostSpentUsd: 1.23,
+          ninjaGpuCostUsd: 0.42,
+          ninjaPacResult: [
+            { ruleId: 'r1', description: 'x' },
+            { ruleId: 'r2', description: 'y' },
+          ],
+          hasPacReport: true,
+        }),
+      ],
+      nextCursor: null,
+    });
+
+    renderPage();
+
+    await screen.findByText('sample.pdf');
+    expect(screen.getByText('4m 12s')).toBeInTheDocument();
+    expect(screen.getByText('$1.23')).toBeInTheDocument();
+    expect(screen.getByText('$0.42')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getByTitle('PAC report uploaded')).toBeInTheDocument();
+  });
+
+  it('shows a blank convergence time while a run is still active, and a dash when no PAC report is attached', async () => {
+    mockService.listTrials.mockResolvedValue({
+      trials: [
+        mockTrial({
+          mode: 'auto',
+          autoStatus: 'running',
+          autoStartedAt: '2026-08-01T10:00:00Z',
+          autoStoppedAt: null,
+          hasPacReport: false,
+        }),
+      ],
+      nextCursor: null,
+    });
+
+    renderPage();
+
+    await screen.findByText('sample.pdf');
+    expect(screen.queryByTitle('PAC report uploaded')).not.toBeInTheDocument();
+    // '--' appears for both convergence time (running) and PAC failures (null ninjaPacResult).
+    expect(screen.getAllByText('--').length).toBeGreaterThanOrEqual(2);
   });
 
   it('shows an empty state when there are no trials', async () => {
