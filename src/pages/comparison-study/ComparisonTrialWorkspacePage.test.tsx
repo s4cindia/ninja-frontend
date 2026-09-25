@@ -59,6 +59,10 @@ const mockTrial = (overrides?: Partial<ComparisonTrialWithJob>): ComparisonTrial
   autoColorContrastMode: null,
   autoStartedAt: null,
   autoStoppedAt: null,
+  taggerSource: null,
+  autoTagStatus: null,
+  aiFixesAppliedCount: 0,
+  manualFixesRequiredCount: 0,
   job: null,
   ...overrides,
 });

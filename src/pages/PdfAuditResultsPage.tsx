@@ -82,7 +82,7 @@ function normalizeCategory(category: string | undefined): string | undefined {
 import { cn } from '@/utils/cn';
 import { validateJobId } from '@/utils/validation';
 import { useCreateRemediationPlan } from '@/hooks/usePdfRemediation';
-import { useComparisonTrial } from '@/hooks/useComparisonStudy';
+import { useComparisonTrial, useInvalidateComparisonTrial } from '@/hooks/useComparisonStudy';
 import { useAutoModeStatus, useAutoModeRoundHistory, useStartAutoMode, useStopAutoMode } from '@/hooks/useAutoMode';
 import { AutoModeStatusCard } from '@/components/pdf/AutoModeStatusCard';
 import type { ComparisonTrialMode } from '@/types/comparisonStudy.types';
@@ -169,6 +169,7 @@ export const PdfAuditResultsPage: React.FC = () => {
     isLoading: isComparisonTrialLoading,
     isError: isComparisonTrialError,
   } = useComparisonTrial(comparisonTrialId ?? undefined);
+  const invalidateComparisonTrial = useInvalidateComparisonTrial();
   // Three states, not a boolean: while the trial lookup is loading or has
   // failed, render NEITHER control set. A bare boolean would flash the
   // manual controls for a trial that turns out to be auto-mode, or silently
@@ -993,9 +994,15 @@ export const PdfAuditResultsPage: React.FC = () => {
     // one, so without this the just-finished final round (or any round,
     // really) could sit unfetched until its own next independent tick.
     refetchAutoModeRoundHistory();
+    // The comparison-study trial's own taggerSource/aiFixesAppliedCount/
+    // manualFixesRequiredCount go stale the same way — without this, an
+    // operator who opens the trial report right after a round (or right
+    // after the run finishes) sees pre-run numbers until the app-wide
+    // 5-minute staleTime happens to expire.
+    if (comparisonTrialId) invalidateComparisonTrial(comparisonTrialId);
   }, [
     isAutoModeTrial, autoModeProgressKey, fetchAuditResult, fetchAiSuggestions, fetchJobFlags, fetchAutoTagStatus,
-    bumpHistoryRefreshTrigger, refetchAutoModeRoundHistory,
+    bumpHistoryRefreshTrigger, refetchAutoModeRoundHistory, comparisonTrialId, invalidateComparisonTrial,
   ]);
 
   const handleRetryAutoTag = async () => {

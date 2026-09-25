@@ -10,6 +10,7 @@ const KEYS = {
   report: (id: string) => ['comparison-study', 'report', id] as const,
   aggregate: () => ['comparison-study', 'aggregate-report'] as const,
   pacReport: (trialId: string) => ['comparison-study', 'pac-report', trialId] as const,
+  manualFixes: (trialId: string) => ['comparison-study', 'manual-fixes', trialId] as const,
 };
 
 const PAGE_SIZE = 20;
@@ -125,6 +126,23 @@ export function useDeleteTrial(id: string) {
   });
 }
 
+/**
+ * For callers outside this file that need to invalidate a trial's cached
+ * data after something changed it server-side without going through one of
+ * the mutations above — e.g. PdfAuditResultsPage's Auto Mode progress
+ * effect, which needs the trial's taggerSource/aiFixesAppliedCount/
+ * manualFixesRequiredCount to refresh as rounds complete. Keeps the actual
+ * query-key shape encapsulated here rather than leaking KEYS/TRIALS_KEY
+ * into unrelated pages.
+ */
+export function useInvalidateComparisonTrial() {
+  const qc = useQueryClient();
+  return (trialId: string) => {
+    qc.invalidateQueries({ queryKey: KEYS.trial(trialId) });
+    qc.invalidateQueries({ queryKey: TRIALS_KEY });
+  };
+}
+
 /** null (not an error) means no External PAC Report has been attached to this trial yet. */
 export function useExternalPacReport(trialId: string | undefined) {
   return useQuery({
@@ -167,5 +185,20 @@ export function useDeleteExternalPacReport(trialId: string) {
       qc.setQueryData(KEYS.pacReport(trialId), null);
       qc.invalidateQueries({ queryKey: KEYS.pacReport(trialId) });
     },
+  });
+}
+
+/**
+ * Lazy — only fetches once `enabled` (the modal being open), not on every
+ * report-page load. staleTime: 0 (overriding the app-wide 5-minute
+ * default) so reopening the modal after remediating/re-auditing always
+ * refetches instead of serving a list from before those fixes landed.
+ */
+export function useManualFixes(trialId: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: KEYS.manualFixes(trialId ?? ''),
+    queryFn: () => comparisonStudyService.getManualFixes(trialId!),
+    enabled: enabled && !!trialId,
+    staleTime: 0,
   });
 }

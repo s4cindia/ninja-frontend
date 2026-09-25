@@ -1,16 +1,26 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/Dialog';
 import {
   useTrialReport,
   useComparisonTrial,
   useExternalPacReport,
   useUploadExternalPacReport,
   useDeleteExternalPacReport,
+  useManualFixes,
 } from '@/hooks/useComparisonStudy';
 import { formatDuration } from '@/utils/format';
-import type { ExternalPacReportSummary } from '@/types/comparisonStudy.types';
+import type { ExternalPacReportSummary, ComparisonTaggerSource, ComparisonAutoTagStatus } from '@/types/comparisonStudy.types';
+
+function taggerLabel(taggerSource: ComparisonTaggerSource, autoTagStatus: ComparisonAutoTagStatus): string {
+  if (taggerSource === 'seam-c') return 'Seam-C';
+  if (taggerSource === 'adobe') return 'Adobe';
+  if (autoTagStatus === 'failed') return 'Tagging failed';
+  if (autoTagStatus === 'skipped') return 'Tagging skipped';
+  return 'Not yet tagged';
+}
 
 function fmtMs(ms: number | null | undefined): string {
   if (ms == null) return '--';
@@ -31,18 +41,29 @@ function fmtNum(v: number | null | undefined, digits = 0): string {
  * pdfxtValue is optional — some metrics (time-to-convergence, AI/AWS cost)
  * are Ninja-only with no pdfxt equivalent to compare against. Omitting it
  * renders a single centered value instead of the Ninja-vs-pdfxt split.
+ *
+ * onClick is optional — used by Manual Fixes Required to open its modal.
+ * When provided, the tile becomes a real <button> (keyboard-operable, with
+ * a hover affordance) instead of a plain <div>.
  */
 function MetricTile({
   label,
   ninjaValue,
   pdfxtValue,
+  onClick,
 }: {
   label: string;
   ninjaValue: string;
   pdfxtValue?: string;
+  onClick?: () => void;
 }) {
+  const Wrapper = onClick ? 'button' : 'div';
   return (
-    <div className="bg-white rounded-lg shadow p-4">
+    <Wrapper
+      type={onClick ? 'button' : undefined}
+      onClick={onClick}
+      className={`bg-white rounded-lg shadow p-4 w-full text-left ${onClick ? 'hover:shadow-md hover:ring-1 hover:ring-teal-200 transition cursor-pointer' : ''}`}
+    >
       <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">{label}</p>
       {pdfxtValue === undefined ? (
         <p className="text-2xl font-bold tabular-nums text-teal-700 text-center">{ninjaValue}</p>
@@ -59,7 +80,7 @@ function MetricTile({
           </div>
         </div>
       )}
-    </div>
+    </Wrapper>
   );
 }
 
@@ -242,10 +263,91 @@ function ExternalPacReportCard({ trialId }: { trialId: string }) {
   );
 }
 
+/** Lazy-fetches .../manual-fixes only while open — never on page load. */
+function ManualFixesModal({
+  trialId,
+  isOpen,
+  onClose,
+}: {
+  trialId: string;
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  const { data, isLoading, isError, refetch } = useManualFixes(trialId, isOpen);
+  const items = data?.items ?? [];
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-6">
+        <DialogHeader className="mb-4">
+          <DialogTitle>Manual Fixes Required</DialogTitle>
+        </DialogHeader>
+        <DialogClose />
+
+        <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+          {isLoading && (
+            <div className="flex justify-center py-8"><Spinner /></div>
+          )}
+
+          {isError && (
+            <div className="text-center py-8">
+              <p className="text-sm text-red-600 mb-3">Could not load manual fixes.</p>
+              <button
+                onClick={() => refetch()}
+                className="text-xs font-medium text-blue-600 hover:text-blue-700"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {!isLoading && !isError && items.length === 0 && (
+            <p className="text-center py-8 text-sm text-gray-400">No manual fixes required.</p>
+          )}
+
+          {items.map((item) => (
+            <div key={item.id} className="border border-gray-200 rounded-lg p-3">
+              <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                {item.code && (
+                  <span className="text-xs font-mono font-medium px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded">
+                    {item.code}
+                  </span>
+                )}
+                {item.pageNumber != null && (
+                  <span className="text-xs text-gray-500">Page {item.pageNumber}</span>
+                )}
+                {item.location && (
+                  <span className="text-xs text-gray-400 font-mono truncate">{item.location}</span>
+                )}
+              </div>
+              {item.message && (
+                <p className="text-sm text-gray-800 mb-1.5">{item.message}</p>
+              )}
+              {item.guidance && (
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  <span className="font-medium text-gray-700">How to fix: </span>
+                  {item.guidance}
+                </p>
+              )}
+              {item.rationale && (
+                <p className="text-xs text-gray-400 mt-1 italic">{item.rationale}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function ComparisonTrialReportPage() {
   const { id } = useParams<{ id: string }>();
   const { data: report, isLoading: reportLoading, error: reportError } = useTrialReport(id);
   const { data: trial, isLoading: trialLoading } = useComparisonTrial(id);
+  const [showManualFixes, setShowManualFixes] = useState(false);
+  // Restores focus to whichever element opened the modal once it closes —
+  // Dialog itself only manages focus INTO the modal on open, not back out.
+  const manualFixesTriggerRef = useRef<HTMLElement | null>(null);
 
   // Gated on the trial alone, not the comparison report too — the report
   // query 404s (expected, not an error) for any trial that hasn't been
@@ -263,6 +365,22 @@ export default function ComparisonTrialReportPage() {
       </div>
     );
   }
+
+  // Prefer the comparison report's copy of these fields once it's loaded —
+  // it and the trial object carry identical field names, but reading from
+  // two different sources depending on what happened to render first was
+  // inconsistent. Falls back to the trial object pre-validation, same as
+  // every other trial-level tile on this page.
+  const ninjaMetrics = (!reportLoading && !reportError && report) ? report.ninja : trial;
+
+  const openManualFixes = () => {
+    manualFixesTriggerRef.current = document.activeElement as HTMLElement | null;
+    setShowManualFixes(true);
+  };
+  const closeManualFixes = () => {
+    setShowManualFixes(false);
+    manualFixesTriggerRef.current?.focus();
+  };
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 p-6">
@@ -308,7 +426,19 @@ export default function ComparisonTrialReportPage() {
         <MetricTile label="AWS Cost (Est.)" ninjaValue={trial.ninjaGpuCostUsd != null ? `~${fmtUsd(trial.ninjaGpuCostUsd)}` : '--'} />
       </div>
 
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <MetricTile label="Tagger" ninjaValue={taggerLabel(ninjaMetrics.taggerSource, ninjaMetrics.autoTagStatus)} />
+        <MetricTile label="AI Fixes Applied" ninjaValue={String(ninjaMetrics.aiFixesAppliedCount)} />
+        <MetricTile
+          label="Manual Fixes Required"
+          ninjaValue={String(ninjaMetrics.manualFixesRequiredCount)}
+          onClick={ninjaMetrics.manualFixesRequiredCount > 0 ? openManualFixes : undefined}
+        />
+      </div>
+
       <ExternalPacReportCard trialId={id!} />
+
+      <ManualFixesModal trialId={id!} isOpen={showManualFixes} onClose={closeManualFixes} />
     </div>
   );
 }

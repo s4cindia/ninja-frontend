@@ -9,6 +9,7 @@ import type {
   AggregateReport,
   ExternalPacReport,
   ExternalPacReportSummary,
+  ManualFixItem,
 } from '@/types/comparisonStudy.types';
 
 // Routes are mounted under /admin, not bare /comparison-study.
@@ -105,6 +106,9 @@ export const comparisonStudyService = {
 
   deleteExternalPacReport: (trialId: string): Promise<{ success: true }> =>
     api.delete(`${BASE}/trials/${encodeURIComponent(trialId)}/pac-report`).then((r) => r.data.data),
+
+  getManualFixes: (trialId: string): Promise<{ items: ManualFixItem[] }> =>
+    api.get(`${BASE}/trials/${encodeURIComponent(trialId)}/manual-fixes`).then((r) => r.data.data),
 };
 
 /**

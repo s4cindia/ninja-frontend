@@ -43,6 +43,14 @@ function pacFailureCount(trial: ComparisonTrial): string {
   return String(trial.ninjaPacResult.failures.length);
 }
 
+function taggerLabel(trial: ComparisonTrial): string {
+  if (trial.taggerSource === 'seam-c') return 'Seam-C';
+  if (trial.taggerSource === 'adobe') return 'Adobe';
+  if (trial.autoTagStatus === 'failed') return 'Failed';
+  if (trial.autoTagStatus === 'skipped') return 'Skipped';
+  return '--';
+}
+
 /** Per-row lookup — the trial-list endpoint doesn't carry this, so each row fetches it independently (React Query caches/dedupes across re-renders). */
 function ExternalPacReportBadge({ trialId }: { trialId: string }) {
   const { data, isLoading } = useExternalPacReport(trialId);
@@ -193,6 +201,9 @@ export default function ComparisonStudyConsolePage() {
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AWS Cost (Est.)</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PAC Failures</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">External PAC Report</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tagger</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AI Fixes</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Manual Fixes</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
               </tr>
             </thead>
@@ -200,7 +211,7 @@ export default function ComparisonStudyConsolePage() {
               {isLoading ? (
                 Array.from({ length: 5 }, (_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: 9 }, (_, j) => (
+                    {Array.from({ length: 12 }, (_, j) => (
                       <td key={j} className="px-6 py-4">
                         <div className="h-4 bg-gray-200 rounded animate-pulse" />
                       </td>
@@ -209,7 +220,7 @@ export default function ComparisonStudyConsolePage() {
                 ))
               ) : trials.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center text-sm text-gray-400">
+                  <td colSpan={12} className="px-6 py-12 text-center text-sm text-gray-400">
                     No trials registered yet
                   </td>
                 </tr>
@@ -243,6 +254,15 @@ export default function ComparisonStudyConsolePage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <ExternalPacReportBadge trialId={trial.id} />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {taggerLabel(trial)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {trial.aiFixesAppliedCount}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {trial.manualFixesRequiredCount}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {fmtDate(trial.createdAt)}
