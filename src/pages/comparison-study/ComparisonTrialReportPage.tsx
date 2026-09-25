@@ -134,17 +134,21 @@ function ExternalPacReportCard({ trialId }: { trialId: string }) {
             </div>
           ))}
         </div>
-        {/* No download link yet — ExternalPacReport only carries an s3Key,
-            and there's no presigned-download endpoint in the API contract
-            this was built against. Needs a backend addition before this can
-            link anywhere real. */}
-        <button
-          onClick={() => deleteMutation.mutate()}
-          disabled={deleteMutation.isPending}
-          className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50"
-        >
-          {deleteMutation.isPending ? 'Removing…' : 'Remove'}
-        </button>
+        <div className="flex items-center gap-4">
+          <a
+            href={pacReport.downloadUrl}
+            className="text-xs font-medium text-blue-600 hover:text-blue-700"
+          >
+            Download
+          </a>
+          <button
+            onClick={() => deleteMutation.mutate()}
+            disabled={deleteMutation.isPending}
+            className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50"
+          >
+            {deleteMutation.isPending ? 'Removing…' : 'Remove'}
+          </button>
+        </div>
       </div>
     );
   }

@@ -57,6 +57,7 @@ const mockPacReport = (overrides?: Partial<ExternalPacReport>): ExternalPacRepor
   notApplicable: 2,
   uploadedById: 'op-1',
   createdAt: '2026-08-01T11:00:00Z',
+  downloadUrl: 'https://s3.example/presigned-get',
   ...overrides,
 });
 
@@ -173,6 +174,7 @@ describe('ComparisonTrialReportPage', () => {
       expect(screen.getByText('20')).toBeInTheDocument(); // pass
       expect(screen.getByText('3')).toBeInTheDocument(); // fail
       expect(screen.queryByText('Upload PAC Report')).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Download' })).toHaveAttribute('href', 'https://s3.example/presigned-get');
     });
 
     it('uploads the file then confirms with the hand-typed summary counts (presign + S3 PUT mechanics are covered in comparisonStudy.service.test.ts)', async () => {

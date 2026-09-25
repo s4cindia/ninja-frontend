@@ -111,6 +111,8 @@ export interface ExternalPacReport {
   notApplicable: number | null;
   uploadedById: string;
   createdAt: string;
+  /** Presigned GET, generated fresh on every fetch of this report — link to it directly, no extra request needed. */
+  downloadUrl: string;
 }
 
 /** Operator-typed summary counts from a real PAC-tool export — there's no parser for the actual file, so these are hand-entered alongside the upload. */

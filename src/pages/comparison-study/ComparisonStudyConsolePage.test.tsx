@@ -97,7 +97,7 @@ describe('ComparisonStudyConsolePage', () => {
     mockService.getExternalPacReport.mockResolvedValue({
       id: 'pac-1', trialId: 'trial-1', s3Key: 'k', originalFileName: 'report.pdf', mimeType: 'application/pdf',
       size: 100, pass: 10, fail: 2, untested: 1, humanRequired: 0, notApplicable: 0,
-      uploadedById: 'op-1', createdAt: '2026-08-01T10:05:00Z',
+      uploadedById: 'op-1', createdAt: '2026-08-01T10:05:00Z', downloadUrl: 'https://s3.example/presigned-get',
     });
 
     renderPage();
