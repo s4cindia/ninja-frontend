@@ -301,9 +301,12 @@ describe('PdfAuditResultsPage', () => {
       });
     });
 
-    it('shows the real backend error for a FAILED job, not a generic message (regression: job.error was previously dropped for a non-COMPLETED job, always showing "Audit failed. Please try again." with nothing to act on)', async () => {
+    it('prefers data.error over data.message for a FAILED job, not a generic message (regression: job.error was previously dropped for a non-COMPLETED job, always showing "Audit failed. Please try again." with nothing to act on)', async () => {
+      // Deliberately distinct message/error values (CodeRabbit catch on PR
+      // #334) -- identical fixture values would let this test pass even if
+      // the component read the wrong field.
       mockApi.get.mockResolvedValueOnce({
-        data: { data: { status: 'failed', message: 'PDF file exceeds maximum size of 500MB', error: 'PDF file exceeds maximum size of 500MB' } },
+        data: { data: { status: 'failed', message: 'Audit failed', error: 'PDF file exceeds maximum size of 500MB' } },
       });
 
       renderWithRouter();
@@ -312,6 +315,7 @@ describe('PdfAuditResultsPage', () => {
         expect(screen.getByText('PDF file exceeds maximum size of 500MB')).toBeInTheDocument();
       });
       expect(screen.queryByText('Audit failed. Please try again.')).not.toBeInTheDocument();
+      expect(screen.queryByText('Audit failed')).not.toBeInTheDocument();
     });
 
     it('falls back to a generic message for a FAILED job with no error recorded', async () => {
