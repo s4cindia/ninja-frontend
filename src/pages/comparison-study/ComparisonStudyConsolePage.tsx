@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { Loader2, FileCheck } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/Dialog';
-import { useComparisonTrialsInfinite, useRegisterTrial } from '@/hooks/useComparisonStudy';
-import type { ComparisonTrialContentType } from '@/types/comparisonStudy.types';
+import { useComparisonTrialsInfinite, useRegisterTrial, useExternalPacReport } from '@/hooks/useComparisonStudy';
+import { formatDuration } from '@/utils/format';
+import type { ComparisonTrial, ComparisonTrialContentType } from '@/types/comparisonStudy.types';
 
 const CONTENT_TYPE_OPTIONS: { value: ComparisonTrialContentType; label: string }[] = [
   { value: 'text-dominant', label: 'Text Dominant' },
@@ -29,6 +30,37 @@ function StatusBadge({ status }: { status: string }) {
 
 function fmtDate(d: string): string {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function fmtUsd(v: number | null | undefined): string {
+  if (v == null) return '--';
+  return `$${v.toFixed(2)}`;
+}
+
+/** ran: false (or missing) means veraPDF didn't run for this trial — distinct from a real zero-failures pass. */
+function pacFailureCount(trial: ComparisonTrial): string {
+  if (!trial.ninjaPacResult?.ran) return '--';
+  return String(trial.ninjaPacResult.failures.length);
+}
+
+/** Per-row lookup — the trial-list endpoint doesn't carry this, so each row fetches it independently (React Query caches/dedupes across re-renders). */
+function ExternalPacReportBadge({ trialId }: { trialId: string }) {
+  const { data, isLoading } = useExternalPacReport(trialId);
+  if (isLoading) {
+    return <span className="text-gray-300">…</span>;
+  }
+  if (!data) {
+    return <span className="text-gray-300" title="No External PAC Report uploaded">—</span>;
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700"
+      title={`External PAC Report attached: ${data.originalFileName}`}
+    >
+      <FileCheck className="h-3.5 w-3.5" aria-hidden="true" />
+      Attached
+    </span>
+  );
 }
 
 function RegisterTrialForm({ onClose }: { onClose: () => void }) {
@@ -156,6 +188,11 @@ export default function ComparisonStudyConsolePage() {
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Filename</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Content Type</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time to Convergence</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AI Cost</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AWS Cost (Est.)</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PAC Failures</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">External PAC Report</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
               </tr>
             </thead>
@@ -163,7 +200,7 @@ export default function ComparisonStudyConsolePage() {
               {isLoading ? (
                 Array.from({ length: 5 }, (_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: 4 }, (_, j) => (
+                    {Array.from({ length: 9 }, (_, j) => (
                       <td key={j} className="px-6 py-4">
                         <div className="h-4 bg-gray-200 rounded animate-pulse" />
                       </td>
@@ -172,7 +209,7 @@ export default function ComparisonStudyConsolePage() {
                 ))
               ) : trials.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-12 text-center text-sm text-gray-400">
+                  <td colSpan={9} className="px-6 py-12 text-center text-sm text-gray-400">
                     No trials registered yet
                   </td>
                 </tr>
@@ -191,6 +228,21 @@ export default function ComparisonStudyConsolePage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <StatusBadge status={trial.status} />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatDuration(trial.autoStartedAt, trial.autoStoppedAt) ?? '--'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {fmtUsd(trial.autoCostSpentUsd)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {trial.ninjaGpuCostUsd != null ? `~${fmtUsd(trial.ninjaGpuCostUsd)}` : '--'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {pacFailureCount(trial)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <ExternalPacReportBadge trialId={trial.id} />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {fmtDate(trial.createdAt)}

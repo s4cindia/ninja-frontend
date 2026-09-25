@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, type Mocked } from 'vitest';
-import { comparisonStudyService, uploadComparisonPdf } from './comparisonStudy.service';
+import { comparisonStudyService, uploadComparisonPdf, uploadExternalPacReportFile } from './comparisonStudy.service';
 import { api } from './api';
 
 vi.mock('./api');
@@ -44,6 +44,45 @@ describe('uploadComparisonPdf', () => {
   });
 });
 
+describe('uploadExternalPacReportFile', () => {
+  const mockApi = api as Mocked<typeof api>;
+
+  beforeEach(() => {
+    mockApi.post.mockReset();
+    global.fetch = vi.fn();
+  });
+
+  it('gets a trial-scoped presigned URL and PUTs the file to S3 (no returned key — the confirm step does not need one)', async () => {
+    mockApi.post.mockResolvedValue({
+      data: { data: { uploadUrl: 'https://s3.example.com/presigned-pac', expiresIn: 900 } },
+    });
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true });
+
+    const file = new File(['%PDF-1.4'], 'export.pdf', { type: 'application/pdf' });
+    await uploadExternalPacReportFile('trial-1', file);
+
+    expect(mockApi.post).toHaveBeenCalledWith('/admin/comparison-study/trials/trial-1/pac-report-upload-url', {
+      filename: 'export.pdf',
+      contentType: 'application/pdf',
+    });
+    expect(global.fetch).toHaveBeenCalledWith('https://s3.example.com/presigned-pac', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/pdf' },
+      body: file,
+    });
+  });
+
+  it('throws when the S3 PUT fails', async () => {
+    mockApi.post.mockResolvedValue({
+      data: { data: { uploadUrl: 'https://s3.example.com/presigned-pac', expiresIn: 900 } },
+    });
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false, status: 403 });
+
+    const file = new File(['%PDF-1.4'], 'export.pdf', { type: 'application/pdf' });
+    await expect(uploadExternalPacReportFile('trial-1', file)).rejects.toThrow('S3 upload failed: 403');
+  });
+});
+
 describe('comparisonStudyService', () => {
   const mockApi = api as Mocked<typeof api>;
 
@@ -51,6 +90,7 @@ describe('comparisonStudyService', () => {
     mockApi.get.mockReset();
     mockApi.post.mockReset();
     mockApi.patch.mockReset();
+    mockApi.delete.mockReset();
   });
 
   it('logPdfxtData PATCHes the /pdfxt sub-route, not the bare trial route', async () => {
@@ -75,5 +115,38 @@ describe('comparisonStudyService', () => {
       sourceS3Key: 'uploads/a.pdf',
       contentType: 'mixed',
     });
+  });
+
+  it('confirmExternalPacReportUpload POSTs to the trial-scoped pac-report-confirm route', async () => {
+    mockApi.post.mockResolvedValue({ data: { data: { id: 'pac-1', trialId: 'trial-1' } } });
+
+    await comparisonStudyService.confirmExternalPacReportUpload('trial-1', {
+      originalFileName: 'export.pdf',
+      mimeType: 'application/pdf',
+      summary: { pass: 10, fail: 2 },
+    });
+
+    expect(mockApi.post).toHaveBeenCalledWith('/admin/comparison-study/trials/trial-1/pac-report-confirm', {
+      originalFileName: 'export.pdf',
+      mimeType: 'application/pdf',
+      summary: { pass: 10, fail: 2 },
+    });
+  });
+
+  it('getExternalPacReport GETs the trial-scoped pac-report route and passes through a null result', async () => {
+    mockApi.get.mockResolvedValue({ data: { data: null } });
+
+    const result = await comparisonStudyService.getExternalPacReport('trial-1');
+
+    expect(mockApi.get).toHaveBeenCalledWith('/admin/comparison-study/trials/trial-1/pac-report');
+    expect(result).toBeNull();
+  });
+
+  it('deleteExternalPacReport DELETEs the trial-scoped pac-report route', async () => {
+    mockApi.delete.mockResolvedValue({ data: { data: { success: true } } });
+
+    await comparisonStudyService.deleteExternalPacReport('trial-1');
+
+    expect(mockApi.delete).toHaveBeenCalledWith('/admin/comparison-study/trials/trial-1/pac-report');
   });
 });

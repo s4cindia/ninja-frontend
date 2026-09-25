@@ -57,6 +57,8 @@ const mockTrial = (overrides?: Partial<ComparisonTrialWithJob>): ComparisonTrial
   autoStatus: null,
   autoStopReason: null,
   autoColorContrastMode: null,
+  autoStartedAt: null,
+  autoStoppedAt: null,
   job: null,
   ...overrides,
 });
@@ -169,6 +171,14 @@ describe('ComparisonTrialWorkspacePage', () => {
     fireEvent.click(await screen.findByRole('link', { name: /View Report/ }));
 
     expect(await screen.findByText('Report page')).toBeInTheDocument();
+  });
+
+  it('regression (Codex finding on PR #335): shows the report link even for an unvalidated trial — the report page\'s convergence/cost tiles and External PAC Report card are useful well before a comparison report exists', async () => {
+    mockService.getTrial.mockResolvedValue(mockTrial({ status: 'registered' }));
+
+    renderPage();
+
+    expect(await screen.findByRole('link', { name: /View Report/ })).toBeInTheDocument();
   });
 
   it('shows a not-found state for a missing trial without crashing', async () => {
