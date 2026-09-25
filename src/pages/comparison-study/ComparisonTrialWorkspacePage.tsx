@@ -451,14 +451,17 @@ export default function ComparisonTrialWorkspacePage() {
             {validateTrial.isPending && <Loader2 className="animate-spin h-4 w-4" />}
             Run Validation
           </button>
-          {trial.status === 'validated' && (
-            <Link
-              to={`/comparison-study/trials/${trial.id}/report`}
-              className="text-sm font-medium text-teal-700 hover:text-teal-900 hover:underline"
-            >
-              View Report &rarr;
-            </Link>
-          )}
+          {/* Always reachable, not just once validated — the report page's
+              convergence-time/cost tiles and External PAC Report card come
+              straight from the trial itself and are useful well before a
+              Ninja-vs-pdfxt comparison report exists (which is the only
+              part of that page still gated on validation). */}
+          <Link
+            to={`/comparison-study/trials/${trial.id}/report`}
+            className="text-sm font-medium text-teal-700 hover:text-teal-900 hover:underline"
+          >
+            View Report &rarr;
+          </Link>
         </div>
         {validateTrial.isError && (
           <p className="text-sm text-red-600 mt-3">Validation failed — please retry.</p>

@@ -37,6 +37,11 @@ export function useTrialReport(id: string | undefined) {
     queryKey: KEYS.report(id ?? ''),
     queryFn: () => comparisonStudyService.getTrialReport(id!),
     enabled: !!id,
+    // A 404 here (no comparison report yet — the trial hasn't been
+    // validated) is an expected, terminal state for most trials, not a
+    // transient failure — retrying it 3x (the app-wide default) just delays
+    // isLoading settling to false for no benefit.
+    retry: false,
   });
 }
 
@@ -140,7 +145,12 @@ export function useUploadExternalPacReport(trialId: string) {
         summary,
       });
     },
-    onSuccess: () => {
+    onSuccess: (report) => {
+      // Seed the cache with the response directly, not just invalidate —
+      // invalidate alone leaves a window where the query is stale but not
+      // yet refetched, during which the upload form could still be showing
+      // (double-submit risk).
+      qc.setQueryData(KEYS.pacReport(trialId), report);
       qc.invalidateQueries({ queryKey: KEYS.pacReport(trialId) });
     },
   });
@@ -151,6 +161,10 @@ export function useDeleteExternalPacReport(trialId: string) {
   return useMutation({
     mutationFn: () => comparisonStudyService.deleteExternalPacReport(trialId),
     onSuccess: () => {
+      // Same reasoning as the upload mutation above — seed null directly so
+      // the deleted report doesn't keep showing until the invalidated query
+      // gets around to refetching.
+      qc.setQueryData(KEYS.pacReport(trialId), null);
       qc.invalidateQueries({ queryKey: KEYS.pacReport(trialId) });
     },
   });

@@ -79,7 +79,7 @@ const PAC_SUMMARY_FIELDS: { key: keyof ExternalPacReportSummary; label: string }
  * same as this page's pdfxt data-entry precedent.
  */
 function ExternalPacReportCard({ trialId }: { trialId: string }) {
-  const { data: pacReport, isLoading } = useExternalPacReport(trialId);
+  const { data: pacReport, isLoading, isError, refetch } = useExternalPacReport(trialId);
   const uploadMutation = useUploadExternalPacReport(trialId);
   const deleteMutation = useDeleteExternalPacReport(trialId);
 
@@ -88,6 +88,24 @@ function ExternalPacReportCard({ trialId }: { trialId: string }) {
     pass: '', fail: '', untested: '', humanRequired: '', notApplicable: '',
   });
   const [error, setError] = useState<string | null>(null);
+  const [isRefreshingDownload, setIsRefreshingDownload] = useState(false);
+
+  // The presigned URL is generated fresh per fetch, so on a long-lived tab
+  // the one baked into `pacReport` can go stale (S3 403s on click) — refetch
+  // right before navigating rather than trusting a URL that may be old.
+  const handleDownloadClick = async (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    if (isRefreshingDownload) return;
+    setIsRefreshingDownload(true);
+    try {
+      const { data: fresh } = await refetch();
+      if (fresh?.downloadUrl) {
+        window.location.href = fresh.downloadUrl;
+      }
+    } finally {
+      setIsRefreshingDownload(false);
+    }
+  };
 
   const handleUpload = () => {
     setError(null);
@@ -96,9 +114,15 @@ function ExternalPacReportCard({ trialId }: { trialId: string }) {
       return;
     }
     const summary: ExternalPacReportSummary = {};
-    for (const { key } of PAC_SUMMARY_FIELDS) {
+    for (const { key, label } of PAC_SUMMARY_FIELDS) {
       const raw = counts[key].trim();
-      if (raw) summary[key] = Number(raw);
+      if (!raw) continue;
+      const n = Number(raw);
+      if (!Number.isInteger(n) || n < 0) {
+        setError(`${label} must be a whole number of 0 or more.`);
+        return;
+      }
+      summary[key] = n;
     }
     uploadMutation.mutate(
       { file, summary },
@@ -111,6 +135,25 @@ function ExternalPacReportCard({ trialId }: { trialId: string }) {
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-sm font-semibold mb-4">External PAC Report</h3>
         <p className="text-sm text-gray-400">Loading…</p>
+      </div>
+    );
+  }
+
+  // Distinct from "confirmed nothing attached" (pacReport === null, a real
+  // success response) — a failed fetch must not fall through to the upload
+  // form, which could invite a redundant upload over an existing report
+  // this card just couldn't confirm.
+  if (isError) {
+    return (
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-sm font-semibold mb-1">External PAC Report</h3>
+        <p className="text-sm text-red-600 mb-3">Could not load External PAC Report status.</p>
+        <button
+          onClick={() => refetch()}
+          className="text-xs font-medium text-blue-600 hover:text-blue-700"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -137,9 +180,11 @@ function ExternalPacReportCard({ trialId }: { trialId: string }) {
         <div className="flex items-center gap-4">
           <a
             href={pacReport.downloadUrl}
-            className="text-xs font-medium text-blue-600 hover:text-blue-700"
+            onClick={handleDownloadClick}
+            aria-disabled={isRefreshingDownload}
+            className={`text-xs font-medium text-blue-600 hover:text-blue-700 ${isRefreshingDownload ? 'opacity-50 pointer-events-none' : ''}`}
           >
-            Download
+            {isRefreshingDownload ? 'Preparing…' : 'Download'}
           </a>
           <button
             onClick={() => deleteMutation.mutate()}
@@ -176,6 +221,7 @@ function ExternalPacReportCard({ trialId }: { trialId: string }) {
               id={`external-pac-report-${key}`}
               type="number"
               min={0}
+              step={1}
               value={counts[key]}
               onChange={(e) => setCounts((prev) => ({ ...prev, [key]: e.target.value }))}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -201,7 +247,11 @@ export default function ComparisonTrialReportPage() {
   const { data: report, isLoading: reportLoading, error: reportError } = useTrialReport(id);
   const { data: trial, isLoading: trialLoading } = useComparisonTrial(id);
 
-  if (reportLoading || trialLoading) {
+  // Gated on the trial alone, not the comparison report too — the report
+  // query 404s (expected, not an error) for any trial that hasn't been
+  // validated yet, and that shouldn't block the trial-level content below
+  // (convergence time/cost tiles, External PAC Report) from rendering.
+  if (trialLoading) {
     return <div className="flex justify-center py-16"><Spinner size="lg" /></div>;
   }
 
@@ -224,7 +274,9 @@ export default function ComparisonTrialReportPage() {
       {/* Ninja-vs-pdfxt comparison — only available once validation has run.
           Everything below this (auto-mode timing/cost, External PAC Report)
           comes from the trial itself and doesn't require validation. */}
-      {reportError || !report ? (
+      {reportLoading ? (
+        <div className="bg-white rounded-lg shadow p-8 flex justify-center"><Spinner /></div>
+      ) : reportError || !report ? (
         <div className="bg-white rounded-lg shadow p-8 text-center text-gray-400">
           No comparison report available yet — run validation on this trial first.
         </div>

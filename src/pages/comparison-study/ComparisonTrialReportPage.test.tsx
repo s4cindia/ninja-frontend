@@ -150,6 +150,18 @@ describe('ComparisonTrialReportPage', () => {
     expect(await screen.findByText('Trial not found.')).toBeInTheDocument();
   });
 
+  it('regression (Codex finding on PR #335): renders the trial header, cost/convergence tiles, and External PAC Report card while the comparison report is still loading, instead of blocking the whole page behind it', async () => {
+    mockService.getTrialReport.mockImplementation(() => new Promise(() => {})); // never resolves
+
+    renderPage();
+
+    expect(await screen.findByText(/Trial Report — sample.pdf/)).toBeInTheDocument();
+    expect(screen.getByText('Time to Convergence')).toBeInTheDocument();
+    expect(screen.getByText('External PAC Report')).toBeInTheDocument();
+    // The comparison-report section itself shows its own loading indicator.
+    expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
+  });
+
   describe('Time to Convergence / AI cost / AWS cost tiles', () => {
     it('shows dashes when auto mode has never run', async () => {
       mockService.getTrial.mockResolvedValue(mockTrial({ autoStartedAt: null, autoStoppedAt: null, autoCostSpentUsd: 0, ninjaGpuCostUsd: null }));
@@ -181,6 +193,13 @@ describe('ComparisonTrialReportPage', () => {
       mockService.getTrialReport.mockRejectedValue(new Error('404'));
       mockUploadFile.mockResolvedValue(undefined);
       mockService.confirmExternalPacReportUpload.mockResolvedValue(mockPacReport());
+      // Mirrors a real backend: the initial load has nothing attached, and
+      // the invalidate-triggered refetch after a successful upload reflects
+      // the newly created report — a static mock here would mask whether
+      // the immediate setQueryData seed (asserted below) actually matters.
+      mockService.getExternalPacReport.mockReset()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValue(mockPacReport());
 
       renderPage();
 
@@ -201,6 +220,27 @@ describe('ComparisonTrialReportPage', () => {
           summary: { pass: 20, fail: 3 },
         });
       });
+      // regression (CodeRabbit finding on PR #335): the upload form must
+      // disappear immediately, not just after a later invalidated refetch —
+      // otherwise it stays visible long enough to invite a double-submit.
+      expect(await screen.findByText('real-pac-report.pdf')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Upload PAC Report' })).not.toBeInTheDocument();
+    });
+
+    it('regression (CodeRabbit finding on PR #335): rejects a non-integer or negative summary count instead of silently sending it', async () => {
+      mockService.getTrialReport.mockRejectedValue(new Error('404'));
+
+      renderPage();
+
+      const file = new File(['%PDF-1.4'], 'export.pdf', { type: 'application/pdf' });
+      fireEvent.change(await screen.findByLabelText('PAC Report File'), { target: { files: [file] } });
+      fireEvent.change(screen.getByLabelText('Pass'), { target: { value: '1.5' } });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Upload PAC Report' }));
+
+      expect(await screen.findByText('Pass must be a whole number of 0 or more.')).toBeInTheDocument();
+      expect(mockService.confirmExternalPacReportUpload).not.toHaveBeenCalled();
+      expect(mockUploadFile).not.toHaveBeenCalled();
     });
 
     it('shows an error and does not call confirm when no file is chosen', async () => {
@@ -216,8 +256,14 @@ describe('ComparisonTrialReportPage', () => {
 
     it('removes an attached report via the Remove link', async () => {
       mockService.getTrialReport.mockRejectedValue(new Error('404'));
-      mockService.getExternalPacReport.mockResolvedValue(mockPacReport());
       mockService.deleteExternalPacReport.mockResolvedValue({ success: true });
+      // Mirrors a real backend: the initial load has the report attached,
+      // and the invalidate-triggered refetch after a successful delete
+      // reflects the removal — a static mock here would mask whether the
+      // immediate setQueryData(null) seed (asserted below) actually matters.
+      mockService.getExternalPacReport.mockReset()
+        .mockResolvedValueOnce(mockPacReport())
+        .mockResolvedValue(null);
 
       renderPage();
 
@@ -225,6 +271,43 @@ describe('ComparisonTrialReportPage', () => {
 
       await waitFor(() => {
         expect(mockService.deleteExternalPacReport).toHaveBeenCalledWith('trial-1');
+      });
+      // regression (CodeRabbit finding on PR #335): the old report must not
+      // keep showing until the invalidated query gets around to refetching.
+      expect(await screen.findByRole('button', { name: 'Upload PAC Report' })).toBeInTheDocument();
+      expect(screen.queryByText('real-pac-report.pdf')).not.toBeInTheDocument();
+    });
+
+    it('regression (Codex finding on PR #335): shows a distinct error state with a retry option, not the upload form, when the attachment status fails to load', async () => {
+      mockService.getTrialReport.mockRejectedValue(new Error('404'));
+      mockService.getExternalPacReport.mockRejectedValue(new Error('500'));
+
+      renderPage();
+
+      expect(await screen.findByText('Could not load External PAC Report status.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Upload PAC Report' })).not.toBeInTheDocument();
+
+      mockService.getExternalPacReport.mockResolvedValue(mockPacReport());
+      fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+      expect(await screen.findByText('real-pac-report.pdf')).toBeInTheDocument();
+    });
+
+    it('regression (Codex finding on PR #335): refetches for a fresh presigned URL before navigating on Download, instead of trusting a URL that may have gone stale', async () => {
+      mockService.getTrialReport.mockRejectedValue(new Error('404'));
+      mockService.getExternalPacReport.mockResolvedValueOnce(mockPacReport({ downloadUrl: 'https://s3.example/stale' }));
+
+      renderPage();
+      await screen.findByRole('link', { name: 'Download' });
+
+      const freshReport = mockPacReport({ downloadUrl: 'https://s3.example/fresh' });
+      mockService.getExternalPacReport.mockResolvedValueOnce(freshReport);
+      const getCallsBefore = mockService.getExternalPacReport.mock.calls.length;
+
+      fireEvent.click(screen.getByRole('link', { name: 'Download' }));
+
+      await waitFor(() => {
+        expect(mockService.getExternalPacReport.mock.calls.length).toBeGreaterThan(getCallsBefore);
       });
     });
   });
