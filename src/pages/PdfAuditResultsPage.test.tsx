@@ -301,6 +301,35 @@ describe('PdfAuditResultsPage', () => {
       });
     });
 
+    it('prefers data.error over data.message for a FAILED job, not a generic message (regression: job.error was previously dropped for a non-COMPLETED job, always showing "Audit failed. Please try again." with nothing to act on)', async () => {
+      // Deliberately distinct message/error values (CodeRabbit catch on PR
+      // #334) -- identical fixture values would let this test pass even if
+      // the component read the wrong field.
+      mockApi.get.mockResolvedValueOnce({
+        data: { data: { status: 'failed', message: 'Audit failed', error: 'PDF file exceeds maximum size of 500MB' } },
+      });
+
+      renderWithRouter();
+
+      await waitFor(() => {
+        expect(screen.getByText('PDF file exceeds maximum size of 500MB')).toBeInTheDocument();
+      });
+      expect(screen.queryByText('Audit failed. Please try again.')).not.toBeInTheDocument();
+      expect(screen.queryByText('Audit failed')).not.toBeInTheDocument();
+    });
+
+    it('falls back to a generic message for a FAILED job with no error recorded', async () => {
+      mockApi.get.mockResolvedValueOnce({
+        data: { data: { status: 'failed', message: 'Audit failed', error: null } },
+      });
+
+      renderWithRouter();
+
+      await waitFor(() => {
+        expect(screen.getByText('Audit failed')).toBeInTheDocument();
+      });
+    });
+
     it('the error state\'s "Return to Upload" button still navigates to /pdf (regression: shares a renamed handler with the toolbar Re-run Audit button)', async () => {
       mockApi.get.mockRejectedValueOnce(new Error('Network error'));
 

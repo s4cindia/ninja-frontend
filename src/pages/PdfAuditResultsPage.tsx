@@ -478,9 +478,14 @@ export const PdfAuditResultsPage: React.FC = () => {
         return;
       }
 
-      // Check if failed
+      // Check if failed. The backend now includes the real failure reason
+      // (job.error) here -- previously this always showed a generic
+      // "Audit failed. Please try again." with no way to tell a genuine bug
+      // apart from e.g. a file exceeding a size limit (real incident,
+      // 2026-09-25: this hid "PDF file exceeds maximum size of 500MB").
       if (statusLower === 'failed') {
-        setError('Audit failed. Please try again.');
+        const failureData = data as { error?: string | null; message?: string };
+        setError(failureData.error || failureData.message || 'Audit failed. Please try again.');
         setIsLoading(false);
         setIsPolling(false);
         return;
