@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
@@ -345,6 +345,9 @@ export default function ComparisonTrialReportPage() {
   const { data: report, isLoading: reportLoading, error: reportError } = useTrialReport(id);
   const { data: trial, isLoading: trialLoading } = useComparisonTrial(id);
   const [showManualFixes, setShowManualFixes] = useState(false);
+  // Restores focus to whichever element opened the modal once it closes —
+  // Dialog itself only manages focus INTO the modal on open, not back out.
+  const manualFixesTriggerRef = useRef<HTMLElement | null>(null);
 
   // Gated on the trial alone, not the comparison report too — the report
   // query 404s (expected, not an error) for any trial that hasn't been
@@ -362,6 +365,22 @@ export default function ComparisonTrialReportPage() {
       </div>
     );
   }
+
+  // Prefer the comparison report's copy of these fields once it's loaded —
+  // it and the trial object carry identical field names, but reading from
+  // two different sources depending on what happened to render first was
+  // inconsistent. Falls back to the trial object pre-validation, same as
+  // every other trial-level tile on this page.
+  const ninjaMetrics = (!reportLoading && !reportError && report) ? report.ninja : trial;
+
+  const openManualFixes = () => {
+    manualFixesTriggerRef.current = document.activeElement as HTMLElement | null;
+    setShowManualFixes(true);
+  };
+  const closeManualFixes = () => {
+    setShowManualFixes(false);
+    manualFixesTriggerRef.current?.focus();
+  };
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 p-6">
@@ -408,18 +427,18 @@ export default function ComparisonTrialReportPage() {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <MetricTile label="Tagger" ninjaValue={taggerLabel(trial.taggerSource, trial.autoTagStatus)} />
-        <MetricTile label="AI Fixes Applied" ninjaValue={String(trial.aiFixesAppliedCount)} />
+        <MetricTile label="Tagger" ninjaValue={taggerLabel(ninjaMetrics.taggerSource, ninjaMetrics.autoTagStatus)} />
+        <MetricTile label="AI Fixes Applied" ninjaValue={String(ninjaMetrics.aiFixesAppliedCount)} />
         <MetricTile
           label="Manual Fixes Required"
-          ninjaValue={String(trial.manualFixesRequiredCount)}
-          onClick={trial.manualFixesRequiredCount > 0 ? () => setShowManualFixes(true) : undefined}
+          ninjaValue={String(ninjaMetrics.manualFixesRequiredCount)}
+          onClick={ninjaMetrics.manualFixesRequiredCount > 0 ? openManualFixes : undefined}
         />
       </div>
 
       <ExternalPacReportCard trialId={id!} />
 
-      <ManualFixesModal trialId={id!} isOpen={showManualFixes} onClose={() => setShowManualFixes(false)} />
+      <ManualFixesModal trialId={id!} isOpen={showManualFixes} onClose={closeManualFixes} />
     </div>
   );
 }

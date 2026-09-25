@@ -2663,6 +2663,53 @@ describe('PdfAuditResultsPage', () => {
       }
     });
 
+    it('regression (Codex finding on PR #336): re-fetches the comparison-study trial as Auto Mode rounds complete, so its taggerSource/aiFixesAppliedCount/manualFixesRequiredCount do not go stale on the trial report page', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        const mockResult = createMockAuditResult();
+        mockApi.get.mockImplementation((url: string) => {
+          if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+          if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+          if (url === aiUrl) return Promise.resolve({ data: { data: { suggestions: [], analyzed: 0, total: 0, status: 'complete' } } });
+          return Promise.resolve({ data: { data: {} } });
+        });
+        mockGetTrial.mockResolvedValue(mockTrial({ mode: 'auto' }));
+        mockGetAutoModeStatus.mockResolvedValue({
+          mode: 'auto',
+          autoStatus: 'running',
+          autoStopReason: null,
+          autoRoundsCompleted: 1,
+          autoMaxRounds: 10,
+          autoCostSpentUsd: 0.1,
+          autoCostLimitUsd: 2,
+        });
+
+        renderWithRouter(jobId, `?comparisonTrialId=${trialId}`);
+        await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+        await screen.findByTestId('auto-mode-status-card');
+        const callsAfterMount = mockGetTrial.mock.calls.length;
+        expect(callsAfterMount).toBeGreaterThanOrEqual(1);
+
+        // Round advances 1 -> 2 (autoModeProgressKey changes) — the fix
+        // invalidates the trial query here; without it, getTrial would never
+        // be called again and the report page could keep showing pre-run counts.
+        mockGetAutoModeStatus.mockResolvedValue({
+          mode: 'auto',
+          autoStatus: 'running',
+          autoStopReason: null,
+          autoRoundsCompleted: 2,
+          autoMaxRounds: 10,
+          autoCostSpentUsd: 0.2,
+          autoCostLimitUsd: 2,
+        });
+        await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+
+        expect(mockGetTrial.mock.calls.length).toBeGreaterThan(callsAfterMount);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('regression: an /auto-tag/status response resolving out of order does not overwrite fresher applied state (e.g. Generate ACR getting stuck on "Validating…")', async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       try {

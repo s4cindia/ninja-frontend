@@ -92,6 +92,26 @@ function renderPage() {
   );
 }
 
+/**
+ * Matches App.tsx's real global staleTime (5 minutes) — renderPage()'s
+ * QueryClient omits it, which is effectively React Query's own default of
+ * 0 and would make any query, including useManualFixes, look "always
+ * fresh" regardless of whether it sets its own staleTime: 0 override. Only
+ * this variant actually isolates that override.
+ */
+function renderPageWithAppStaleTime() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 5 * 60 * 1000 } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={['/comparison-study/trials/trial-1/report']}>
+        <Routes>
+          <Route path="/comparison-study/trials/:id/report" element={<ComparisonTrialReportPage />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
+  );
+}
+
 describe('ComparisonTrialReportPage', () => {
   beforeEach(() => {
     mockService.getTrialReport.mockReset();
@@ -426,6 +446,74 @@ describe('ComparisonTrialReportPage', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 
       expect(await screen.findByText('MATTERHORN-13-001')).toBeInTheDocument();
+    });
+
+    it('regression (Codex finding on PR #336): refetches manual fixes on reopen instead of serving a cached list from before a fix landed', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ manualFixesRequiredCount: 1 }));
+      mockService.getManualFixes.mockResolvedValueOnce({ items: [mockManualFixItem({ id: 'fix-old', code: 'OLD-CODE' })] });
+
+      // Uses the app-matching 5-minute staleTime — renderPage()'s QueryClient
+      // has no staleTime override at all, which already behaves like
+      // staleTime: 0 regardless of what useManualFixes itself sets.
+      renderPageWithAppStaleTime();
+
+      const tile = await screen.findByRole('button', { name: /Manual Fixes Required/ });
+      fireEvent.click(tile);
+      expect(await screen.findByText('OLD-CODE')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+      await waitFor(() => expect(screen.queryByText('OLD-CODE')).not.toBeInTheDocument());
+
+      // The operator remediated the old one — the reopen must not serve the
+      // stale cached list (staleTime: 0 forces a real refetch every time).
+      mockService.getManualFixes.mockResolvedValueOnce({ items: [mockManualFixItem({ id: 'fix-new', code: 'NEW-CODE' })] });
+      fireEvent.click(tile);
+
+      expect(await screen.findByText('NEW-CODE')).toBeInTheDocument();
+      expect(screen.queryByText('OLD-CODE')).not.toBeInTheDocument();
+      expect(mockService.getManualFixes).toHaveBeenCalledTimes(2);
+    });
+
+    it('regression (CodeRabbit finding on PR #336): returns focus to the Manual Fixes Required tile after the modal closes', async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ manualFixesRequiredCount: 1 }));
+      mockService.getManualFixes.mockResolvedValue({ items: [mockManualFixItem()] });
+
+      renderPage();
+
+      const tile = await screen.findByRole('button', { name: /Manual Fixes Required/ });
+      tile.focus();
+      fireEvent.click(tile);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Close' }));
+
+      await waitFor(() => expect(document.activeElement).toBe(tile));
+    });
+  });
+
+  describe('Ninja metrics prefer the comparison report once it is loaded', () => {
+    it("regression (CodeRabbit finding on PR #336): shows report.ninja's counts, not the (potentially stale) trial object's, once the comparison report has loaded", async () => {
+      mockService.getTrial.mockResolvedValue(mockTrial({ aiFixesAppliedCount: 3, manualFixesRequiredCount: 3 }));
+      mockService.getTrialReport.mockResolvedValue({
+        trialId: 'trial-1',
+        sourceFileName: 'sample.pdf',
+        contentType: 'text-dominant',
+        pageCount: 10,
+        ninja: {
+          activeMs: 1000, costUsd: 1, pacFailureCount: 0, pagesPerHour: 10,
+          taggerSource: 'seam-c', autoTagStatus: 'complete', aiFixesAppliedCount: 9, manualFixesRequiredCount: 0,
+        },
+        pdfxt: { timeMs: null, costUsd: null, pacFailureCount: null, pagesPerHour: null },
+      });
+
+      renderPage();
+
+      expect(await screen.findByText('AI Fixes Applied')).toBeInTheDocument();
+      // 9 (from report.ninja), not 3 (the trial object's own, now-stale value).
+      expect(screen.getByText('9')).toBeInTheDocument();
+      expect(screen.queryByText('3')).not.toBeInTheDocument();
+      // manualFixesRequiredCount is 0 in the report, so the tile must not be
+      // clickable even though the trial object still says 3.
+      expect(screen.queryByRole('button', { name: /Manual Fixes Required/ })).not.toBeInTheDocument();
     });
   });
 });
