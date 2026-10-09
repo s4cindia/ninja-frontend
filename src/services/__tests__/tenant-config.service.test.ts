@@ -362,4 +362,59 @@ describe('TenantConfigService', () => {
       consoleErrorSpy.mockRestore();
     });
   });
+
+  describe('getAxes4Config', () => {
+    it('should fetch and return the axes4 tenant toggle, including the audit trail', async () => {
+      vi.mocked(api.get).mockResolvedValue({
+        data: {
+          success: true,
+          data: { enabled: true, enabledBy: 'jane@example.com', enabledAt: '2026-10-01T12:00:00Z' },
+        },
+      } as any);
+
+      const config = await tenantConfigService.getAxes4Config();
+
+      expect(api.get).toHaveBeenCalledWith('/tenant/config/axes4');
+      expect(config).toEqual({ enabled: true, enabledBy: 'jane@example.com', enabledAt: '2026-10-01T12:00:00Z' });
+    });
+
+    it('should return a disabled default (not throw) on API error', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      vi.mocked(api.get).mockRejectedValue(new Error('Network error'));
+
+      const config = await tenantConfigService.getAxes4Config();
+
+      expect(config).toEqual({ enabled: false, enabledBy: null, enabledAt: null });
+      expect(consoleErrorSpy).toHaveBeenCalled();
+
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('updateAxes4Config', () => {
+    it('should PATCH the enabled flag and return the updated config', async () => {
+      vi.mocked(api.patch).mockResolvedValue({
+        data: {
+          success: true,
+          data: { enabled: true, enabledBy: 'jane@example.com', enabledAt: '2026-10-10T00:00:00Z' },
+          message: 'Updated',
+        },
+      } as any);
+
+      const config = await tenantConfigService.updateAxes4Config({ enabled: true });
+
+      expect(api.patch).toHaveBeenCalledWith('/tenant/config/axes4', { enabled: true });
+      expect(config.enabled).toBe(true);
+      expect(config.enabledBy).toBe('jane@example.com');
+    });
+
+    it('should propagate errors (e.g. a 403 from a non-admin) rather than swallowing them', async () => {
+      const error = new Error('Forbidden');
+      (error as any).response = { status: 403 };
+      vi.mocked(api.patch).mockRejectedValue(error);
+
+      await expect(tenantConfigService.updateAxes4Config({ enabled: true })).rejects.toThrow('Forbidden');
+    });
+  });
 });
