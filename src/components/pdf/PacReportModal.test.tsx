@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { PacReportModal } from './PacReportModal';
 import { getPacReport, runLivePacCheck, getAxes4QuotaStatus } from '../../services/pac-report.service';
 import type { PacReport, Axes4LiveResult, Axes4QuotaStatus } from '../../services/pac-report.service';
@@ -109,11 +109,18 @@ describe('PacReportModal', () => {
   describe('axes4 Live Check tab', () => {
     it('hides the tab entirely when axes4 is not configured in this environment', async () => {
       mockGetPacReport.mockResolvedValue(buildReport());
-      mockGetAxes4QuotaStatus.mockResolvedValue(buildQuota({ configured: false }));
+      let resolveQuota!: (q: Axes4QuotaStatus) => void;
+      mockGetAxes4QuotaStatus.mockImplementation(() => new Promise((resolve) => { resolveQuota = resolve; }));
 
       render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} />);
 
       await waitFor(() => expect(mockGetAxes4QuotaStatus).toHaveBeenCalled());
+      // Resolve inside act and wait for the response to actually be applied
+      // (not just confirm the mock was called) before asserting the tab
+      // stays absent — otherwise this could pass even if the tab briefly
+      // appeared and nothing ever re-hid it.
+      await act(async () => { resolveQuota(buildQuota({ configured: false })); });
+
       expect(screen.queryByRole('tab', { name: 'axes4 Live Check' })).not.toBeInTheDocument();
     });
 
@@ -256,6 +263,89 @@ describe('PacReportModal', () => {
       await screen.findByText(/This check could not complete/);
 
       expect(mockGetAxes4QuotaStatus).toHaveBeenCalledTimes(1);
+    });
+
+    it('regression (CodeRabbit): preserves the in-flight run and its eventual result across a tab switch, and does not let a second run start while the first is still pending', async () => {
+      mockGetPacReport.mockResolvedValue(buildReport());
+      mockGetAxes4QuotaStatus.mockResolvedValue(buildQuota());
+      let resolveRun!: (v: Axes4LiveResult) => void;
+      mockRunLivePacCheck.mockImplementation(() => new Promise((resolve) => { resolveRun = resolve; }));
+
+      render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} />);
+
+      fireEvent.click(await screen.findByRole('tab', { name: 'axes4 Live Check' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Run Live Check' }));
+      await screen.findByText(/Running live axes4 PAC Cloud check/);
+
+      // Switch away (unmounts Axes4LiveCheckPanel via TabsContent) and back.
+      fireEvent.click(screen.getByRole('tab', { name: 'Ninja Report' }));
+      fireEvent.click(screen.getByRole('tab', { name: 'axes4 Live Check' }));
+
+      // Still shows the in-flight state, not a freshly-reset enabled button —
+      // and clicking it again (as an operator returning to check might) must
+      // not fire a second, separately-billed request.
+      const runButtonAfterReturn = screen.getByRole('button', { name: /Running live axes4 PAC Cloud check/ });
+      expect(runButtonAfterReturn).toBeDisabled();
+      fireEvent.click(runButtonAfterReturn);
+      expect(mockRunLivePacCheck).toHaveBeenCalledTimes(1);
+
+      await act(async () => { resolveRun(buildLiveResult()); });
+
+      expect(await screen.findByText('48.7')).toBeInTheDocument();
+    });
+
+    it('regression (CodeRabbit): clears a stale quota from a previous open when the new fetch fails, instead of leaving old configured/usage state visible', async () => {
+      mockGetPacReport.mockResolvedValue(buildReport());
+      mockGetAxes4QuotaStatus.mockResolvedValueOnce(buildQuota());
+
+      const { rerender } = render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} />);
+      expect(await screen.findByRole('tab', { name: 'axes4 Live Check' })).toBeInTheDocument();
+
+      // Close, then reopen with a failing quota fetch this time.
+      rerender(<PacReportModal isOpen={false} jobId="job-1" onClose={() => {}} />);
+      mockGetAxes4QuotaStatus.mockRejectedValueOnce(new Error('network error'));
+      rerender(<PacReportModal isOpen jobId="job-1" onClose={() => {}} />);
+
+      await waitFor(() => expect(mockGetAxes4QuotaStatus).toHaveBeenCalledTimes(2));
+      // The stale "configured" tab from the first open must not keep showing
+      // just because this reopen's own fetch failed.
+      await waitFor(() => expect(screen.queryByRole('tab', { name: 'axes4 Live Check' })).not.toBeInTheDocument());
+    });
+
+    it('regression (CodeRabbit): applies only the most recently started quota response when two post-run refreshes resolve out of order', async () => {
+      mockGetPacReport.mockResolvedValue(buildReport());
+      let resolveFirstRunQuota!: (q: Axes4QuotaStatus) => void;
+      let resolveSecondRunQuota!: (q: Axes4QuotaStatus) => void;
+      mockGetAxes4QuotaStatus
+        .mockResolvedValueOnce(buildQuota({ pagesUsedThisPeriod: 10 })) // initial open fetch
+        .mockImplementationOnce(() => new Promise((resolve) => { resolveFirstRunQuota = resolve; })) // after 1st run
+        .mockImplementationOnce(() => new Promise((resolve) => { resolveSecondRunQuota = resolve; })); // after 2nd run
+      mockRunLivePacCheck.mockResolvedValue(buildLiveResult());
+
+      render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} />);
+
+      fireEvent.click(await screen.findByRole('tab', { name: 'axes4 Live Check' }));
+      expect(await screen.findByText(/10 of 100 pages used this period/)).toBeInTheDocument();
+
+      // First run — its own result resolves fast (re-enabling the button),
+      // but the quota refresh it triggers is left pending.
+      fireEvent.click(screen.getByRole('button', { name: 'Run Live Check' }));
+      await screen.findByText('48.7');
+      await waitFor(() => expect(mockGetAxes4QuotaStatus).toHaveBeenCalledTimes(2));
+
+      // Operator runs it again before the first refresh ever resolved.
+      fireEvent.click(screen.getByRole('button', { name: 'Run Live Check' }));
+      await waitFor(() => expect(mockGetAxes4QuotaStatus).toHaveBeenCalledTimes(3));
+
+      // The second (newer) refresh resolves first with fresh data...
+      await act(async () => { resolveSecondRunQuota(buildQuota({ pagesUsedThisPeriod: 30 })); });
+      expect(await screen.findByText(/30 of 100 pages used this period/)).toBeInTheDocument();
+
+      // ...and the first (now-stale) refresh arriving late must not
+      // overwrite it.
+      await act(async () => { resolveFirstRunQuota(buildQuota({ pagesUsedThisPeriod: 20 })); });
+      expect(screen.getByText(/30 of 100 pages used this period/)).toBeInTheDocument();
+      expect(screen.queryByText(/20 of 100 pages used this period/)).not.toBeInTheDocument();
     });
   });
 });

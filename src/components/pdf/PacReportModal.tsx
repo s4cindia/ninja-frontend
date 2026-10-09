@@ -166,37 +166,28 @@ function Axes4FailureRow({ failure }: { failure: Axes4Failure }) {
   );
 }
 
+/**
+ * result/isRunning/error are owned by the parent PacReportModal, not this
+ * panel — TabsContent unmounts inactive tabs (src/components/ui/Tabs.tsx),
+ * so state living here would be discarded on every tab switch. That would
+ * both lose a result the operator never got to see and, worse, reset
+ * isRunning on remount while the original (paid) request was still in
+ * flight server-side, letting a second billable run start before the first
+ * one even finished.
+ */
 function Axes4LiveCheckPanel({
-  jobId,
   quota,
-  onRanSuccessfully,
+  result,
+  isRunning,
+  error,
+  onRun,
 }: {
-  jobId: string;
   quota: Axes4QuotaStatus | null;
-  onRanSuccessfully: () => void;
+  result: Axes4LiveResult | null;
+  isRunning: boolean;
+  error: string | null;
+  onRun: () => void;
 }) {
-  const [result, setResult] = useState<Axes4LiveResult | null>(null);
-  const [isRunning, setIsRunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleRun = async () => {
-    setIsRunning(true);
-    setError(null);
-    try {
-      const r = await runLivePacCheck(jobId);
-      setResult(r);
-      if (r.ran) onRanSuccessfully();
-    } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.status === 429) {
-        setError('axes4 live check rate limit reached — try again in about a minute.');
-      } else {
-        setError(err instanceof Error ? err.message : 'Failed to run live axes4 check.');
-      }
-    } finally {
-      setIsRunning(false);
-    }
-  };
-
   const atQuotaLimit = !!quota && quota.pagesUsedThisPeriod >= quota.pagesLimitThisPeriod;
 
   return (
@@ -214,7 +205,7 @@ function Axes4LiveCheckPanel({
       <Button
         variant="outline"
         size="sm"
-        onClick={handleRun}
+        onClick={onRun}
         disabled={!quota || isRunning || atQuotaLimit}
         title={atQuotaLimit ? `Monthly page quota exhausted — resets ${fmtResetDate(quota?.periodResetAt ?? null)}.` : undefined}
       >
@@ -283,20 +274,61 @@ export function PacReportModal({ isOpen, onClose, jobId, onGenerated }: PacRepor
   // decide whether to show the axes4 tab trigger at all (hidden entirely
   // when not configured, never just a disabled dead control).
   const [axes4Quota, setAxes4Quota] = useState<Axes4QuotaStatus | null>(null);
-  const refetchAxes4Quota = () => {
-    getAxes4QuotaStatus().then(setAxes4Quota).catch(() => {
-      // Non-fatal — the quota line/tab-visibility just won't update from
-      // this attempt; next modal open (or post-run refresh) tries again.
-    });
+  // Guards against two quota fetches resolving out of order (the open-effect
+  // fetch and a post-run refetch could both be in flight at once) — only the
+  // most recently STARTED request's response is ever applied, same pattern
+  // as PdfAuditResultsPage's aiFetchRequestIdRef/aiFetchAppliedIdRef.
+  const axes4QuotaRequestIdRef = useRef(0);
+  const axes4QuotaAppliedIdRef = useRef(0);
+  const fetchAxes4Quota = () => {
+    const requestId = ++axes4QuotaRequestIdRef.current;
+    getAxes4QuotaStatus()
+      .then((q) => {
+        if (requestId <= axes4QuotaAppliedIdRef.current) return;
+        axes4QuotaAppliedIdRef.current = requestId;
+        setAxes4Quota(q);
+      })
+      .catch(() => {
+        if (requestId <= axes4QuotaAppliedIdRef.current) return;
+        axes4QuotaAppliedIdRef.current = requestId;
+        // Clear rather than leave a stale value showing — a formerly-
+        // configured environment must not keep exposing the paid-run
+        // control, and a stale exhausted quota must not keep blocking a
+        // now-valid run, just because this particular refresh failed.
+        setAxes4Quota(null);
+      });
   };
   useEffect(() => {
     if (!isOpen) return;
-    let cancelled = false;
-    getAxes4QuotaStatus()
-      .then((q) => { if (!cancelled) setAxes4Quota(q); })
-      .catch(() => { /* tab just stays hidden until a later attempt succeeds */ });
-    return () => { cancelled = true; };
+    setAxes4Quota(null);
+    fetchAxes4Quota();
   }, [isOpen]);
+
+  // Lifted out of Axes4LiveCheckPanel — TabsContent unmounts inactive tabs,
+  // so result/isRunning/error must live here or switching away mid-request
+  // and back would both lose the result and (far worse) let a second,
+  // separately-billed request start while the first was still in flight.
+  const [axes4Result, setAxes4Result] = useState<Axes4LiveResult | null>(null);
+  const [isAxes4Running, setIsAxes4Running] = useState(false);
+  const [axes4Error, setAxes4Error] = useState<string | null>(null);
+  const handleRunAxes4Live = async () => {
+    if (isAxes4Running) return;
+    setIsAxes4Running(true);
+    setAxes4Error(null);
+    try {
+      const r = await runLivePacCheck(jobId);
+      setAxes4Result(r);
+      if (r.ran) fetchAxes4Quota();
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 429) {
+        setAxes4Error('axes4 live check rate limit reached — try again in about a minute.');
+      } else {
+        setAxes4Error(err instanceof Error ? err.message : 'Failed to run live axes4 check.');
+      }
+    } finally {
+      setIsAxes4Running(false);
+    }
+  };
 
   // Read via a ref rather than a dependency, so a parent passing an inline
   // callback doesn't re-trigger the fetch below on every render. Updated in
@@ -379,7 +411,13 @@ export function PacReportModal({ isOpen, onClose, jobId, onGenerated }: PacRepor
 
             {axes4Quota?.configured && (
               <TabsContent value="axes4">
-                <Axes4LiveCheckPanel jobId={jobId} quota={axes4Quota} onRanSuccessfully={refetchAxes4Quota} />
+                <Axes4LiveCheckPanel
+                  quota={axes4Quota}
+                  result={axes4Result}
+                  isRunning={isAxes4Running}
+                  error={axes4Error}
+                  onRun={handleRunAxes4Live}
+                />
               </TabsContent>
             )}
           </Tabs>
