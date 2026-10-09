@@ -1,17 +1,24 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { PacReportModal } from './PacReportModal';
-import { getPacReport } from '../../services/pac-report.service';
-import type { PacReport } from '../../services/pac-report.service';
+import { getPacReport, runLivePacCheck, getAxes4QuotaStatus } from '../../services/pac-report.service';
+import type { PacReport, Axes4LiveResult, Axes4QuotaStatus } from '../../services/pac-report.service';
 
 vi.mock('../../services/pac-report.service', async () => {
   const actual = await vi.importActual<typeof import('../../services/pac-report.service')>(
     '../../services/pac-report.service'
   );
-  return { ...actual, getPacReport: vi.fn() };
+  return {
+    ...actual,
+    getPacReport: vi.fn(),
+    runLivePacCheck: vi.fn(),
+    getAxes4QuotaStatus: vi.fn(),
+  };
 });
 
 const mockGetPacReport = getPacReport as unknown as ReturnType<typeof vi.fn>;
+const mockRunLivePacCheck = runLivePacCheck as unknown as ReturnType<typeof vi.fn>;
+const mockGetAxes4QuotaStatus = getAxes4QuotaStatus as unknown as ReturnType<typeof vi.fn>;
 
 function buildReport(source?: 'ninja' | 'verapdf' | 'pdfa11y'): PacReport {
   return {
@@ -41,7 +48,37 @@ function buildReport(source?: 'ninja' | 'verapdf' | 'pdfa11y'): PacReport {
   };
 }
 
+function buildQuota(overrides?: Partial<Axes4QuotaStatus>): Axes4QuotaStatus {
+  return {
+    configured: true,
+    pagesUsedThisPeriod: 10,
+    pagesLimitThisPeriod: 100,
+    periodResetAt: '2026-11-01T12:00:00Z',
+    ...overrides,
+  };
+}
+
+function buildLiveResult(overrides?: Partial<Axes4LiveResult>): Axes4LiveResult {
+  return {
+    ran: true,
+    uaIndex: 48.73,
+    configured: true,
+    source: 'original',
+    failures: [
+      { checkId: 'FontsAreEmbedded', description: 'Font not embedded', pageNumber: 1, count: 1 },
+      { checkId: 'ValidLanguageCheck', description: 'Document language metadata contains a syntax error', count: 1 },
+    ],
+    ...overrides,
+  };
+}
+
 describe('PacReportModal', () => {
+  beforeEach(() => {
+    mockGetPacReport.mockReset();
+    mockRunLivePacCheck.mockReset();
+    mockGetAxes4QuotaStatus.mockReset().mockResolvedValue(buildQuota({ configured: false }));
+  });
+
   it('shows a provenance badge on a failing condition when the backend attributes a source', async () => {
     mockGetPacReport.mockResolvedValue(buildReport('verapdf'));
 
@@ -67,5 +104,248 @@ describe('PacReportModal', () => {
     expect(screen.queryByText('Ninja')).not.toBeInTheDocument();
     expect(screen.queryByText('veraPDF')).not.toBeInTheDocument();
     expect(screen.queryByText('pdfa11y')).not.toBeInTheDocument();
+  });
+
+  describe('axes4 Live Check tab', () => {
+    it('hides the tab entirely when axes4 is not configured in this environment', async () => {
+      mockGetPacReport.mockResolvedValue(buildReport());
+      let resolveQuota!: (q: Axes4QuotaStatus) => void;
+      mockGetAxes4QuotaStatus.mockImplementation(() => new Promise((resolve) => { resolveQuota = resolve; }));
+
+      render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} />);
+
+      await waitFor(() => expect(mockGetAxes4QuotaStatus).toHaveBeenCalled());
+      // Resolve inside act and wait for the response to actually be applied
+      // (not just confirm the mock was called) before asserting the tab
+      // stays absent — otherwise this could pass even if the tab briefly
+      // appeared and nothing ever re-hid it.
+      await act(async () => { resolveQuota(buildQuota({ configured: false })); });
+
+      expect(screen.queryByRole('tab', { name: 'axes4 Live Check' })).not.toBeInTheDocument();
+    });
+
+    it('shows the tab and the quota line when configured', async () => {
+      mockGetPacReport.mockResolvedValue(buildReport());
+      mockGetAxes4QuotaStatus.mockResolvedValue(buildQuota({ pagesUsedThisPeriod: 42, pagesLimitThisPeriod: 500 }));
+
+      render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} />);
+
+      fireEvent.click(await screen.findByRole('tab', { name: 'axes4 Live Check' }));
+
+      expect(await screen.findByText(/42 of 500 pages used this period/)).toBeInTheDocument();
+      expect(screen.getByText(/resets Nov 1, 2026/)).toBeInTheDocument();
+    });
+
+    it('disables Run Live Check once the page quota is exhausted', async () => {
+      mockGetPacReport.mockResolvedValue(buildReport());
+      mockGetAxes4QuotaStatus.mockResolvedValue(buildQuota({ pagesUsedThisPeriod: 100, pagesLimitThisPeriod: 100 }));
+
+      render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} />);
+
+      fireEvent.click(await screen.findByRole('tab', { name: 'axes4 Live Check' }));
+
+      const runButton = await screen.findByRole('button', { name: 'Run Live Check' });
+      expect(runButton).toBeDisabled();
+      expect(runButton).toHaveAttribute('title', expect.stringMatching(/quota exhausted/i));
+    });
+
+    it('shows distinct loading copy while the live check is running, not the free report\'s "Generating report…"', async () => {
+      mockGetPacReport.mockResolvedValue(buildReport());
+      mockGetAxes4QuotaStatus.mockResolvedValue(buildQuota());
+      let resolveRun!: (v: Axes4LiveResult) => void;
+      mockRunLivePacCheck.mockImplementation(() => new Promise((resolve) => { resolveRun = resolve; }));
+
+      render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} />);
+
+      fireEvent.click(await screen.findByRole('tab', { name: 'axes4 Live Check' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Run Live Check' }));
+
+      expect(await screen.findByText(/Running live axes4 PAC Cloud check — this can take a minute or two…/)).toBeInTheDocument();
+      expect(screen.queryByText('Generating report…')).not.toBeInTheDocument();
+
+      resolveRun(buildLiveResult({ ran: false }));
+      await screen.findByText(/This check could not complete/);
+    });
+
+    it('renders the uaIndex and the flat failure list on a successful run, including a document-level failure with no pageNumber', async () => {
+      mockGetPacReport.mockResolvedValue(buildReport());
+      mockGetAxes4QuotaStatus.mockResolvedValue(buildQuota());
+      mockRunLivePacCheck.mockResolvedValue(buildLiveResult());
+
+      render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} />);
+
+      fireEvent.click(await screen.findByRole('tab', { name: 'axes4 Live Check' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Run Live Check' }));
+
+      expect(await screen.findByText('48.7')).toBeInTheDocument();
+      expect(screen.getByText('FontsAreEmbedded')).toBeInTheDocument();
+      expect(screen.getByText('Page 1')).toBeInTheDocument();
+      expect(screen.getByText('ValidLanguageCheck')).toBeInTheDocument();
+      expect(screen.getByText('Document-level')).toBeInTheDocument();
+    });
+
+    it('shows the failure count multiplier only when greater than 1', async () => {
+      mockGetPacReport.mockResolvedValue(buildReport());
+      mockGetAxes4QuotaStatus.mockResolvedValue(buildQuota());
+      mockRunLivePacCheck.mockResolvedValue(buildLiveResult({
+        failures: [{ checkId: 'RepeatedCheck', description: 'Happens a lot', count: 3 }],
+      }));
+
+      render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} />);
+
+      fireEvent.click(await screen.findByRole('tab', { name: 'axes4 Live Check' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Run Live Check' }));
+
+      expect(await screen.findByText('×3')).toBeInTheDocument();
+    });
+
+    it('shows a neutral (non-error-styled) message when ran is false, since it is an expected outcome not a failure', async () => {
+      mockGetPacReport.mockResolvedValue(buildReport());
+      mockGetAxes4QuotaStatus.mockResolvedValue(buildQuota());
+      mockRunLivePacCheck.mockResolvedValue(buildLiveResult({ ran: false, uaIndex: undefined, failures: [] }));
+
+      render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} />);
+
+      fireEvent.click(await screen.findByRole('tab', { name: 'axes4 Live Check' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Run Live Check' }));
+
+      const message = await screen.findByText(/This check could not complete/);
+      expect(message).toBeInTheDocument();
+      expect(message.className).not.toMatch(/text-red/);
+    });
+
+    it('shows a rate-limit-specific message on a 429, not a generic error', async () => {
+      mockGetPacReport.mockResolvedValue(buildReport());
+      mockGetAxes4QuotaStatus.mockResolvedValue(buildQuota());
+      mockRunLivePacCheck.mockRejectedValue({
+        isAxiosError: true,
+        message: 'Request failed with status code 429',
+        response: { status: 429, data: {} },
+      });
+
+      render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} />);
+
+      fireEvent.click(await screen.findByRole('tab', { name: 'axes4 Live Check' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Run Live Check' }));
+
+      expect(await screen.findByText(/axes4 live check rate limit reached — try again in about a minute/)).toBeInTheDocument();
+    });
+
+    it('refetches quota after a successful run so the used/limit line updates without reopening the modal', async () => {
+      mockGetPacReport.mockResolvedValue(buildReport());
+      mockGetAxes4QuotaStatus
+        .mockResolvedValueOnce(buildQuota({ pagesUsedThisPeriod: 10, pagesLimitThisPeriod: 100 }))
+        .mockResolvedValueOnce(buildQuota({ pagesUsedThisPeriod: 15, pagesLimitThisPeriod: 100 }));
+      mockRunLivePacCheck.mockResolvedValue(buildLiveResult());
+
+      render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} />);
+
+      fireEvent.click(await screen.findByRole('tab', { name: 'axes4 Live Check' }));
+      expect(await screen.findByText(/10 of 100 pages used this period/)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Run Live Check' }));
+
+      expect(await screen.findByText(/15 of 100 pages used this period/)).toBeInTheDocument();
+      expect(mockGetAxes4QuotaStatus).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not refetch quota after a run that did not complete (ran: false) — nothing was billed', async () => {
+      mockGetPacReport.mockResolvedValue(buildReport());
+      mockGetAxes4QuotaStatus.mockResolvedValue(buildQuota());
+      mockRunLivePacCheck.mockResolvedValue(buildLiveResult({ ran: false, uaIndex: undefined, failures: [] }));
+
+      render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} />);
+
+      fireEvent.click(await screen.findByRole('tab', { name: 'axes4 Live Check' }));
+      await waitFor(() => expect(mockGetAxes4QuotaStatus).toHaveBeenCalledTimes(1));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Run Live Check' }));
+      await screen.findByText(/This check could not complete/);
+
+      expect(mockGetAxes4QuotaStatus).toHaveBeenCalledTimes(1);
+    });
+
+    it('regression (CodeRabbit): preserves the in-flight run and its eventual result across a tab switch, and does not let a second run start while the first is still pending', async () => {
+      mockGetPacReport.mockResolvedValue(buildReport());
+      mockGetAxes4QuotaStatus.mockResolvedValue(buildQuota());
+      let resolveRun!: (v: Axes4LiveResult) => void;
+      mockRunLivePacCheck.mockImplementation(() => new Promise((resolve) => { resolveRun = resolve; }));
+
+      render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} />);
+
+      fireEvent.click(await screen.findByRole('tab', { name: 'axes4 Live Check' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Run Live Check' }));
+      await screen.findByText(/Running live axes4 PAC Cloud check/);
+
+      // Switch away (unmounts Axes4LiveCheckPanel via TabsContent) and back.
+      fireEvent.click(screen.getByRole('tab', { name: 'Ninja Report' }));
+      fireEvent.click(screen.getByRole('tab', { name: 'axes4 Live Check' }));
+
+      // Still shows the in-flight state, not a freshly-reset enabled button —
+      // and clicking it again (as an operator returning to check might) must
+      // not fire a second, separately-billed request.
+      const runButtonAfterReturn = screen.getByRole('button', { name: /Running live axes4 PAC Cloud check/ });
+      expect(runButtonAfterReturn).toBeDisabled();
+      fireEvent.click(runButtonAfterReturn);
+      expect(mockRunLivePacCheck).toHaveBeenCalledTimes(1);
+
+      await act(async () => { resolveRun(buildLiveResult()); });
+
+      expect(await screen.findByText('48.7')).toBeInTheDocument();
+    });
+
+    it('regression (CodeRabbit): clears a stale quota from a previous open when the new fetch fails, instead of leaving old configured/usage state visible', async () => {
+      mockGetPacReport.mockResolvedValue(buildReport());
+      mockGetAxes4QuotaStatus.mockResolvedValueOnce(buildQuota());
+
+      const { rerender } = render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} />);
+      expect(await screen.findByRole('tab', { name: 'axes4 Live Check' })).toBeInTheDocument();
+
+      // Close, then reopen with a failing quota fetch this time.
+      rerender(<PacReportModal isOpen={false} jobId="job-1" onClose={() => {}} />);
+      mockGetAxes4QuotaStatus.mockRejectedValueOnce(new Error('network error'));
+      rerender(<PacReportModal isOpen jobId="job-1" onClose={() => {}} />);
+
+      await waitFor(() => expect(mockGetAxes4QuotaStatus).toHaveBeenCalledTimes(2));
+      // The stale "configured" tab from the first open must not keep showing
+      // just because this reopen's own fetch failed.
+      await waitFor(() => expect(screen.queryByRole('tab', { name: 'axes4 Live Check' })).not.toBeInTheDocument());
+    });
+
+    it('regression (CodeRabbit): applies only the most recently started quota response when two post-run refreshes resolve out of order', async () => {
+      mockGetPacReport.mockResolvedValue(buildReport());
+      let resolveFirstRunQuota!: (q: Axes4QuotaStatus) => void;
+      let resolveSecondRunQuota!: (q: Axes4QuotaStatus) => void;
+      mockGetAxes4QuotaStatus
+        .mockResolvedValueOnce(buildQuota({ pagesUsedThisPeriod: 10 })) // initial open fetch
+        .mockImplementationOnce(() => new Promise((resolve) => { resolveFirstRunQuota = resolve; })) // after 1st run
+        .mockImplementationOnce(() => new Promise((resolve) => { resolveSecondRunQuota = resolve; })); // after 2nd run
+      mockRunLivePacCheck.mockResolvedValue(buildLiveResult());
+
+      render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} />);
+
+      fireEvent.click(await screen.findByRole('tab', { name: 'axes4 Live Check' }));
+      expect(await screen.findByText(/10 of 100 pages used this period/)).toBeInTheDocument();
+
+      // First run — its own result resolves fast (re-enabling the button),
+      // but the quota refresh it triggers is left pending.
+      fireEvent.click(screen.getByRole('button', { name: 'Run Live Check' }));
+      await screen.findByText('48.7');
+      await waitFor(() => expect(mockGetAxes4QuotaStatus).toHaveBeenCalledTimes(2));
+
+      // Operator runs it again before the first refresh ever resolved.
+      fireEvent.click(screen.getByRole('button', { name: 'Run Live Check' }));
+      await waitFor(() => expect(mockGetAxes4QuotaStatus).toHaveBeenCalledTimes(3));
+
+      // The second (newer) refresh resolves first with fresh data...
+      await act(async () => { resolveSecondRunQuota(buildQuota({ pagesUsedThisPeriod: 30 })); });
+      expect(await screen.findByText(/30 of 100 pages used this period/)).toBeInTheDocument();
+
+      // ...and the first (now-stale) refresh arriving late must not
+      // overwrite it.
+      await act(async () => { resolveFirstRunQuota(buildQuota({ pagesUsedThisPeriod: 20 })); });
+      expect(screen.getByText(/30 of 100 pages used this period/)).toBeInTheDocument();
+      expect(screen.queryByText(/20 of 100 pages used this period/)).not.toBeInTheDocument();
+    });
   });
 });

@@ -9,6 +9,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
 import {
   Dialog,
   DialogContent,
@@ -17,13 +18,17 @@ import {
   DialogTitle,
 } from '../ui/Dialog';
 import { Button } from '../ui/Button';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs';
 import { Loader2, CheckCircle2, XCircle, AlertTriangle, HelpCircle, ChevronDown, ChevronRight } from 'lucide-react';
-import { getPacReport } from '../../services/pac-report.service';
+import { getPacReport, runLivePacCheck, getAxes4QuotaStatus } from '../../services/pac-report.service';
 import type {
   PacReport,
   PacCheckpointResult,
   PacCheckpointStatus,
   PacConditionStatus,
+  Axes4LiveResult,
+  Axes4QuotaStatus,
+  Axes4Failure,
 } from '../../services/pac-report.service';
 import { SourceBadge } from '../audit';
 
@@ -137,6 +142,118 @@ function SummaryBar({ report }: { report: PacReport }) {
   );
 }
 
+// ─── axes4 Live Check tab ──────────────────────────────────────────────────────
+
+function fmtResetDate(iso: string | null): string {
+  if (!iso) return 'unknown';
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function Axes4FailureRow({ failure }: { failure: Axes4Failure }) {
+  return (
+    <div className="flex items-start gap-2 text-xs border-b border-gray-100 py-1.5 last:border-b-0">
+      <span className="font-mono flex-shrink-0 w-40 truncate text-gray-700" title={failure.checkId}>
+        {failure.checkId}
+      </span>
+      <span className="flex-1 text-gray-600">{failure.description}</span>
+      <span className="flex-shrink-0 w-24 text-right text-gray-400">
+        {failure.pageNumber != null ? `Page ${failure.pageNumber}` : 'Document-level'}
+      </span>
+      <span className="flex-shrink-0 w-8 text-right font-mono text-gray-500">
+        {failure.count > 1 ? `×${failure.count}` : ''}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * result/isRunning/error are owned by the parent PacReportModal, not this
+ * panel — TabsContent unmounts inactive tabs (src/components/ui/Tabs.tsx),
+ * so state living here would be discarded on every tab switch. That would
+ * both lose a result the operator never got to see and, worse, reset
+ * isRunning on remount while the original (paid) request was still in
+ * flight server-side, letting a second billable run start before the first
+ * one even finished.
+ */
+function Axes4LiveCheckPanel({
+  quota,
+  result,
+  isRunning,
+  error,
+  onRun,
+}: {
+  quota: Axes4QuotaStatus | null;
+  result: Axes4LiveResult | null;
+  isRunning: boolean;
+  error: string | null;
+  onRun: () => void;
+}) {
+  const atQuotaLimit = !!quota && quota.pagesUsedThisPeriod >= quota.pagesLimitThisPeriod;
+
+  return (
+    <div>
+      {quota && (
+        <p className="text-xs text-gray-500 mb-2">
+          {quota.pagesUsedThisPeriod} of {quota.pagesLimitThisPeriod} pages used this period
+          {' · '}resets {fmtResetDate(quota.periodResetAt)}
+        </p>
+      )}
+      <p className="text-xs text-gray-400 italic mb-3">
+        Uses real axes4 page quota. Can take up to a few minutes.
+      </p>
+
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={onRun}
+        disabled={!quota || isRunning || atQuotaLimit}
+        title={atQuotaLimit ? `Monthly page quota exhausted — resets ${fmtResetDate(quota?.periodResetAt ?? null)}.` : undefined}
+      >
+        {isRunning
+          ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Running live axes4 PAC Cloud check — this can take a minute or two…</>
+          : 'Run Live Check'
+        }
+      </Button>
+
+      {error && (
+        <div className="mt-4 py-4 text-center text-red-600 text-sm">{error}</div>
+      )}
+
+      {result && !error && (
+        result.ran ? (
+          <div className="mt-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="bg-blue-50 border border-blue-200 rounded px-3 py-2 text-center">
+                <div className="text-lg font-bold text-blue-700">{result.uaIndex?.toFixed(1) ?? '--'}</div>
+                <div className="text-xs text-blue-600">UA Index</div>
+              </div>
+              {result.source && (
+                <span className="text-xs text-gray-400">
+                  Checked the {result.source} file.
+                </span>
+              )}
+            </div>
+            {result.failures.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">No failures reported.</p>
+            ) : (
+              <div className="space-y-0">
+                {result.failures.map((f, i) => (
+                  <Axes4FailureRow key={`${f.checkId}-${i}`} failure={f} />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="mt-4 py-4 text-center text-gray-500 text-sm">
+            This check could not complete. The document may have exceeded axes4's limits,
+            or the service may be temporarily unavailable.
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
 // ─── Modal ────────────────────────────────────────────────────────────────────
 
 interface PacReportModalProps {
@@ -151,6 +268,67 @@ export function PacReportModal({ isOpen, onClose, jobId, onGenerated }: PacRepor
   const [report, setReport] = useState<PacReport | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Quota is cheap/free to check (unlike actually running a live check), so
+  // this fetches on open regardless of which tab is active — needed to
+  // decide whether to show the axes4 tab trigger at all (hidden entirely
+  // when not configured, never just a disabled dead control).
+  const [axes4Quota, setAxes4Quota] = useState<Axes4QuotaStatus | null>(null);
+  // Guards against two quota fetches resolving out of order (the open-effect
+  // fetch and a post-run refetch could both be in flight at once) — only the
+  // most recently STARTED request's response is ever applied, same pattern
+  // as PdfAuditResultsPage's aiFetchRequestIdRef/aiFetchAppliedIdRef.
+  const axes4QuotaRequestIdRef = useRef(0);
+  const axes4QuotaAppliedIdRef = useRef(0);
+  const fetchAxes4Quota = () => {
+    const requestId = ++axes4QuotaRequestIdRef.current;
+    getAxes4QuotaStatus()
+      .then((q) => {
+        if (requestId <= axes4QuotaAppliedIdRef.current) return;
+        axes4QuotaAppliedIdRef.current = requestId;
+        setAxes4Quota(q);
+      })
+      .catch(() => {
+        if (requestId <= axes4QuotaAppliedIdRef.current) return;
+        axes4QuotaAppliedIdRef.current = requestId;
+        // Clear rather than leave a stale value showing — a formerly-
+        // configured environment must not keep exposing the paid-run
+        // control, and a stale exhausted quota must not keep blocking a
+        // now-valid run, just because this particular refresh failed.
+        setAxes4Quota(null);
+      });
+  };
+  useEffect(() => {
+    if (!isOpen) return;
+    setAxes4Quota(null);
+    fetchAxes4Quota();
+  }, [isOpen]);
+
+  // Lifted out of Axes4LiveCheckPanel — TabsContent unmounts inactive tabs,
+  // so result/isRunning/error must live here or switching away mid-request
+  // and back would both lose the result and (far worse) let a second,
+  // separately-billed request start while the first was still in flight.
+  const [axes4Result, setAxes4Result] = useState<Axes4LiveResult | null>(null);
+  const [isAxes4Running, setIsAxes4Running] = useState(false);
+  const [axes4Error, setAxes4Error] = useState<string | null>(null);
+  const handleRunAxes4Live = async () => {
+    if (isAxes4Running) return;
+    setIsAxes4Running(true);
+    setAxes4Error(null);
+    try {
+      const r = await runLivePacCheck(jobId);
+      setAxes4Result(r);
+      if (r.ran) fetchAxes4Quota();
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 429) {
+        setAxes4Error('axes4 live check rate limit reached — try again in about a minute.');
+      } else {
+        setAxes4Error(err instanceof Error ? err.message : 'Failed to run live axes4 check.');
+      }
+    } finally {
+      setIsAxes4Running(false);
+    }
+  };
 
   // Read via a ref rather than a dependency, so a parent passing an inline
   // callback doesn't re-trigger the fetch below on every render. Updated in
@@ -193,33 +371,56 @@ export function PacReportModal({ isOpen, onClose, jobId, onGenerated }: PacRepor
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto pr-1">
-          {isLoading && (
-            <div className="flex items-center justify-center py-16 text-gray-400">
-              <Loader2 className="h-6 w-6 animate-spin mr-2" />
-              Generating report…
-            </div>
-          )}
+          <Tabs defaultValue="ninja">
+            <TabsList>
+              <TabsTrigger value="ninja">Ninja Report</TabsTrigger>
+              {axes4Quota?.configured && (
+                <TabsTrigger value="axes4">axes4 Live Check</TabsTrigger>
+              )}
+            </TabsList>
 
-          {error && (
-            <div className="py-8 text-center text-red-600 text-sm">{error}</div>
-          )}
+            <TabsContent value="ninja">
+              {isLoading && (
+                <div className="flex items-center justify-center py-16 text-gray-400">
+                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                  Generating report…
+                </div>
+              )}
 
-          {report && !isLoading && (
-            <>
-              <SummaryBar report={report} />
+              {error && (
+                <div className="py-8 text-center text-red-600 text-sm">{error}</div>
+              )}
 
-              <div className="space-y-1.5">
-                {report.checkpoints.map((cp) => (
-                  <CheckpointRow key={cp.id} cp={cp} />
-                ))}
-              </div>
+              {report && !isLoading && (
+                <>
+                  <SummaryBar report={report} />
 
-              <p className="mt-4 text-xs text-gray-400 italic text-center">
-                UNTESTED conditions are not confirmed passing. This report does not constitute
-                full PDF/UA-1 certification.
-              </p>
-            </>
-          )}
+                  <div className="space-y-1.5">
+                    {report.checkpoints.map((cp) => (
+                      <CheckpointRow key={cp.id} cp={cp} />
+                    ))}
+                  </div>
+
+                  <p className="mt-4 text-xs text-gray-400 italic text-center">
+                    UNTESTED conditions are not confirmed passing. This report does not constitute
+                    full PDF/UA-1 certification.
+                  </p>
+                </>
+              )}
+            </TabsContent>
+
+            {axes4Quota?.configured && (
+              <TabsContent value="axes4">
+                <Axes4LiveCheckPanel
+                  quota={axes4Quota}
+                  result={axes4Result}
+                  isRunning={isAxes4Running}
+                  error={axes4Error}
+                  onRun={handleRunAxes4Live}
+                />
+              </TabsContent>
+            )}
+          </Tabs>
         </div>
 
         <div className="flex justify-end pt-3 border-t">
