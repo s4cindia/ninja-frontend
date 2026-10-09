@@ -1,14 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Button } from '../components/ui/Button';
-import { tenantConfigService, WorkflowConfig, ExplanationSource } from '../services/tenant-config.service';
+import { tenantConfigService, WorkflowConfig, ExplanationSource, Axes4Config } from '../services/tenant-config.service';
 import { Loader2, Save, X } from 'lucide-react';
+import { useAuthStore } from '@/stores/auth.store';
 
 export const TenantWorkflowSettings: React.FC = () => {
+  const { user: currentUser } = useAuthStore();
+  const isAdmin = currentUser?.role === 'ADMIN';
+
   const [config, setConfig] = useState<WorkflowConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+
+  // Form state — axes4 tenant toggle. Readable by everyone, but only an
+  // ADMIN can actually change it (enforced both here and by the backend).
+  const [axes4Config, setAxes4Config] = useState<Axes4Config | null>(null);
+  const [axes4Enabled, setAxes4Enabled] = useState(false);
+  const [savingAxes4, setSavingAxes4] = useState(false);
 
   // Form state — workflow
   const [enabled, setEnabled] = useState(false);
@@ -30,9 +40,10 @@ export const TenantWorkflowSettings: React.FC = () => {
   const loadConfig = async () => {
     try {
       setLoading(true);
-      const [currentConfig, reportsConfig] = await Promise.all([
+      const [currentConfig, reportsConfig, currentAxes4Config] = await Promise.all([
         tenantConfigService.getWorkflowConfig(),
         tenantConfigService.getReportsConfig(),
+        tenantConfigService.getAxes4Config(),
       ]);
       setConfig(currentConfig);
 
@@ -46,6 +57,8 @@ export const TenantWorkflowSettings: React.FC = () => {
       );
       setAllowFullyHeadless(currentConfig.batchPolicy?.allowFullyHeadless ?? false);
       setExplanationSource(reportsConfig.explanationSource);
+      setAxes4Config(currentAxes4Config);
+      setAxes4Enabled(currentAxes4Config.enabled);
 
       setIsDirty(false);
     } catch (err) {
@@ -143,6 +156,22 @@ export const TenantWorkflowSettings: React.FC = () => {
       toast.error('Failed to save reports configuration. Please try again.', { duration: 5000 });
     } finally {
       setSavingReports(false);
+    }
+  };
+
+  const handleSaveAxes4Config = async () => {
+    try {
+      setSavingAxes4(true);
+      const updated = await tenantConfigService.updateAxes4Config({ enabled: axes4Enabled });
+      setAxes4Config(updated);
+      setAxes4Enabled(updated.enabled);
+      toast.success('axes4 setting saved!', { duration: 3000, icon: '✅' });
+    } catch (err: unknown) {
+      const errorMessage = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        || 'Failed to save axes4 setting. Please try again.';
+      toast.error(errorMessage, { duration: 5000 });
+    } finally {
+      setSavingAxes4(false);
     }
   };
 
@@ -458,6 +487,69 @@ export const TenantWorkflowSettings: React.FC = () => {
             )}
           </Button>
         </div>
+      </div>
+
+      {/* axes4 PAC Cloud Configuration */}
+      <div className="mt-8">
+        <h1 className="text-3xl font-bold text-gray-900">axes4 PAC Cloud</h1>
+        <p className="mt-2 text-gray-600">
+          Controls per-organization access to the paid axes4 live PDF/UA check.
+        </p>
+      </div>
+
+      <div className="mt-4 bg-white rounded-lg border border-gray-200 p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold text-gray-900">Enable axes4 PAC Cloud live checks</h3>
+            <p className="mt-1 text-sm text-gray-600">
+              Enables the paid, per-page-billed axes4 live PDF/UA check for your team. Off by
+              default; turn on only if your organization has decided to use it.
+            </p>
+            {axes4Config?.enabledAt && (
+              <p className="mt-1 text-xs text-gray-400">
+                Last changed by {axes4Config.enabledBy ?? 'unknown'} on{' '}
+                {new Date(axes4Config.enabledAt).toLocaleDateString('en-US', {
+                  month: 'short', day: 'numeric', year: 'numeric',
+                })}
+              </p>
+            )}
+            {!isAdmin && (
+              <p className="mt-1 text-xs text-amber-600">Only administrators can change this setting.</p>
+            )}
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer ml-4">
+            <input
+              type="checkbox"
+              aria-label="Enable axes4 PAC Cloud live checks"
+              className="sr-only peer"
+              checked={axes4Enabled}
+              disabled={!isAdmin || savingAxes4}
+              onChange={(e) => setAxes4Enabled(e.target.checked)}
+            />
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600 peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"></div>
+          </label>
+        </div>
+
+        {isAdmin && (
+          <div className="flex justify-end mt-5">
+            <Button
+              onClick={handleSaveAxes4Config}
+              disabled={savingAxes4 || axes4Enabled === (axes4Config?.enabled ?? false)}
+            >
+              {savingAxes4 ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save axes4 Setting
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -33,6 +33,19 @@ export interface BatchPolicyTenantConfig {
 export type ExplanationSource = 'hardcoded' | 'gemini' | 'hybrid';
 
 /**
+ * Per-tenant admin toggle for the axes4 live PAC Cloud check (PR #337) —
+ * the paid, per-page-billed external check isn't economically justified as
+ * a routine default, so it requires an explicit admin opt-in per tenant on
+ * top of the existing env-credential gate. enabledBy/enabledAt form a
+ * lightweight audit trail of the last change, same shape both ways.
+ */
+export interface Axes4Config {
+  enabled: boolean;
+  enabledBy: string | null;
+  enabledAt: string | null;
+}
+
+/**
  * Tenant-level reports configuration.
  * Controls how AI explanations are sourced for issue explainability.
  */
@@ -168,6 +181,38 @@ class TenantConfigService {
       data: TimeMetricsConfig;
       message: string;
     }>('/tenant/config/time-metrics', updates);
+    return response.data.data;
+  }
+
+  /**
+   * Get the axes4 live PAC Cloud check tenant toggle. Readable by any
+   * authenticated user (not just admins) — only the PATCH below is
+   * admin-restricted.
+   */
+  async getAxes4Config(): Promise<Axes4Config> {
+    try {
+      const response = await api.get<{ success: boolean; data: Axes4Config }>(
+        '/tenant/config/axes4'
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error('[TenantConfig] Failed to fetch axes4 config:', error);
+      // Off by default on error, matching the backend's own default.
+      return { enabled: false, enabledBy: null, enabledAt: null };
+    }
+  }
+
+  /**
+   * Update the axes4 tenant toggle. Admin-only server-side — a non-admin
+   * PATCH gets a 403, which this does not swallow (same as
+   * updateWorkflowConfig/updateReportsConfig above).
+   */
+  async updateAxes4Config(updates: { enabled: boolean }): Promise<Axes4Config> {
+    const response = await api.patch<{
+      success: boolean;
+      data: Axes4Config;
+      message: string;
+    }>('/tenant/config/axes4', updates);
     return response.data.data;
   }
 }
