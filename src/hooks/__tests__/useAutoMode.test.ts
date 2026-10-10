@@ -1,16 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
-import { useAutoModeRoundHistory } from '../useAutoMode';
+import { useAutoModeRoundHistory, useStartAutoMode } from '../useAutoMode';
 import { pdfRemediationService } from '@/services/pdf-remediation.service';
+import { pdfAutoModeService } from '@/services/pdfAutoMode.service';
 import type { RemediationHistoryRun, RemediationHistoryEvent } from '@/types/pdf-remediation.types';
 
 vi.mock('@/services/pdf-remediation.service', () => ({
   pdfRemediationService: { getRemediationHistory: vi.fn() },
 }));
 
+vi.mock('@/services/pdfAutoMode.service', () => ({
+  pdfAutoModeService: { startAutoMode: vi.fn(), getAutoModeStatus: vi.fn(), stopAutoMode: vi.fn() },
+}));
+
 const mockService = vi.mocked(pdfRemediationService);
+const mockAutoModeService = vi.mocked(pdfAutoModeService);
 
 function createWrapper() {
   const queryClient = new QueryClient({
@@ -196,5 +202,32 @@ describe('useAutoModeRoundHistory', () => {
     renderRoundHistory({ enabled: true, isRunning: false, completedRounds: 0 }, undefined);
 
     expect(mockService.getRemediationHistory).not.toHaveBeenCalled();
+  });
+});
+
+describe('useStartAutoMode', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls the service with no overrides when mutate is called with none (the trial-preconfigured-auto path)', async () => {
+    mockAutoModeService.startAutoMode.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useStartAutoMode('job-1'), { wrapper: createWrapper() });
+
+    act(() => { result.current.mutate(undefined); });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockAutoModeService.startAutoMode).toHaveBeenCalledWith('job-1', undefined);
+  });
+
+  it('passes overrides through to the service unchanged (the regular-job path)', async () => {
+    mockAutoModeService.startAutoMode.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useStartAutoMode('job-1'), { wrapper: createWrapper() });
+
+    const overrides = { autoMaxRounds: 5, autoCostLimitUsd: 1.5, autoColorContrastMode: 'disabled' as const };
+    act(() => { result.current.mutate(overrides); });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockAutoModeService.startAutoMode).toHaveBeenCalledWith('job-1', overrides);
   });
 });

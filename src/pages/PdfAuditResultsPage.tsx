@@ -85,6 +85,7 @@ import { useCreateRemediationPlan } from '@/hooks/usePdfRemediation';
 import { useComparisonTrial, useInvalidateComparisonTrial } from '@/hooks/useComparisonStudy';
 import { useAutoModeStatus, useAutoModeRoundHistory, useStartAutoMode, useStopAutoMode } from '@/hooks/useAutoMode';
 import { AutoModeStatusCard } from '@/components/pdf/AutoModeStatusCard';
+import { AutoModeStartControl } from '@/components/pdf/AutoModeStartControl';
 import type { ComparisonTrialMode } from '@/types/comparisonStudy.types';
 import type { PdfAuditResult, PdfAuditIssue } from '@/types/pdf.types';
 import type { IssueSeverity } from '@/types/accessibility.types';
@@ -180,24 +181,25 @@ export const PdfAuditResultsPage: React.FC = () => {
     ? 'unknown'
     : comparisonTrial.mode;
   const isAutoModeTrial = trialMode === 'auto';
-  // Approve/Apply/Dismiss and the bulk Apply Fixes action are all disabled
-  // whenever the trial isn't confirmed-manual — covers both auto mode (the
-  // backend loop owns those decisions) and the loading/error 'unknown' state.
-  const disableManualActions = trialMode !== 'manual';
   const startAutoMode = useStartAutoMode(jobId);
-  // Only polled for auto-mode trials — polling this for every manual
-  // session would hit a status endpoint that's permanently irrelevant.
-  const autoModeStatusQuery = useAutoModeStatus(isAutoModeTrial ? jobId : undefined);
+  // Job-scoped and cheap enough to poll for every job now that Auto Mode
+  // works outside Comparison Study trials too — no longer gated on
+  // isAutoModeTrial. getStatus returns a "never run" shape instead of
+  // 404ing for a job with no run yet, so this is always safe to fire.
+  const autoModeStatusQuery = useAutoModeStatus(jobId);
   const stopAutoMode = useStopAutoMode(jobId);
+  // Auto Mode's backend loop owns Approve/Apply/Dismiss and the bulk Apply
+  // Fixes action while a run is actually active — for any job, trial or
+  // not. (Previously keyed off trial mode, which only ever covered the
+  // trial-preconfigured-auto path.)
+  const disableManualActions = autoModeStatusQuery.data?.autoStatus === 'running';
   // Loads once a run has produced at least one completed round (or is
-  // actively running one), even for a trial being reviewed after the fact —
-  // not gated on isAutoModeTrial alone, since a stopped run's history is
-  // still worth seeing.
+  // actively running one) — for any job, not just a trial being reviewed
+  // after the fact.
   const autoModeRoundHistoryQuery = useAutoModeRoundHistory(jobId, {
-    enabled: isAutoModeTrial && (
+    enabled:
       autoModeStatusQuery.data?.autoStatus === 'running' ||
-      (autoModeStatusQuery.data?.autoRoundsCompleted ?? 0) > 0
-    ),
+      (autoModeStatusQuery.data?.autoRoundsCompleted ?? 0) > 0,
     isRunning: autoModeStatusQuery.data?.autoStatus === 'running',
     // Also trims off any earlier Auto Mode run's rounds still returned by
     // the job-wide history endpoint — see useAutoModeRoundHistory's own doc
@@ -979,11 +981,26 @@ export const PdfAuditResultsPage: React.FC = () => {
   const autoModeProgressKey = autoModeStatusQuery.data
     ? `${autoModeStatusQuery.data.autoRoundsCompleted}:${autoModeStatusQuery.data.autoStatus}`
     : null;
+  // A plain, stable-looking primitive for the effect below's own deps array
+  // — same reason autoModeProgressKey exists instead of a member expression.
+  const isAutoModeNeverRun = autoModeStatusQuery.data?.autoStatus === null && autoModeStatusQuery.data?.autoRoundsCompleted === 0;
   const lastRefreshedAutoModeKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!isAutoModeTrial || autoModeProgressKey === null) return;
+    if (autoModeProgressKey === null) return;
     if (lastRefreshedAutoModeKeyRef.current === autoModeProgressKey) return;
+    const isFirstObservation = lastRefreshedAutoModeKeyRef.current === null;
     lastRefreshedAutoModeKeyRef.current = autoModeProgressKey;
+    // Every job, Auto Mode or not, starts out at this same "no run has ever
+    // started" baseline — now that this runs for every job (not just
+    // trial-auto ones), the very first observation of it isn't a round
+    // transition to react to, and refreshing audit/AI/history state on
+    // every single page load for jobs that never touch Auto Mode would be
+    // pure waste. A later, real transition (including one that lands on
+    // this exact 0/null shape again, e.g. after a stop+restart) still goes
+    // through the `current === autoModeProgressKey` short-circuit above.
+    if (isFirstObservation && isAutoModeNeverRun) {
+      return;
+    }
     fetchAuditResult();
     fetchAiSuggestions();
     fetchJobFlags();
@@ -1001,7 +1018,7 @@ export const PdfAuditResultsPage: React.FC = () => {
     // 5-minute staleTime happens to expire.
     if (comparisonTrialId) invalidateComparisonTrial(comparisonTrialId);
   }, [
-    isAutoModeTrial, autoModeProgressKey, fetchAuditResult, fetchAiSuggestions, fetchJobFlags, fetchAutoTagStatus,
+    autoModeProgressKey, isAutoModeNeverRun, fetchAuditResult, fetchAiSuggestions, fetchJobFlags, fetchAutoTagStatus,
     bumpHistoryRefreshTrigger, refetchAutoModeRoundHistory, comparisonTrialId, invalidateComparisonTrial,
   ]);
 
@@ -1469,6 +1486,23 @@ export const PdfAuditResultsPage: React.FC = () => {
                     </span>
                   </div>
                 </div>
+                <AutoModeStartControl
+                  onStart={(overrides) => startAutoMode.mutate(overrides, {
+                    onError: (err) => toast.error(getErrorMessage(err)),
+                  })}
+                  isPending={startAutoMode.isPending}
+                  disabled={remediationCycleActive || autoModeStatusQuery.data?.autoStatus === 'running'}
+                  disabledTitle={
+                    autoModeStatusQuery.data?.autoStatus === 'running' ? 'A run is already in progress'
+                      : remediationCycleActive ? remediationCycleSourceMessage(remediationCycleActiveSource)
+                      : undefined
+                  }
+                  // A trial-linked job (even one in manual mode) ignores
+                  // per-run overrides server-side and keeps using the
+                  // trial's own pre-configured settings — only offer the
+                  // config form for a job with no trial at all.
+                  showConfig={!comparisonTrialId}
+                />
               </>
             )}
             <Button
@@ -1510,7 +1544,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         jobId={jobId!}
       />
 
-      {isAutoModeTrial && autoModeStatusQuery.data && (
+      {autoModeStatusQuery.data && autoModeStatusQuery.data.autoStatus !== null && (
         <AutoModeStatusCard
           status={autoModeStatusQuery.data}
           onStop={() => stopAutoMode.mutate()}
