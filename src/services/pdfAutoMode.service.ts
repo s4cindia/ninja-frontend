@@ -1,9 +1,11 @@
 /**
  * PDF Auto Mode Service
  *
- * Job-scoped endpoints for Comparison Study "Auto Mode" — the backend loop
- * that runs analyze -> auto-approve -> apply -> re-audit on its own. Not to
- * be confused with usePdfAutoRemediation (an unrelated single-shot
+ * Job-scoped endpoints for "Auto Mode" — the backend loop that runs
+ * analyze -> auto-approve -> apply -> re-audit on its own, for any job the
+ * caller owns (originally Comparison-Study-trial-exclusive; the backend now
+ * supports a second, trial-free path too — see StartAutoModeOverrides). Not
+ * to be confused with usePdfAutoRemediation (an unrelated single-shot
  * auto-fix concept already in pdf-remediation.service.ts).
  */
 
@@ -22,7 +24,12 @@ export interface StartAutoModeOverrides {
   autoColorContrastMode?: 'guidance-only' | 'disabled' | 'apply-to-pdf';
 }
 
-/** 400 if the job has no trial or the trial isn't in auto mode, 409 if already running. */
+/**
+ * 400 if the job has a trial that isn't in auto mode, 409 if already
+ * running. `overrides` is ignored server-side for a trial-linked job
+ * (it keeps using the trial's own pre-configured settings) — only a job
+ * with no trial at all honors them.
+ */
 export async function startAutoMode(jobId: string, overrides?: StartAutoModeOverrides): Promise<void> {
   await api.post(`/pdf/${encodeURIComponent(jobId)}/auto-mode/start`, overrides);
 }
