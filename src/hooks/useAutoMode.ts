@@ -4,7 +4,10 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { pdfAutoModeService } from '@/services/pdfAutoMode.service';
+import type { StartAutoModeOverrides } from '@/services/pdfAutoMode.service';
 import { pdfRemediationService } from '@/services/pdf-remediation.service';
+
+export type { StartAutoModeOverrides };
 
 const STATUS_KEY = (jobId: string) => ['pdf-auto-mode-status', jobId] as const;
 const ROUND_HISTORY_KEY = (jobId: string) => ['auto-mode-round-history', jobId] as const;
@@ -111,7 +114,7 @@ export function useAutoModeRoundHistory(
 export function useStartAutoMode(jobId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => pdfAutoModeService.startAutoMode(jobId!),
+    mutationFn: (overrides?: StartAutoModeOverrides) => pdfAutoModeService.startAutoMode(jobId!, overrides),
     onSuccess: () => {
       if (jobId) queryClient.invalidateQueries({ queryKey: STATUS_KEY(jobId) });
     },

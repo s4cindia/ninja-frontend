@@ -30,7 +30,22 @@ vi.mock('@/services/comparisonStudy.service', () => ({
   comparisonStudyService: { getTrial: vi.fn() },
 }));
 vi.mock('@/services/pdfAutoMode.service', () => ({
-  pdfAutoModeService: { startAutoMode: vi.fn(), getAutoModeStatus: vi.fn(), stopAutoMode: vi.fn() },
+  pdfAutoModeService: {
+    startAutoMode: vi.fn(),
+    // Default: "never run" — matches a fresh job with no Auto Mode history,
+    // which is the overwhelming majority of tests in this file now that the
+    // status query fires for every job, not just Comparison Study trials.
+    getAutoModeStatus: vi.fn().mockResolvedValue({
+      mode: 'manual',
+      autoStatus: null,
+      autoStopReason: null,
+      autoRoundsCompleted: 0,
+      autoMaxRounds: 10,
+      autoCostSpentUsd: 0,
+      autoCostLimitUsd: 2,
+    }),
+    stopAutoMode: vi.fn(),
+  },
 }));
 // Has its own dedicated test file — stub here to keep these tests focused on
 // PdfAuditResultsPage's own mode-based button gating, not the card's polling.
@@ -2500,7 +2515,7 @@ describe('PdfAuditResultsPage', () => {
       expect(await screen.findByTestId('auto-mode-status-card')).toHaveTextContent('running:2/10');
     });
 
-    it('still shows the manual controls for a Comparison Study trial that is in manual mode (regression: must not hide them for every trial, only auto-mode ones)', async () => {
+    it('still shows the manual controls for a Comparison Study trial that is in manual mode, now alongside a plain (no-config) Start Auto Remediation affordance (regression: must not hide the manual controls for every trial, only auto-mode ones; Auto Mode is no longer trial-exclusive)', async () => {
       mockCommonGets();
       mockGetTrial.mockResolvedValue(mockTrial({ mode: 'manual' }));
 
@@ -2508,8 +2523,15 @@ describe('PdfAuditResultsPage', () => {
 
       expect(await screen.findByRole('button', { name: 'Re-run Audit' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Re-run AI Analysis' })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Start Auto Remediation' })).not.toBeInTheDocument();
       expect(screen.queryByTestId('auto-mode-status-card')).not.toBeInTheDocument();
+
+      // Present, but trial-linked — the backend ignores per-run overrides
+      // for a trial-linked job, so this must start immediately with no
+      // config popover rather than opening one the backend would ignore.
+      const startButton = screen.getByRole('button', { name: 'Start Auto Remediation' });
+      fireEvent.click(startButton);
+      expect(screen.queryByLabelText('Max rounds')).not.toBeInTheDocument();
+      await waitFor(() => expect(mockStartAutoMode).toHaveBeenCalledWith(jobId, undefined));
     });
 
     it('calls startAutoMode when "Start Auto Remediation" is clicked, and disables the button while the request is in flight', async () => {
@@ -2523,7 +2545,7 @@ describe('PdfAuditResultsPage', () => {
       const startButton = await screen.findByRole('button', { name: 'Start Auto Remediation' });
       fireEvent.click(startButton);
 
-      await waitFor(() => expect(mockStartAutoMode).toHaveBeenCalledWith(jobId));
+      await waitFor(() => expect(mockStartAutoMode).toHaveBeenCalledWith(jobId, undefined));
       expect(await screen.findByRole('button', { name: /Starting…/ })).toBeDisabled();
 
       await act(async () => { resolveStart(); });
@@ -2831,9 +2853,12 @@ describe('PdfAuditResultsPage', () => {
         // Wait for the resolved (not the transient pre-load undefined) auto-mode
         // status before asserting — otherwise this could pass on the initial
         // unmuted render even if a later-resolved null/stopped value muted it.
-        // React renders a null child as nothing, so the stub's {status.autoStatus}
-        // interpolation produces no "null" text — the colons sit adjacent.
-        expect(await screen.findByTestId('auto-mode-status-card')).toHaveTextContent('auto-mode-status::0/10');
+        await screen.findByRole('button', { name: 'Start Auto Remediation' });
+        await waitFor(() => expect(mockGetAutoModeStatus).toHaveBeenCalled());
+        // autoStatus: null (never run) no longer renders the status card at
+        // all — AutoModeStatusCard is for a run that has started at least
+        // once (see the page's own `autoStatus !== null` gate).
+        expect(screen.queryByTestId('auto-mode-status-card')).not.toBeInTheDocument();
         expect(screen.getByText('2. Run AI Analysis')).toBeInTheDocument();
         expect(screen.getByText('Recommended next')).toBeInTheDocument();
         expect(screen.queryByText('Auto mode is handling remediation — see status above.')).not.toBeInTheDocument();
@@ -2878,6 +2903,131 @@ describe('PdfAuditResultsPage', () => {
         expect(await screen.findByText('Auto mode is handling remediation — see status above.')).toBeInTheDocument();
         expect(screen.queryByText('Recommended next')).not.toBeInTheDocument();
       });
+    });
+  });
+
+  describe('Auto Mode on regular (non-trial) jobs', () => {
+    const jobId = 'job-123';
+    const auditUrl = `/pdf/job/${jobId}/audit/result`;
+    const statusUrl = `/pdf/${jobId}/auto-tag/status`;
+    const aiUrl = `/pdf/${jobId}/ai-analysis`;
+    const mockStartAutoMode = pdfAutoModeService.startAutoMode as ReturnType<typeof vi.fn>;
+    const mockGetAutoModeStatus = pdfAutoModeService.getAutoModeStatus as ReturnType<typeof vi.fn>;
+
+    function mockCommonGets() {
+      const mockResult = createMockAuditResult();
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve({ data: { data: { suggestions: [], analyzed: 0, total: 0, status: 'complete' } } });
+        return Promise.resolve({ data: { data: {} } });
+      });
+      // Re-establish the "never run" default explicitly — vi.clearAllMocks()
+      // in the outer beforeEach clears call history but not a previous
+      // test's mockResolvedValue, so without this a preceding describe
+      // block's last override (e.g. autoStatus: 'running') would otherwise
+      // leak in and disable the Start Auto Remediation button.
+      mockGetAutoModeStatus.mockResolvedValue({
+        mode: 'manual',
+        autoStatus: null,
+        autoStopReason: null,
+        autoRoundsCompleted: 0,
+        autoMaxRounds: 10,
+        autoCostSpentUsd: 0,
+        autoCostLimitUsd: 2,
+      });
+    }
+
+    it('shows Start Auto Remediation alongside the existing manual controls, not instead of them (no trial required)', async () => {
+      mockCommonGets();
+
+      renderWithRouter(jobId);
+
+      expect(await screen.findByRole('button', { name: 'Re-run Audit' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Re-run AI Analysis' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Start Auto Remediation' })).toBeInTheDocument();
+    });
+
+    it('opens an inline config popover pre-filled with defaults, and starts with the overrides the operator confirms', async () => {
+      mockCommonGets();
+      mockStartAutoMode.mockResolvedValue(undefined);
+
+      renderWithRouter(jobId);
+
+      const startButton = await screen.findByRole('button', { name: 'Start Auto Remediation' });
+      fireEvent.click(startButton);
+
+      expect(screen.getByLabelText('Max rounds')).toHaveValue(10);
+      expect(screen.getByLabelText('Cost limit (USD)')).toHaveValue(2);
+      expect(screen.getByLabelText('Color-contrast handling')).toHaveValue('apply-to-pdf');
+
+      fireEvent.change(screen.getByLabelText('Max rounds'), { target: { value: '3' } });
+      fireEvent.change(screen.getByLabelText('Cost limit (USD)'), { target: { value: '0.5' } });
+      fireEvent.change(screen.getByLabelText('Color-contrast handling'), { target: { value: 'disabled' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+
+      await waitFor(() => {
+        expect(mockStartAutoMode).toHaveBeenCalledWith(jobId, {
+          autoMaxRounds: 3,
+          autoCostLimitUsd: 0.5,
+          autoColorContrastMode: 'disabled',
+        });
+      });
+    });
+
+    it('regression: disables Start Auto Remediation, hides the bulk Apply Fixes button, and renders the status card once a run is active on a regular job — Auto Mode is no longer Comparison-Study-trial-exclusive', async () => {
+      const mockResult = createMockAuditResult();
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) {
+          return Promise.resolve({
+            data: {
+              data: {
+                suggestions: [{
+                  id: 'sugg-1', jobId, issueId: '1', suggestionType: 'alt-text', value: 'A description',
+                  guidance: null, confidence: 0.9, rationale: 'because', model: 'gemini',
+                  applyMode: 'apply-to-pdf', status: 'pending',
+                  createdAt: '2024-01-15T10:00:00Z', updatedAt: '2024-01-15T10:00:00Z',
+                }],
+                analyzed: 1, total: 1, status: 'complete',
+              },
+            },
+          });
+        }
+        return Promise.resolve({ data: { data: {} } });
+      });
+      mockGetAutoModeStatus.mockResolvedValue({
+        mode: 'manual',
+        autoStatus: 'running',
+        autoStopReason: null,
+        autoRoundsCompleted: 1,
+        autoMaxRounds: 3,
+        autoCostSpentUsd: 0.1,
+        autoCostLimitUsd: 0.5,
+      });
+
+      renderWithRouter(jobId);
+
+      // Sanity check: with an eligible suggestion present and no run active,
+      // the bulk Apply Fixes button would show (see the sibling "no trial"
+      // tests above) — its absence here is specifically disableManualActions
+      // reacting to the active run, not just an empty suggestion list.
+      const startButton = await screen.findByRole('button', { name: 'Start Auto Remediation' });
+      await waitFor(() => expect(startButton).toBeDisabled());
+      expect(startButton).toHaveAttribute('title', expect.stringMatching(/already in progress/i));
+      expect(await screen.findByTestId('auto-mode-status-card')).toHaveTextContent('running:1/3');
+      expect(screen.queryByRole('button', { name: /Apply Fixes/ })).not.toBeInTheDocument();
+    });
+
+    it('does not render the status card for a regular job that has never used Auto Mode', async () => {
+      mockCommonGets();
+
+      renderWithRouter(jobId);
+
+      await screen.findByRole('button', { name: 'Start Auto Remediation' });
+      await waitFor(() => expect(mockGetAutoModeStatus).toHaveBeenCalled());
+      expect(screen.queryByTestId('auto-mode-status-card')).not.toBeInTheDocument();
     });
   });
 

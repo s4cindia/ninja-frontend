@@ -10,9 +10,21 @@
 import { api } from './api';
 import type { AutoModeStatusResponse } from '@/types/pdfAutoMode.types';
 
+/**
+ * Per-run overrides for a job with no linked Comparison Study trial — a
+ * trial-linked job ignores these and keeps using the trial's own
+ * pre-configured autoMaxRounds/autoCostLimitUsd/autoColorContrastMode
+ * (set via PATCH .../trials/:id/auto-mode instead).
+ */
+export interface StartAutoModeOverrides {
+  autoMaxRounds?: number;
+  autoCostLimitUsd?: number;
+  autoColorContrastMode?: 'guidance-only' | 'disabled' | 'apply-to-pdf';
+}
+
 /** 400 if the job has no trial or the trial isn't in auto mode, 409 if already running. */
-export async function startAutoMode(jobId: string): Promise<void> {
-  await api.post(`/pdf/${encodeURIComponent(jobId)}/auto-mode/start`);
+export async function startAutoMode(jobId: string, overrides?: StartAutoModeOverrides): Promise<void> {
+  await api.post(`/pdf/${encodeURIComponent(jobId)}/auto-mode/start`, overrides);
 }
 
 export async function getAutoModeStatus(jobId: string): Promise<AutoModeStatusResponse> {
