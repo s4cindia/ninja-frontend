@@ -11,7 +11,9 @@ on:
 env:
   AWS_REGION: ap-south-1
   S3_BUCKET: s4carlisle-ninja-frontend-prod
-  CLOUDFRONT_DISTRIBUTION_ID: E1QKQO2LS0HHWD
+  # Real values, as created by ninja-backend's Terraform (Phase 9).
+  CLOUDFRONT_DISTRIBUTION_ID: E30OSKHUNAIY83
+  CLOUDFRONT_DOMAIN: d6vj0eks39i8l.cloudfront.net
 
 jobs:
   validate:
@@ -51,9 +53,15 @@ jobs:
       - name: Build production bundle
         run: npm run build
         env:
-          # TODO: Update with production CloudFront URL when available.
-          # Do NOT use ALB or API Gateway URLs directly - they cause CORS issues.
-          VITE_API_URL: http://ninja-alb-prod-1427017841.ap-south-1.elb.amazonaws.com
+          # Backend production CloudFront URL - required for CORS. Do NOT
+          # use the ALB hostname directly (same reason staging doesn't).
+          VITE_API_URL: https://djyquzmm2lxcg.cloudfront.net/api/v1
+          # Consumed by useBatchSocket.ts/useWorkflowSocket.ts (WebSocket
+          # hooks) - they strip a trailing /api/vN themselves, so this is
+          # the same value as VITE_API_URL. Previously unset here (and
+          # still unset on staging), silently falling back to
+          # http://localhost:5000 in any real deployed bundle.
+          VITE_API_BASE_URL: https://djyquzmm2lxcg.cloudfront.net/api/v1
           VITE_ENV: production
 
       - name: Configure AWS credentials
@@ -89,5 +97,5 @@ jobs:
           echo "| Environment | Production |" >> $GITHUB_STEP_SUMMARY
           echo "| S3 Bucket | ${{ env.S3_BUCKET }} |" >> $GITHUB_STEP_SUMMARY
           echo "| CloudFront | ${{ env.CLOUDFRONT_DISTRIBUTION_ID }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| URL | https://d2ymf9ge2z48qx.cloudfront.net |" >> $GITHUB_STEP_SUMMARY
+          echo "| URL | https://${{ env.CLOUDFRONT_DOMAIN }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Commit | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
