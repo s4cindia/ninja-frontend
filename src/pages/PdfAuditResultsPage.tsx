@@ -84,6 +84,7 @@ import { validateJobId } from '@/utils/validation';
 import { useCreateRemediationPlan } from '@/hooks/usePdfRemediation';
 import { useComparisonTrial, useInvalidateComparisonTrial } from '@/hooks/useComparisonStudy';
 import { useAutoModeStatus, useAutoModeRoundHistory, useStartAutoMode, useStopAutoMode } from '@/hooks/useAutoMode';
+import { useApplyProgress } from '@/hooks/useApplyProgress';
 import { AutoModeStatusCard } from '@/components/pdf/AutoModeStatusCard';
 import { AutoModeStartControl } from '@/components/pdf/AutoModeStartControl';
 import type { ComparisonTrialMode } from '@/types/comparisonStudy.types';
@@ -432,6 +433,18 @@ export const PdfAuditResultsPage: React.FC = () => {
   const [isReRunningAudit, setIsReRunningAudit] = useState(false);
   const [showPacReport, setShowPacReport] = useState(false);
   const [showApplyAllPanel, setShowApplyAllPanel] = useState(false);
+  // Lifted from ApplyAllSuggestionsPanel's own mutation (via onPendingChange)
+  // — the panel owns the mutation, but the live-progress SSE connection
+  // below needs to span both that step and Auto Mode's own apply step, so
+  // it lives at the page level instead of duplicating it in each place.
+  const [isApplyAllPending, setIsApplyAllPending] = useState(false);
+  // Purely additive progress indicator (see useApplyProgress's own doc
+  // comment) — enabled while either apply path is actually running;
+  // existing polling remains authoritative regardless of whether this ever
+  // connects.
+  const applyProgress = useApplyProgress(jobId, {
+    enabled: isApplyAllPending || autoModeStatusQuery.data?.autoStatus === 'running',
+  });
 
   // Guided remediation checklist state — aiAnalysisStatus/guidanceAcknowledgment
   // ride on the existing AI-analysis fetch; jobFlags needs one extra lookup
@@ -1552,6 +1565,7 @@ export const PdfAuditResultsPage: React.FC = () => {
           stopError={stopAutoMode.isError ? stopAutoMode.error : undefined}
           stopSucceeded={stopAutoMode.isSuccess}
           rounds={autoModeRoundHistoryQuery.data ?? []}
+          applyProgress={applyProgress}
         />
       )}
 
@@ -1993,6 +2007,8 @@ export const PdfAuditResultsPage: React.FC = () => {
             remediationCycleInProgress={remediationCycleActive}
             remediationCycleSource={remediationCycleActiveSource}
             onApplyError={() => { void refreshRemediationCycleLock(); }}
+            onPendingChange={setIsApplyAllPending}
+            applyProgress={applyProgress}
           />
         </DialogContent>
       </Dialog>

@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { AutoModeStatusCard } from './AutoModeStatusCard';
 import type { AutoModeStatusResponse } from '@/types/pdfAutoMode.types';
 import type { AutoModeRound } from '@/hooks/useAutoMode';
+import type { ApplyProgressState } from '@/hooks/useApplyProgress';
 
 function status(overrides?: Partial<AutoModeStatusResponse>): AutoModeStatusResponse {
   return {
@@ -20,7 +21,7 @@ function status(overrides?: Partial<AutoModeStatusResponse>): AutoModeStatusResp
 
 function renderCard(
   overrides?: Partial<AutoModeStatusResponse>,
-  props?: { isStopping?: boolean; stopError?: unknown; stopSucceeded?: boolean; rounds?: AutoModeRound[] }
+  props?: { isStopping?: boolean; stopError?: unknown; stopSucceeded?: boolean; rounds?: AutoModeRound[]; applyProgress?: ApplyProgressState }
 ) {
   const onStop = vi.fn();
   const utils = render(
@@ -31,6 +32,7 @@ function renderCard(
       stopError={props?.stopError}
       stopSucceeded={props?.stopSucceeded}
       rounds={props?.rounds ?? []}
+      applyProgress={props?.applyProgress}
     />
   );
   return { onStop, ...utils };
@@ -143,5 +145,49 @@ describe('AutoModeStatusCard', () => {
     renderCard();
 
     expect(screen.queryByText('Round-by-round')).not.toBeInTheDocument();
+  });
+
+  it('shows live apply-progress counts while running, when connected with a total', () => {
+    renderCard(undefined, {
+      applyProgress: { applied: 12, failed: 1, processed: 13, total: 910, source: 'auto_loop', connected: true },
+    });
+
+    expect(screen.getByText(/Applying fixes: 13\/910 processed/)).toBeInTheDocument();
+    expect(screen.getByText(/12 applied/)).toBeInTheDocument();
+    expect(screen.getByText(/1 failed/)).toBeInTheDocument();
+  });
+
+  it('omits the failed count when nothing has failed', () => {
+    renderCard(undefined, {
+      applyProgress: { applied: 5, failed: 0, processed: 5, total: 100, source: 'apply_all', connected: true },
+    });
+
+    expect(screen.getByText(/Applying fixes: 5\/100 processed/)).toBeInTheDocument();
+    expect(screen.queryByText(/failed/)).not.toBeInTheDocument();
+  });
+
+  it('does not show apply-progress when not connected', () => {
+    renderCard(undefined, {
+      applyProgress: { applied: null, failed: null, processed: null, total: null, source: null, connected: false },
+    });
+
+    expect(screen.queryByText(/Applying fixes:/)).not.toBeInTheDocument();
+  });
+
+  it('does not show apply-progress when connected but no total has arrived yet', () => {
+    renderCard(undefined, {
+      applyProgress: { applied: null, failed: null, processed: null, total: null, source: null, connected: true },
+    });
+
+    expect(screen.queryByText(/Applying fixes:/)).not.toBeInTheDocument();
+  });
+
+  it('does not show apply-progress on the terminal (stopped) summary, even if the prop is somehow still set', () => {
+    renderCard(
+      { autoStatus: 'stopped', autoStopReason: 'converged' },
+      { applyProgress: { applied: 5, failed: 0, processed: 5, total: 10, source: 'apply_all', connected: true } }
+    );
+
+    expect(screen.queryByText(/Applying fixes:/)).not.toBeInTheDocument();
   });
 });

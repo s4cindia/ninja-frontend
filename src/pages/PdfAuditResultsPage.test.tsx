@@ -8,6 +8,7 @@ import { api } from '@/services/api';
 import { pdfRemediationService } from '@/services/pdf-remediation.service';
 import { comparisonStudyService } from '@/services/comparisonStudy.service';
 import { pdfAutoModeService } from '@/services/pdfAutoMode.service';
+import { useApplyProgress } from '@/hooks/useApplyProgress';
 import type { ComparisonTrialWithJob } from '@/types/comparisonStudy.types';
 import type { PdfAuditResult, PdfAuditIssue, MatterhornSummary } from '@/types/pdf.types';
 
@@ -50,12 +51,18 @@ vi.mock('@/services/pdfAutoMode.service', () => ({
 // Has its own dedicated test file — stub here to keep these tests focused on
 // PdfAuditResultsPage's own mode-based button gating, not the card's polling.
 vi.mock('@/components/pdf/AutoModeStatusCard', () => ({
-  AutoModeStatusCard: ({ status, rounds }: {
+  AutoModeStatusCard: ({ status, rounds, applyProgress }: {
     status: { autoStatus: string | null; autoRoundsCompleted: number; autoMaxRounds: number };
     rounds: Array<{ round: number }>;
+    applyProgress?: { connected: boolean; processed: number | null; total: number | null };
   }) => (
     <div data-testid="auto-mode-status-card">
       auto-mode-status:{status.autoStatus}:{status.autoRoundsCompleted}/{status.autoMaxRounds}:rounds={rounds.length}
+      {applyProgress?.connected && applyProgress.total != null && (
+        <span data-testid="auto-mode-apply-progress">
+          apply-progress:{applyProgress.processed}/{applyProgress.total}
+        </span>
+      )}
     </div>
   ),
 }));
@@ -117,14 +124,27 @@ vi.mock('@/components/remediation/IssueCard', () => ({
 }));
 
 vi.mock('@/components/remediation/ApplyAllSuggestionsPanel', () => ({
-  ApplyAllSuggestionsPanel: ({ onApplied, remediationCycleInProgress }: {
+  ApplyAllSuggestionsPanel: ({ onApplied, remediationCycleInProgress, onPendingChange }: {
     onApplied: (result: { applied: number; failed: number }) => void;
     remediationCycleInProgress?: boolean;
+    onPendingChange?: (isPending: boolean) => void;
   }) => (
-    <button onClick={() => onApplied({ applied: 1, failed: 0 })} disabled={!!remediationCycleInProgress}>
-      Mock Apply All
-    </button>
+    <>
+      <button onClick={() => onApplied({ applied: 1, failed: 0 })} disabled={!!remediationCycleInProgress}>
+        Mock Apply All
+      </button>
+      <button onClick={() => onPendingChange?.(true)}>Mock Apply All: start pending</button>
+      <button onClick={() => onPendingChange?.(false)}>Mock Apply All: end pending</button>
+    </>
   ),
+}));
+vi.mock('@/hooks/useApplyProgress', () => ({
+  // Default: not connected, nothing in flight — matches the overwhelming
+  // majority of tests in this file, which don't exercise the apply-progress
+  // SSE indicator at all.
+  useApplyProgress: vi.fn().mockReturnValue({
+    applied: null, failed: null, processed: null, total: null, source: null, connected: false,
+  }),
 }));
 
 const mockMatterhornSummary: MatterhornSummary = {
@@ -3028,6 +3048,132 @@ describe('PdfAuditResultsPage', () => {
       await screen.findByRole('button', { name: 'Start Auto Remediation' });
       await waitFor(() => expect(mockGetAutoModeStatus).toHaveBeenCalled());
       expect(screen.queryByTestId('auto-mode-status-card')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Apply progress (SSE) wiring', () => {
+    const jobId = 'job-123';
+    const auditUrl = `/pdf/job/${jobId}/audit/result`;
+    const statusUrl = `/pdf/${jobId}/auto-tag/status`;
+    const aiUrl = `/pdf/${jobId}/ai-analysis`;
+    const mockGetAutoModeStatus = pdfAutoModeService.getAutoModeStatus as ReturnType<typeof vi.fn>;
+    const mockUseApplyProgress = useApplyProgress as ReturnType<typeof vi.fn>;
+
+    function mockCommonGets() {
+      const mockResult = createMockAuditResult();
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve({ data: { data: { suggestions: [], analyzed: 0, total: 0, status: 'complete' } } });
+        return Promise.resolve({ data: { data: {} } });
+      });
+      mockGetAutoModeStatus.mockResolvedValue({
+        mode: 'manual', autoStatus: null, autoStopReason: null,
+        autoRoundsCompleted: 0, autoMaxRounds: 10, autoCostSpentUsd: 0, autoCostLimitUsd: 2,
+      });
+      mockUseApplyProgress.mockReturnValue({
+        applied: null, failed: null, processed: null, total: null, source: null, connected: false,
+      });
+    }
+
+    function lastEnabledArg(): boolean {
+      const calls = mockUseApplyProgress.mock.calls;
+      return calls[calls.length - 1][1].enabled;
+    }
+
+    it('is disabled when neither a manual apply nor an Auto Mode run is in flight', async () => {
+      mockCommonGets();
+
+      renderWithRouter(jobId);
+
+      await screen.findByRole('button', { name: 'Start Auto Remediation' });
+      await waitFor(() => expect(lastEnabledArg()).toBe(false));
+      expect(mockUseApplyProgress).toHaveBeenCalledWith(jobId, expect.anything());
+    });
+
+    it('enables useApplyProgress while the manual Apply All mutation is pending, and disables it again once the mutation settles', async () => {
+      const mockResult = createMockAuditResult();
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) {
+          return Promise.resolve({
+            data: {
+              data: {
+                suggestions: [{
+                  id: 'sugg-1', jobId, issueId: '1', suggestionType: 'alt-text', value: 'A description',
+                  guidance: null, confidence: 0.9, rationale: 'because', model: 'gemini',
+                  applyMode: 'apply-to-pdf', status: 'pending',
+                  createdAt: '2024-01-15T10:00:00Z', updatedAt: '2024-01-15T10:00:00Z',
+                }],
+                analyzed: 1, total: 1, status: 'complete',
+              },
+            },
+          });
+        }
+        return Promise.resolve({ data: { data: {} } });
+      });
+      mockGetAutoModeStatus.mockResolvedValue({
+        mode: 'manual', autoStatus: null, autoStopReason: null,
+        autoRoundsCompleted: 0, autoMaxRounds: 10, autoCostSpentUsd: 0, autoCostLimitUsd: 2,
+      });
+      mockUseApplyProgress.mockReturnValue({
+        applied: null, failed: null, processed: null, total: null, source: null, connected: false,
+      });
+
+      renderWithRouter(jobId);
+
+      // Open the Apply All dialog so the (mocked) panel actually mounts.
+      fireEvent.click(await screen.findByRole('button', { name: /Apply Fixes/ }));
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Mock Apply All: start pending' }));
+      await waitFor(() => expect(lastEnabledArg()).toBe(true));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Mock Apply All: end pending' }));
+      await waitFor(() => expect(lastEnabledArg()).toBe(false));
+    });
+
+    it('enables useApplyProgress while an Auto Mode round is running, independent of the manual-apply pending flag', async () => {
+      mockCommonGets();
+      mockGetAutoModeStatus.mockResolvedValue({
+        mode: 'manual', autoStatus: 'running', autoStopReason: null,
+        autoRoundsCompleted: 1, autoMaxRounds: 10, autoCostSpentUsd: 0.1, autoCostLimitUsd: 2,
+      });
+
+      renderWithRouter(jobId);
+
+      await waitFor(() => expect(lastEnabledArg()).toBe(true));
+    });
+
+    it('passes live progress through to AutoModeStatusCard when connected with a total', async () => {
+      mockCommonGets();
+      mockGetAutoModeStatus.mockResolvedValue({
+        mode: 'manual', autoStatus: 'running', autoStopReason: null,
+        autoRoundsCompleted: 1, autoMaxRounds: 10, autoCostSpentUsd: 0.1, autoCostLimitUsd: 2,
+      });
+      mockUseApplyProgress.mockReturnValue({
+        applied: 12, failed: 1, processed: 13, total: 910, source: 'auto_loop', connected: true,
+      });
+
+      renderWithRouter(jobId);
+
+      expect(await screen.findByTestId('auto-mode-apply-progress')).toHaveTextContent('apply-progress:13/910');
+    });
+
+    it('does not show live progress on AutoModeStatusCard when not connected', async () => {
+      mockCommonGets();
+      mockGetAutoModeStatus.mockResolvedValue({
+        mode: 'manual', autoStatus: 'running', autoStopReason: null,
+        autoRoundsCompleted: 1, autoMaxRounds: 10, autoCostSpentUsd: 0.1, autoCostLimitUsd: 2,
+      });
+      mockUseApplyProgress.mockReturnValue({
+        applied: null, failed: null, processed: null, total: null, source: null, connected: false,
+      });
+
+      renderWithRouter(jobId);
+
+      await screen.findByTestId('auto-mode-status-card');
+      expect(screen.queryByTestId('auto-mode-apply-progress')).not.toBeInTheDocument();
     });
   });
 

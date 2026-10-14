@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ApplyAllSuggestionsPanel } from './ApplyAllSuggestionsPanel';
 import { applyAllAiSuggestions } from '@/services/api/pdfAiAnalysis.service';
@@ -173,5 +173,43 @@ describe('ApplyAllSuggestionsPanel', () => {
     renderPanel({ remediationCycleInProgress: false });
 
     expect(screen.getByRole('button', { name: /Apply All \(3\)/ })).not.toBeDisabled();
+  });
+
+  it('reports the mutation\'s own pending state via onPendingChange, since the panel owns the mutation but the caller needs to know when it starts/settles', async () => {
+    let resolveApply!: (result: { applied: number; failed: number }) => void;
+    mockApplyAll.mockImplementation(() => new Promise((resolve) => { resolveApply = resolve; }));
+    const onPendingChange = vi.fn();
+    renderPanel({ onPendingChange });
+
+    expect(onPendingChange).toHaveBeenCalledWith(false);
+    onPendingChange.mockClear();
+
+    fireEvent.click(screen.getByRole('button', { name: /Apply All \(3\)/ }));
+    await waitFor(() => expect(onPendingChange).toHaveBeenCalledWith(true));
+
+    await act(async () => { resolveApply({ applied: 3, failed: 0 }); });
+    await waitFor(() => expect(onPendingChange).toHaveBeenLastCalledWith(false));
+  });
+
+  it('shows live processed/total counts in the button while applying, when applyProgress is connected with a total', async () => {
+    mockApplyAll.mockImplementation(() => new Promise(() => {}));
+    renderPanel({
+      applyProgress: { applied: 7, failed: 0, processed: 8, total: 3, source: 'apply_all', connected: true },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Apply All \(3\)/ }));
+
+    expect(await screen.findByText(/Applying… 8\/3 processed/)).toBeInTheDocument();
+  });
+
+  it('falls back to the static "Applying N fixes..." text while pending when applyProgress is not connected', async () => {
+    mockApplyAll.mockImplementation(() => new Promise(() => {}));
+    renderPanel({
+      applyProgress: { applied: null, failed: null, processed: null, total: null, source: null, connected: false },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Apply All \(3\)/ }));
+
+    expect(await screen.findByText(/Applying 3 fixes\.\.\./)).toBeInTheDocument();
   });
 });

@@ -9,6 +9,7 @@ import {
   remediationCycleSourceMessage,
   type RemediationCycleSource,
 } from '@/services/api';
+import type { ApplyProgressState } from '@/hooks/useApplyProgress';
 
 interface ApplyAllSuggestionsPanelProps {
   jobId: string;
@@ -43,6 +44,15 @@ interface ApplyAllSuggestionsPanelProps {
    * completion in the background).
    */
   onApplyError?: () => void;
+  /**
+   * Fires whenever the apply-all mutation's own pending state changes — the
+   * caller (PdfAuditResultsPage) uses this to drive a shared
+   * useApplyProgress SSE connection, since this panel doesn't otherwise
+   * expose whether a request is in flight.
+   */
+  onPendingChange?: (isPending: boolean) => void;
+  /** Live counts from that same SSE connection, shown in the button while applying. */
+  applyProgress?: ApplyProgressState;
 }
 
 function ResultsView({
@@ -159,6 +169,8 @@ export function ApplyAllSuggestionsPanel({
   remediationCycleInProgress = false,
   remediationCycleSource = null,
   onApplyError,
+  onPendingChange,
+  applyProgress,
 }: ApplyAllSuggestionsPanelProps) {
   const [includePending, setIncludePending] = useState(false);
   // Distinguishes a lock conflict (409 — expected/transient, not the
@@ -178,6 +190,10 @@ export function ApplyAllSuggestionsPanel({
       onApplyError?.();
     },
   });
+
+  useEffect(() => {
+    onPendingChange?.(applyAllMutation.isPending);
+  }, [applyAllMutation.isPending, onPendingChange]);
 
   if (applyAllMutation.data) {
     return <ResultsView results={applyAllMutation.data} onClose={onClose} />;
@@ -243,7 +259,9 @@ export function ApplyAllSuggestionsPanel({
           {applyAllMutation.isPending ? (
             <>
               <Loader2 className="animate-spin" size={20} aria-hidden="true" />
-              Applying {totalToApply} {totalToApply === 1 ? 'fix' : 'fixes'}...
+              {applyProgress?.connected && applyProgress.total != null
+                ? `Applying… ${applyProgress.processed ?? 0}/${applyProgress.total} processed`
+                : `Applying ${totalToApply} ${totalToApply === 1 ? 'fix' : 'fixes'}...`}
             </>
           ) : remediationCycleInProgress ? (
             <>{remediationCycleSourceMessage(remediationCycleSource)}</>
