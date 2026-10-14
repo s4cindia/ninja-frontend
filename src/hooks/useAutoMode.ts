@@ -6,11 +6,30 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { pdfAutoModeService } from '@/services/pdfAutoMode.service';
 import type { StartAutoModeOverrides } from '@/services/pdfAutoMode.service';
 import { pdfRemediationService } from '@/services/pdf-remediation.service';
+import type { RemediationHistoryRun } from '@/types/pdf-remediation.types';
 
 export type { StartAutoModeOverrides };
 
 const STATUS_KEY = (jobId: string) => ['pdf-auto-mode-status', jobId] as const;
 const ROUND_HISTORY_KEY = (jobId: string) => ['auto-mode-round-history', jobId] as const;
+const RAW_HISTORY_KEY = (jobId: string) => ['remediation-history-raw', jobId] as const;
+
+/**
+ * Raw, unfiltered remediation history (every action/source, not just
+ * auto_loop rounds) — unlike useAutoModeRoundHistory above, which
+ * transforms+filters the same endpoint down to auto-mode rounds only. Used
+ * by PdfPhaseStepper to find the most recent completed ai_analysis/
+ * apply_fixes/reaudit events for phase durations. Always enabled (not
+ * gated on Auto Mode) and not polled — a manual refetch() after a
+ * known state change is cheap enough and avoids yet another 5s interval.
+ */
+export function useRemediationHistory(jobId: string | undefined) {
+  return useQuery({
+    queryKey: RAW_HISTORY_KEY(jobId ?? ''),
+    queryFn: (): Promise<RemediationHistoryRun[]> => pdfRemediationService.getRemediationHistory(jobId!),
+    enabled: !!jobId,
+  });
+}
 
 /**
  * Polls every 5s while autoStatus is 'running', and stops automatically

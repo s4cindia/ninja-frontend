@@ -3245,4 +3245,73 @@ describe('PdfAuditResultsPage', () => {
       });
     });
   });
+
+  describe('PdfPhaseStepper wiring', () => {
+    const jobId = 'job-123';
+    const auditUrl = `/pdf/job/${jobId}/audit/result`;
+    const statusUrl = `/pdf/${jobId}/auto-tag/status`;
+    const aiUrl = `/pdf/${jobId}/ai-analysis`;
+    const jobUrl = `/jobs/${jobId}`;
+    const mockGetAutoModeStatus = pdfAutoModeService.getAutoModeStatus as ReturnType<typeof vi.fn>;
+
+    function mockCommonGets(jobOutput: Record<string, unknown> = {}) {
+      const mockResult = createMockAuditResult({
+        createdAt: '2026-10-01T10:00:00.000Z',
+        completedAt: '2026-10-01T10:02:00.000Z',
+      });
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve({ data: { data: { suggestions: [], analyzed: 0, total: 0, status: 'complete' } } });
+        if (url === jobUrl) return Promise.resolve({ data: { data: { output: jobOutput } } });
+        return Promise.resolve({ data: { data: {} } });
+      });
+      mockGetAutoModeStatus.mockResolvedValue({
+        mode: 'manual', autoStatus: null, autoStopReason: null,
+        autoRoundsCompleted: 0, autoMaxRounds: 10, autoCostSpentUsd: 0, autoCostLimitUsd: 2,
+      });
+    }
+
+    it('renders the stepper with the Audit phase done, using the loaded audit result\'s own timestamps', async () => {
+      mockCommonGets();
+
+      renderWithRouter(jobId);
+
+      const stepper = await screen.findByTestId('pdf-phase-stepper');
+      expect(within(stepper).getByTestId('pdf-phase-audit')).toHaveTextContent('2m 0s');
+    });
+
+    it('shows Remediation in-progress with a "Round N" detail and a live ticking duration while an Auto Mode run is active', async () => {
+      mockCommonGets();
+      mockGetAutoModeStatus.mockResolvedValue({
+        mode: 'manual', autoStatus: 'running', autoStopReason: null,
+        autoRoundsCompleted: 2, autoMaxRounds: 10, autoCostSpentUsd: 0.1, autoCostLimitUsd: 2,
+        autoStartedAt: '2026-10-01T11:00:00.000Z',
+      });
+
+      renderWithRouter(jobId);
+
+      const remediation = await screen.findByTestId('pdf-phase-remediation');
+      expect(remediation).toHaveTextContent('Round 3');
+    });
+
+    it('shows Compliance done once both ACR and the PAC report have been generated', async () => {
+      mockCommonGets({ acrGenerated: true, pacReportGenerated: true });
+
+      renderWithRouter(jobId);
+
+      const compliance = await screen.findByTestId('pdf-phase-compliance');
+      await waitFor(() => expect(compliance.querySelector('svg')).toHaveClass('text-green-600'));
+    });
+
+    it('shows Compliance not-started when neither artifact has been generated', async () => {
+      mockCommonGets();
+
+      renderWithRouter(jobId);
+
+      await screen.findByTestId('pdf-phase-stepper');
+      const compliance = screen.getByTestId('pdf-phase-compliance');
+      expect(compliance.querySelector('svg')).toHaveClass('text-gray-300');
+    });
+  });
 });
