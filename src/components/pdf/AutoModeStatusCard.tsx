@@ -19,6 +19,7 @@ import { Alert } from '@/components/ui/Alert';
 import { getErrorMessage } from '@/services/api';
 import { AutoModeRoundHistory } from '@/components/pdf/AutoModeRoundHistory';
 import type { AutoModeRound } from '@/hooks/useAutoMode';
+import type { ApplyProgressState } from '@/hooks/useApplyProgress';
 import type { AutoColorContrastMode, AutoModeStopReason } from '@/types/comparisonStudy.types';
 import type { AutoModeStatusResponse } from '@/types/pdfAutoMode.types';
 
@@ -30,6 +31,8 @@ interface AutoModeStatusCardProps {
   stopSucceeded?: boolean;
   /** Round-by-round trend — fetched by the page (see useAutoModeRoundHistory), same "query lives in the page" split as `status`. */
   rounds: AutoModeRound[];
+  /** Live progress for the current round's apply step, from useApplyProgress — same "query/connection lives in the page" split as the rest of this card's data. */
+  applyProgress?: ApplyProgressState;
 }
 
 const STOP_REASON_CONFIG: Record<NonNullable<AutoModeStopReason>, { variant: 'success' | 'warning' | 'error'; title: string }> = {
@@ -54,7 +57,7 @@ function contrastModeLabel(mode: AutoColorContrastMode): string {
   return mode ? CONTRAST_MODE_LABELS[mode] : 'inherited';
 }
 
-export function AutoModeStatusCard({ status, onStop, isStopping, stopError, stopSucceeded, rounds }: AutoModeStatusCardProps) {
+export function AutoModeStatusCard({ status, onStop, isStopping, stopError, stopSucceeded, rounds, applyProgress }: AutoModeStatusCardProps) {
   // Nothing to show before the first run ever starts — the header's Start
   // Auto Remediation button is the entry point, not this card.
   if (status.autoStatus === null) return null;
@@ -100,6 +103,13 @@ export function AutoModeStatusCard({ status, onStop, isStopping, stopError, stop
         <p className="text-xs text-gray-500 mt-2">
           ${status.autoCostSpentUsd.toFixed(2)} of ${status.autoCostLimitUsd.toFixed(2)} spent · contrast: {contrastModeLabel(status.autoColorContrastMode)}
         </p>
+        {applyProgress?.connected && applyProgress.total != null && (
+          <p className="text-xs text-primary-700 mt-1">
+            Applying fixes: {applyProgress.processed ?? 0}/{applyProgress.total} processed
+            {applyProgress.applied != null && ` · ${applyProgress.applied} applied`}
+            {!!applyProgress.failed && ` · ${applyProgress.failed} failed`}
+          </p>
+        )}
         {stopError !== undefined && (
           <p className="text-xs text-red-600 mt-2">{getErrorMessage(stopError)}</p>
         )}
