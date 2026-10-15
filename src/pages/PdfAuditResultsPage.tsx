@@ -83,10 +83,12 @@ import { cn } from '@/utils/cn';
 import { validateJobId } from '@/utils/validation';
 import { useCreateRemediationPlan } from '@/hooks/usePdfRemediation';
 import { useComparisonTrial, useInvalidateComparisonTrial } from '@/hooks/useComparisonStudy';
-import { useAutoModeStatus, useAutoModeRoundHistory, useStartAutoMode, useStopAutoMode } from '@/hooks/useAutoMode';
+import { useAutoModeStatus, useAutoModeRoundHistory, useStartAutoMode, useStopAutoMode, useRemediationHistory } from '@/hooks/useAutoMode';
 import { useApplyProgress } from '@/hooks/useApplyProgress';
 import { AutoModeStatusCard } from '@/components/pdf/AutoModeStatusCard';
 import { AutoModeStartControl } from '@/components/pdf/AutoModeStartControl';
+import { PdfPhaseStepper } from '@/components/pdf/PdfPhaseStepper';
+import { derivePhases } from '@/utils/pdfPhaseStepper';
 import type { ComparisonTrialMode } from '@/types/comparisonStudy.types';
 import type { PdfAuditResult, PdfAuditIssue } from '@/types/pdf.types';
 import type { IssueSeverity } from '@/types/accessibility.types';
@@ -212,6 +214,11 @@ export const PdfAuditResultsPage: React.FC = () => {
   // member expression (react-hooks/exhaustive-deps wants the whole object
   // otherwise, which would re-run that effect on every query state change).
   const refetchAutoModeRoundHistory = autoModeRoundHistoryQuery.refetch;
+  // Raw, unfiltered history (unlike the auto_loop-only query above) — feeds
+  // PdfPhaseStepper's AI Analysis/Remediation phase durations. Always
+  // enabled, not gated on Auto Mode.
+  const remediationHistoryQuery = useRemediationHistory(jobId);
+  const refetchRemediationHistory = remediationHistoryQuery.refetch;
 
   // State management
   const [auditResult, setAuditResult] = useState<PdfAuditResult | null>(null);
@@ -466,6 +473,35 @@ export const PdfAuditResultsPage: React.FC = () => {
       .filter(s => s.applyMode === 'apply-to-pdf' && s.status === 'pending').length,
     [aiSuggestions]
   );
+  // Mirrors RemediationChecklist's own pendingGuidance memo — feeds
+  // PdfPhaseStepper's Verification phase, computed independently here since
+  // the checklist doesn't expose it as a prop.
+  const pendingGuidanceCount = useMemo(
+    () => Array.from(aiSuggestions.values())
+      .filter(s => s.status === 'pending' && s.applyMode === 'guidance-only').length,
+    [aiSuggestions]
+  );
+
+  const phases = useMemo(() => derivePhases({
+    auditResult: auditResult ? { createdAt: auditResult.createdAt, completedAt: auditResult.completedAt } : null,
+    aiAnalysisStatus,
+    aiAnalyzedAt: aiStats?.analyzedAt,
+    remediationHistory: remediationHistoryQuery.data ?? [],
+    autoModeStatus: autoModeStatusQuery.data,
+    remediationCycleActive,
+    remediationCycleSource: remediationCycleActiveSource,
+    postRemediationStatus: autoTagInfo?.postRemediationStatus,
+    lastVerifiedAt: latestTimestamp(autoTagInfo?.postRemediationAudit?.runAt, jobFlags?.lastReauditAt) ?? null,
+    pendingGuidanceCount,
+    guidanceAcknowledgment,
+    acrGenerated: jobFlags?.acrGenerated ?? false,
+    pacReportGenerated: jobFlags?.pacReportGenerated ?? false,
+  }), [
+    auditResult, aiAnalysisStatus, aiStats?.analyzedAt, remediationHistoryQuery.data, autoModeStatusQuery.data,
+    remediationCycleActive, remediationCycleActiveSource, autoTagInfo?.postRemediationStatus,
+    autoTagInfo?.postRemediationAudit?.runAt, jobFlags?.lastReauditAt, pendingGuidanceCount, guidanceAcknowledgment,
+    jobFlags?.acrGenerated, jobFlags?.pacReportGenerated,
+  ]);
 
   // Fetch audit result
   const fetchAuditResult = useCallback(async () => {
@@ -1024,6 +1060,10 @@ export const PdfAuditResultsPage: React.FC = () => {
     // one, so without this the just-finished final round (or any round,
     // really) could sit unfetched until its own next independent tick.
     refetchAutoModeRoundHistory();
+    // PdfPhaseStepper's Remediation-phase duration (manual cycles) and
+    // Auto Mode's own round detail are both derived from this same raw
+    // history — keep it in sync the same way.
+    refetchRemediationHistory();
     // The comparison-study trial's own taggerSource/aiFixesAppliedCount/
     // manualFixesRequiredCount go stale the same way — without this, an
     // operator who opens the trial report right after a round (or right
@@ -1032,7 +1072,7 @@ export const PdfAuditResultsPage: React.FC = () => {
     if (comparisonTrialId) invalidateComparisonTrial(comparisonTrialId);
   }, [
     autoModeProgressKey, isAutoModeNeverRun, fetchAuditResult, fetchAiSuggestions, fetchJobFlags, fetchAutoTagStatus,
-    bumpHistoryRefreshTrigger, refetchAutoModeRoundHistory, comparisonTrialId, invalidateComparisonTrial,
+    bumpHistoryRefreshTrigger, refetchAutoModeRoundHistory, refetchRemediationHistory, comparisonTrialId, invalidateComparisonTrial,
   ]);
 
   const handleRetryAutoTag = async () => {
@@ -1542,6 +1582,8 @@ export const PdfAuditResultsPage: React.FC = () => {
 
         </div>
       </div>
+
+      <PdfPhaseStepper phases={phases} />
 
       <PdfStatsCards
         autoTagInfo={autoTagInfo}

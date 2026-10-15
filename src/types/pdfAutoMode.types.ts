@@ -19,4 +19,11 @@ export interface AutoModeStatusResponse {
   autoCostSpentUsd: number;
   autoCostLimitUsd: number;
   autoColorContrastMode: AutoColorContrastMode;
+  /**
+   * When the CURRENT run started (ninja-backend#671) — null if no run has
+   * ever started, or once a run has stopped. Anchors a live elapsed-time
+   * ticker while autoStatus === 'running'; not meant to span multiple
+   * rounds' own individual timings, just "how long has this run been going".
+   */
+  autoStartedAt?: string | null;
 }
