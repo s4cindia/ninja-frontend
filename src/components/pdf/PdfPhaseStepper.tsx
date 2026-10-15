@@ -15,20 +15,11 @@
 import { useEffect, useState, Fragment } from 'react';
 import { CheckCircle, Circle, Loader2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { formatDuration } from '@/utils/duration';
 import type { Phase, PhaseStatus } from '@/utils/pdfPhaseStepper';
 
 interface PdfPhaseStepperProps {
   phases: Phase[];
-}
-
-function formatDuration(ms: number): string {
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  if (minutes > 0) return `${minutes}m ${seconds}s`;
-  return `${seconds}s`;
 }
 
 function StatusIcon({ status }: { status: PhaseStatus }) {

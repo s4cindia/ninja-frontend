@@ -54,6 +54,10 @@ import BatchProcessingPage from '@/pages/BatchProcessingPage';
 import BatchResultsPage from '@/pages/BatchResultsPage';
 import BatchFileDetailsPage from '@/pages/BatchFileDetailsPage';
 import BatchListPage from '@/pages/BatchListPage';
+import PdfBatchListPage from '@/pages/pdf-batch/PdfBatchListPage';
+import PdfBatchCreatePage from '@/pages/pdf-batch/PdfBatchCreatePage';
+import PdfBatchDetailPage from '@/pages/pdf-batch/PdfBatchDetailPage';
+import PdfBatchResultsPage from '@/pages/pdf-batch/PdfBatchResultsPage';
 import Settings from '@/pages/Settings';
 import HouseRulesSettingsPage from '@/pages/HouseRulesSettingsPage';
 import { TenantWorkflowSettings } from '@/pages/TenantWorkflowSettings';
@@ -235,6 +239,10 @@ function AppRoutes() {
           <Route path="/batch/:batchId/file/:fileId" element={<BatchFileDetailsPage />} />
           <Route path="/batches" element={<BatchListPage />} />
           <Route path="/batches/new" element={<BatchCreationPage />} />
+          <Route path="/pdf-batches" element={<PdfBatchListPage />} />
+          <Route path="/pdf-batches/new" element={<PdfBatchCreatePage />} />
+          <Route path="/pdf-batches/:batchId" element={<PdfBatchDetailPage />} />
+          <Route path="/pdf-batches/:batchId/results" element={<PdfBatchResultsPage />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/settings/house-rules" element={<HouseRulesSettingsPage />} />
           <Route path="/settings/workflow" element={<TenantWorkflowSettings />} />
