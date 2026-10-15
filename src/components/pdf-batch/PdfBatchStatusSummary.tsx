@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from 'react';
 import { Clock } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/Card';
 import { formatDuration } from '@/utils/duration';
 import { getPdfBatchItemStatusMeta } from '@/utils/pdfBatchItemStatus';
 import type { PdfBatchDetail, PdfBatchItemStatus } from '@/types/pdfBatch.types';
@@ -49,36 +50,38 @@ export function PdfBatchStatusSummary({ batch }: PdfBatchStatusSummaryProps) {
     .filter((entry) => entry.count > 0);
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">Processing Progress</h2>
-        {elapsedMs != null && elapsedMs >= 0 && (
-          <div className="flex items-center gap-1.5 text-sm text-gray-600" data-testid="pdf-batch-elapsed">
-            <Clock className="h-4 w-4" aria-hidden="true" />
-            Running for {formatDuration(elapsedMs)}
-          </div>
-        )}
-      </div>
-
-      {isActive && (
-        <p className="text-sm text-gray-600 mb-4">
-          Each file goes through a full multi-round AI remediation pass (up to 10 rounds).
-          A batch of several real-world PDFs can legitimately take hours — items waiting
-          for capacity are queued, not stuck.
-        </p>
-      )}
-
-      <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        {counts.map(({ status, count }) => {
-          const meta = getPdfBatchItemStatusMeta(status);
-          return (
-            <div key={status}>
-              <dt className="text-sm text-gray-600">{meta.label}</dt>
-              <dd className="text-2xl font-bold text-gray-900">{count}</dd>
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Processing Progress</h2>
+          {elapsedMs != null && elapsedMs >= 0 && (
+            <div className="flex items-center gap-1.5 text-sm text-gray-600" data-testid="pdf-batch-elapsed">
+              <Clock className="h-4 w-4" aria-hidden="true" />
+              Running for {formatDuration(elapsedMs)}
             </div>
-          );
-        })}
-      </dl>
-    </div>
+          )}
+        </div>
+
+        {isActive && (
+          <p className="text-sm text-gray-600 mb-4">
+            Each file goes through a full multi-round AI remediation pass (up to 10 rounds).
+            A batch of several real-world PDFs can legitimately take hours — items waiting
+            for capacity are queued, not stuck.
+          </p>
+        )}
+
+        <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          {counts.map(({ status, count }) => {
+            const meta = getPdfBatchItemStatusMeta(status);
+            return (
+              <div key={status}>
+                <dt className="text-sm text-gray-600">{meta.label}</dt>
+                <dd className="text-2xl font-bold text-gray-900">{count}</dd>
+              </div>
+            );
+          })}
+        </dl>
+      </CardContent>
+    </Card>
   );
 }
