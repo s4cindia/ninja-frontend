@@ -89,6 +89,7 @@ export function MainLayout() {
       items: [
         { to: '/remediation', icon: Wrench, label: 'Remediation' },
         { to: '/batches', icon: Layers, label: 'Batch Processing' },
+        { to: '/pdf-batches', icon: Layers, label: 'PDF Batch Processing', activePrefix: '/pdf-batches' },
         {
           to: '/workflow/batch/new',
           icon: Bot,

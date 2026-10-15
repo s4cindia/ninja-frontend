@@ -1,0 +1,59 @@
+import { api, ApiResponse } from './api';
+import type {
+  PdfBatchListResponse,
+  CreatePdfBatchRequest,
+  CreatePdfBatchResponse,
+  AddPdfBatchItemsRequestItem,
+  AddPdfBatchItemsResponse,
+  StartPdfBatchResponse,
+  CancelPdfBatchResponse,
+  PdfBatchDetail,
+} from '@/types/pdfBatch.types';
+
+const BASE_URL = '/pdf-batches';
+
+export const pdfBatchService = {
+  async createBatch(data: CreatePdfBatchRequest): Promise<CreatePdfBatchResponse> {
+    const response = await api.post<ApiResponse<CreatePdfBatchResponse>>(BASE_URL, data);
+    return response.data.data;
+  },
+
+  async addItems(batchId: string, items: AddPdfBatchItemsRequestItem[]): Promise<AddPdfBatchItemsResponse> {
+    const response = await api.post<ApiResponse<AddPdfBatchItemsResponse>>(
+      `${BASE_URL}/${batchId}/items`,
+      { items }
+    );
+    return response.data.data;
+  },
+
+  async removeItem(batchId: string, itemId: string): Promise<void> {
+    await api.delete(`${BASE_URL}/${batchId}/items/${itemId}`);
+  },
+
+  async startBatch(batchId: string): Promise<StartPdfBatchResponse> {
+    const response = await api.post<ApiResponse<StartPdfBatchResponse>>(`${BASE_URL}/${batchId}/start`);
+    return response.data.data;
+  },
+
+  async cancelBatch(batchId: string): Promise<CancelPdfBatchResponse> {
+    const response = await api.post<ApiResponse<CancelPdfBatchResponse>>(`${BASE_URL}/${batchId}/cancel`);
+    return response.data.data;
+  },
+
+  async getBatch(batchId: string): Promise<PdfBatchDetail> {
+    const response = await api.get<ApiResponse<PdfBatchDetail>>(`${BASE_URL}/${batchId}`);
+    return response.data.data;
+  },
+
+  async listBatches(page: number = 1, limit: number = 20, status?: string): Promise<PdfBatchListResponse> {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    if (status) {
+      params.append('status', status);
+    }
+    const response = await api.get<ApiResponse<PdfBatchListResponse>>(`${BASE_URL}?${params}`);
+    return response.data.data;
+  },
+};
