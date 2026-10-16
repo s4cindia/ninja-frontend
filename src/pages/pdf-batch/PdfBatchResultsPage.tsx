@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { Button } from '@/components/ui/Button';
+import { Card, CardContent } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
 import { PdfBatchStatusBadge } from '@/components/pdf-batch/PdfBatchStatusBadge';
 import { PdfBatchResultsList } from '@/components/pdf-batch/PdfBatchResultsList';
@@ -51,22 +52,24 @@ export default function PdfBatchResultsPage() {
         <PdfBatchStatusBadge status={batch.status} />
       </div>
 
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <dl className="grid grid-cols-3 gap-4">
-          <div>
-            <dt className="text-sm text-gray-600">Remediated</dt>
-            <dd className="text-2xl font-bold text-green-600">{remediated}</dd>
-          </div>
-          <div>
-            <dt className="text-sm text-gray-600">Failed</dt>
-            <dd className="text-2xl font-bold text-red-600">{failed}</dd>
-          </div>
-          <div>
-            <dt className="text-sm text-gray-600">Skipped</dt>
-            <dd className="text-2xl font-bold text-gray-500">{skipped}</dd>
-          </div>
-        </dl>
-      </div>
+      <Card className="mb-6">
+        <CardContent className="p-6">
+          <dl className="grid grid-cols-3 gap-4">
+            <div>
+              <dt className="text-sm text-gray-600">Remediated</dt>
+              <dd className="text-2xl font-bold text-green-600">{remediated}</dd>
+            </div>
+            <div>
+              <dt className="text-sm text-gray-600">Failed</dt>
+              <dd className="text-2xl font-bold text-red-600">{failed}</dd>
+            </div>
+            <div>
+              <dt className="text-sm text-gray-600">Skipped</dt>
+              <dd className="text-2xl font-bold text-gray-500">{skipped}</dd>
+            </div>
+          </dl>
+        </CardContent>
+      </Card>
 
       <PdfBatchResultsList items={batch.items} />
     </div>
