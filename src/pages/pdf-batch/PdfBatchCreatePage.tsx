@@ -48,32 +48,36 @@ export default function PdfBatchCreatePage() {
     try {
       const batch = await createBatchMutation.mutateAsync({ name: batchName || undefined });
 
-      // Upload files one at a time (via the same presign -> S3 -> confirm
-      // flow upload.service.ts already exposes) so each row's progress is
-      // independently visible, rather than firing N concurrent XHRs with
-      // interleaved progress callbacks.
-      const uploadedFileIds: string[] = [];
-      for (let i = 0; i < uploadItems.length; i++) {
-        const file = uploadItems[i].file;
-        updateItem(i, { state: 'uploading', progress: 0 });
+      // Upload all files in parallel (via the same presign -> S3 -> confirm
+      // flow upload.service.ts already exposes). Each row tracks its own
+      // progress independently via its index, so concurrent XHRs don't
+      // interleave each other's progress -- a large file no longer blocks
+      // smaller ones behind it in the queue.
+      const uploadResults = await Promise.all(
+        uploadItems.map(async (item, i): Promise<string | null> => {
+          const file = item.file;
+          updateItem(i, { state: 'uploading', progress: 0 });
 
-        try {
-          const contentType = file.type || 'application/pdf';
-          const presigned = await uploadService.getPresignedUrl(file.name, file.size, contentType);
-          await uploadService.uploadToS3(
-            presigned.uploadUrl,
-            file,
-            (progress) => updateItem(i, { progress: progress.percentage }),
-            contentType
-          );
-          await uploadService.confirmUpload(presigned.fileId);
+          try {
+            const contentType = file.type || 'application/pdf';
+            const presigned = await uploadService.getPresignedUrl(file.name, file.size, contentType);
+            await uploadService.uploadToS3(
+              presigned.uploadUrl,
+              file,
+              (progress) => updateItem(i, { progress: progress.percentage }),
+              contentType
+            );
+            await uploadService.confirmUpload(presigned.fileId);
 
-          updateItem(i, { state: 'uploaded', progress: 100, fileId: presigned.fileId });
-          uploadedFileIds.push(presigned.fileId);
-        } catch (err) {
-          updateItem(i, { state: 'error', error: getErrorMessage(err) });
-        }
-      }
+            updateItem(i, { state: 'uploaded', progress: 100, fileId: presigned.fileId });
+            return presigned.fileId;
+          } catch (err) {
+            updateItem(i, { state: 'error', error: getErrorMessage(err) });
+            return null;
+          }
+        })
+      );
+      const uploadedFileIds = uploadResults.filter((id): id is string => id !== null);
 
       if (uploadedFileIds.length > 0) {
         for (let i = 0; i < uploadedFileIds.length; i += MAX_ITEMS_PER_ADD_REQUEST) {
