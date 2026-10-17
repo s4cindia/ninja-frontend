@@ -93,6 +93,33 @@ describe('PdfBatchCreatePage', () => {
     expect(mockBatchService.addItems).toHaveBeenCalledWith('b1', [{ sourceFileId: 'file-1' }, { sourceFileId: 'file-1' }]);
   });
 
+  it('uploads all files in parallel rather than one at a time (real fix, 2026-10-18: a large first file no longer blocks smaller ones behind it)', async () => {
+    mockUploadService.getPresignedUrl
+      .mockResolvedValueOnce({ uploadUrl: 'https://s3.example.com/upload', fileKey: 'key1', fileId: 'file-1', expiresIn: 900 })
+      .mockResolvedValueOnce({ uploadUrl: 'https://s3.example.com/upload', fileKey: 'key2', fileId: 'file-2', expiresIn: 900 });
+
+    const pendingUploads: Array<() => void> = [];
+    mockUploadService.uploadToS3.mockImplementation(
+      () => new Promise<void>((resolve) => { pendingUploads.push(() => resolve(undefined)); })
+    );
+
+    renderPage();
+
+    await selectFiles([pdfFile('a.pdf'), pdfFile('b.pdf')]);
+    fireEvent.click(screen.getByRole('button', { name: 'Create & Upload' }));
+
+    // Both files' S3 uploads must be in flight before either resolves --
+    // proves the second file's upload starts without waiting for the
+    // first one to finish.
+    await waitFor(() => expect(pendingUploads).toHaveLength(2));
+
+    pendingUploads.forEach((resolve) => resolve());
+
+    await waitFor(() => expect(screen.getByText('Detail page for batch b1')).toBeInTheDocument());
+
+    expect(mockBatchService.addItems).toHaveBeenCalledWith('b1', [{ sourceFileId: 'file-1' }, { sourceFileId: 'file-2' }]);
+  });
+
   it('passes the batch name through when provided', async () => {
     renderPage();
 
