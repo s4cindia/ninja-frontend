@@ -92,14 +92,24 @@ describe('usePdfBatch mutations', () => {
     expect(mockService.removeItem).toHaveBeenCalledWith('b1', 'item1');
   });
 
-  it('useStartPdfBatch calls the service with the batchId', async () => {
+  it('useStartPdfBatch calls the service with the batchId and no overrides', async () => {
     mockService.startBatch.mockResolvedValue({ batchId: 'b1', status: 'QUEUED', totalFiles: 1, startedAt: '2026-10-15T00:00:00Z' });
     const { result } = renderHook(() => useStartPdfBatch('b1'), { wrapper: createWrapper() });
 
-    result.current.mutate();
+    result.current.mutate(undefined);
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(mockService.startBatch).toHaveBeenCalledWith('b1');
+    expect(mockService.startBatch).toHaveBeenCalledWith('b1', undefined);
+  });
+
+  it('useStartPdfBatch forwards Auto Mode overrides to the service when provided', async () => {
+    mockService.startBatch.mockResolvedValue({ batchId: 'b1', status: 'QUEUED', totalFiles: 1, startedAt: '2026-10-15T00:00:00Z' });
+    const { result } = renderHook(() => useStartPdfBatch('b1'), { wrapper: createWrapper() });
+
+    result.current.mutate({ autoMaxRounds: 3, autoCostLimitUsd: 0.5, autoColorContrastMode: 'disabled' });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockService.startBatch).toHaveBeenCalledWith('b1', { autoMaxRounds: 3, autoCostLimitUsd: 0.5, autoColorContrastMode: 'disabled' });
   });
 
   it('useCancelPdfBatch calls the service with the batchId', async () => {

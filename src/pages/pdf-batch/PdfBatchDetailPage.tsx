@@ -5,8 +5,10 @@ import { Spinner } from '@/components/ui/Spinner';
 import { PdfBatchStatusBadge } from '@/components/pdf-batch/PdfBatchStatusBadge';
 import { PdfBatchStatusSummary } from '@/components/pdf-batch/PdfBatchStatusSummary';
 import { PdfBatchItemList } from '@/components/pdf-batch/PdfBatchItemList';
+import { AutoModeStartControl } from '@/components/pdf/AutoModeStartControl';
 import { usePdfBatch, useStartPdfBatch, useCancelPdfBatch, useRemovePdfBatchItem } from '@/hooks/usePdfBatch';
-import { Play, XCircle, ArrowRight } from 'lucide-react';
+import type { StartPdfBatchRequest } from '@/types/pdfBatch.types';
+import { XCircle, ArrowRight } from 'lucide-react';
 
 export default function PdfBatchDetailPage() {
   const { batchId } = useParams<{ batchId: string }>();
@@ -17,8 +19,8 @@ export default function PdfBatchDetailPage() {
   const cancelBatchMutation = useCancelPdfBatch(batchId);
   const removeItemMutation = useRemovePdfBatchItem(batchId);
 
-  const handleStart = () => {
-    startBatchMutation.mutate();
+  const handleStart = (overrides?: StartPdfBatchRequest) => {
+    startBatchMutation.mutate(overrides);
   };
 
   const handleCancel = () => {
@@ -111,14 +113,14 @@ export default function PdfBatchDetailPage() {
                 <Button variant="outline" onClick={() => navigate('/pdf-batches')}>
                   Back to Batches
                 </Button>
-                <Button
-                  onClick={handleStart}
+                <AutoModeStartControl
+                  onStart={handleStart}
+                  isPending={startBatchMutation.isPending}
                   disabled={!canStart}
-                  isLoading={startBatchMutation.isPending}
-                  leftIcon={<Play className="h-4 w-4" />}
-                >
-                  Start Processing
-                </Button>
+                  disabledTitle={canStart ? undefined : 'Add at least one file before starting'}
+                  showConfig
+                  triggerLabel="Start Processing"
+                />
               </>
             )}
 

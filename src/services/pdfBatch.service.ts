@@ -5,6 +5,7 @@ import type {
   CreatePdfBatchResponse,
   AddPdfBatchItemsRequestItem,
   AddPdfBatchItemsResponse,
+  StartPdfBatchRequest,
   StartPdfBatchResponse,
   CancelPdfBatchResponse,
   PdfBatchDetail,
@@ -30,8 +31,13 @@ export const pdfBatchService = {
     await api.delete(`${BASE_URL}/${batchId}/items/${itemId}`);
   },
 
-  async startBatch(batchId: string): Promise<StartPdfBatchResponse> {
-    const response = await api.post<ApiResponse<StartPdfBatchResponse>>(`${BASE_URL}/${batchId}/start`);
+  async startBatch(batchId: string, overrides?: StartPdfBatchRequest): Promise<StartPdfBatchResponse> {
+    // Conditional call (not just passing `overrides` through unconditionally)
+    // so a start with no overrides still posts with no body at all, exactly
+    // as before -- not a call with an explicit `undefined` body.
+    const response = overrides
+      ? await api.post<ApiResponse<StartPdfBatchResponse>>(`${BASE_URL}/${batchId}/start`, overrides)
+      : await api.post<ApiResponse<StartPdfBatchResponse>>(`${BASE_URL}/${batchId}/start`);
     return response.data.data;
   },
 

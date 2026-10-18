@@ -38,12 +38,20 @@ describe('pdfBatchService', () => {
     expect(mockApi.delete).toHaveBeenCalledWith('/pdf-batches/b1/items/item1');
   });
 
-  it('startBatch posts with no body', async () => {
+  it('startBatch posts with no body when no overrides are given', async () => {
     mockApi.post.mockResolvedValue({ data: { success: true, data: { batchId: 'b1', status: 'QUEUED', totalFiles: 2, startedAt: '2026-10-15T00:00:00Z' } } });
 
     await pdfBatchService.startBatch('b1');
 
     expect(mockApi.post).toHaveBeenCalledWith('/pdf-batches/b1/start');
+  });
+
+  it('startBatch posts the Auto Mode overrides as the body when given -- each item still gets its own independent budget/round count, not a shared pool', async () => {
+    mockApi.post.mockResolvedValue({ data: { success: true, data: { batchId: 'b1', status: 'QUEUED', totalFiles: 2, startedAt: '2026-10-15T00:00:00Z' } } });
+
+    await pdfBatchService.startBatch('b1', { autoMaxRounds: 3, autoCostLimitUsd: 0.5, autoColorContrastMode: 'disabled' });
+
+    expect(mockApi.post).toHaveBeenCalledWith('/pdf-batches/b1/start', { autoMaxRounds: 3, autoCostLimitUsd: 0.5, autoColorContrastMode: 'disabled' });
   });
 
   it('cancelBatch posts with no body', async () => {

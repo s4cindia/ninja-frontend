@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { pdfBatchService } from '@/services/pdfBatch.service';
-import type { AddPdfBatchItemsRequestItem, CreatePdfBatchRequest } from '@/types/pdfBatch.types';
+import type { AddPdfBatchItemsRequestItem, CreatePdfBatchRequest, StartPdfBatchRequest } from '@/types/pdfBatch.types';
 import { getErrorMessage } from '@/services/api';
 import toast from 'react-hot-toast';
 
@@ -57,9 +57,9 @@ export function useRemovePdfBatchItem(batchId: string | undefined) {
 export function useStartPdfBatch(batchId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => {
+    mutationFn: (overrides?: StartPdfBatchRequest) => {
       if (!batchId) return Promise.reject(new Error('Batch ID is required'));
-      return pdfBatchService.startBatch(batchId);
+      return pdfBatchService.startBatch(batchId, overrides);
     },
     onSuccess: () => {
       if (batchId) queryClient.invalidateQueries({ queryKey: BATCH_KEY(batchId) });
