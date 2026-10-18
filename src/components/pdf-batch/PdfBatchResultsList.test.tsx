@@ -1,11 +1,19 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { PdfBatchResultsList } from './PdfBatchResultsList';
 import type { PdfBatchItem } from '@/types/pdfBatch.types';
 
 vi.mock('@/components/pdf/DownloadRemediatedButton', () => ({
   DownloadRemediatedButton: ({ jobId, fileName }: { jobId: string; fileName: string }) => (
     <button type="button">Download {fileName} ({jobId})</button>
+  ),
+}));
+
+// PdfBatchResultsItemDetail has its own dedicated test file -- stub it here
+// so these tests stay focused on the list's own expand/collapse wiring.
+vi.mock('@/components/pdf-batch/PdfBatchResultsItemDetail', () => ({
+  PdfBatchResultsItemDetail: ({ item }: { item: PdfBatchItem }) => (
+    <div data-testid="results-detail">results-detail:{item.itemId}</div>
   ),
 }));
 
@@ -63,5 +71,41 @@ describe('PdfBatchResultsList', () => {
     render(<PdfBatchResultsList items={[item({ auditScore: null, issuesFound: null, issuesAutoFixed: null, issuesGuidanceOnly: null })]} />);
 
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('offers no expand toggle for an item with no auditJobId', () => {
+    render(<PdfBatchResultsList items={[item({ auditJobId: null })]} />);
+
+    expect(screen.queryByRole('button', { name: /show detail/i })).not.toBeInTheDocument();
+  });
+
+  it('expands to show the rich detail on click, and collapses on a second click', () => {
+    render(<PdfBatchResultsList items={[item({ auditJobId: 'job-1' })]} />);
+
+    const toggle = screen.getByRole('button', { name: /show detail for a\.pdf/i });
+    expect(screen.queryByTestId('results-detail')).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(screen.getByTestId('results-detail')).toHaveTextContent('results-detail:i1');
+    expect(screen.getByRole('button', { name: /hide detail for a\.pdf/i })).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: /hide detail for a\.pdf/i }));
+    expect(screen.queryByTestId('results-detail')).not.toBeInTheDocument();
+  });
+
+  it('tracks each item\'s expanded state independently', () => {
+    render(
+      <PdfBatchResultsList
+        items={[
+          item({ itemId: 'i1', originalName: 'a.pdf', auditJobId: 'job-1' }),
+          item({ itemId: 'i2', originalName: 'b.pdf', auditJobId: 'job-2' }),
+        ]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /show detail for a\.pdf/i }));
+
+    expect(screen.getByText('results-detail:i1')).toBeInTheDocument();
+    expect(screen.queryByText('results-detail:i2')).not.toBeInTheDocument();
   });
 });
