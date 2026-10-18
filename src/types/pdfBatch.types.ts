@@ -6,6 +6,8 @@
  * per-tenant budget, rather than strictly one-at-a-time like EPUB batch.
  */
 
+import type { StartAutoModeOverrides } from '@/services/pdfAutoMode.service';
+
 export type PdfBatchStatus =
   | 'DRAFT'
   | 'QUEUED'
@@ -85,6 +87,15 @@ export interface AddPdfBatchItemsResponse {
   itemsAdded: number;
   items: AddedPdfBatchItem[];
 }
+
+/**
+ * Optional per-batch Auto Mode overrides, applied uniformly to every item's
+ * own remediation run (each item still gets its own independent
+ * budget/round count, not a shared pool across the batch). Same shape as
+ * the single-file job-native endpoint's own StartAutoModeOverrides
+ * (pdfAutoMode.service.ts) -- reused rather than duplicated.
+ */
+export type StartPdfBatchRequest = StartAutoModeOverrides;
 
 export interface StartPdfBatchResponse {
   batchId: string;

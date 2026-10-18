@@ -74,15 +74,24 @@ describe('PdfBatchDetailPage', () => {
     expect(await screen.findByRole('button', { name: /Start Processing/ })).toBeDisabled();
   });
 
-  it('calls startBatch when Start Processing is clicked', async () => {
+  it('calls startBatch with the confirmed Auto Mode overrides when Start Processing is clicked and confirmed', async () => {
     mockService.getBatch.mockResolvedValue(detail());
     mockService.startBatch.mockResolvedValue({ batchId: 'b1', status: 'QUEUED', totalFiles: 1, startedAt: '2026-10-01T12:00:00Z' });
 
     renderPage();
 
+    // Clicking the trigger reveals the Auto Mode settings popover (reused
+    // from the single-file page's AutoModeStartControl) rather than
+    // starting immediately -- confirming with the unedited defaults is
+    // what actually calls startBatch.
     fireEvent.click(await screen.findByRole('button', { name: /Start Processing/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
 
-    await waitFor(() => expect(mockService.startBatch).toHaveBeenCalledWith('b1'));
+    await waitFor(() => expect(mockService.startBatch).toHaveBeenCalledWith('b1', {
+      autoMaxRounds: 10,
+      autoCostLimitUsd: 2,
+      autoColorContrastMode: 'apply-to-pdf',
+    }));
   });
 
   it('calls removeItem when a DRAFT item is removed', async () => {

@@ -32,9 +32,17 @@ interface AutoModeStartControlProps {
    * controls the backend silently ignores.
    */
   showConfig: boolean;
+  /**
+   * Idle-state button text — defaults to this component's original
+   * single-file label. PDF batch processing reuses this exact component
+   * (same fields, same defaults, same popover) for its own "Start
+   * Processing" trigger, where every item always honors overrides (no
+   * trial-linked complexity for batches), passing this to match.
+   */
+  triggerLabel?: string;
 }
 
-export function AutoModeStartControl({ onStart, isPending, disabled, disabledTitle, showConfig }: AutoModeStartControlProps) {
+export function AutoModeStartControl({ onStart, isPending, disabled, disabledTitle, showConfig, triggerLabel = 'Start Auto Remediation' }: AutoModeStartControlProps) {
   const [open, setOpen] = useState(false);
   const [maxRoundsInput, setMaxRoundsInput] = useState(String(DEFAULT_MAX_ROUNDS));
   const [costLimitInput, setCostLimitInput] = useState(String(DEFAULT_COST_LIMIT_USD));
@@ -72,7 +80,7 @@ export function AutoModeStartControl({ onStart, isPending, disabled, disabledTit
       >
         {isPending
           ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Starting…</>
-          : <><Sparkles className="h-4 w-4 mr-1" />Start Auto Remediation</>
+          : <><Sparkles className="h-4 w-4 mr-1" />{triggerLabel}</>
         }
       </Button>
 

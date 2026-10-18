@@ -116,4 +116,18 @@ describe('AutoModeStartControl', () => {
     const button = screen.getByRole('button', { name: /Starting…/ });
     expect(button).toBeDisabled();
   });
+
+  it('uses a custom triggerLabel when given -- PDF batch processing reuses this exact component for its own "Start Processing" trigger', () => {
+    const { onStart } = renderControl({ triggerLabel: 'Start Processing' });
+
+    expect(screen.queryByRole('button', { name: 'Start Auto Remediation' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Start Processing' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+
+    expect(onStart).toHaveBeenCalledWith({
+      autoMaxRounds: 10,
+      autoCostLimitUsd: 2,
+      autoColorContrastMode: 'apply-to-pdf',
+    });
+  });
 });
