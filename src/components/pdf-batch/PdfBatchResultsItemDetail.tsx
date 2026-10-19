@@ -22,7 +22,19 @@
  *     remediationCycleInProgress=false, since there's no in-progress cycle
  *     to transition out of for an item that's already done. Renders
  *     nothing if there's no history (e.g. FMHE never reached remediation).
+ *
+ * "View Full Results" navigates to /pdf/audit/:jobId -- the existing
+ * single-file PdfAuditResultsPage, completely unmodified. That page is
+ * driven purely by jobId (useParams), with no batch-specific coupling
+ * anywhere in it (MatterhornSummary and the page-by-page viewer aren't
+ * gated by trial/upload-flow origin), and every batch item's auditJobId is
+ * a real Job row identical in shape to one created by the single-upload
+ * flow -- so this gets the Matterhorn Protocol compliance panel and the
+ * full page viewer for free, with zero new UI work, instead of trying to
+ * cram that page's full layout into this inline expandable row.
  */
+import { useNavigate } from 'react-router-dom';
+import { Maximize2 } from 'lucide-react';
 import { useJob } from '@/hooks/useJobs';
 import type { JobData } from '@/hooks/useJobPolling';
 import { PdfJobProgressPanel } from '@/components/pdf/PdfJobProgressPanel';
@@ -36,6 +48,7 @@ interface PdfBatchResultsItemDetailProps {
 export function PdfBatchResultsItemDetail({ item }: PdfBatchResultsItemDetailProps) {
   const jobId = item.auditJobId ?? null;
   const { data: job, isLoading } = useJob(jobId);
+  const navigate = useNavigate();
 
   if (!jobId) {
     return (
@@ -47,6 +60,17 @@ export function PdfBatchResultsItemDetail({ item }: PdfBatchResultsItemDetailPro
 
   return (
     <div className="px-4 py-3 bg-gray-50 space-y-4">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => navigate(`/pdf/audit/${jobId}`)}
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline"
+        >
+          <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
+          View Full Results
+        </button>
+      </div>
+
       <div>
         <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Audit</h4>
         {job ? (
