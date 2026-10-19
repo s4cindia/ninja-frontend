@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mocked } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup, act, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate, createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import { PdfAuditResultsPage } from './PdfAuditResultsPage';
@@ -50,11 +50,16 @@ vi.mock('@/services/pdfAutoMode.service', () => ({
 }));
 // Has its own dedicated test file — stub here to keep these tests focused on
 // PdfAuditResultsPage's own mode-based button gating, not the card's polling.
+// onStop/stopError included (unlike the other omitted real props) because
+// the stale-mutation-state regression test below needs to trigger Stop and
+// observe its error text, same as the real component does.
 vi.mock('@/components/pdf/AutoModeStatusCard', () => ({
-  AutoModeStatusCard: ({ status, rounds, applyProgress }: {
+  AutoModeStatusCard: ({ status, rounds, applyProgress, onStop, stopError }: {
     status: { autoStatus: string | null; autoRoundsCompleted: number; autoMaxRounds: number };
     rounds: Array<{ round: number }>;
     applyProgress?: { connected: boolean; processed: number | null; total: number | null };
+    onStop?: () => void;
+    stopError?: unknown;
   }) => (
     <div data-testid="auto-mode-status-card">
       auto-mode-status:{status.autoStatus}:{status.autoRoundsCompleted}/{status.autoMaxRounds}:rounds={rounds.length}
@@ -62,6 +67,10 @@ vi.mock('@/components/pdf/AutoModeStatusCard', () => ({
         <span data-testid="auto-mode-apply-progress">
           apply-progress:{applyProgress.processed}/{applyProgress.total}
         </span>
+      )}
+      {onStop && <button onClick={onStop}>Stop</button>}
+      {stopError !== undefined && (
+        <p data-testid="auto-mode-stop-error">{String((stopError as Error)?.message ?? stopError)}</p>
       )}
     </div>
   ),
@@ -3312,6 +3321,69 @@ describe('PdfAuditResultsPage', () => {
       await screen.findByTestId('pdf-phase-stepper');
       const compliance = screen.getByTestId('pdf-phase-compliance');
       expect(compliance.querySelector('svg')).toHaveClass('text-gray-300');
+    });
+  });
+
+  describe('Auto Mode mutation state reset across job navigation (stale-error regression)', () => {
+    // Pattern-matches by URL suffix (not exact job-specific URLs, unlike
+    // mockCommonGets above) so the same helper transparently serves whichever
+    // jobId is currently on screen -- this test needs to render two different
+    // jobs in the SAME mounted component instance.
+    function mockCommonGetsForJob(jobId: string) {
+      const mockResult = createMockAuditResult({ jobId });
+      mockApi.get.mockImplementation((url: string) => {
+        if (url.includes('/audit/result')) return Promise.resolve({ data: { data: mockResult } });
+        if (url.includes('/auto-tag/status')) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url.includes('/ai-analysis')) return Promise.resolve({ data: { data: { suggestions: [], analyzed: 0, total: 0, status: 'complete' } } });
+        if (url.startsWith('/jobs/')) return Promise.resolve({ data: { data: { output: {} } } });
+        return Promise.resolve({ data: { data: {} } });
+      });
+    }
+
+    it('clears a stale Stop-button error from an earlier job when navigating to a different job without unmounting (real bug, confirmed live 2026-10-19)', async () => {
+      mockCommonGetsForJob('job-A');
+      const mockGetAutoModeStatus = pdfAutoModeService.getAutoModeStatus as ReturnType<typeof vi.fn>;
+      const mockStopAutoMode = pdfAutoModeService.stopAutoMode as ReturnType<typeof vi.fn>;
+      mockGetAutoModeStatus.mockResolvedValue({
+        mode: 'manual', autoStatus: 'running', autoStopReason: null,
+        autoRoundsCompleted: 1, autoMaxRounds: 10, autoCostSpentUsd: 0, autoCostLimitUsd: 2,
+      });
+      mockStopAutoMode.mockRejectedValue(new Error('stop failed for job-A'));
+
+      // createMemoryRouter + RouterProvider (not the plain MemoryRouter
+      // renderWithRouter uses elsewhere) so router.navigate() below updates
+      // the SAME router instance in place -- a plain re-render with new
+      // initialEntries would not actually navigate, since MemoryRouter only
+      // reads that prop once, on its own initial mount.
+      const router = createMemoryRouter(
+        [
+          { path: '/pdf/audit/:jobId', element: <PdfAuditResultsPage /> },
+          { path: '/pdf', element: <div>Upload page</div> },
+        ],
+        { initialEntries: ['/pdf/audit/job-A'] }
+      );
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      render(
+        <QueryClientProvider client={queryClient}>
+          <RouterProvider router={router} />
+        </QueryClientProvider>
+      );
+
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: 'Stop' }));
+      expect(await screen.findByTestId('auto-mode-stop-error')).toHaveTextContent('stop failed for job-A');
+
+      // Navigate to a different job WITHOUT unmounting PdfAuditResultsPage --
+      // same component instance, new jobId route param, exactly how React
+      // Router handles ordinary in-app navigation (e.g. the batch results
+      // page's "View Full Results" link).
+      mockCommonGetsForJob('job-B');
+      await act(async () => {
+        await router.navigate('/pdf/audit/job-B');
+      });
+
+      await screen.findByTestId('auto-mode-status-card');
+      expect(screen.queryByTestId('auto-mode-stop-error')).not.toBeInTheDocument();
     });
   });
 });

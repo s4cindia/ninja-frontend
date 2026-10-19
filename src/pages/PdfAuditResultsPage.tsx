@@ -191,6 +191,21 @@ export const PdfAuditResultsPage: React.FC = () => {
   // 404ing for a job with no run yet, so this is always safe to fire.
   const autoModeStatusQuery = useAutoModeStatus(jobId);
   const stopAutoMode = useStopAutoMode(jobId);
+  // Real bug, confirmed live (2026-10-19): useMutation's error/success state
+  // is tied to this component's own mount lifecycle, not to jobId -- React
+  // Router re-renders this page with a new jobId on normal in-app navigation
+  // without unmounting it. Without this reset, a Stop (or Start) click that
+  // genuinely failed on an EARLIER job keeps rendering its stale error on
+  // every job viewed afterward, with no way for an operator to tell it's
+  // not about the job currently on screen.
+  useEffect(() => {
+    startAutoMode.reset();
+    stopAutoMode.reset();
+    // Intentionally reacting to jobId alone -- startAutoMode/stopAutoMode are
+    // new objects every render, so including them would re-run this on every
+    // render instead of only when the job actually changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId]);
   // Auto Mode's backend loop owns Approve/Apply/Dismiss and the bulk Apply
   // Fixes action while a run is actually active — for any job, trial or
   // not. (Previously keyed off trial mode, which only ever covered the
