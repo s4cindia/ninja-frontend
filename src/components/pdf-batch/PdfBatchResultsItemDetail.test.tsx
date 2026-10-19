@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, type Mocked } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PdfBatchResultsItemDetail } from './PdfBatchResultsItemDetail';
 import { jobsService } from '@/services/jobs.service';
@@ -13,6 +14,15 @@ vi.mock('@/services/jobs.service', () => ({
 vi.mock('@/services/pdf-remediation.service', () => ({
   pdfRemediationService: { getRemediationHistory: vi.fn() },
 }));
+
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
 
 const mockJobsService = jobsService as Mocked<typeof jobsService>;
 const mockRemediationService = pdfRemediationService as Mocked<typeof pdfRemediationService>;
@@ -38,6 +48,7 @@ function renderWithClient(ui: React.ReactElement) {
 describe('PdfBatchResultsItemDetail', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockNavigate.mockClear();
     mockRemediationService.getRemediationHistory.mockResolvedValue([]);
   });
 
@@ -92,5 +103,19 @@ describe('PdfBatchResultsItemDetail', () => {
     await waitFor(() => expect(mockRemediationService.getRemediationHistory).toHaveBeenCalledWith('job-42'));
     expect(await screen.findByText('Remediation')).toBeInTheDocument();
     expect(await screen.findByText('Run 1')).toBeInTheDocument();
+  });
+
+  it('navigates to the full single-file results page (Matterhorn + page viewer) when "View Full Results" is clicked', async () => {
+    mockJobsService.getJob.mockResolvedValue({
+      id: 'job-1', type: 'pdf-audit', status: 'COMPLETED', progress: 100,
+      createdAt: '2026-10-18T00:00:00.000Z', updatedAt: '2026-10-18T00:00:00.000Z',
+    });
+    const user = userEvent.setup();
+
+    renderWithClient(<PdfBatchResultsItemDetail item={makeItem({ auditJobId: 'job-99' })} />);
+
+    await user.click(await screen.findByRole('button', { name: /view full results/i }));
+
+    expect(mockNavigate).toHaveBeenCalledWith('/pdf/audit/job-99');
   });
 });
