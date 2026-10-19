@@ -69,6 +69,102 @@ describe('PdfJobProgressPanel', () => {
     expect(container.textContent).not.toContain('1 issues');
   });
 
+  it('shows a live "completed of total" counter next to the currently-running Alt Text step, in both the checklist and the Timing table', () => {
+    const { container } = render(
+      <PdfJobProgressPanel
+        jobData={job({
+          input: {
+            totalPages: 2040,
+            validatorProgress: [
+              { label: 'Structure & Tags', issuesFound: 2049, startedAt: '2026-10-19T19:03:07.553Z', completedAt: '2026-10-19T19:05:33.280Z' },
+            ],
+            altTextImageProgress: { completed: 1601, total: 5934 },
+          },
+        })}
+        progress={89}
+      />
+    );
+
+    expect(container.textContent).toContain('1,601 of 5,934');
+  });
+
+  it('shows a live "completed of total" counter for Color Contrast once it becomes the running step', () => {
+    const { container } = render(
+      <PdfJobProgressPanel
+        jobData={job({
+          input: {
+            totalPages: 2040,
+            validatorProgress: [
+              { label: 'Structure & Tags', issuesFound: 2049, startedAt: '2026-10-19T19:03:07.553Z', completedAt: '2026-10-19T19:05:33.280Z' },
+              { label: 'Alt Text', issuesFound: 104, startedAt: '2026-10-19T19:05:33.280Z', completedAt: '2026-10-19T20:10:00.000Z' },
+            ],
+            contrastPageProgress: { completed: 800, total: 2040 },
+          },
+        })}
+        progress={92}
+      />
+    );
+
+    expect(container.textContent).toContain('800 of 2,040');
+  });
+
+  it('does not crash and renders no counter when the progress field has a malformed shape (CodeRabbit finding, PR #351)', () => {
+    const { container } = render(
+      <PdfJobProgressPanel
+        jobData={job({
+          input: {
+            totalPages: 2040,
+            validatorProgress: [
+              { label: 'Structure & Tags', issuesFound: 2049, startedAt: '2026-10-19T19:03:07.553Z', completedAt: '2026-10-19T19:05:33.280Z' },
+            ],
+            // jobData.input is loosely typed (Record<string, unknown>) --
+            // a malformed/partial write must not throw when this component
+            // calls completed.toLocaleString().
+            altTextImageProgress: { completed: null, total: 5934 },
+          },
+        })}
+        progress={89}
+      />
+    );
+
+    expect(container.textContent).not.toContain('of 5,934');
+  });
+
+  it('does not show a live counter for a validator that is not currently running, even if its progress field is still present from earlier', () => {
+    const { container } = render(
+      <PdfJobProgressPanel
+        jobData={job({
+          input: {
+            totalPages: 2040,
+            // Alt Text already completed (its own validatorProgress entry
+            // exists) -- its last-known altTextImageProgress object is still
+            // sitting in Job.input (nothing ever clears it), but it must not
+            // render a stale "5934 of 5934" next to a step that's already done.
+            validatorProgress: [
+              { label: 'Structure & Tags', issuesFound: 2049, startedAt: '2026-10-19T19:03:07.553Z', completedAt: '2026-10-19T19:05:33.280Z' },
+              { label: 'Alt Text', issuesFound: 104, startedAt: '2026-10-19T19:05:33.280Z', completedAt: '2026-10-19T20:10:00.000Z' },
+            ],
+            altTextImageProgress: { completed: 5934, total: 5934 },
+          },
+        })}
+        progress={92}
+      />
+    );
+
+    expect(container.textContent).not.toContain('5,934 of 5,934');
+  });
+
+  it('renders no live counter (and does not crash) when neither progress field is present -- the common case for most of a run', () => {
+    const { container } = render(
+      <PdfJobProgressPanel
+        jobData={job({ input: { totalPages: 40, validatorProgress: [] } })}
+        progress={95}
+      />
+    );
+
+    expect(container.textContent).not.toContain(' of ');
+  });
+
   it('renders no checklist when totalPages is absent, but still renders the Timing table', () => {
     render(<PdfJobProgressPanel jobData={job({ input: {} })} progress={5} />);
 
