@@ -135,6 +135,24 @@ describe('PdfBatchItemProgressDetail', () => {
     await waitFor(() => expect(screen.getByText('Round-by-round')).toBeInTheDocument());
   });
 
+  it('does not show a stop error for an active remediation run when Stop was never clicked (real bug, confirmed live: useMutation.error defaults to null, not undefined)', async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      data: { data: { id: 'job-1', status: 'PROCESSING', type: 'pdf-audit', progress: 95 } },
+    });
+    vi.mocked(pdfAutoModeService.getAutoModeStatus).mockResolvedValue({
+      ...NEVER_RUN_STATUS,
+      mode: 'auto',
+      autoStatus: 'running',
+      autoRoundsCompleted: 0,
+    });
+
+    renderWithClient(<PdfBatchItemProgressDetail item={makeItem({ status: 'REMEDIATING' })} />);
+
+    await screen.findByText('Remediation');
+    expect(pdfAutoModeService.stopAutoMode).not.toHaveBeenCalled();
+    expect(screen.queryByText(/an unexpected error occurred/i)).not.toBeInTheDocument();
+  });
+
   it('wires the Stop button through to pdfAutoModeService.stopAutoMode', async () => {
     const user = userEvent.setup();
     vi.mocked(api.get).mockResolvedValue({

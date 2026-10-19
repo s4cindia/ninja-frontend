@@ -110,7 +110,14 @@ export function AutoModeStatusCard({ status, onStop, isStopping, stopError, stop
             {!!applyProgress.failed && ` · ${applyProgress.failed} failed`}
           </p>
         )}
-        {stopError !== undefined && (
+        {/* != null (not !== undefined) -- useMutation's own `error` field
+            defaults to null, not undefined, before any attempt. A caller
+            passing that raw field straight through (PdfBatchItemProgressDetail
+            did, until it was caught live) would otherwise show this
+            unconditionally on every active run. Both PdfAuditResultsPage and
+            PdfBatchItemProgressDetail now also guard with `.isError ?` at
+            their own call sites; this is the second line of defense. */}
+        {stopError != null && (
           <p className="text-xs text-red-600 mt-2">{getErrorMessage(stopError)}</p>
         )}
         {stopSucceeded && (

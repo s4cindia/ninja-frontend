@@ -97,6 +97,12 @@ describe('AutoModeStatusCard', () => {
     expect(screen.getByText('boom')).toBeInTheDocument();
   });
 
+  it('does not show a stop error when stopError is null (real bug: useMutation.error defaults to null, not undefined, before any attempt)', () => {
+    renderCard(undefined, { stopError: null });
+
+    expect(screen.queryByText(/an unexpected error occurred/i)).not.toBeInTheDocument();
+  });
+
   it('shows a success-styled alert when stopped due to convergence', () => {
     renderCard({ autoStatus: 'stopped', autoStopReason: 'converged', autoRoundsCompleted: 4 });
 

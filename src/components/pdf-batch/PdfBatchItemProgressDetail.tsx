@@ -80,7 +80,14 @@ export function PdfBatchItemProgressDetail({ item }: PdfBatchItemProgressDetailP
             status={autoStatus}
             onStop={() => stopMutation.mutate()}
             isStopping={stopMutation.isPending}
-            stopError={stopMutation.error}
+            // Real bug, confirmed live: useMutation's `error` defaults to
+            // null (not undefined) before any attempt -- AutoModeStatusCard
+            // checks `stopError !== undefined`, so passing the raw field
+            // showed "An unexpected error occurred" unconditionally on every
+            // active remediation, with zero Stop clicks ever needed.
+            // PdfAuditResultsPage already guards this correctly; this sibling
+            // component never got the same guard.
+            stopError={stopMutation.isError ? stopMutation.error : undefined}
             stopSucceeded={stopMutation.isSuccess}
             rounds={roundHistoryQuery.data ?? []}
           />
