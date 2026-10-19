@@ -51,6 +51,17 @@ export function PdfJobProgressPanel({
 }: PdfJobProgressPanelProps) {
   const totalPages = jobData?.input?.totalPages as number | undefined;
   const validatorProgress = jobData?.input?.validatorProgress as ValidatorStat[] | undefined;
+  // Live counters for the two validators whose own internal loops are slow
+  // enough to need a mid-run heartbeat (per-image Gemini calls / per-page
+  // canvas rendering) -- written into Job.input throughout the run, well
+  // before that validator's own validatorProgress entry appears at the end.
+  const altTextProgress = jobData?.input?.altTextImageProgress as { completed: number; total: number } | undefined;
+  const contrastProgress = jobData?.input?.contrastPageProgress as { completed: number; total: number } | undefined;
+  const liveCounterFor = (label: string): { completed: number; total: number } | undefined => {
+    if (label === 'Alt Text' && altTextProgress && altTextProgress.total > 0) return altTextProgress;
+    if (label === 'Color Contrast' && contrastProgress && contrastProgress.total > 0) return contrastProgress;
+    return undefined;
+  };
 
   // ─── Step checklist ────────────────────────────────────────────────────────
   let stepChecklist: React.ReactNode = null;
@@ -71,6 +82,7 @@ export function PdfJobProgressPanel({
               const done = doneNames.has(label);
               const stat = validatorProgress?.find(v => v.label === label);
               const isNext = !done && (validatorProgress ?? []).length === VALIDATOR_LABELS.indexOf(label);
+              const liveCounter = isNext ? liveCounterFor(label) : undefined;
               return (
                 <div key={label} className="flex items-center gap-2 text-sm">
                   {done ? (
@@ -85,6 +97,11 @@ export function PdfJobProgressPanel({
                     {done && stat && (
                       <span className={`ml-1 font-normal text-xs ${stat.issuesFound > 0 ? 'text-amber-600' : 'text-green-600'}`}>
                         — {stat.issuesFound} {stat.issuesFound === 1 ? 'issue' : 'issues'}
+                      </span>
+                    )}
+                    {liveCounter && (
+                      <span className="ml-1 font-normal text-xs text-primary-600 font-mono">
+                        — {liveCounter.completed.toLocaleString()} of {liveCounter.total.toLocaleString()}
                       </span>
                     )}
                   </span>
@@ -178,7 +195,14 @@ export function PdfJobProgressPanel({
       }
       const isRunning = extractionDone && vp.length === idx;
       const prevEnd = vp.length > 0 ? new Date(vp[vp.length - 1].completedAt) : (isRunning ? auditStart : null);
-      return { label: lbl, start: isRunning ? prevEnd : null, end: null, status: isRunning ? 'running' as const : 'pending' as const };
+      const liveCounter = isRunning ? liveCounterFor(lbl) : undefined;
+      return {
+        label: lbl,
+        start: isRunning ? prevEnd : null,
+        end: null,
+        status: isRunning ? 'running' as const : 'pending' as const,
+        detail: liveCounter ? `${liveCounter.completed.toLocaleString()} of ${liveCounter.total.toLocaleString()}` : undefined,
+      };
     }),
   ];
 
