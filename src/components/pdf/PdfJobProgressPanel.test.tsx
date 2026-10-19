@@ -108,6 +108,28 @@ describe('PdfJobProgressPanel', () => {
     expect(container.textContent).toContain('800 of 2,040');
   });
 
+  it('does not crash and renders no counter when the progress field has a malformed shape (CodeRabbit finding, PR #351)', () => {
+    const { container } = render(
+      <PdfJobProgressPanel
+        jobData={job({
+          input: {
+            totalPages: 2040,
+            validatorProgress: [
+              { label: 'Structure & Tags', issuesFound: 2049, startedAt: '2026-10-19T19:03:07.553Z', completedAt: '2026-10-19T19:05:33.280Z' },
+            ],
+            // jobData.input is loosely typed (Record<string, unknown>) --
+            // a malformed/partial write must not throw when this component
+            // calls completed.toLocaleString().
+            altTextImageProgress: { completed: null, total: 5934 },
+          },
+        })}
+        progress={89}
+      />
+    );
+
+    expect(container.textContent).not.toContain('of 5,934');
+  });
+
   it('does not show a live counter for a validator that is not currently running, even if its progress field is still present from earlier', () => {
     const { container } = render(
       <PdfJobProgressPanel

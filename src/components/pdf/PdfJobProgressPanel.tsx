@@ -57,9 +57,15 @@ export function PdfJobProgressPanel({
   // before that validator's own validatorProgress entry appears at the end.
   const altTextProgress = jobData?.input?.altTextImageProgress as { completed: number; total: number } | undefined;
   const contrastProgress = jobData?.input?.contrastPageProgress as { completed: number; total: number } | undefined;
+  // jobData.input is Record<string, unknown> underneath the cast above --
+  // validate the shape actually holds numbers before trusting it, rather
+  // than risking completed.toLocaleString() throwing on a malformed/partial
+  // write (CodeRabbit finding, confirmed real).
+  const isValidCounter = (v: { completed: number; total: number } | undefined): v is { completed: number; total: number } =>
+    !!v && typeof v.completed === 'number' && typeof v.total === 'number' && v.total > 0;
   const liveCounterFor = (label: string): { completed: number; total: number } | undefined => {
-    if (label === 'Alt Text' && altTextProgress && altTextProgress.total > 0) return altTextProgress;
-    if (label === 'Color Contrast' && contrastProgress && contrastProgress.total > 0) return contrastProgress;
+    if (label === 'Alt Text' && isValidCounter(altTextProgress)) return altTextProgress;
+    if (label === 'Color Contrast' && isValidCounter(contrastProgress)) return contrastProgress;
     return undefined;
   };
 
