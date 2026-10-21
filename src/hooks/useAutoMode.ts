@@ -7,7 +7,7 @@ import { pdfAutoModeService } from '@/services/pdfAutoMode.service';
 import type { StartAutoModeOverrides } from '@/services/pdfAutoMode.service';
 import { pdfRemediationService } from '@/services/pdf-remediation.service';
 import { msBetween } from '@/utils/pdfPhaseStepper';
-import type { RemediationHistoryRun } from '@/types/pdf-remediation.types';
+import type { RemediationHistoryRun, RemediationHistoryEvent } from '@/types/pdf-remediation.types';
 
 export type { StartAutoModeOverrides };
 
@@ -74,17 +74,27 @@ export interface AutoModeRound {
  * Round-by-round trend for a Comparison Study Auto Mode run, derived from
  * the same GET /pdf/:jobId/remediation/history data RemediationHistoryCard
  * shows generically — filtered here to this job's auto_loop-sourced,
- * successfully-completed rounds only (pairing each round's apply_fixes and
- * reaudit events by cycleNumber). A round with no *completed* auto_loop
+ * successfully-completed rounds only. A round with no *completed* auto_loop
  * reaudit event (no auto_loop reaudit at all, or one that failed) is
  * excluded entirely, not shown as a gap or a phantom dashes-only row.
  *
+ * Pairing is NOT done by cycleNumber. Auto Mode's remediation-cycle lock is
+ * held for a run's ENTIRE duration, not re-acquired per round (confirmed in
+ * auto-remediation-loop.service.ts: cycleNumber is captured once before the
+ * round while(true) loop and reused unchanged for every round within that
+ * run) -- so one cycleNumber's events can contain several
+ * ai_analysis/apply_fixes/reaudit triplets, one per round. Instead, this
+ * flattens every auto_loop event across all runs, sorts chronologically by
+ * startedAt, and walks the list: the most recent apply_fixes seen is paired
+ * with the next COMPLETED reaudit to close out a round. A failed reaudit
+ * closes nothing and produces no row.
+ *
  * The history endpoint is job-wide, not scoped to "this Auto Mode
  * invocation" — if the operator starts a second run after a prior one
- * stopped, it still returns the earlier run's rounds too. Since cycleNumber
- * only increases over time, the current run's own rounds are always the
- * chronologically-last `completedRounds` of them (autoRoundsCompleted from
- * useAutoModeStatus), so trim to just those.
+ * stopped, it still returns the earlier run's rounds too (under their own,
+ * earlier cycleNumber). Since real time only moves forward, the current
+ * run's own rounds are always the chronologically-last `completedRounds` of
+ * them (autoRoundsCompleted from useAutoModeStatus), so trim to just those.
  */
 export function useAutoModeRoundHistory(
   jobId: string | undefined,
@@ -94,29 +104,33 @@ export function useAutoModeRoundHistory(
     queryKey: ROUND_HISTORY_KEY(jobId ?? ''),
     queryFn: async (): Promise<AutoModeRound[]> => {
       const runs = await pdfRemediationService.getRemediationHistory(jobId!);
-      const isCompletedAutoLoopReaudit = (e: { action: string; source: string; status: string }) =>
-        e.action === 'reaudit' && e.source === 'auto_loop' && e.status === 'completed';
 
-      const allRounds = runs
-        .filter(run => run.events.some(isCompletedAutoLoopReaudit))
-        .sort((a, b) => a.cycleNumber - b.cycleNumber)
-        .map((run, idx): AutoModeRound => {
-          const reaudit = run.events.find(isCompletedAutoLoopReaudit)!;
-          const apply = run.events.find(e => e.action === 'apply_fixes' && e.source === 'auto_loop');
-          const startedAt = apply?.startedAt ?? reaudit.startedAt;
-          return {
-            round: idx + 1,
-            applied: apply?.appliedCount ?? null,
-            failed: apply?.failedCount ?? null,
-            resolved: reaudit.resolvedCount ?? null,
-            remaining: reaudit.remainingCount ?? null,
-            regressions: reaudit.regressionCount ?? null,
-            resolutionRate: reaudit.resolutionRate ?? null,
-            completedAt: reaudit.completedAt ?? null,
+      const autoLoopEvents = runs
+        .flatMap(run => run.events.filter(e => e.source === 'auto_loop'))
+        .sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+
+      const allRounds: Omit<AutoModeRound, 'round'>[] = [];
+      let pendingApply: RemediationHistoryEvent | undefined;
+
+      for (const event of autoLoopEvents) {
+        if (event.action === 'apply_fixes') {
+          pendingApply = event;
+        } else if (event.action === 'reaudit' && event.status === 'completed') {
+          const startedAt = pendingApply?.startedAt ?? event.startedAt;
+          allRounds.push({
+            applied: pendingApply?.appliedCount ?? null,
+            failed: pendingApply?.failedCount ?? null,
+            resolved: event.resolvedCount ?? null,
+            remaining: event.remainingCount ?? null,
+            regressions: event.regressionCount ?? null,
+            resolutionRate: event.resolutionRate ?? null,
+            completedAt: event.completedAt ?? null,
             startedAt: startedAt ?? null,
-            durationMs: msBetween(startedAt, reaudit.completedAt),
-          };
-        });
+            durationMs: msBetween(startedAt, event.completedAt),
+          });
+          pendingApply = undefined;
+        }
+      }
 
       // array.slice(-0) returns the WHOLE array in JS, not an empty one —
       // guard the 0 case explicitly rather than relying on slice's own
