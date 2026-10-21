@@ -77,6 +77,28 @@ describe('deriveCurrentRoundPhase', () => {
     expect(result).toEqual({ label: 'Analyzing issues', since: '2026-10-22T10:10:00.000Z' });
   });
 
+  it('regression: real production data (Math_Olszewski_PDF.pdf, job 89re3fmGEiaXxRUXc5Mu9) -- round 2 in progress must not get stuck reporting round 1\'s already-completed reaudit', () => {
+    // Auto Mode's remediation-cycle lock is held for the WHOLE run, not
+    // re-acquired per round -- both rounds genuinely share cycleNumber: 1
+    // in the real backend response. A naive .find() (first match) over
+    // this cycle's events would permanently lock onto round 1's reaudit
+    // the moment it's logged, never advancing to round 2.
+    const history: RemediationHistoryRun[] = [
+      {
+        cycleNumber: 1,
+        events: [
+          { action: 'ai_analysis', source: 'auto_loop', status: 'completed', startedAt: '2026-10-21T19:48:42.469Z', completedAt: '2026-10-21T20:24:26.245Z' },
+          { action: 'apply_fixes', source: 'auto_loop', status: 'completed', startedAt: '2026-10-21T20:24:26.305Z', completedAt: '2026-10-21T20:26:45.605Z', appliedCount: 954, failedCount: 77 },
+          { action: 'reaudit', source: 'auto_loop', status: 'completed', startedAt: '2026-10-21T20:26:45.608Z', completedAt: '2026-10-21T20:35:31.758Z', resolvedCount: 1323, remainingCount: 489, regressionCount: 456, resolutionRate: 73.01 },
+          // Round 2, still in progress -- only its ai_analysis has completed so far.
+          { action: 'ai_analysis', source: 'auto_loop', status: 'completed', startedAt: '2026-10-21T20:35:31.796Z', completedAt: '2026-10-21T20:57:23.324Z' },
+        ],
+      },
+    ];
+    const result = deriveCurrentRoundPhase(status({ autoRoundsCompleted: 1, autoStartedAt: '2026-10-21T19:48:42.463Z' }), history, []);
+    expect(result).toEqual({ label: 'Applying fixes', since: '2026-10-21T20:57:23.324Z' });
+  });
+
   it('only looks at the latest auto_loop cycle, ignoring earlier completed rounds and non-auto_loop events in the same history', () => {
     const history: RemediationHistoryRun[] = [
       {

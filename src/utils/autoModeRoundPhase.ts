@@ -38,6 +38,16 @@ export function deriveCurrentRoundPhase(
     : completedRounds[completedRounds.length - 1]?.completedAt ?? autoModeStatus.autoStartedAt;
   if (!roundStart) return null;
 
+  // Auto Mode's remediation-cycle lock is acquired ONCE for a run's entire
+  // duration, not re-acquired per round (confirmed in
+  // auto-remediation-loop.service.ts: cycleNumber is captured once before
+  // the round while(true) loop and passed unchanged into every runRound
+  // call) -- so a single cycleNumber's events can contain several
+  // ai_analysis/apply_fixes/reaudit triplets, one per round, all under the
+  // SAME cycleNumber. Taking the chronologically LATEST event (not the
+  // first match of each type) is what makes this track whichever round is
+  // actually current, instead of permanently locking onto round 1's phase
+  // the moment its reaudit is logged.
   const autoLoopEvents = flattenEvents(remediationHistory).filter(e => e.source === 'auto_loop');
   const latestCycleNumber = autoLoopEvents.reduce(
     (max, e) => Math.max(max, e.cycleNumber),
@@ -46,28 +56,33 @@ export function deriveCurrentRoundPhase(
   const currentCycleEvents = Number.isFinite(latestCycleNumber)
     ? autoLoopEvents.filter(e => e.cycleNumber === latestCycleNumber)
     : [];
+  const latestEvent = [...currentCycleEvents].sort((a, b) => a.startedAt.localeCompare(b.startedAt)).pop();
 
-  const reaudit = currentCycleEvents.find(e => e.action === 'reaudit');
-  const applyFixes = currentCycleEvents.find(e => e.action === 'apply_fixes');
-  const aiAnalysis = currentCycleEvents.find(e => e.action === 'ai_analysis' && e.status === 'completed');
-
+  if (!latestEvent) {
+    return { label: 'Analyzing issues', since: roundStart };
+  }
   // Each event is only ever logged once its own phase has COMPLETED
-  // (logEvent always stamps a fresh completedAt) -- so an apply_fixes
-  // event's mere presence means apply_fixes already finished and
-  // re-auditing is the phase actually running now, even though no
-  // reaudit event has been logged yet.
-  if (reaudit) {
-    // Reaudit itself already completed too -- the round is essentially
-    // over and about to roll into the next one on the next status poll.
-    // Keep showing the last active phase rather than nothing.
-    return { label: 'Re-auditing', since: applyFixes?.completedAt ?? reaudit.startedAt };
+  // (logEvent always stamps a fresh completedAt) -- so the latest event's
+  // mere presence means that phase already finished and the NEXT phase is
+  // the one actually running now.
+  if (latestEvent.action === 'ai_analysis' && latestEvent.status === 'completed') {
+    return { label: 'Applying fixes', since: latestEvent.completedAt ?? roundStart };
   }
-  if (applyFixes) {
-    return { label: 'Re-auditing', since: applyFixes.completedAt ?? applyFixes.startedAt };
+  if (latestEvent.action === 'apply_fixes') {
+    return { label: 'Re-auditing', since: latestEvent.completedAt ?? latestEvent.startedAt };
   }
-  if (aiAnalysis) {
-    // Between analysis completing and the apply_fixes event being logged.
-    return { label: 'Applying fixes', since: aiAnalysis.completedAt ?? roundStart };
+  if (latestEvent.action === 'reaudit') {
+    // This round just finished and is about to roll over into the next one
+    // on the next status poll -- anchor to the apply_fixes event that
+    // preceded it rather than showing a phase with no real start to tick
+    // from.
+    const precedingApply = [...currentCycleEvents]
+      .filter(e => e.action === 'apply_fixes' && e.startedAt <= latestEvent.startedAt)
+      .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
+      .pop();
+    return { label: 'Re-auditing', since: precedingApply?.completedAt ?? latestEvent.startedAt };
   }
+  // A failed ai_analysis, or any other unexpected state -- nothing
+  // meaningful to anchor to beyond the round's own start.
   return { label: 'Analyzing issues', since: roundStart };
 }
