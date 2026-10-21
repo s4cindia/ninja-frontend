@@ -13,6 +13,7 @@ import { useId, useState } from 'react';
 import { Table2, LineChart } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Badge } from '@/components/ui/Badge';
+import { formatDuration } from '@/utils/duration';
 import { buildSparklinePath } from './autoModeSparkline';
 import type { AutoModeRound } from '@/hooks/useAutoMode';
 
@@ -57,6 +58,7 @@ function RoundTable({ rounds }: { rounds: AutoModeRound[] }) {
           <th className="font-normal pb-1 text-right">Resolved</th>
           <th className="font-normal pb-1 text-right">Remaining</th>
           <th className="font-normal pb-1 text-right">Regressions</th>
+          <th className="font-normal pb-1 text-right">Duration</th>
         </tr>
       </thead>
       <tbody className="font-mono text-gray-700">
@@ -78,6 +80,7 @@ function RoundTable({ rounds }: { rounds: AutoModeRound[] }) {
                 <span className="text-gray-400">—</span>
               )}
             </td>
+            <td className="py-1 text-right">{r.durationMs != null ? formatDuration(r.durationMs) : '—'}</td>
           </tr>
         ))}
       </tbody>

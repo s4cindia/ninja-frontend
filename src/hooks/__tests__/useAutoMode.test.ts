@@ -60,7 +60,7 @@ describe('useAutoModeRoundHistory', () => {
     vi.clearAllMocks();
   });
 
-  it('pairs each cycle\'s apply_fixes + reaudit auto_loop events into one AutoModeRound', async () => {
+  it('pairs each cycle\'s apply_fixes + reaudit auto_loop events into one AutoModeRound, with startedAt/durationMs from apply_fixes.startedAt through reaudit.completedAt', async () => {
     mockService.getRemediationHistory.mockResolvedValue([
       run(1, [
         event({ action: 'apply_fixes', source: 'auto_loop', appliedCount: 12, failedCount: 1 }),
@@ -82,16 +82,34 @@ describe('useAutoModeRoundHistory', () => {
         regressions: 0,
         resolutionRate: 20,
         completedAt: '2026-09-01T10:05:00.000Z',
+        startedAt: '2026-09-01T10:00:00.000Z',
+        durationMs: 5 * 60 * 1000,
       },
     ]);
+  });
+
+  it('falls back to the reaudit\'s own startedAt for round duration when no apply_fixes event was logged', async () => {
+    mockService.getRemediationHistory.mockResolvedValue([
+      run(1, [
+        event({ action: 'reaudit', source: 'auto_loop', remainingCount: 40, startedAt: '2026-09-01T10:03:00.000Z', completedAt: '2026-09-01T10:05:00.000Z' }),
+      ]),
+    ]);
+
+    const { result } = renderRoundHistory({ enabled: true, isRunning: false, completedRounds: 1 }, 'job-1');
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(result.current.data?.[0]).toEqual(
+      expect.objectContaining({ startedAt: '2026-09-01T10:03:00.000Z', durationMs: 2 * 60 * 1000 }),
+    );
   });
 
   it('numbers rounds by position among auto_loop rounds, not by the raw cycleNumber (which can have gaps from non-auto-mode actions sharing the same counter)', async () => {
     mockService.getRemediationHistory.mockResolvedValue([
       // cycleNumber 1 is a manual apply_single with no reaudit at all — excluded entirely.
       run(1, [event({ action: 'apply_fixes', source: 'apply_single', appliedCount: 3 })]),
-      run(4, [event({ action: 'reaudit', source: 'auto_loop', remainingCount: 50 })]),
-      run(7, [event({ action: 'reaudit', source: 'auto_loop', remainingCount: 30 })]),
+      run(4, [event({ action: 'reaudit', source: 'auto_loop', remainingCount: 50, startedAt: '2026-09-01T10:00:00.000Z', completedAt: '2026-09-01T10:01:00.000Z' })]),
+      run(7, [event({ action: 'reaudit', source: 'auto_loop', remainingCount: 30, startedAt: '2026-09-01T11:00:00.000Z', completedAt: '2026-09-01T11:01:00.000Z' })]),
     ]);
 
     const { result } = renderRoundHistory({ enabled: true, isRunning: false, completedRounds: 2 }, 'job-1');
@@ -104,9 +122,9 @@ describe('useAutoModeRoundHistory', () => {
 
   it('skips a cycle with no auto_loop reaudit event (e.g. a manual re-audit that happened to run between auto-mode rounds)', async () => {
     mockService.getRemediationHistory.mockResolvedValue([
-      run(1, [event({ action: 'reaudit', source: 'auto_loop', remainingCount: 40 })]),
-      run(2, [event({ action: 'reaudit', source: 'reaudit_current_file', remainingCount: 39 })]),
-      run(3, [event({ action: 'reaudit', source: 'auto_loop', remainingCount: 20 })]),
+      run(1, [event({ action: 'reaudit', source: 'auto_loop', remainingCount: 40, startedAt: '2026-09-01T10:00:00.000Z', completedAt: '2026-09-01T10:01:00.000Z' })]),
+      run(2, [event({ action: 'reaudit', source: 'reaudit_current_file', remainingCount: 39, startedAt: '2026-09-01T10:30:00.000Z', completedAt: '2026-09-01T10:31:00.000Z' })]),
+      run(3, [event({ action: 'reaudit', source: 'auto_loop', remainingCount: 20, startedAt: '2026-09-01T11:00:00.000Z', completedAt: '2026-09-01T11:01:00.000Z' })]),
     ]);
 
     const { result } = renderRoundHistory({ enabled: true, isRunning: false, completedRounds: 2 }, 'job-1');
@@ -117,10 +135,10 @@ describe('useAutoModeRoundHistory', () => {
     expect(result.current.data?.map(r => r.remaining)).toEqual([40, 20]);
   });
 
-  it('sorts rounds ascending by cycleNumber regardless of the order the backend returns them in', async () => {
+  it('sorts rounds chronologically by startedAt, not by the raw cycleNumber -- cycleNumber no longer reliably orders auto_loop rounds (see useAutoModeRoundHistory\'s own doc comment)', async () => {
     mockService.getRemediationHistory.mockResolvedValue([
-      run(5, [event({ action: 'reaudit', source: 'auto_loop', remainingCount: 10 })]),
-      run(2, [event({ action: 'reaudit', source: 'auto_loop', remainingCount: 30 })]),
+      run(5, [event({ action: 'reaudit', source: 'auto_loop', remainingCount: 10, startedAt: '2026-09-01T11:00:00.000Z', completedAt: '2026-09-01T11:01:00.000Z' })]),
+      run(2, [event({ action: 'reaudit', source: 'auto_loop', remainingCount: 30, startedAt: '2026-09-01T10:00:00.000Z', completedAt: '2026-09-01T10:01:00.000Z' })]),
     ]);
 
     const { result } = renderRoundHistory({ enabled: true, isRunning: false, completedRounds: 2 }, 'job-1');
@@ -161,13 +179,21 @@ describe('useAutoModeRoundHistory', () => {
 
   it('regression: scopes history to the current Auto Mode run — an earlier run\'s rounds (still returned by the job-wide history endpoint) are trimmed off', async () => {
     mockService.getRemediationHistory.mockResolvedValue([
-      // A prior Auto Mode run: 3 rounds, already finished.
-      run(1, [event({ action: 'reaudit', source: 'auto_loop', remainingCount: 100 })]),
-      run(2, [event({ action: 'reaudit', source: 'auto_loop', remainingCount: 80 })]),
-      run(3, [event({ action: 'reaudit', source: 'auto_loop', remainingCount: 60 })]),
-      // The operator started a second run — 2 rounds so far.
-      run(4, [event({ action: 'reaudit', source: 'auto_loop', remainingCount: 50 })]),
-      run(5, [event({ action: 'reaudit', source: 'auto_loop', remainingCount: 45 })]),
+      // A prior Auto Mode run: 3 rounds, already finished. All 3 share ONE
+      // cycleNumber -- the remediation-cycle lock is held for a run's
+      // whole duration, not re-acquired per round (see useAutoModeRoundHistory's
+      // own doc comment), so a real prior run looks like this, not 3 separate cycles.
+      run(1, [
+        event({ action: 'reaudit', source: 'auto_loop', remainingCount: 100, startedAt: '2026-09-01T09:00:00.000Z', completedAt: '2026-09-01T09:01:00.000Z' }),
+        event({ action: 'reaudit', source: 'auto_loop', remainingCount: 80, startedAt: '2026-09-01T09:10:00.000Z', completedAt: '2026-09-01T09:11:00.000Z' }),
+        event({ action: 'reaudit', source: 'auto_loop', remainingCount: 60, startedAt: '2026-09-01T09:20:00.000Z', completedAt: '2026-09-01T09:21:00.000Z' }),
+      ]),
+      // The operator started a second run (a fresh lock acquisition -- a
+      // new cycleNumber) — 2 rounds so far.
+      run(2, [
+        event({ action: 'reaudit', source: 'auto_loop', remainingCount: 50, startedAt: '2026-09-01T10:00:00.000Z', completedAt: '2026-09-01T10:01:00.000Z' }),
+        event({ action: 'reaudit', source: 'auto_loop', remainingCount: 45, startedAt: '2026-09-01T10:10:00.000Z', completedAt: '2026-09-01T10:11:00.000Z' }),
+      ]),
     ]);
 
     // autoRoundsCompleted for the CURRENT run is 2, not 5.
@@ -178,6 +204,32 @@ describe('useAutoModeRoundHistory', () => {
     expect(result.current.data).toHaveLength(2);
     expect(result.current.data?.map(r => r.round)).toEqual([1, 2]);
     expect(result.current.data?.map(r => r.remaining)).toEqual([50, 45]);
+  });
+
+  it('regression: real production data (Math_Olszewski_PDF.pdf, job 89re3fmGEiaXxRUXc5Mu9) -- 2 completed rounds sharing ONE cycleNumber must produce 2 rows, not 1', async () => {
+    mockService.getRemediationHistory.mockResolvedValue([
+      {
+        cycleNumber: 1,
+        events: [
+          event({ action: 'ai_analysis', source: 'auto_loop', startedAt: '2026-10-21T19:48:42.469Z', completedAt: '2026-10-21T20:24:26.245Z' }),
+          event({ action: 'apply_fixes', source: 'auto_loop', startedAt: '2026-10-21T20:24:26.305Z', completedAt: '2026-10-21T20:26:45.605Z', appliedCount: 954, failedCount: 77 }),
+          event({ action: 'reaudit', source: 'auto_loop', startedAt: '2026-10-21T20:26:45.608Z', completedAt: '2026-10-21T20:35:31.758Z', resolvedCount: 1323, remainingCount: 489, regressionCount: 456, resolutionRate: 73.01 }),
+          event({ action: 'ai_analysis', source: 'auto_loop', startedAt: '2026-10-21T20:35:31.796Z', completedAt: '2026-10-21T20:57:23.324Z' }),
+          event({ action: 'apply_fixes', source: 'auto_loop', startedAt: '2026-10-21T20:57:23.356Z', completedAt: '2026-10-21T20:57:39.980Z', appliedCount: 466, failedCount: 83 }),
+          event({ action: 'reaudit', source: 'auto_loop', startedAt: '2026-10-21T20:57:39.986Z', completedAt: '2026-10-21T21:06:33.818Z', resolvedCount: 107, remainingCount: 838, regressionCount: 28, resolutionRate: 11.32 }),
+        ],
+      },
+    ]);
+
+    const { result } = renderRoundHistory({ enabled: true, isRunning: false, completedRounds: 2 }, 'job-1');
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(result.current.data).toHaveLength(2);
+    expect(result.current.data).toEqual([
+      expect.objectContaining({ round: 1, applied: 954, failed: 77, resolved: 1323, remaining: 489, regressions: 456 }),
+      expect.objectContaining({ round: 2, applied: 466, failed: 83, resolved: 107, remaining: 838, regressions: 28 }),
+    ]);
   });
 
   it('regression: a completedRounds of 0 returns no rounds, not the entire history (array.slice(-0) is a JS footgun that returns everything)', async () => {

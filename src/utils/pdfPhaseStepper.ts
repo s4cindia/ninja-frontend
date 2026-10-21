@@ -53,7 +53,8 @@ export interface DerivePhasesInput {
   pacReportGenerated: boolean;
 }
 
-function msBetween(start: string | null | undefined, end: string | null | undefined): number | undefined {
+/** Exported for reuse by autoModeRoundPhase.ts's own sub-phase derivation. */
+export function msBetween(start: string | null | undefined, end: string | null | undefined): number | undefined {
   if (!start || !end) return undefined;
   const startMs = new Date(start).getTime();
   const endMs = new Date(end).getTime();
@@ -66,7 +67,8 @@ function isAfter(a: string | null | undefined, b: string | null | undefined): bo
   return new Date(a).getTime() > new Date(b).getTime();
 }
 
-function flattenEvents(runs: RemediationHistoryRun[]) {
+/** Exported for reuse by autoModeRoundPhase.ts's own sub-phase derivation. */
+export function flattenEvents(runs: RemediationHistoryRun[]) {
   return runs.flatMap(run => run.events.map(event => ({ ...event, cycleNumber: run.cycleNumber })));
 }
 
