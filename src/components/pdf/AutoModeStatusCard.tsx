@@ -18,8 +18,11 @@ import { Progress } from '@/components/ui/Progress';
 import { Alert } from '@/components/ui/Alert';
 import { getErrorMessage } from '@/services/api';
 import { AutoModeRoundHistory } from '@/components/pdf/AutoModeRoundHistory';
+import { useLiveTick } from '@/hooks/useLiveTick';
+import { formatDuration } from '@/utils/duration';
 import type { AutoModeRound } from '@/hooks/useAutoMode';
 import type { ApplyProgressState } from '@/hooks/useApplyProgress';
+import type { CurrentRoundPhase } from '@/utils/autoModeRoundPhase';
 import type { AutoColorContrastMode, AutoModeStopReason } from '@/types/comparisonStudy.types';
 import type { AutoModeStatusResponse } from '@/types/pdfAutoMode.types';
 
@@ -33,6 +36,8 @@ interface AutoModeStatusCardProps {
   rounds: AutoModeRound[];
   /** Live progress for the current round's apply step, from useApplyProgress — same "query/connection lives in the page" split as the rest of this card's data. */
   applyProgress?: ApplyProgressState;
+  /** Current round's sub-phase + start anchor, from deriveCurrentRoundPhase — same "derived by the page" split as the rest of this card's data. */
+  currentPhase?: CurrentRoundPhase | null;
 }
 
 const STOP_REASON_CONFIG: Record<NonNullable<AutoModeStopReason>, { variant: 'success' | 'warning' | 'error'; title: string }> = {
@@ -57,7 +62,12 @@ function contrastModeLabel(mode: AutoColorContrastMode): string {
   return mode ? CONTRAST_MODE_LABELS[mode] : 'inherited';
 }
 
-export function AutoModeStatusCard({ status, onStop, isStopping, stopError, stopSucceeded, rounds, applyProgress }: AutoModeStatusCardProps) {
+export function AutoModeStatusCard({ status, onStop, isStopping, stopError, stopSucceeded, rounds, applyProgress, currentPhase }: AutoModeStatusCardProps) {
+  // Ticks every second only while there's a live phase anchor to display —
+  // the 'stopped' branch below never reaches this, so no interval leaks
+  // past the run's own lifetime.
+  const now = useLiveTick(!!currentPhase);
+
   // Nothing to show before the first run ever starts — the header's Start
   // Auto Remediation button is the entry point, not this card.
   if (status.autoStatus === null) return null;
@@ -99,6 +109,11 @@ export function AutoModeStatusCard({ status, onStop, isStopping, stopError, stop
             {isStopping ? 'Stopping…' : 'Stop'}
           </Button>
         </div>
+        {currentPhase && (
+          <p className="text-xs text-gray-600 mb-2">
+            {currentPhase.label} · {formatDuration(Math.max(0, now - new Date(currentPhase.since).getTime()))}
+          </p>
+        )}
         <Progress value={status.autoRoundsCompleted} max={status.autoMaxRounds} size="sm" />
         <p className="text-xs text-gray-500 mt-2">
           ${status.autoCostSpentUsd.toFixed(2)} of ${status.autoCostLimitUsd.toFixed(2)} spent · contrast: {contrastModeLabel(status.autoColorContrastMode)}

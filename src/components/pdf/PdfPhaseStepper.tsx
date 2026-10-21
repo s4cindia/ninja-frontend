@@ -12,10 +12,11 @@
  * everything else is a pure function of props.
  */
 
-import { useEffect, useState, Fragment } from 'react';
+import { Fragment } from 'react';
 import { CheckCircle, Circle, Loader2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { formatDuration } from '@/utils/duration';
+import { useLiveTick } from '@/hooks/useLiveTick';
 import type { Phase, PhaseStatus } from '@/utils/pdfPhaseStepper';
 
 interface PdfPhaseStepperProps {
@@ -40,14 +41,8 @@ const LABEL_COLOR: Record<PhaseStatus, string> = {
 };
 
 export function PdfPhaseStepper({ phases }: PdfPhaseStepperProps) {
-  const [now, setNow] = useState(() => Date.now());
   const hasLiveAnchor = phases.some(p => p.liveSince);
-
-  useEffect(() => {
-    if (!hasLiveAnchor) return;
-    const intervalId = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(intervalId);
-  }, [hasLiveAnchor]);
+  const now = useLiveTick(hasLiveAnchor);
 
   return (
     <div

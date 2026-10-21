@@ -1,9 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { AutoModeStatusCard } from './AutoModeStatusCard';
 import type { AutoModeStatusResponse } from '@/types/pdfAutoMode.types';
 import type { AutoModeRound } from '@/hooks/useAutoMode';
 import type { ApplyProgressState } from '@/hooks/useApplyProgress';
+import type { CurrentRoundPhase } from '@/utils/autoModeRoundPhase';
 
 function status(overrides?: Partial<AutoModeStatusResponse>): AutoModeStatusResponse {
   return {
@@ -21,7 +22,7 @@ function status(overrides?: Partial<AutoModeStatusResponse>): AutoModeStatusResp
 
 function renderCard(
   overrides?: Partial<AutoModeStatusResponse>,
-  props?: { isStopping?: boolean; stopError?: unknown; stopSucceeded?: boolean; rounds?: AutoModeRound[]; applyProgress?: ApplyProgressState }
+  props?: { isStopping?: boolean; stopError?: unknown; stopSucceeded?: boolean; rounds?: AutoModeRound[]; applyProgress?: ApplyProgressState; currentPhase?: CurrentRoundPhase | null }
 ) {
   const onStop = vi.fn();
   const utils = render(
@@ -33,6 +34,7 @@ function renderCard(
       stopSucceeded={props?.stopSucceeded}
       rounds={props?.rounds ?? []}
       applyProgress={props?.applyProgress}
+      currentPhase={props?.currentPhase}
     />
   );
   return { onStop, ...utils };
@@ -195,5 +197,37 @@ describe('AutoModeStatusCard', () => {
     );
 
     expect(screen.queryByText(/Applying fixes:/)).not.toBeInTheDocument();
+  });
+
+  it('shows the current round phase and a live elapsed timer that ticks every second while running', () => {
+    vi.useFakeTimers();
+    try {
+      const since = new Date('2026-10-22T10:00:00.000Z');
+      vi.setSystemTime(since);
+      renderCard(undefined, { currentPhase: { label: 'Applying fixes', since: since.toISOString() } });
+
+      expect(screen.getByText('Applying fixes · 0s')).toBeInTheDocument();
+
+      act(() => { vi.advanceTimersByTime(90 * 1000); });
+
+      expect(screen.getByText('Applying fixes · 1m 30s')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows no current-phase line when currentPhase is not provided', () => {
+    renderCard();
+
+    expect(screen.queryByText(/Analyzing issues|Applying fixes|Re-auditing/)).not.toBeInTheDocument();
+  });
+
+  it('does not show the current-phase line on the terminal (stopped) summary, even if the prop is somehow still set', () => {
+    renderCard(
+      { autoStatus: 'stopped', autoStopReason: 'converged' },
+      { currentPhase: { label: 'Re-auditing', since: '2026-10-22T10:00:00.000Z' } }
+    );
+
+    expect(screen.queryByText(/Re-auditing/)).not.toBeInTheDocument();
   });
 });

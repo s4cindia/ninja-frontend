@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useJobPolling } from '@/hooks/useJobPolling';
-import { useAutoModeStatus, useAutoModeRoundHistory, useStopAutoMode } from '@/hooks/useAutoMode';
+import { useAutoModeStatus, useAutoModeRoundHistory, useStopAutoMode, useRemediationHistory } from '@/hooks/useAutoMode';
 import { PdfJobProgressPanel } from '@/components/pdf/PdfJobProgressPanel';
 import { AutoModeStatusCard } from '@/components/pdf/AutoModeStatusCard';
+import { deriveCurrentRoundPhase } from '@/utils/autoModeRoundPhase';
 import type { PdfBatchItem } from '@/types/pdfBatch.types';
 
 interface PdfBatchItemProgressDetailProps {
@@ -23,10 +24,12 @@ interface PdfBatchItemProgressDetailProps {
  * Remediation phase: the batch orchestrator drives this item's remediation
  * through the exact same PdfAutoRemediationRun row (keyed by this same
  * auditJobId) the single-file Auto Mode flow uses, so useAutoModeStatus/
- * useAutoModeRoundHistory/useStopAutoMode and AutoModeStatusCard all work
- * completely unmodified -- including the Stop button, which cooperatively
- * stops just this one item's remediation via the same autoStopRequested
- * mechanism the loop already checks every round.
+ * useAutoModeRoundHistory/useStopAutoMode/useRemediationHistory and
+ * AutoModeStatusCard all work completely unmodified -- including the Stop
+ * button, which cooperatively stops just this one item's remediation via
+ * the same autoStopRequested mechanism the loop already checks every round,
+ * and the live current-round phase/timer (deriveCurrentRoundPhase), which
+ * this view wires in itself since it's the one caller-specific piece.
  *
  * Only mounted while its row is expanded (see PdfBatchItemList) -- every
  * hook here polls on its own interval while active, so an unmounted/
@@ -54,7 +57,17 @@ export function PdfBatchItemProgressDetail({ item }: PdfBatchItemProgressDetailP
     isRunning: autoStatus?.autoStatus === 'running',
     completedRounds: autoStatus?.autoRoundsCompleted ?? 0,
   });
+  const remediationHistoryQuery = useRemediationHistory(jobId);
   const stopMutation = useStopAutoMode(jobId);
+
+  const currentPhase = useMemo(() => {
+    if (!autoStatus) return null;
+    return deriveCurrentRoundPhase(
+      autoStatus,
+      remediationHistoryQuery.data ?? [],
+      roundHistoryQuery.data ?? [],
+    );
+  }, [autoStatus, remediationHistoryQuery.data, roundHistoryQuery.data]);
 
   if (!jobId) {
     return (
@@ -90,6 +103,7 @@ export function PdfBatchItemProgressDetail({ item }: PdfBatchItemProgressDetailP
             stopError={stopMutation.isError ? stopMutation.error : undefined}
             stopSucceeded={stopMutation.isSuccess}
             rounds={roundHistoryQuery.data ?? []}
+            currentPhase={currentPhase}
           />
         </div>
       )}

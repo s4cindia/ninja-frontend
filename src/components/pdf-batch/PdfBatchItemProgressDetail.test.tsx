@@ -135,6 +135,44 @@ describe('PdfBatchItemProgressDetail', () => {
     await waitFor(() => expect(screen.getByText('Round-by-round')).toBeInTheDocument());
   });
 
+  it('shows the live current-round phase line, derived from the raw remediation history', async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      data: { data: { id: 'job-1', status: 'PROCESSING', type: 'pdf-audit', progress: 95 } },
+    });
+    vi.mocked(pdfAutoModeService.getAutoModeStatus).mockResolvedValue({
+      ...NEVER_RUN_STATUS,
+      mode: 'auto',
+      autoStatus: 'running',
+      autoRoundsCompleted: 1,
+      autoStartedAt: '2026-10-18T00:00:00.000Z',
+    });
+    vi.mocked(pdfRemediationService.getRemediationHistory).mockResolvedValue([
+      {
+        cycleNumber: 1,
+        events: [
+          {
+            action: 'reaudit', source: 'auto_loop', status: 'completed',
+            resolvedCount: 5, remainingCount: 3, regressionCount: 0, resolutionRate: 62.5,
+            startedAt: '2026-10-18T00:01:00.000Z', completedAt: '2026-10-18T00:02:00.000Z',
+          },
+        ],
+      },
+      {
+        cycleNumber: 2,
+        events: [
+          {
+            action: 'ai_analysis', source: 'auto_loop', status: 'completed',
+            startedAt: '2026-10-18T00:02:00.000Z', completedAt: '2026-10-18T00:03:00.000Z',
+          },
+        ],
+      },
+    ]);
+
+    renderWithClient(<PdfBatchItemProgressDetail item={makeItem({ status: 'REMEDIATING' })} />);
+
+    expect(await screen.findByText(/Applying fixes/)).toBeInTheDocument();
+  });
+
   it('does not show a stop error for an active remediation run when Stop was never clicked (real bug, confirmed live: useMutation.error defaults to null, not undefined)', async () => {
     vi.mocked(api.get).mockResolvedValue({
       data: { data: { id: 'job-1', status: 'PROCESSING', type: 'pdf-audit', progress: 95 } },

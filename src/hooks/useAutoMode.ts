@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { pdfAutoModeService } from '@/services/pdfAutoMode.service';
 import type { StartAutoModeOverrides } from '@/services/pdfAutoMode.service';
 import { pdfRemediationService } from '@/services/pdf-remediation.service';
+import { msBetween } from '@/utils/pdfPhaseStepper';
 import type { RemediationHistoryRun } from '@/types/pdf-remediation.types';
 
 export type { StartAutoModeOverrides };
@@ -63,6 +64,10 @@ export interface AutoModeRound {
   regressions: number | null;
   resolutionRate: number | null;
   completedAt: string | null;
+  /** This round's own start — apply_fixes' startedAt, falling back to the reaudit's own startedAt when no apply_fixes event was logged. Optional so existing fixtures/callers that don't care about timing don't need to supply it. */
+  startedAt?: string | null;
+  /** msBetween(startedAt, completedAt) — undefined when either timestamp is missing. */
+  durationMs?: number;
 }
 
 /**
@@ -98,6 +103,7 @@ export function useAutoModeRoundHistory(
         .map((run, idx): AutoModeRound => {
           const reaudit = run.events.find(isCompletedAutoLoopReaudit)!;
           const apply = run.events.find(e => e.action === 'apply_fixes' && e.source === 'auto_loop');
+          const startedAt = apply?.startedAt ?? reaudit.startedAt;
           return {
             round: idx + 1,
             applied: apply?.appliedCount ?? null,
@@ -107,6 +113,8 @@ export function useAutoModeRoundHistory(
             regressions: reaudit.regressionCount ?? null,
             resolutionRate: reaudit.resolutionRate ?? null,
             completedAt: reaudit.completedAt ?? null,
+            startedAt: startedAt ?? null,
+            durationMs: msBetween(startedAt, reaudit.completedAt),
           };
         });
 

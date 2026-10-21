@@ -89,6 +89,7 @@ import { AutoModeStatusCard } from '@/components/pdf/AutoModeStatusCard';
 import { AutoModeStartControl } from '@/components/pdf/AutoModeStartControl';
 import { PdfPhaseStepper } from '@/components/pdf/PdfPhaseStepper';
 import { derivePhases } from '@/utils/pdfPhaseStepper';
+import { deriveCurrentRoundPhase } from '@/utils/autoModeRoundPhase';
 import type { ComparisonTrialMode } from '@/types/comparisonStudy.types';
 import type { PdfAuditResult, PdfAuditIssue } from '@/types/pdf.types';
 import type { IssueSeverity } from '@/types/accessibility.types';
@@ -517,6 +518,15 @@ export const PdfAuditResultsPage: React.FC = () => {
     autoTagInfo?.postRemediationAudit?.runAt, jobFlags?.lastReauditAt, pendingGuidanceCount, guidanceAcknowledgment,
     jobFlags?.acrGenerated, jobFlags?.pacReportGenerated,
   ]);
+
+  const currentRoundPhase = useMemo(() => {
+    if (!autoModeStatusQuery.data) return null;
+    return deriveCurrentRoundPhase(
+      autoModeStatusQuery.data,
+      remediationHistoryQuery.data ?? [],
+      autoModeRoundHistoryQuery.data ?? [],
+    );
+  }, [autoModeStatusQuery.data, remediationHistoryQuery.data, autoModeRoundHistoryQuery.data]);
 
   // Fetch audit result
   const fetchAuditResult = useCallback(async () => {
@@ -1623,6 +1633,7 @@ export const PdfAuditResultsPage: React.FC = () => {
           stopSucceeded={stopAutoMode.isSuccess}
           rounds={autoModeRoundHistoryQuery.data ?? []}
           applyProgress={applyProgress}
+          currentPhase={currentRoundPhase}
         />
       )}
 

@@ -162,6 +162,20 @@ describe('AutoModeRoundHistory', () => {
     expect(screen.getByRole('button', { name: 'Chart view' })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('shows a formatted Duration column when startedAt/durationMs are present, and a dash when absent', () => {
+    render(
+      <AutoModeRoundHistory
+        rounds={[
+          round({ round: 1, startedAt: '2026-10-22T10:00:00.000Z', completedAt: '2026-10-22T10:05:30.000Z', durationMs: 5 * 60 * 1000 + 30 * 1000 }),
+          round({ round: 2 }),
+        ]}
+      />
+    );
+
+    expect(screen.getByRole('columnheader', { name: 'Duration' })).toBeInTheDocument();
+    expect(screen.getByText('5m 30s')).toBeInTheDocument();
+  });
+
   it('regression: an invalid/corrupted stored value falls back to table view instead of crashing', () => {
     localStorage.setItem(STORAGE_KEY, 'not-a-real-view');
 

@@ -60,7 +60,7 @@ describe('useAutoModeRoundHistory', () => {
     vi.clearAllMocks();
   });
 
-  it('pairs each cycle\'s apply_fixes + reaudit auto_loop events into one AutoModeRound', async () => {
+  it('pairs each cycle\'s apply_fixes + reaudit auto_loop events into one AutoModeRound, with startedAt/durationMs from apply_fixes.startedAt through reaudit.completedAt', async () => {
     mockService.getRemediationHistory.mockResolvedValue([
       run(1, [
         event({ action: 'apply_fixes', source: 'auto_loop', appliedCount: 12, failedCount: 1 }),
@@ -82,8 +82,26 @@ describe('useAutoModeRoundHistory', () => {
         regressions: 0,
         resolutionRate: 20,
         completedAt: '2026-09-01T10:05:00.000Z',
+        startedAt: '2026-09-01T10:00:00.000Z',
+        durationMs: 5 * 60 * 1000,
       },
     ]);
+  });
+
+  it('falls back to the reaudit\'s own startedAt for round duration when no apply_fixes event was logged', async () => {
+    mockService.getRemediationHistory.mockResolvedValue([
+      run(1, [
+        event({ action: 'reaudit', source: 'auto_loop', remainingCount: 40, startedAt: '2026-09-01T10:03:00.000Z', completedAt: '2026-09-01T10:05:00.000Z' }),
+      ]),
+    ]);
+
+    const { result } = renderRoundHistory({ enabled: true, isRunning: false, completedRounds: 1 }, 'job-1');
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(result.current.data?.[0]).toEqual(
+      expect.objectContaining({ startedAt: '2026-09-01T10:03:00.000Z', durationMs: 2 * 60 * 1000 }),
+    );
   });
 
   it('numbers rounds by position among auto_loop rounds, not by the raw cycleNumber (which can have gaps from non-auto-mode actions sharing the same counter)', async () => {
