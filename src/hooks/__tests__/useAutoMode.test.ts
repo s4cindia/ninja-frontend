@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
-import { useAutoModeRoundHistory, useStartAutoMode } from '../useAutoMode';
+import { useAutoModeRoundHistory, useStartAutoMode, useBudgetEstimate } from '../useAutoMode';
 import { pdfRemediationService } from '@/services/pdf-remediation.service';
 import { pdfAutoModeService } from '@/services/pdfAutoMode.service';
 import type { RemediationHistoryRun, RemediationHistoryEvent } from '@/types/pdf-remediation.types';
@@ -12,7 +12,7 @@ vi.mock('@/services/pdf-remediation.service', () => ({
 }));
 
 vi.mock('@/services/pdfAutoMode.service', () => ({
-  pdfAutoModeService: { startAutoMode: vi.fn(), getAutoModeStatus: vi.fn(), stopAutoMode: vi.fn() },
+  pdfAutoModeService: { startAutoMode: vi.fn(), getAutoModeStatus: vi.fn(), stopAutoMode: vi.fn(), getBudgetEstimate: vi.fn() },
 }));
 
 const mockService = vi.mocked(pdfRemediationService);
@@ -281,5 +281,49 @@ describe('useStartAutoMode', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockAutoModeService.startAutoMode).toHaveBeenCalledWith('job-1', overrides);
+  });
+});
+
+describe('useBudgetEstimate', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('is disabled without a jobId', () => {
+    const { result } = renderHook(() => useBudgetEstimate(undefined), { wrapper: createWrapper() });
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(mockAutoModeService.getBudgetEstimate).not.toHaveBeenCalled();
+  });
+
+  it('fetches the job-specific estimate once enabled', async () => {
+    const estimate = { estimatedCostUsd: 5.0, confidence: 'high' as const, sampleSize: 25, basedOnIssueCount: 1812 };
+    mockAutoModeService.getBudgetEstimate.mockResolvedValue(estimate);
+    const { result } = renderHook(() => useBudgetEstimate('job-1'), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockAutoModeService.getBudgetEstimate).toHaveBeenCalledWith('job-1');
+    expect(result.current.data).toEqual(estimate);
+  });
+
+  it('regression (CodeRabbit): stays disabled when opts.enabled is false, even with a jobId -- the caller gates this on the audit being complete, since this query has no refetchInterval to pick up a later completion on its own', () => {
+    const { result } = renderHook(() => useBudgetEstimate('job-1', { enabled: false }), { wrapper: createWrapper() });
+
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(mockAutoModeService.getBudgetEstimate).not.toHaveBeenCalled();
+  });
+
+  it('fetches once opts.enabled flips true (the audit completing after this hook was already mounted)', async () => {
+    const estimate = { estimatedCostUsd: 3.0, confidence: 'medium' as const, sampleSize: 6, basedOnIssueCount: 400 };
+    mockAutoModeService.getBudgetEstimate.mockResolvedValue(estimate);
+    const { result, rerender } = renderHook(
+      ({ enabled }: { enabled: boolean }) => useBudgetEstimate('job-1', { enabled }),
+      { wrapper: createWrapper(), initialProps: { enabled: false } }
+    );
+    expect(mockAutoModeService.getBudgetEstimate).not.toHaveBeenCalled();
+
+    rerender({ enabled: true });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockAutoModeService.getBudgetEstimate).toHaveBeenCalledWith('job-1');
   });
 });

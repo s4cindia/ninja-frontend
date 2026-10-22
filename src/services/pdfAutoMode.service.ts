@@ -10,7 +10,7 @@
  */
 
 import { api } from './api';
-import type { AutoModeStatusResponse } from '@/types/pdfAutoMode.types';
+import type { AutoModeStatusResponse, BudgetEstimate } from '@/types/pdfAutoMode.types';
 
 /**
  * Per-run overrides for a job with no linked Comparison Study trial — a
@@ -44,8 +44,15 @@ export async function stopAutoMode(jobId: string): Promise<void> {
   await api.post(`/pdf/${encodeURIComponent(jobId)}/auto-mode/stop`);
 }
 
+/** Requires this job's own audit to already be complete -- see BudgetEstimate's own doc comment. */
+export async function getBudgetEstimate(jobId: string): Promise<BudgetEstimate> {
+  const response = await api.get(`/pdf/${encodeURIComponent(jobId)}/auto-mode/budget-estimate`);
+  return response.data.data;
+}
+
 export const pdfAutoModeService = {
   startAutoMode,
   getAutoModeStatus,
   stopAutoMode,
+  getBudgetEstimate,
 };

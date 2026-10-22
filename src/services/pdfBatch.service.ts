@@ -10,6 +10,7 @@ import type {
   CancelPdfBatchResponse,
   PdfBatchDetail,
 } from '@/types/pdfBatch.types';
+import type { BudgetEstimate } from '@/types/pdfAutoMode.types';
 
 const BASE_URL = '/pdf-batches';
 
@@ -60,6 +61,12 @@ export const pdfBatchService = {
       params.append('status', status);
     }
     const response = await api.get<ApiResponse<PdfBatchListResponse>>(`${BASE_URL}?${params}`);
+    return response.data.data;
+  },
+
+  /** Tenant-wide, not per-item -- no item in a DRAFT batch has been audited yet. */
+  async getBudgetEstimate(batchId: string): Promise<BudgetEstimate> {
+    const response = await api.get<ApiResponse<BudgetEstimate>>(`${BASE_URL}/${batchId}/budget-estimate`);
     return response.data.data;
   },
 };

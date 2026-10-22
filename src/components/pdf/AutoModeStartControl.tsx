@@ -11,10 +11,11 @@
  * replace.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import type { StartAutoModeOverrides } from '@/services/pdfAutoMode.service';
+import type { BudgetEstimate } from '@/types/pdfAutoMode.types';
 
 const DEFAULT_MAX_ROUNDS = 10;
 const DEFAULT_COST_LIMIT_USD = 2;
@@ -40,15 +41,40 @@ interface AutoModeStartControlProps {
    * trial-linked complexity for batches), passing this to match.
    */
   triggerLabel?: string;
+  /**
+   * Suggested cost limit from useBudgetEstimate/useBatchBudgetEstimate —
+   * seeds the Cost Limit field instead of the flat $2 default when present
+   * and not low-confidence. Falls back to the flat default exactly as
+   * before whenever this is missing, still loading, or low-confidence (no
+   * regression path while historical data is still thin).
+   */
+  budgetEstimate?: BudgetEstimate;
 }
 
-export function AutoModeStartControl({ onStart, isPending, disabled, disabledTitle, showConfig, triggerLabel = 'Start Auto Remediation' }: AutoModeStartControlProps) {
+export function AutoModeStartControl({ onStart, isPending, disabled, disabledTitle, showConfig, triggerLabel = 'Start Auto Remediation', budgetEstimate }: AutoModeStartControlProps) {
   const [open, setOpen] = useState(false);
   const [maxRoundsInput, setMaxRoundsInput] = useState(String(DEFAULT_MAX_ROUNDS));
   const [costLimitInput, setCostLimitInput] = useState(String(DEFAULT_COST_LIMIT_USD));
   const [colorContrastMode, setColorContrastMode] = useState<NonNullable<StartAutoModeOverrides['autoColorContrastMode']>>(
     DEFAULT_COLOR_CONTRAST_MODE
   );
+
+  const hasConfidentEstimate = !!budgetEstimate && budgetEstimate.confidence !== 'low';
+
+  // Re-seeds the Cost Limit field whenever the estimate changes after this
+  // component already mounted (the query resolving async, or -- since this
+  // component can be reused across job/batch navigations without
+  // unmounting -- the estimate changing under it entirely) -- only while
+  // the popover is closed, so it never clobbers an operator's own
+  // in-progress edit. Falls back to the flat default on any non-confident
+  // result (missing, still loading, or low-confidence), not just on mount,
+  // so a confident estimate that's later replaced by a non-confident one
+  // doesn't leave the field showing a stale value.
+  useEffect(() => {
+    if (open) return;
+    setCostLimitInput(String(hasConfidentEstimate ? budgetEstimate!.estimatedCostUsd : DEFAULT_COST_LIMIT_USD));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasConfidentEstimate, budgetEstimate?.estimatedCostUsd]);
 
   const handleButtonClick = () => {
     if (!showConfig) {
@@ -114,6 +140,13 @@ export function AutoModeStartControl({ onStart, isPending, disabled, disabledTit
                 onChange={(e) => setCostLimitInput(e.target.value)}
                 className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
+              {hasConfidentEstimate && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {budgetEstimate!.basedOnIssueCount != null
+                    ? `Estimated from this document's ${budgetEstimate!.basedOnIssueCount.toLocaleString()} issues`
+                    : 'Estimated from your team’s recent documents'}
+                </p>
+              )}
             </div>
             <div>
               <label htmlFor="auto-start-color-contrast-mode" className="block text-xs font-medium text-gray-600 mb-1">

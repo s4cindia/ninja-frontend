@@ -113,3 +113,17 @@ export function usePdfBatches(page: number = 1, status?: string) {
     queryFn: () => pdfBatchService.listBatches(page, 20, status),
   });
 }
+
+/**
+ * Suggested cost limit to seed AutoModeStartControl's popover on the batch
+ * "Start Processing" step, instead of its hardcoded $2 default. Tenant-wide
+ * (see pdfBatchService.getBudgetEstimate's own doc comment), not polled --
+ * a one-time fetch is enough.
+ */
+export function useBatchBudgetEstimate(batchId: string | undefined) {
+  return useQuery({
+    queryKey: ['pdf-batch-budget-estimate', batchId ?? ''] as const,
+    queryFn: () => pdfBatchService.getBudgetEstimate(batchId!),
+    enabled: !!batchId,
+  });
+}

@@ -83,7 +83,7 @@ import { cn } from '@/utils/cn';
 import { validateJobId } from '@/utils/validation';
 import { useCreateRemediationPlan } from '@/hooks/usePdfRemediation';
 import { useComparisonTrial, useInvalidateComparisonTrial } from '@/hooks/useComparisonStudy';
-import { useAutoModeStatus, useAutoModeRoundHistory, useStartAutoMode, useStopAutoMode, useRemediationHistory } from '@/hooks/useAutoMode';
+import { useAutoModeStatus, useAutoModeRoundHistory, useStartAutoMode, useStopAutoMode, useRemediationHistory, useBudgetEstimate } from '@/hooks/useAutoMode';
 import { useApplyProgress } from '@/hooks/useApplyProgress';
 import { AutoModeStatusCard } from '@/components/pdf/AutoModeStatusCard';
 import { AutoModeStartControl } from '@/components/pdf/AutoModeStartControl';
@@ -238,6 +238,13 @@ export const PdfAuditResultsPage: React.FC = () => {
 
   // State management
   const [auditResult, setAuditResult] = useState<PdfAuditResult | null>(null);
+  // Seeds AutoModeStartControl's Cost Limit field below instead of its flat
+  // $2 default. Gated on auditResult (not just jobId) -- CodeRabbit finding,
+  // confirmed real: this page can mount and poll while the audit is still
+  // running, and this query has no refetchInterval of its own, so firing it
+  // on jobId alone would cache a stale "no audit yet" ($2, low-confidence)
+  // result that never refreshes once the audit actually completes.
+  const budgetEstimateQuery = useBudgetEstimate(jobId, { enabled: !!auditResult });
   const [isLoading, setIsLoading] = useState(true);
   const [isPolling, setIsPolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1580,6 +1587,7 @@ export const PdfAuditResultsPage: React.FC = () => {
                   // trial's own pre-configured settings — only offer the
                   // config form for a job with no trial at all.
                   showConfig={!comparisonTrialId}
+                  budgetEstimate={budgetEstimateQuery.data}
                 />
               </>
             )}
