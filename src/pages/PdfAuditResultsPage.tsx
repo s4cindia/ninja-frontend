@@ -235,13 +235,16 @@ export const PdfAuditResultsPage: React.FC = () => {
   // enabled, not gated on Auto Mode.
   const remediationHistoryQuery = useRemediationHistory(jobId);
   const refetchRemediationHistory = remediationHistoryQuery.refetch;
-  // Seeds AutoModeStartControl's Cost Limit field below instead of its flat
-  // $2 default -- requires the audit (already on screen by this point) to
-  // be complete, which it always is here.
-  const budgetEstimateQuery = useBudgetEstimate(jobId);
 
   // State management
   const [auditResult, setAuditResult] = useState<PdfAuditResult | null>(null);
+  // Seeds AutoModeStartControl's Cost Limit field below instead of its flat
+  // $2 default. Gated on auditResult (not just jobId) -- CodeRabbit finding,
+  // confirmed real: this page can mount and poll while the audit is still
+  // running, and this query has no refetchInterval of its own, so firing it
+  // on jobId alone would cache a stale "no audit yet" ($2, low-confidence)
+  // result that never refreshes once the audit actually completes.
+  const budgetEstimateQuery = useBudgetEstimate(jobId, { enabled: !!auditResult });
   const [isLoading, setIsLoading] = useState(true);
   const [isPolling, setIsPolling] = useState(false);
   const [error, setError] = useState<string | null>(null);

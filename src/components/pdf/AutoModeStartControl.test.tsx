@@ -200,5 +200,27 @@ describe('AutoModeStartControl', () => {
 
       expect(screen.getByLabelText('Cost limit (USD)')).toHaveValue(1.23);
     });
+
+    it('regression (CodeRabbit): resets to the flat $2 default when a confident estimate is later replaced by a non-confident one, rather than leaving a stale value (this component can be reused across job/batch navigations without unmounting)', () => {
+      // Popover stays closed throughout -- this is the realistic version of
+      // the scenario (e.g. a route change reusing the same component
+      // instance): the operator isn't mid-edit when the estimate changes
+      // underneath it, so the "don't clobber an open popover" guard doesn't
+      // apply here.
+      const { rerender } = renderControl({ budgetEstimate: estimate({ estimatedCostUsd: 7.5, confidence: 'high' }) });
+
+      rerender(
+        <AutoModeStartControl
+          onStart={vi.fn()}
+          isPending={false}
+          disabled={false}
+          showConfig={true}
+          budgetEstimate={estimate({ confidence: 'low', estimatedCostUsd: 2 })}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Start Auto Remediation' }));
+      expect(screen.getByLabelText('Cost limit (USD)')).toHaveValue(2);
+    });
   });
 });

@@ -61,14 +61,18 @@ export function AutoModeStartControl({ onStart, isPending, disabled, disabledTit
 
   const hasConfidentEstimate = !!budgetEstimate && budgetEstimate.confidence !== 'low';
 
-  // Re-seeds the Cost Limit field once a confident estimate arrives after
-  // this component already mounted (the query resolving async) -- only
-  // while the popover is closed, so it never clobbers an operator's own
-  // in-progress edit.
+  // Re-seeds the Cost Limit field whenever the estimate changes after this
+  // component already mounted (the query resolving async, or -- since this
+  // component can be reused across job/batch navigations without
+  // unmounting -- the estimate changing under it entirely) -- only while
+  // the popover is closed, so it never clobbers an operator's own
+  // in-progress edit. Falls back to the flat default on any non-confident
+  // result (missing, still loading, or low-confidence), not just on mount,
+  // so a confident estimate that's later replaced by a non-confident one
+  // doesn't leave the field showing a stale value.
   useEffect(() => {
-    if (hasConfidentEstimate && !open) {
-      setCostLimitInput(String(budgetEstimate!.estimatedCostUsd));
-    }
+    if (open) return;
+    setCostLimitInput(String(hasConfidentEstimate ? budgetEstimate!.estimatedCostUsd : DEFAULT_COST_LIMIT_USD));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasConfidentEstimate, budgetEstimate?.estimatedCostUsd]);
 

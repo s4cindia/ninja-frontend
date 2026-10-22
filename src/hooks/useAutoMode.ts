@@ -19,16 +19,17 @@ const BUDGET_ESTIMATE_KEY = (jobId: string) => ['pdf-auto-mode-budget-estimate',
 /**
  * Suggested cost limit for this job, to seed AutoModeStartControl's popover
  * instead of its hardcoded $2 default. Requires the job's own audit to
- * already be complete -- enabled alongside the status query since both are
- * only useful once the operator can see "Start Auto Remediation" at all.
- * Not polled -- a one-time fetch is enough, it isn't expected to change
- * within a single page visit.
+ * already be complete -- the caller must pass `enabled: false` until then
+ * (e.g. gated on its own auditResult), since this page can mount and poll
+ * while the audit is still running, and this query has no refetchInterval
+ * of its own to pick up a completion that happens later. Not polled
+ * otherwise -- a one-time fetch is enough once enabled.
  */
-export function useBudgetEstimate(jobId: string | undefined) {
+export function useBudgetEstimate(jobId: string | undefined, opts?: { enabled?: boolean }) {
   return useQuery({
     queryKey: BUDGET_ESTIMATE_KEY(jobId ?? ''),
     queryFn: () => pdfAutoModeService.getBudgetEstimate(jobId!),
-    enabled: !!jobId,
+    enabled: !!jobId && (opts?.enabled ?? true),
   });
 }
 

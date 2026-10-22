@@ -304,4 +304,26 @@ describe('useBudgetEstimate', () => {
     expect(mockAutoModeService.getBudgetEstimate).toHaveBeenCalledWith('job-1');
     expect(result.current.data).toEqual(estimate);
   });
+
+  it('regression (CodeRabbit): stays disabled when opts.enabled is false, even with a jobId -- the caller gates this on the audit being complete, since this query has no refetchInterval to pick up a later completion on its own', () => {
+    const { result } = renderHook(() => useBudgetEstimate('job-1', { enabled: false }), { wrapper: createWrapper() });
+
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(mockAutoModeService.getBudgetEstimate).not.toHaveBeenCalled();
+  });
+
+  it('fetches once opts.enabled flips true (the audit completing after this hook was already mounted)', async () => {
+    const estimate = { estimatedCostUsd: 3.0, confidence: 'medium' as const, sampleSize: 6, basedOnIssueCount: 400 };
+    mockAutoModeService.getBudgetEstimate.mockResolvedValue(estimate);
+    const { result, rerender } = renderHook(
+      ({ enabled }: { enabled: boolean }) => useBudgetEstimate('job-1', { enabled }),
+      { wrapper: createWrapper(), initialProps: { enabled: false } }
+    );
+    expect(mockAutoModeService.getBudgetEstimate).not.toHaveBeenCalled();
+
+    rerender({ enabled: true });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockAutoModeService.getBudgetEstimate).toHaveBeenCalledWith('job-1');
+  });
 });
