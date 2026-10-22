@@ -93,10 +93,14 @@ describe('PdfBatchItemProgressDetail', () => {
     renderWithClient(<PdfBatchItemProgressDetail item={makeItem()} />);
 
     await waitFor(() => expect(api.get).toHaveBeenCalledWith('/jobs/job-1'));
-    expect(await screen.findByText('Audit')).toBeInTheDocument();
+    // getByRole('heading', ...), not getByText -- PdfPhaseStepper (rendered
+    // above these sections) also shows "Audit"/"Remediation" as its own
+    // phase labels, which would otherwise collide with these section
+    // headings on an exact-text query.
+    expect(await screen.findByRole('heading', { name: 'Audit' })).toBeInTheDocument();
     expect(screen.getByText(/page \d+ of 10/i)).toBeInTheDocument();
     // No remediation run has ever started for this job -- that section is omitted.
-    expect(screen.queryByText('Remediation')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Remediation' })).not.toBeInTheDocument();
   });
 
   it('renders the Auto Mode status card and round history once a remediation run exists', async () => {
@@ -130,9 +134,47 @@ describe('PdfBatchItemProgressDetail', () => {
 
     renderWithClient(<PdfBatchItemProgressDetail item={makeItem({ status: 'REMEDIATING' })} />);
 
-    expect(await screen.findByText('Remediation')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Remediation' })).toBeInTheDocument();
     expect(screen.getByText(/auto remediation running — round 2 in progress/i)).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText('Round-by-round')).toBeInTheDocument());
+  });
+
+  it('renders a 3-phase stepper (Audit, AI Analysis, Remediation) -- Verification/Compliance are structurally unreachable from this view and left out, not shown dim', async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        data: {
+          id: 'job-1', status: 'PROCESSING', type: 'pdf-audit', progress: 95,
+          createdAt: '2026-10-18T00:00:00.000Z',
+        },
+      },
+    });
+    vi.mocked(pdfAutoModeService.getAutoModeStatus).mockResolvedValue({
+      ...NEVER_RUN_STATUS,
+      mode: 'auto',
+      autoStatus: 'running',
+      autoRoundsCompleted: 0,
+    });
+    vi.mocked(pdfRemediationService.getRemediationHistory).mockResolvedValue([
+      {
+        cycleNumber: 1,
+        events: [
+          { action: 'ai_analysis', source: 'auto_loop', status: 'completed', startedAt: '2026-10-18T00:01:00.000Z', completedAt: '2026-10-18T00:02:00.000Z' },
+        ],
+      },
+    ]);
+
+    renderWithClient(<PdfBatchItemProgressDetail item={makeItem({ status: 'REMEDIATING' })} />);
+
+    const stepper = await screen.findByTestId('pdf-phase-stepper');
+    expect(stepper).toBeInTheDocument();
+    expect(screen.getByTestId('pdf-phase-audit')).toBeInTheDocument();
+    expect(screen.getByTestId('pdf-phase-ai-analysis')).toBeInTheDocument();
+    expect(screen.getByTestId('pdf-phase-remediation')).toBeInTheDocument();
+    expect(screen.queryByTestId('pdf-phase-verification')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('pdf-phase-compliance')).not.toBeInTheDocument();
+    // AI Analysis shows done+duration from remediationHistory alone (no
+    // aiAnalysisStatus/aiAnalyzedAt source exists for a batch item).
+    expect(screen.getByTestId('pdf-phase-ai-analysis')).toHaveTextContent('1m 0s');
   });
 
   it('shows the live current-round phase line, derived from the raw remediation history', async () => {
@@ -186,7 +228,7 @@ describe('PdfBatchItemProgressDetail', () => {
 
     renderWithClient(<PdfBatchItemProgressDetail item={makeItem({ status: 'REMEDIATING' })} />);
 
-    await screen.findByText('Remediation');
+    await screen.findByRole('heading', { name: 'Remediation' });
     expect(pdfAutoModeService.stopAutoMode).not.toHaveBeenCalled();
     expect(screen.queryByText(/an unexpected error occurred/i)).not.toBeInTheDocument();
   });

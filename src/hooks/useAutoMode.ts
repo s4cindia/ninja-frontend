@@ -39,14 +39,23 @@ export function useBudgetEstimate(jobId: string | undefined, opts?: { enabled?: 
  * transforms+filters the same endpoint down to auto-mode rounds only. Used
  * by PdfPhaseStepper to find the most recent completed ai_analysis/
  * apply_fixes/reaudit events for phase durations. Always enabled (not
- * gated on Auto Mode) and not polled — a manual refetch() after a
- * known state change is cheap enough and avoids yet another 5s interval.
+ * gated on Auto Mode).
+ *
+ * Polls every 5s while isRunning -- same cadence as useAutoModeRoundHistory.
+ * Real bug, confirmed live: without this, the page's own manual refetch()
+ * (triggered only once a WHOLE round completes, via autoModeProgressKey)
+ * left this stale for a round's entire apply/reaudit tail -- the backend's
+ * own ai_analysis event for that round had already completed, but nothing
+ * refetched it, so PdfPhaseStepper showed no AI Analysis duration for the
+ * whole rest of the round. Not polled when not running -- a manual
+ * refetch() after a known state change is enough then.
  */
-export function useRemediationHistory(jobId: string | undefined) {
+export function useRemediationHistory(jobId: string | undefined, opts?: { isRunning?: boolean }) {
   return useQuery({
     queryKey: RAW_HISTORY_KEY(jobId ?? ''),
     queryFn: (): Promise<RemediationHistoryRun[]> => pdfRemediationService.getRemediationHistory(jobId!),
     enabled: !!jobId,
+    refetchInterval: opts?.isRunning ? 5000 : false,
   });
 }
 

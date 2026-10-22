@@ -232,8 +232,13 @@ export const PdfAuditResultsPage: React.FC = () => {
   const refetchAutoModeRoundHistory = autoModeRoundHistoryQuery.refetch;
   // Raw, unfiltered history (unlike the auto_loop-only query above) — feeds
   // PdfPhaseStepper's AI Analysis/Remediation phase durations. Always
-  // enabled, not gated on Auto Mode.
-  const remediationHistoryQuery = useRemediationHistory(jobId);
+  // enabled, not gated on Auto Mode. Polled while running -- see
+  // useRemediationHistory's own doc comment for the staleness bug this
+  // fixes (AI Analysis duration missing for a round's whole apply/reaudit
+  // tail).
+  const remediationHistoryQuery = useRemediationHistory(jobId, {
+    isRunning: autoModeStatusQuery.data?.autoStatus === 'running',
+  });
   const refetchRemediationHistory = remediationHistoryQuery.refetch;
 
   // State management
@@ -1616,7 +1621,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         </div>
       </div>
 
-      <PdfPhaseStepper phases={phases} />
+      <PdfPhaseStepper phases={phases} pipelineStartedAt={auditResult?.createdAt} />
 
       <PdfStatsCards
         autoTagInfo={autoTagInfo}

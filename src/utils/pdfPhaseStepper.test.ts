@@ -86,6 +86,21 @@ describe('derivePhases', () => {
       expect(byId(phases, 'ai-analysis').status).toBe('done');
     });
 
+    it('is done (with a duration) from a completed remediationHistory ai_analysis event ALONE, with no aiAnalysisStatus/aiAnalyzedAt at all -- the PDF Batch item view has no source for either field', () => {
+      const history: RemediationHistoryRun[] = [
+        {
+          cycleNumber: 1,
+          events: [
+            { action: 'ai_analysis', source: 'auto_loop', status: 'completed', startedAt: '2026-10-01T10:02:00.000Z', completedAt: '2026-10-01T10:05:00.000Z' },
+          ],
+        },
+      ];
+      const phases = derivePhases(baseInput({ aiAnalysisStatus: null, aiAnalyzedAt: null, remediationHistory: history }));
+      const aiAnalysis = byId(phases, 'ai-analysis');
+      expect(aiAnalysis.status).toBe('done');
+      expect(aiAnalysis.durationMs).toBe(3 * 60 * 1000);
+    });
+
     it('picks the LATEST of several completed ai_analysis events, not the first', () => {
       const history: RemediationHistoryRun[] = [
         { cycleNumber: 1, events: [{ action: 'ai_analysis', source: 'analyze_job', status: 'completed', startedAt: '2026-10-01T08:00:00.000Z', completedAt: '2026-10-01T08:10:00.000Z' }] },

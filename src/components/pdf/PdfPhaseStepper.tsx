@@ -12,7 +12,7 @@
  * everything else is a pure function of props.
  */
 
-import { Fragment } from 'react';
+import { Fragment, useRef } from 'react';
 import { CheckCircle, Circle, Loader2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { formatDuration } from '@/utils/duration';
@@ -21,6 +21,14 @@ import type { Phase, PhaseStatus } from '@/utils/pdfPhaseStepper';
 
 interface PdfPhaseStepperProps {
   phases: Phase[];
+  /**
+   * Pipeline's own start anchor -- the same timestamp the caller already
+   * passes as auditResult.createdAt/jobData.createdAt into derivePhases.
+   * Drives a live "Total: Xm Ys" indicator after the last phase, ticking
+   * until the last phase in `phases` reports done, then freezing. Omit to
+   * hide the indicator entirely (nothing to anchor from yet).
+   */
+  pipelineStartedAt?: string | null;
 }
 
 function StatusIcon({ status }: { status: PhaseStatus }) {
@@ -40,9 +48,56 @@ const LABEL_COLOR: Record<PhaseStatus, string> = {
   'not-started': 'text-gray-400',
 };
 
-export function PdfPhaseStepper({ phases }: PdfPhaseStepperProps) {
-  const hasLiveAnchor = phases.some(p => p.liveSince);
+export function PdfPhaseStepper({ phases, pipelineStartedAt }: PdfPhaseStepperProps) {
+  const isPipelineComplete = phases.length > 0 && phases[phases.length - 1].status === 'done';
+  const hasLiveAnchor = phases.some(p => p.liveSince) || (!!pipelineStartedAt && !isPipelineComplete);
   const now = useLiveTick(hasLiveAnchor);
+
+  // There's no backend timestamp for "the last phase finished" (e.g.
+  // Compliance's own ACR/PAC generation times aren't tracked) -- this
+  // captures the moment the frontend first OBSERVES the incomplete ->
+  // complete transition and freezes there (accurate to within one poll
+  // interval), the same kind of approximation every other timing signal in
+  // this component already makes.
+  //
+  // CodeRabbit finding, confirmed real: a mount where the pipeline is
+  // ALREADY complete on the very first render (e.g. opening an
+  // already-finished job) must NOT capture Date.now() as the freeze time --
+  // that would silently count however long ago it actually finished as
+  // part of the total. hasSeenIncompleteRef tracks whether THIS component
+  // instance ever actually observed the pipeline running, so a freeze
+  // timestamp is only ever captured from a transition we genuinely saw.
+  // Resets whenever pipelineStartedAt itself changes (this component is
+  // reused across job/batch navigations without unmounting), so a stale
+  // freeze -- or a stale "never saw it running" -- from a previous job
+  // can't leak into a new one.
+  const completedAtRef = useRef<number | null>(null);
+  const hasSeenIncompleteRef = useRef(!isPipelineComplete);
+  const prevStartRef = useRef(pipelineStartedAt);
+  if (prevStartRef.current !== pipelineStartedAt) {
+    prevStartRef.current = pipelineStartedAt;
+    completedAtRef.current = null;
+    hasSeenIncompleteRef.current = !isPipelineComplete;
+  } else if (isPipelineComplete) {
+    if (hasSeenIncompleteRef.current && completedAtRef.current === null) {
+      completedAtRef.current = Date.now();
+    }
+  } else {
+    hasSeenIncompleteRef.current = true;
+    completedAtRef.current = null;
+  }
+  // Nothing trustworthy to show when the pipeline was already complete the
+  // first time this instance observed it -- hide the total rather than
+  // guess, matching how the rest of this component omits a timing label it
+  // has no real data for.
+  const hasTrustworthyTotal = !isPipelineComplete || completedAtRef.current !== null;
+
+  const pipelineElapsedMs = pipelineStartedAt && hasTrustworthyTotal
+    ? (completedAtRef.current ?? now) - new Date(pipelineStartedAt).getTime()
+    : undefined;
+  const totalLabel = pipelineElapsedMs != null && pipelineElapsedMs >= 0
+    ? formatDuration(pipelineElapsedMs)
+    : undefined;
 
   return (
     <div
@@ -78,6 +133,14 @@ export function PdfPhaseStepper({ phases }: PdfPhaseStepperProps) {
           </Fragment>
         );
       })}
+      {totalLabel && (
+        <span
+          className="ml-4 pl-4 border-l border-gray-200 text-xs text-gray-500 shrink-0 whitespace-nowrap"
+          data-testid="pdf-phase-stepper-total"
+        >
+          Total: {totalLabel}
+        </span>
+      )}
     </div>
   );
 }

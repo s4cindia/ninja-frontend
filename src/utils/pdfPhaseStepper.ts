@@ -102,8 +102,6 @@ const REMEDIATION_LOCK_SOURCES: RemediationCycleSource[] = [
 ];
 
 export function derivePhases(input: DerivePhasesInput): Phase[] {
-  const aiAnalysisEverCompleted = input.aiAnalysisStatus === 'complete' || !!input.aiAnalyzedAt;
-
   // --- Audit ---
   const audit: Phase = input.auditResult
     ? {
@@ -116,6 +114,11 @@ export function derivePhases(input: DerivePhasesInput): Phase[] {
 
   // --- AI Analysis ---
   const latestAnalysis = latestCompletedAiAnalysis(input.remediationHistory);
+  // Also recognizes a completed ai_analysis event in remediationHistory
+  // directly, not only aiAnalysisStatus/aiAnalyzedAt -- a caller with no
+  // source for those (the PDF Batch item view has neither) still gets a
+  // correct done/duration from the same raw history it already has.
+  const aiAnalysisEverCompleted = input.aiAnalysisStatus === 'complete' || !!input.aiAnalyzedAt || !!latestAnalysis;
   const aiAnalysis: Phase = {
     id: 'ai-analysis',
     label: 'AI Analysis',
