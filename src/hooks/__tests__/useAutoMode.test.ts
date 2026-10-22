@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
-import { useAutoModeRoundHistory, useStartAutoMode, useBudgetEstimate } from '../useAutoMode';
+import { useAutoModeRoundHistory, useStartAutoMode, useBudgetEstimate, useRemediationHistory } from '../useAutoMode';
 import { pdfRemediationService } from '@/services/pdf-remediation.service';
 import { pdfAutoModeService } from '@/services/pdfAutoMode.service';
 import type { RemediationHistoryRun, RemediationHistoryEvent } from '@/types/pdf-remediation.types';
@@ -325,5 +325,45 @@ describe('useBudgetEstimate', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockAutoModeService.getBudgetEstimate).toHaveBeenCalledWith('job-1');
+  });
+});
+
+describe('useRemediationHistory polling', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockService.getRemediationHistory.mockResolvedValue([]);
+  });
+
+  it('polls every 5s when isRunning is true -- real staleness bug fix: without this, a round\'s own completed ai_analysis event could sit unfetched for the whole rest of that round', async () => {
+    vi.useFakeTimers();
+    try {
+      renderHook(() => useRemediationHistory('job-1', { isRunning: true }), { wrapper: createWrapper() });
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(mockService.getRemediationHistory).toHaveBeenCalledTimes(1);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      expect(mockService.getRemediationHistory).toHaveBeenCalledTimes(2);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      expect(mockService.getRemediationHistory).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not poll when isRunning is false or omitted -- a manual refetch() after a known state change is enough then', async () => {
+    vi.useFakeTimers();
+    try {
+      renderHook(() => useRemediationHistory('job-1'), { wrapper: createWrapper() });
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(mockService.getRemediationHistory).toHaveBeenCalledTimes(1);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+      expect(mockService.getRemediationHistory).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

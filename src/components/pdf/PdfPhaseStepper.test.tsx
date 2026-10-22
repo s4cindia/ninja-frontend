@@ -93,4 +93,73 @@ describe('PdfPhaseStepper', () => {
 
     expect(setIntervalSpy).not.toHaveBeenCalled();
   });
+
+  describe('total-time indicator', () => {
+    it('renders nothing when pipelineStartedAt is omitted', () => {
+      render(<PdfPhaseStepper phases={FIVE_PHASES} />);
+
+      expect(screen.queryByTestId('pdf-phase-stepper-total')).not.toBeInTheDocument();
+    });
+
+    it('ticks live while the last phase in the array is not done', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-10-01T12:00:00.000Z'));
+
+      render(<PdfPhaseStepper phases={FIVE_PHASES} pipelineStartedAt="2026-10-01T12:00:00.000Z" />);
+      expect(screen.getByTestId('pdf-phase-stepper-total')).toHaveTextContent('Total: 0s');
+
+      act(() => {
+        vi.advanceTimersByTime(90_000);
+      });
+
+      expect(screen.getByTestId('pdf-phase-stepper-total')).toHaveTextContent('Total: 1m 30s');
+    });
+
+    it('freezes once the last phase becomes done and does not resume ticking afterward', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-10-01T12:00:00.000Z'));
+
+      const { rerender } = render(<PdfPhaseStepper phases={FIVE_PHASES} pipelineStartedAt="2026-10-01T12:00:00.000Z" />);
+
+      act(() => {
+        vi.advanceTimersByTime(90_000);
+      });
+      expect(screen.getByTestId('pdf-phase-stepper-total')).toHaveTextContent('Total: 1m 30s');
+
+      const allDone = FIVE_PHASES.map(p => ({ ...p, status: 'done' as const }));
+      rerender(<PdfPhaseStepper phases={allDone} pipelineStartedAt="2026-10-01T12:00:00.000Z" />);
+      expect(screen.getByTestId('pdf-phase-stepper-total')).toHaveTextContent('Total: 1m 30s');
+
+      act(() => {
+        vi.advanceTimersByTime(60_000);
+      });
+      // Still 1m 30s -- frozen, not 2m 30s.
+      expect(screen.getByTestId('pdf-phase-stepper-total')).toHaveTextContent('Total: 1m 30s');
+    });
+
+    it('follows whichever phase is actually last in the array, not a hardcoded Compliance check -- the PDF Batch item view only passes 3 phases', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-10-01T12:00:00.000Z'));
+      const threePhases: Phase[] = [
+        phase({ id: 'audit', label: 'Audit', status: 'done', durationMs: 60_000 }),
+        phase({ id: 'ai-analysis', label: 'AI Analysis', status: 'done', durationMs: 120_000 }),
+        phase({ id: 'remediation', label: 'Remediation', status: 'in-progress', detail: 'Round 1' }),
+      ];
+
+      const { rerender } = render(<PdfPhaseStepper phases={threePhases} pipelineStartedAt="2026-10-01T12:00:00.000Z" />);
+      act(() => {
+        vi.advanceTimersByTime(30_000);
+      });
+      expect(screen.getByTestId('pdf-phase-stepper-total')).toHaveTextContent('Total: 30s');
+
+      const allDone = threePhases.map(p => ({ ...p, status: 'done' as const }));
+      rerender(<PdfPhaseStepper phases={allDone} pipelineStartedAt="2026-10-01T12:00:00.000Z" />);
+      act(() => {
+        vi.advanceTimersByTime(60_000);
+      });
+      // Froze at Remediation's own completion, not stuck waiting for a
+      // Verification/Compliance phase that was never passed in.
+      expect(screen.getByTestId('pdf-phase-stepper-total')).toHaveTextContent('Total: 30s');
+    });
+  });
 });

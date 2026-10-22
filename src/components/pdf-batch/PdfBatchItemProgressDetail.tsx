@@ -3,6 +3,8 @@ import { useJobPolling } from '@/hooks/useJobPolling';
 import { useAutoModeStatus, useAutoModeRoundHistory, useStopAutoMode, useRemediationHistory } from '@/hooks/useAutoMode';
 import { PdfJobProgressPanel } from '@/components/pdf/PdfJobProgressPanel';
 import { AutoModeStatusCard } from '@/components/pdf/AutoModeStatusCard';
+import { PdfPhaseStepper } from '@/components/pdf/PdfPhaseStepper';
+import { derivePhases } from '@/utils/pdfPhaseStepper';
 import { deriveCurrentRoundPhase } from '@/utils/autoModeRoundPhase';
 import type { PdfBatchItem } from '@/types/pdfBatch.types';
 
@@ -35,6 +37,13 @@ interface PdfBatchItemProgressDetailProps {
  * hook here polls on its own interval while active, so an unmounted/
  * collapsed row stops polling entirely rather than accumulating N
  * simultaneous background queries across a large batch.
+ *
+ * Phase stepper: reuses derivePhases/PdfPhaseStepper from the single-file
+ * page too, trimmed to its first 3 phases (Audit -> AI Analysis ->
+ * Remediation) -- Verification/Compliance are structurally unreachable
+ * from a batch item (no manual guidance-review or ACR-generation step in
+ * its own AUDITING -> REMEDIATING -> REMEDIATED/FAILED/SKIPPED state
+ * machine), so they're left out rather than shown permanently dim.
  */
 export function PdfBatchItemProgressDetail({ item }: PdfBatchItemProgressDetailProps) {
   const jobId = item.auditJobId ?? undefined;
@@ -57,7 +66,9 @@ export function PdfBatchItemProgressDetail({ item }: PdfBatchItemProgressDetailP
     isRunning: autoStatus?.autoStatus === 'running',
     completedRounds: autoStatus?.autoRoundsCompleted ?? 0,
   });
-  const remediationHistoryQuery = useRemediationHistory(jobId);
+  const remediationHistoryQuery = useRemediationHistory(jobId, {
+    isRunning: autoStatus?.autoStatus === 'running',
+  });
   const stopMutation = useStopAutoMode(jobId);
 
   const currentPhase = useMemo(() => {
@@ -69,6 +80,20 @@ export function PdfBatchItemProgressDetail({ item }: PdfBatchItemProgressDetailP
     );
   }, [autoStatus, remediationHistoryQuery.data, roundHistoryQuery.data]);
 
+  const phases = useMemo(() => derivePhases({
+    auditResult: jobData?.createdAt ? { createdAt: jobData.createdAt, completedAt: jobData.completedAt ?? null } : null,
+    aiAnalysisStatus: null,       // not fetched for batch items; remediationHistory alone covers AI-analysis completeness
+    aiAnalyzedAt: null,
+    remediationHistory: remediationHistoryQuery.data ?? [],
+    autoModeStatus: autoStatus,
+    remediationCycleActive: false,   // batch items are always Auto Mode-driven, never a manual cycle -- inert stub
+    remediationCycleSource: null,
+    pendingGuidanceCount: 0,         // no manual guidance-review step reachable from this view
+    guidanceAcknowledgment: null,
+    acrGenerated: false,             // no ACR/PAC step reachable from this view
+    pacReportGenerated: false,
+  }).slice(0, 3), [jobData?.createdAt, jobData?.completedAt, remediationHistoryQuery.data, autoStatus]);
+
   if (!jobId) {
     return (
       <p className="text-xs text-gray-400 italic px-4 py-3">
@@ -79,6 +104,10 @@ export function PdfBatchItemProgressDetail({ item }: PdfBatchItemProgressDetailP
 
   return (
     <div className="px-4 py-3 bg-gray-50 border-t space-y-4">
+      {(jobData || hasRemediationRun) && (
+        <PdfPhaseStepper phases={phases} pipelineStartedAt={jobData?.createdAt} />
+      )}
+
       {jobData && (
         <div>
           <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Audit</h4>
