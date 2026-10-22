@@ -55,25 +55,44 @@ export function PdfPhaseStepper({ phases, pipelineStartedAt }: PdfPhaseStepperPr
 
   // There's no backend timestamp for "the last phase finished" (e.g.
   // Compliance's own ACR/PAC generation times aren't tracked) -- this
-  // captures the moment the frontend first OBSERVES completion and freezes
-  // there (accurate to within one poll interval), the same kind of
-  // approximation every other timing signal in this component already
-  // makes. Resets whenever pipelineStartedAt itself changes (this
-  // component is reused across job/batch navigations without unmounting),
-  // so a stale freeze from a previous job can't leak into a new one.
+  // captures the moment the frontend first OBSERVES the incomplete ->
+  // complete transition and freezes there (accurate to within one poll
+  // interval), the same kind of approximation every other timing signal in
+  // this component already makes.
+  //
+  // CodeRabbit finding, confirmed real: a mount where the pipeline is
+  // ALREADY complete on the very first render (e.g. opening an
+  // already-finished job) must NOT capture Date.now() as the freeze time --
+  // that would silently count however long ago it actually finished as
+  // part of the total. hasSeenIncompleteRef tracks whether THIS component
+  // instance ever actually observed the pipeline running, so a freeze
+  // timestamp is only ever captured from a transition we genuinely saw.
+  // Resets whenever pipelineStartedAt itself changes (this component is
+  // reused across job/batch navigations without unmounting), so a stale
+  // freeze -- or a stale "never saw it running" -- from a previous job
+  // can't leak into a new one.
   const completedAtRef = useRef<number | null>(null);
+  const hasSeenIncompleteRef = useRef(!isPipelineComplete);
   const prevStartRef = useRef(pipelineStartedAt);
   if (prevStartRef.current !== pipelineStartedAt) {
     prevStartRef.current = pipelineStartedAt;
     completedAtRef.current = null;
-  }
-  if (isPipelineComplete) {
-    if (completedAtRef.current === null) completedAtRef.current = Date.now();
+    hasSeenIncompleteRef.current = !isPipelineComplete;
+  } else if (isPipelineComplete) {
+    if (hasSeenIncompleteRef.current && completedAtRef.current === null) {
+      completedAtRef.current = Date.now();
+    }
   } else {
+    hasSeenIncompleteRef.current = true;
     completedAtRef.current = null;
   }
+  // Nothing trustworthy to show when the pipeline was already complete the
+  // first time this instance observed it -- hide the total rather than
+  // guess, matching how the rest of this component omits a timing label it
+  // has no real data for.
+  const hasTrustworthyTotal = !isPipelineComplete || completedAtRef.current !== null;
 
-  const pipelineElapsedMs = pipelineStartedAt
+  const pipelineElapsedMs = pipelineStartedAt && hasTrustworthyTotal
     ? (completedAtRef.current ?? now) - new Date(pipelineStartedAt).getTime()
     : undefined;
   const totalLabel = pipelineElapsedMs != null && pipelineElapsedMs >= 0

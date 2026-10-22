@@ -101,6 +101,16 @@ describe('PdfPhaseStepper', () => {
       expect(screen.queryByTestId('pdf-phase-stepper-total')).not.toBeInTheDocument();
     });
 
+    it('regression (CodeRabbit): hides the total when the pipeline is ALREADY complete on the very first render, rather than guessing from Date.now() -- opening an already-finished job must not silently count however long ago it actually finished', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-10-01T15:00:00.000Z')); // hours after pipelineStartedAt
+      const allDone = FIVE_PHASES.map(p => ({ ...p, status: 'done' as const }));
+
+      render(<PdfPhaseStepper phases={allDone} pipelineStartedAt="2026-10-01T12:00:00.000Z" />);
+
+      expect(screen.queryByTestId('pdf-phase-stepper-total')).not.toBeInTheDocument();
+    });
+
     it('ticks live while the last phase in the array is not done', () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2026-10-01T12:00:00.000Z'));
