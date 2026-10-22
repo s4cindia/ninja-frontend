@@ -27,3 +27,18 @@ export interface AutoModeStatusResponse {
    */
   autoStartedAt?: string | null;
 }
+
+/**
+ * Suggested autoCostLimitUsd, derived from real historical spend on
+ * similarly-sized documents instead of a flat hardcoded default (see
+ * ninja-backend's auto-mode-budget-estimate.service.ts). `confidence: 'low'`
+ * means the sample was too thin to trust -- estimatedCostUsd is the same
+ * flat $2.00 default in that case, not a guess.
+ */
+export interface BudgetEstimate {
+  estimatedCostUsd: number;
+  confidence: 'low' | 'medium' | 'high';
+  sampleSize: number;
+  /** This job's own issuesFound when job-specific; null for the batch/tenant-wide case. */
+  basedOnIssueCount: number | null;
+}

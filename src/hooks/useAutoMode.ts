@@ -14,6 +14,23 @@ export type { StartAutoModeOverrides };
 const STATUS_KEY = (jobId: string) => ['pdf-auto-mode-status', jobId] as const;
 const ROUND_HISTORY_KEY = (jobId: string) => ['auto-mode-round-history', jobId] as const;
 const RAW_HISTORY_KEY = (jobId: string) => ['remediation-history-raw', jobId] as const;
+const BUDGET_ESTIMATE_KEY = (jobId: string) => ['pdf-auto-mode-budget-estimate', jobId] as const;
+
+/**
+ * Suggested cost limit for this job, to seed AutoModeStartControl's popover
+ * instead of its hardcoded $2 default. Requires the job's own audit to
+ * already be complete -- enabled alongside the status query since both are
+ * only useful once the operator can see "Start Auto Remediation" at all.
+ * Not polled -- a one-time fetch is enough, it isn't expected to change
+ * within a single page visit.
+ */
+export function useBudgetEstimate(jobId: string | undefined) {
+  return useQuery({
+    queryKey: BUDGET_ESTIMATE_KEY(jobId ?? ''),
+    queryFn: () => pdfAutoModeService.getBudgetEstimate(jobId!),
+    enabled: !!jobId,
+  });
+}
 
 /**
  * Raw, unfiltered remediation history (every action/source, not just

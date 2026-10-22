@@ -10,6 +10,7 @@ import {
   useCancelPdfBatch,
   usePdfBatch,
   usePdfBatches,
+  useBatchBudgetEstimate,
 } from '../usePdfBatch';
 import { pdfBatchService } from '@/services/pdfBatch.service';
 import type { PdfBatchDetail } from '@/types/pdfBatch.types';
@@ -23,6 +24,7 @@ vi.mock('@/services/pdfBatch.service', () => ({
     cancelBatch: vi.fn(),
     getBatch: vi.fn(),
     listBatches: vi.fn(),
+    getBudgetEstimate: vi.fn(),
   },
 }));
 
@@ -154,5 +156,27 @@ describe('usePdfBatches list query', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockService.listBatches).toHaveBeenCalledWith(2, 20, 'FAILED');
+  });
+});
+
+describe('useBatchBudgetEstimate', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('is disabled without a batchId', () => {
+    const { result } = renderHook(() => useBatchBudgetEstimate(undefined), { wrapper: createWrapper() });
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(mockService.getBudgetEstimate).not.toHaveBeenCalled();
+  });
+
+  it('fetches the tenant-wide estimate once enabled', async () => {
+    const estimate = { estimatedCostUsd: 3.25, confidence: 'medium' as const, sampleSize: 9, basedOnIssueCount: null };
+    mockService.getBudgetEstimate.mockResolvedValue(estimate);
+    const { result } = renderHook(() => useBatchBudgetEstimate('b1'), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockService.getBudgetEstimate).toHaveBeenCalledWith('b1');
+    expect(result.current.data).toEqual(estimate);
   });
 });

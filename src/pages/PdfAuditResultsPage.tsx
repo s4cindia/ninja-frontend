@@ -83,7 +83,7 @@ import { cn } from '@/utils/cn';
 import { validateJobId } from '@/utils/validation';
 import { useCreateRemediationPlan } from '@/hooks/usePdfRemediation';
 import { useComparisonTrial, useInvalidateComparisonTrial } from '@/hooks/useComparisonStudy';
-import { useAutoModeStatus, useAutoModeRoundHistory, useStartAutoMode, useStopAutoMode, useRemediationHistory } from '@/hooks/useAutoMode';
+import { useAutoModeStatus, useAutoModeRoundHistory, useStartAutoMode, useStopAutoMode, useRemediationHistory, useBudgetEstimate } from '@/hooks/useAutoMode';
 import { useApplyProgress } from '@/hooks/useApplyProgress';
 import { AutoModeStatusCard } from '@/components/pdf/AutoModeStatusCard';
 import { AutoModeStartControl } from '@/components/pdf/AutoModeStartControl';
@@ -235,6 +235,10 @@ export const PdfAuditResultsPage: React.FC = () => {
   // enabled, not gated on Auto Mode.
   const remediationHistoryQuery = useRemediationHistory(jobId);
   const refetchRemediationHistory = remediationHistoryQuery.refetch;
+  // Seeds AutoModeStartControl's Cost Limit field below instead of its flat
+  // $2 default -- requires the audit (already on screen by this point) to
+  // be complete, which it always is here.
+  const budgetEstimateQuery = useBudgetEstimate(jobId);
 
   // State management
   const [auditResult, setAuditResult] = useState<PdfAuditResult | null>(null);
@@ -1580,6 +1584,7 @@ export const PdfAuditResultsPage: React.FC = () => {
                   // trial's own pre-configured settings — only offer the
                   // config form for a job with no trial at all.
                   showConfig={!comparisonTrialId}
+                  budgetEstimate={budgetEstimateQuery.data}
                 />
               </>
             )}

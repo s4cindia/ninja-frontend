@@ -6,7 +6,7 @@ import { PdfBatchStatusBadge } from '@/components/pdf-batch/PdfBatchStatusBadge'
 import { PdfBatchStatusSummary } from '@/components/pdf-batch/PdfBatchStatusSummary';
 import { PdfBatchItemList } from '@/components/pdf-batch/PdfBatchItemList';
 import { AutoModeStartControl } from '@/components/pdf/AutoModeStartControl';
-import { usePdfBatch, useStartPdfBatch, useCancelPdfBatch, useRemovePdfBatchItem } from '@/hooks/usePdfBatch';
+import { usePdfBatch, useStartPdfBatch, useCancelPdfBatch, useRemovePdfBatchItem, useBatchBudgetEstimate } from '@/hooks/usePdfBatch';
 import type { StartPdfBatchRequest } from '@/types/pdfBatch.types';
 import { XCircle, ArrowRight } from 'lucide-react';
 
@@ -18,6 +18,10 @@ export default function PdfBatchDetailPage() {
   const startBatchMutation = useStartPdfBatch(batchId);
   const cancelBatchMutation = useCancelPdfBatch(batchId);
   const removeItemMutation = useRemovePdfBatchItem(batchId);
+  // Seeds AutoModeStartControl's Cost Limit field below instead of its flat
+  // $2 default -- tenant-wide, since no item in a DRAFT batch has been
+  // audited yet (see useBatchBudgetEstimate's own doc comment).
+  const budgetEstimateQuery = useBatchBudgetEstimate(batchId);
 
   const handleStart = (overrides?: StartPdfBatchRequest) => {
     startBatchMutation.mutate(overrides);
@@ -120,6 +124,7 @@ export default function PdfBatchDetailPage() {
                   disabledTitle={canStart ? undefined : 'Add at least one file before starting'}
                   showConfig
                   triggerLabel="Start Processing"
+                  budgetEstimate={budgetEstimateQuery.data}
                 />
               </>
             )}
