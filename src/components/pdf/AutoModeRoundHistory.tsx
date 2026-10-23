@@ -9,11 +9,13 @@
  * toggling never refetches.
  */
 
-import { useId, useState } from 'react';
-import { Table2, LineChart } from 'lucide-react';
+import { Fragment, useId, useState } from 'react';
+import { Table2, LineChart, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Badge } from '@/components/ui/Badge';
+import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { formatDuration } from '@/utils/duration';
+import { summarizeRound } from '@/utils/autoModeRoundSummary';
 import { buildSparklinePath } from './autoModeSparkline';
 import type { AutoModeRound } from '@/hooks/useAutoMode';
 
@@ -48,41 +50,89 @@ function TrendArrow({ current, previous }: { current: number | null; previous: n
   return <span className="text-gray-400" aria-label="unchanged from previous round">→</span>;
 }
 
+const ROUND_TABLE_COLUMN_COUNT = 6;
+
 function RoundTable({ rounds }: { rounds: AutoModeRound[] }) {
+  // Collapsed by default -- an expanded round only adds a row when toggled,
+  // so existing row-count assertions elsewhere stay valid without this ever
+  // auto-expanding on its own.
+  const [expandedRounds, setExpandedRounds] = useState<Set<number>>(() => new Set());
+
+  const toggleRound = (round: number) => {
+    setExpandedRounds(prev => {
+      const next = new Set(prev);
+      if (next.has(round)) next.delete(round);
+      else next.add(round);
+      return next;
+    });
+  };
+
   return (
     <table className="w-full text-xs">
       <thead>
         <tr className="text-left text-gray-500">
           <th className="font-normal pb-1">Round</th>
           <th className="font-normal pb-1 text-right">Applied</th>
-          <th className="font-normal pb-1 text-right">Resolved</th>
+          <th className="font-normal pb-1 text-right">
+            <InfoTooltip content="Issues the re-audit independently confirmed are now actually fixed -- not just that a fix was attempted.">
+              <span>Resolved</span>
+            </InfoTooltip>
+          </th>
           <th className="font-normal pb-1 text-right">Remaining</th>
-          <th className="font-normal pb-1 text-right">Regressions</th>
+          <th className="font-normal pb-1 text-right">
+            <InfoTooltip content="Issues that were fixed in an earlier round but reappeared in this round's re-audit.">
+              <span>Regressions</span>
+            </InfoTooltip>
+          </th>
           <th className="font-normal pb-1 text-right">Duration</th>
         </tr>
       </thead>
       <tbody className="font-mono text-gray-700">
-        {rounds.map((r, idx) => (
-          <tr key={r.round} className="border-t border-gray-100">
-            <td className="py-1">{r.round}</td>
-            <td className="py-1 text-right">{r.applied ?? '—'}</td>
-            <td className="py-1 text-right">{r.resolved ?? '—'}</td>
-            <td className="py-1 text-right">
-              <span className="inline-flex items-center gap-1">
-                {r.remaining ?? '—'}
-                <TrendArrow current={r.remaining} previous={rounds[idx - 1]?.remaining} />
-              </span>
-            </td>
-            <td className="py-1 text-right">
-              {r.regressions ? (
-                <Badge variant="warning" size="sm">{r.regressions}</Badge>
-              ) : (
-                <span className="text-gray-400">—</span>
+        {rounds.map((r, idx) => {
+          const isExpanded = expandedRounds.has(r.round);
+          const detailId = `auto-mode-round-${r.round}-explain`;
+          return (
+            <Fragment key={r.round}>
+              <tr className="border-t border-gray-100">
+                <td className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => toggleRound(r.round)}
+                    aria-expanded={isExpanded}
+                    aria-controls={detailId}
+                    className="inline-flex items-center gap-1 text-gray-700 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+                  >
+                    {isExpanded ? <ChevronDown className="h-3 w-3 text-gray-400" /> : <ChevronRight className="h-3 w-3 text-gray-400" />}
+                    {r.round}
+                  </button>
+                </td>
+                <td className="py-1 text-right">{r.applied ?? '—'}</td>
+                <td className="py-1 text-right">{r.resolved ?? '—'}</td>
+                <td className="py-1 text-right">
+                  <span className="inline-flex items-center gap-1">
+                    {r.remaining ?? '—'}
+                    <TrendArrow current={r.remaining} previous={rounds[idx - 1]?.remaining} />
+                  </span>
+                </td>
+                <td className="py-1 text-right">
+                  {r.regressions ? (
+                    <Badge variant="warning" size="sm">{r.regressions}</Badge>
+                  ) : (
+                    <span className="text-gray-400">—</span>
+                  )}
+                </td>
+                <td className="py-1 text-right">{r.durationMs != null ? formatDuration(r.durationMs) : '—'}</td>
+              </tr>
+              {isExpanded && (
+                <tr className="border-t border-gray-50 bg-gray-50">
+                  <td id={detailId} colSpan={ROUND_TABLE_COLUMN_COUNT} className="py-2 px-2 font-sans text-gray-600">
+                    {summarizeRound(r, rounds[idx - 1] ?? null)}
+                  </td>
+                </tr>
               )}
-            </td>
-            <td className="py-1 text-right">{r.durationMs != null ? formatDuration(r.durationMs) : '—'}</td>
-          </tr>
-        ))}
+            </Fragment>
+          );
+        })}
       </tbody>
     </table>
   );

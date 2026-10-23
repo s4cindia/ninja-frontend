@@ -6,6 +6,7 @@ import {
 import { cn } from '@/utils/cn';
 import { api } from '@/services/api';
 import { isMatterhornIssue } from '@/utils/matterhorn';
+import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import type { PdfAuditResult } from '@/types/pdf.types';
 import type { AiAnalysis } from '@/components/remediation/IssueCard';
 
@@ -440,7 +441,15 @@ export function PdfStatsCards({
     <>
       <div className="flex items-baseline gap-2">
         <span className="text-2xl font-bold text-gray-900 tabular-nums">{issues.length}</span>
-        <span className="text-sm text-gray-500">Total Issues</span>
+        {autoTagInfo?.postRemediationStatus === 'complete' && autoTagInfo.postRemediationAudit ? (
+          <InfoTooltip
+            content={`${issues.length} = ${autoTagInfo.postRemediationAudit.remaining} still open + ${autoTagInfo.postRemediationAudit.regressions} regressed in the last re-audit round.`}
+          >
+            <span className="text-sm text-gray-500 underline decoration-dotted">Total Issues</span>
+          </InfoTooltip>
+        ) : (
+          <span className="text-sm text-gray-500">Total Issues</span>
+        )}
         {derived.coverage > 0 && (
           <span className="ml-auto text-xs text-gray-400">{derived.coverage}% AI coverage</span>
         )}
@@ -477,12 +486,16 @@ export function PdfStatsCards({
             Post-fix validation · {Math.round(autoTagInfo.postRemediationAudit.resolutionRate)}% resolved
           </div>
           <div className="flex gap-3 pl-5 text-green-700">
-            <span><strong>{autoTagInfo.postRemediationAudit.resolved}</strong> resolved</span>
+            <InfoTooltip content="Issues the re-audit independently confirmed are now actually fixed, out of everything that was open going into this round.">
+              <span className="underline decoration-dotted"><strong>{autoTagInfo.postRemediationAudit.resolved}</strong> resolved</span>
+            </InfoTooltip>
             <span><strong>{autoTagInfo.postRemediationAudit.remaining}</strong> remaining</span>
             {autoTagInfo.postRemediationAudit.regressions > 0 && (
-              <span className="text-amber-700">
-                <strong>{autoTagInfo.postRemediationAudit.regressions}</strong> regressions
-              </span>
+              <InfoTooltip content="Issues that were fixed in an earlier round but reappeared in this round's re-audit.">
+                <span className="text-amber-700 underline decoration-dotted">
+                  <strong>{autoTagInfo.postRemediationAudit.regressions}</strong> regressions
+                </span>
+              </InfoTooltip>
             )}
           </div>
         </div>
