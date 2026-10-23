@@ -176,6 +176,33 @@ describe('AutoModeRoundHistory', () => {
     expect(screen.getByText('5m 30s')).toBeInTheDocument();
   });
 
+  it('expands a round to show its plain-language explanation on toggle, and collapses it again', () => {
+    render(
+      <AutoModeRoundHistory
+        rounds={[
+          round({ round: 1, applied: 380, resolved: 45, regressions: 43, remaining: 754 }),
+          round({ round: 2, applied: 384, resolved: 34, regressions: 39, remaining: 763 }),
+        ]}
+      />
+    );
+
+    // Collapsed by default -- the existing "header + N data rows" row count
+    // from earlier tests in this file must not have silently changed.
+    expect(screen.getAllByRole('row')).toHaveLength(3);
+
+    const toggle = screen.getByRole('button', { name: /2/ });
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText(/384 fixes applied this round/)).toBeInTheDocument();
+    expect(screen.getByText(/39 previously-fixed issues reappeared/)).toBeInTheDocument();
+    expect(screen.getAllByRole('row')).toHaveLength(4);
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText(/384 fixes applied this round/)).not.toBeInTheDocument();
+  });
+
   it('regression: an invalid/corrupted stored value falls back to table view instead of crashing', () => {
     localStorage.setItem(STORAGE_KEY, 'not-a-real-view');
 

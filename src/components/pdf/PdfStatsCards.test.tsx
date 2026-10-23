@@ -226,6 +226,45 @@ describe('PdfStatsCards — post-fix validation resolution rate', () => {
     expect(screen.getByText('Validating fixes…')).toBeInTheDocument();
   });
 
+  it('explains "resolved" and "regressions" on click, so an operator does not have to ask what they mean', () => {
+    renderCard({
+      status: 'complete',
+      postRemediationStatus: 'complete',
+      postRemediationAudit: { runAt: '2026-08-26T00:00:00.000Z', resolved: 50, remaining: 756, regressions: 20, resolutionRate: 6.44 },
+    });
+
+    fireEvent.click(screen.getByText('50', { selector: 'strong' }));
+    expect(screen.getByText(/independently confirmed are now actually fixed/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('20', { selector: 'strong' }));
+    expect(screen.getByText(/fixed in an earlier round but reappeared/)).toBeInTheDocument();
+  });
+
+  it('explains the Total Issues count as remaining + regressions once post-fix validation has run', () => {
+    render(
+      <PdfStatsCards
+        autoTagInfo={{
+          status: 'complete',
+          postRemediationStatus: 'complete',
+          postRemediationAudit: { runAt: '2026-08-26T00:00:00.000Z', resolved: 50, remaining: 756, regressions: 20, resolutionRate: 6.44 },
+        } as AutoTagInfo}
+        auditResult={{ issues: [issue({ id: '1' }), issue({ id: '2' })] } as unknown as PdfAuditResult}
+        aiSuggestions={new Map()}
+        aiStats={null}
+        matterhornIssueCount={0}
+        isAnalyzingAi={false}
+        aiProgress={null}
+        onViewAutoTagReport={vi.fn()}
+        onRetryAutoTag={vi.fn()}
+        isRetryingAutoTag={false}
+        jobId="job-1"
+      />
+    );
+
+    fireEvent.click(screen.getByText('Total Issues'));
+    expect(screen.getByText('2 = 756 still open + 20 regressed in the last re-audit round.')).toBeInTheDocument();
+  });
+
   it('shows page and validator progress together once both are populated', () => {
     renderCard({
       status: 'complete',
