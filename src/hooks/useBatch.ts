@@ -27,8 +27,15 @@ export function useUploadFiles() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ batchId, files }: { batchId: string; files: File[] }) =>
-      batchService.uploadFiles(batchId, files),
+    mutationFn: ({
+      batchId,
+      files,
+      onProgress,
+    }: {
+      batchId: string;
+      files: File[];
+      onProgress?: (progress: { loaded: number; total: number; percentage: number }) => void;
+    }) => batchService.uploadFiles(batchId, files, onProgress),
     onSuccess: (_, { batchId }) => {
       queryClient.invalidateQueries({ queryKey: ['batch', batchId] });
       toast.success('Files uploaded successfully');

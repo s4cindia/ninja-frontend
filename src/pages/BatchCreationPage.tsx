@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { Button } from '@/components/ui/Button';
@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/Input';
 import { FileUploadZone } from '@/components/batch/FileUploadZone';
 import { FileList } from '@/components/batch/FileList';
 import { useCreateBatch, useUploadFiles } from '@/hooks/useBatch';
+import { computeUploadProgressStats, formatBytes } from '@/utils/uploadProgress';
+import { formatDuration } from '@/utils/duration';
 import { Layers } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -13,9 +15,25 @@ export default function BatchCreationPage() {
   const navigate = useNavigate();
   const [batchName, setBatchName] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadBytes, setUploadBytes] = useState<{ loaded: number; total: number } | null>(null);
+  const [uploadNow, setUploadNow] = useState(() => Date.now());
+  const uploadStartRef = useRef<Date | null>(null);
 
   const createBatchMutation = useCreateBatch();
   const uploadFilesMutation = useUploadFiles();
+
+  // Ticks once a second while uploading so elapsed/ETA stay live even if
+  // progress events are sparse (one multipart request for all files, so
+  // there's only ever aggregate bytes, not per-file).
+  useEffect(() => {
+    if (!uploadFilesMutation.isPending) return;
+    const intervalId = setInterval(() => setUploadNow(Date.now()), 1000);
+    return () => clearInterval(intervalId);
+  }, [uploadFilesMutation.isPending]);
+
+  const uploadStats = uploadBytes && uploadBytes.total > 0 && uploadStartRef.current
+    ? computeUploadProgressStats(uploadBytes.loaded, uploadBytes.total, uploadNow - uploadStartRef.current.getTime())
+    : null;
 
   const handleFilesSelected = (files: File[]) => {
     setSelectedFiles((prev) => [...prev, ...files]);
@@ -41,9 +59,17 @@ export default function BatchCreationPage() {
       createdBatchId = result.batchId;
 
       try {
+        uploadStartRef.current = new Date();
+        setUploadBytes(null);
+        setUploadNow(Date.now());
+
         await uploadFilesMutation.mutateAsync({
           batchId: result.batchId,
           files: selectedFiles,
+          onProgress: (p) => {
+            setUploadBytes({ loaded: p.loaded, total: p.total });
+            setUploadNow(Date.now());
+          },
         });
 
         toast.success('Batch created successfully');
@@ -106,6 +132,27 @@ export default function BatchCreationPage() {
             onRemove={handleRemoveFile}
             disabled={isLoading}
           />
+        )}
+
+        {uploadFilesMutation.isPending && (
+          <div className="text-xs text-gray-500 space-y-0.5" data-testid="batch-upload-progress-detail">
+            {uploadStats ? (
+              <>
+                <p>
+                  {formatBytes(uploadStats.loaded)} of {formatBytes(uploadStats.total)} uploaded
+                  {' · '}
+                  {formatDuration(uploadStats.elapsedMs)} elapsed
+                </p>
+                <p>
+                  {uploadStats.etaMs != null
+                    ? `~${formatDuration(uploadStats.etaMs)} remaining (${formatBytes(uploadStats.remaining)} left)`
+                    : 'Calculating time remaining…'}
+                </p>
+              </>
+            ) : (
+              <p>Uploading files…</p>
+            )}
+          </div>
         )}
 
         <div className="flex justify-between items-center pt-4 border-t">

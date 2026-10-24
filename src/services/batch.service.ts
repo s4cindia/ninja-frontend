@@ -18,13 +18,29 @@ export const batchService = {
     return response.data.data;
   },
 
-  async uploadFiles(batchId: string, files: File[]): Promise<void> {
+  async uploadFiles(
+    batchId: string,
+    files: File[],
+    onProgress?: (progress: { loaded: number; total: number; percentage: number }) => void
+  ): Promise<void> {
     const formData = new FormData();
     files.forEach(file => {
       formData.append('files', file);
     });
 
-    await api.post(`${BASE_URL}/${batchId}/files`, formData);
+    // All files go in one multipart request, so axios's onUploadProgress is
+    // aggregate bytes across the whole request body, not per-file.
+    await api.post(`${BASE_URL}/${batchId}/files`, formData, {
+      onUploadProgress: (event) => {
+        if (event.total && onProgress) {
+          onProgress({
+            loaded: event.loaded,
+            total: event.total,
+            percentage: Math.round((event.loaded / event.total) * 100),
+          });
+        }
+      },
+    });
   },
 
   async removeFile(batchId: string, fileId: string): Promise<void> {
