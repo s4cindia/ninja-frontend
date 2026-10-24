@@ -474,6 +474,64 @@ describe('PdfAuditResultsPage', () => {
     }, 10000);
   });
 
+  describe('Polling screen — filename and progress detail', () => {
+    // /pdf/job/:id/audit/result (fetchAuditResult, the completion signal)
+    // returns almost nothing while a job is processing -- {status, message,
+    // error} only -- so the filename and step/timing detail shown here come
+    // from a separate GET /jobs/:id poll (useJobPolling), mirroring
+    // ComparisonTrialWorkspacePage's pattern for the same panel.
+    it('shows the filename and a step/timing panel while polling, not just a bare spinner (regression: this screen used to show nothing identifying the document or any progress detail at all)', async () => {
+      const jobId = 'job-456';
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === `/pdf/job/${jobId}/audit/result`) {
+          return Promise.resolve({ data: { data: { status: 'processing' } } });
+        }
+        if (url === `/jobs/${jobId}`) {
+          return Promise.resolve({
+            data: {
+              data: {
+                id: jobId,
+                status: 'PROCESSING',
+                type: 'PDF_ACCESSIBILITY',
+                progress: 45,
+                input: { fileName: 'FMHE_PDF.pdf' },
+                createdAt: '2024-01-15T10:00:00Z',
+                startedAt: '2024-01-15T10:00:05Z',
+              },
+            },
+          });
+        }
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      expect(await screen.findByText('Audit in progress...')).toBeInTheDocument();
+      expect(await screen.findByText('FMHE_PDF.pdf')).toBeInTheDocument();
+      // PdfJobProgressPanel's own "Timing" table header -- confirms the real
+      // panel rendered, not just the filename line.
+      expect(await screen.findByText('Timing')).toBeInTheDocument();
+    });
+
+    it('still shows the plain polling screen when /jobs/:id has not responded yet (no filename, no panel, no crash)', async () => {
+      const jobId = 'job-789';
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === `/pdf/job/${jobId}/audit/result`) {
+          return Promise.resolve({ data: { data: { status: 'processing' } } });
+        }
+        if (url === `/jobs/${jobId}`) {
+          return new Promise(() => {}); // never resolves
+        }
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      expect(await screen.findByText('Audit in progress...')).toBeInTheDocument();
+      expect(screen.queryByText('Timing')).not.toBeInTheDocument();
+    });
+  });
+
   describe('Component Integration', () => {
     it('renders MatterhornSummary with data', async () => {
       const mockResult = createMockAuditResult();
