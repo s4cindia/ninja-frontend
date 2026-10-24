@@ -30,8 +30,6 @@ describe('DocumentUploader upload progress', () => {
     vi.clearAllMocks();
     mockTenantConfig.getWorkflowConfig.mockResolvedValue({
       enabled: false,
-      skipGate1: false,
-      skipGate3: false,
     });
   });
 
