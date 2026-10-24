@@ -10,6 +10,8 @@ import { tenantConfigService } from '@/services/tenant-config.service';
 import { useJobPolling, JobData } from '@/hooks/useJobPolling';
 import { PdfJobProgressPanel } from '@/components/pdf/PdfJobProgressPanel';
 import { detectFileType, getAcceptedMimeTypes, DocumentFileType } from '@/utils/fileUtils';
+import { computeUploadProgressStats, formatBytes } from '@/utils/uploadProgress';
+import { formatDuration } from '@/utils/duration';
 import type { AuditSummary } from '@/types/audit.types';
 
 type UploadState = 'idle' | 'uploading' | 'queued' | 'processing' | 'complete' | 'error';
@@ -76,6 +78,11 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     totalTokens: number;
     totalCostUsd: number;
   } | null>(null);
+  const [uploadBytes, setUploadBytes] = useState<{ loaded: number; total: number } | null>(null);
+  // Ticks once a second while uploading so elapsed/ETA stay live even if the
+  // browser's progress events are sparse, rather than only updating on the
+  // next XHR progress tick.
+  const [uploadNow, setUploadNow] = useState(() => Date.now());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileNameRef = useRef<string>('');
   const fileTypeRef = useRef<DocumentFileType>('epub');
@@ -139,6 +146,12 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
       }
     }
   }, [jobStatus, jobData?.progress]);
+
+  useEffect(() => {
+    if (state !== 'uploading') return;
+    const intervalId = setInterval(() => setUploadNow(Date.now()), 1000);
+    return () => clearInterval(intervalId);
+  }, [state]);
 
   // Fetch workflow configuration on mount
   useEffect(() => {
@@ -268,6 +281,8 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     setState('uploading');
     uploadStartRef.current = new Date();
     setProgress(0);
+    setUploadBytes(null);
+    setUploadNow(Date.now());
     setError(null);
     fileNameRef.current = selectedFile.name;
 
@@ -302,6 +317,8 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
         (uploadProgress) => {
           // Scale upload transfer to 0–15% so progress doesn't falsely imply near-completion
           setProgress(Math.round(uploadProgress.percentage * 0.15));
+          setUploadBytes({ loaded: uploadProgress.loaded, total: uploadProgress.total });
+          setUploadNow(Date.now());
         },
         endpoint.directUpload
       );
@@ -357,16 +374,15 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     setAiStatus(null);
     setAiSuggestionCount(0);
     setAiTokenStats(null);
+    setUploadBytes(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
+  const uploadStats = uploadBytes && uploadBytes.total > 0 && uploadStartRef.current
+    ? computeUploadProgressStats(uploadBytes.loaded, uploadBytes.total, uploadNow - uploadStartRef.current.getTime())
+    : null;
 
   const getUploadText = () => {
     if (acceptedFileTypes.length === 1) {
@@ -437,7 +453,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
               <FileText className="h-10 w-10 text-primary-600" />
               <div className="text-left">
                 <p className="font-medium text-gray-900">{selectedFile.name}</p>
-                <p className="text-sm text-gray-500">{formatFileSize(selectedFile.size)}</p>
+                <p className="text-sm text-gray-500">{formatBytes(selectedFile.size)}</p>
               </div>
               <Button
                 variant="ghost"
@@ -481,6 +497,23 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
               {/* Only show % label during processing — during uploading/queued it would be misleading */}
               <Progress value={progress} showLabel={state === 'processing'} />
             </div>
+            {/* Rich upload stats (elapsed/bytes/ETA) — a bare percentage gives
+                no sense of progress on a large file, which is exactly what's
+                scaled down to 0-15% above to avoid implying near-completion. */}
+            {state === 'uploading' && uploadStats && (
+              <div className="max-w-xs mx-auto text-xs text-gray-500 space-y-0.5" data-testid="upload-progress-detail">
+                <p>
+                  {formatBytes(uploadStats.loaded)} of {formatBytes(uploadStats.total)} uploaded
+                  {' · '}
+                  {formatDuration(uploadStats.elapsedMs)} elapsed
+                </p>
+                <p>
+                  {uploadStats.etaMs != null
+                    ? `~${formatDuration(uploadStats.etaMs)} remaining (${formatBytes(uploadStats.remaining)} left)`
+                    : 'Calculating time remaining…'}
+                </p>
+              </div>
+            )}
             {/* Stale queue warning: shown if the job has been queued for > 30s without starting */}
             {state === 'queued' && uploadEndRef.current &&
               new Date().getTime() - uploadEndRef.current.getTime() > 30000 && (
