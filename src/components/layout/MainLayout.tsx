@@ -29,6 +29,8 @@ import {
   ChevronLeft,
   ChevronRight,
   GitCompare,
+  UsersRound,
+  Network,
 } from 'lucide-react';
 
 type NavItem = {
@@ -66,6 +68,7 @@ export function MainLayout() {
         { to: '/products', icon: FileText, label: 'Products' },
         { to: '/jobs', icon: CheckCircle, label: 'Jobs' },
         { to: '/files', icon: Upload, label: 'Files' },
+        { to: '/my-team', icon: UsersRound, label: 'My Team' },
       ],
     },
     {
@@ -107,6 +110,7 @@ export function MainLayout() {
       items: [
         { to: '/admin/corpus', icon: Database, label: 'Corpus Management', activePrefix: '/admin/corpus' },
         { to: '/admin/users', icon: Users, label: 'User Management', activePrefix: '/admin/users' },
+        { to: '/admin/teams', icon: Network, label: 'Team Management', activePrefix: '/admin/teams' },
         { to: '/bootstrap', icon: Shield, label: 'Bootstrap Console', activePrefix: '/bootstrap' },
         { to: '/comparison-study', icon: GitCompare, label: 'Comparison Study', activePrefix: '/comparison-study' },
       ],
