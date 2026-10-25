@@ -88,6 +88,8 @@ import { useApplyProgress } from '@/hooks/useApplyProgress';
 import { AutoModeStatusCard } from '@/components/pdf/AutoModeStatusCard';
 import { AutoModeStartControl } from '@/components/pdf/AutoModeStartControl';
 import { PdfPhaseStepper } from '@/components/pdf/PdfPhaseStepper';
+import { PdfJobProgressPanel } from '@/components/pdf/PdfJobProgressPanel';
+import { useJobPolling } from '@/hooks/useJobPolling';
 import { derivePhases } from '@/utils/pdfPhaseStepper';
 import { deriveCurrentRoundPhase } from '@/utils/autoModeRoundPhase';
 import type { ComparisonTrialMode } from '@/types/comparisonStudy.types';
@@ -252,6 +254,16 @@ export const PdfAuditResultsPage: React.FC = () => {
   const budgetEstimateQuery = useBudgetEstimate(jobId, { enabled: !!auditResult });
   const [isLoading, setIsLoading] = useState(true);
   const [isPolling, setIsPolling] = useState(false);
+  // Supplementary data source for the polling screen below -- /pdf/job/:id/audit/result
+  // (fetchAuditResult, the page's actual completion signal) returns almost nothing
+  // while a job is still processing ({status, message, error} only), so this
+  // mirrors ComparisonTrialWorkspacePage's pattern of also polling the generic
+  // GET /jobs/:id via useJobPolling purely to drive PdfJobProgressPanel's filename
+  // and step/timing detail. It does not affect completion detection, which stays
+  // on fetchAuditResult/isPolling as before.
+  const { data: pollJobData, startPolling: startJobDataPolling, stopPolling: stopJobDataPolling } = useJobPolling({
+    interval: POLLING_INTERVAL_MS,
+  });
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedIssueId, setSelectedIssueId] = useState<string | undefined>();
@@ -621,6 +633,18 @@ export const PdfAuditResultsPage: React.FC = () => {
 
     return () => clearInterval(pollInterval);
   }, [isPolling, fetchAuditResult]);
+
+  // Mirrors the poll above against the richer GET /jobs/:id (see pollJobData
+  // declaration) purely so the polling screen has filename/step/timing detail
+  // to show -- stopped as soon as isPolling flips false so it doesn't keep
+  // hitting /jobs/:id after the real result has already loaded.
+  useEffect(() => {
+    if (!isPolling || !jobId) {
+      stopJobDataPolling();
+      return;
+    }
+    startJobDataPolling(jobId);
+  }, [isPolling, jobId, startJobDataPolling, stopJobDataPolling]);
 
   // Build issues by page map
   const issuesByPage = useMemo(() => {
@@ -1361,16 +1385,28 @@ export const PdfAuditResultsPage: React.FC = () => {
 
   // Polling state
   if (isPolling) {
+    // auditResult is still around (not cleared) across a re-scan, so prefer
+    // it over pollJobData.input.fileName -- it's only null on a fresh
+    // upload's very first poll, before /jobs/:id has responded even once.
+    const pollingFileName = auditResult?.fileName ?? (pollJobData?.input?.fileName as string | undefined);
     return (
       <div className="p-6 max-w-7xl mx-auto">
         <Card>
           <CardContent className="py-12">
-            <div className="flex flex-col items-center justify-center gap-3">
+            <div className="flex flex-col items-center justify-center gap-3 text-center">
               <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
               <p className="text-gray-700 font-medium text-lg">
                 {isReScanning ? 'Re-scanning document...' : 'Audit in progress...'}
               </p>
+              {pollingFileName && (
+                <p className="text-gray-900 font-semibold break-all">{pollingFileName}</p>
+              )}
               <p className="text-gray-500">This may take a few moments</p>
+              {pollJobData && (
+                <div className="w-full max-w-md mt-2">
+                  <PdfJobProgressPanel jobData={pollJobData} progress={pollJobData.progress ?? 0} />
+                </div>
+              )}
               <Button variant="outline" size="sm" onClick={fetchAuditResult} className="mt-4">
                 Check Status
               </Button>
