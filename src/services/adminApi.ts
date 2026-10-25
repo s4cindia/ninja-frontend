@@ -1,4 +1,5 @@
 import { api } from './api';
+import type { Team, TeamMembership, TeamRole } from '@/types/team.types';
 
 // ── Corpus ────────────────────────────────────────────
 
@@ -125,4 +126,41 @@ export async function updateUserRole(
     { role }
   );
   return res.data.data;
+}
+
+// ── Teams ────────────────────────────────────────────
+// Production-oversight teams (TeamRole: EXECUTIVE/TEAM_LEADER/VIEWER),
+// orthogonal to the UserRole gating above. ADMIN-only, like the rest of
+// this file.
+
+export async function listAdminTeams(params?: {
+  limit?: number;
+}): Promise<{ teams: Team[] }> {
+  const res = await api.get('/admin/teams', { params });
+  return res.data.data;
+}
+
+export async function createAdminTeam(name: string): Promise<Team> {
+  const res = await api.post('/admin/teams', { name });
+  return res.data.data;
+}
+
+export async function addAdminTeamMember(
+  teamId: string,
+  input: { userId: string; teamRole: TeamRole }
+): Promise<TeamMembership> {
+  const res = await api.post(
+    `/admin/teams/${encodeURIComponent(teamId)}/members`,
+    input
+  );
+  return res.data.data;
+}
+
+export async function removeAdminTeamMember(
+  teamId: string,
+  userId: string
+): Promise<void> {
+  await api.delete(
+    `/admin/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}`
+  );
 }

@@ -96,6 +96,8 @@ import CorpusSummaryPage from '@/pages/calibration/CorpusSummaryPage';
 import AnnotatorGuideHelpPage from '@/pages/help/AnnotatorGuidePage';
 import AdminCorpusPage from '@/pages/admin/AdminCorpusPage';
 import AdminUsersPage from '@/pages/admin/AdminUsersPage';
+import AdminTeamsPage from '@/pages/admin/AdminTeamsPage';
+import MyTeamPage from '@/pages/MyTeamPage';
 import ComparisonStudyConsolePage from '@/pages/comparison-study/ComparisonStudyConsolePage';
 import ComparisonTrialWorkspacePage from '@/pages/comparison-study/ComparisonTrialWorkspacePage';
 import ComparisonTrialReportPage from '@/pages/comparison-study/ComparisonTrialReportPage';
@@ -197,6 +199,7 @@ function AppRoutes() {
           <Route path="/products" element={<Products />} />
           <Route path="/jobs" element={<Jobs />} />
           <Route path="/jobs/:jobId" element={<JobDetails />} />
+          <Route path="/my-team" element={<MyTeamPage />} />
           <Route path="/files" element={<Files />} />
           <Route path="/validation/:fileId" element={<ValidationResults />} />
           <Route path="/compliance/section508/:fileId" element={<Section508Page />} />
@@ -301,6 +304,7 @@ function AppRoutes() {
           {/* Admin Console Routes */}
           <Route path="/admin/corpus" element={<AdminCorpusPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
+          <Route path="/admin/teams" element={<AdminTeamsPage />} />
 
           {/* Test Editor Page (protected) */}
           <Route path="/test/editor" element={<TestEditorPage />} />
