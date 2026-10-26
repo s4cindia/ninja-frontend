@@ -163,3 +163,47 @@ export const ERROR_CATEGORY_LABELS: Record<ErrorCategory, string> = {
   VALIDATION_ERROR: 'Validation Error',
   UNKNOWN: 'Not Yet Categorized',
 };
+
+// Group 3 (Fix quality / effectiveness) -- the last of the 5 groups.
+export interface SuggestionTypeYield {
+  suggestionType: string;
+  applied: number;
+  failed: number;
+  yieldRate: number; // applied / (applied + failed), 0 when both are 0
+}
+
+export interface QualityReport {
+  period: { from: string; to: string };
+  // Sorted worst-yield first by the backend -- the actionable end of the
+  // list, not alphabetical. Keep that order when rendering.
+  yieldByType: SuggestionTypeYield[];
+}
+
+export interface QualityReportFilters {
+  from?: string;
+  to?: string;
+}
+
+export interface StuckIssueEntry {
+  code: string;
+  count: number;
+  /** Capped at 5 by the backend -- examples to go look at, not exhaustive. */
+  sampleJobIds: string[];
+}
+
+export interface StuckIssuesResponse {
+  stuckIssues: StuckIssueEntry[];
+}
+
+export interface ScoreTrendPoint {
+  cycleNumber: number;
+  resolvedCount: number | null;
+  remainingCount: number | null;
+  resolutionRate: number | null;
+  completedAt: string;
+}
+
+export interface ScoreTrend {
+  jobId: string;
+  rounds: ScoreTrendPoint[];
+}

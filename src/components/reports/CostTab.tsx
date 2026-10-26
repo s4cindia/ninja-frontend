@@ -10,7 +10,7 @@ import { SPEND_SOURCE_LABELS } from '@/types/reports.types';
 import type { SpendEntry } from '@/types/reports.types';
 import { formatUsd, defaultReportRange, rangeLastNDays, clampDateRange, toIsoDate } from '@/utils/reportFormat';
 import type { SimpleDateRange } from '@/utils/reportFormat';
-import { CostDrilldownDialog } from './CostDrilldownDialog';
+import { JobDrilldownDialog } from './JobDrilldownDialog';
 
 type SortKey = 'jobId' | 'source' | 'costUsd' | 'stopReason' | 'pageCount';
 
@@ -225,7 +225,7 @@ export function CostTab() {
         </>
       ) : null}
 
-      <CostDrilldownDialog jobId={drilldownJobId} onClose={() => setDrilldownJobId(null)} />
+      <JobDrilldownDialog jobId={drilldownJobId} onClose={() => setDrilldownJobId(null)} />
     </div>
   );
 }

@@ -1,20 +1,11 @@
 import { Navigate } from 'react-router-dom';
-import { BarChart3 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { ThroughputTab } from '@/components/reports/ThroughputTab';
 import { TeamActivityTab } from '@/components/reports/TeamActivityTab';
 import { CostTab } from '@/components/reports/CostTab';
 import { ReliabilityTab } from '@/components/reports/ReliabilityTab';
-
-function ComingSoon({ label }: { label: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 text-center text-gray-400">
-      <BarChart3 className="w-10 h-10 mb-3 text-gray-300" />
-      <p className="font-medium">{label} reports are coming soon.</p>
-    </div>
-  );
-}
+import { QualityTab } from '@/components/reports/QualityTab';
 
 export default function AdminReportsPage() {
   const { user: currentUser } = useAuthStore();
@@ -49,7 +40,7 @@ export default function AdminReportsPage() {
           <CostTab />
         </TabsContent>
         <TabsContent value="quality">
-          <ComingSoon label="Fix quality / effectiveness" />
+          <QualityTab />
         </TabsContent>
         <TabsContent value="reliability">
           <ReliabilityTab />

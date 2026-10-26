@@ -9,6 +9,10 @@ import type {
   CostRoundTrend,
   ReliabilityReport,
   ReliabilityReportFilters,
+  QualityReport,
+  QualityReportFilters,
+  StuckIssuesResponse,
+  ScoreTrend,
 } from '@/types/reports.types';
 
 export type TeamActivityScope = 'admin' | 'self';
@@ -59,6 +63,30 @@ export const reportsService = {
     const res = await api.get<ApiResponse<ReliabilityReport>>('/admin/reports/reliability', {
       params: filters,
     });
+    return res.data.data;
+  },
+
+  // GET /admin/reports/quality -- ADMIN-only, tenant-scoped, same
+  // date-range convention as the other report endpoints.
+  async getQualityReport(filters?: QualityReportFilters): Promise<QualityReport> {
+    const res = await api.get<ApiResponse<QualityReport>>('/admin/reports/quality', {
+      params: filters,
+    });
+    return res.data.data;
+  },
+
+  // GET /admin/reports/quality/stuck-issues -- current-state backlog, no
+  // date range.
+  async getStuckIssues(): Promise<StuckIssuesResponse> {
+    const res = await api.get<ApiResponse<StuckIssuesResponse>>('/admin/reports/quality/stuck-issues');
+    return res.data.data;
+  },
+
+  // GET /admin/reports/quality/:jobId/score-trend -- per-round
+  // resolutionRate drill-down for one job. 404s if the job doesn't exist or
+  // belongs to another tenant (same guard as the cost drill-down).
+  async getScoreTrend(jobId: string): Promise<ScoreTrend> {
+    const res = await api.get<ApiResponse<ScoreTrend>>(`/admin/reports/quality/${jobId}/score-trend`);
     return res.data.data;
   },
 };

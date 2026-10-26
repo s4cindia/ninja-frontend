@@ -12,7 +12,11 @@ vi.mock('@/services/reports.service', () => ({
     getThroughputReport: vi.fn(),
     getTeamActivityReport: vi.fn(),
     getCostReport: vi.fn(),
+    getCostRoundTrend: vi.fn(),
     getReliabilityReport: vi.fn(),
+    getQualityReport: vi.fn(),
+    getStuckIssues: vi.fn(),
+    getScoreTrend: vi.fn(),
   },
 }));
 
@@ -20,6 +24,8 @@ const mockGetThroughputReport = vi.mocked(reportsService.getThroughputReport);
 const mockGetTeamActivityReport = vi.mocked(reportsService.getTeamActivityReport);
 const mockGetCostReport = vi.mocked(reportsService.getCostReport);
 const mockGetReliabilityReport = vi.mocked(reportsService.getReliabilityReport);
+const mockGetQualityReport = vi.mocked(reportsService.getQualityReport);
+const mockGetStuckIssues = vi.mocked(reportsService.getStuckIssues);
 
 const adminUser: User = {
   id: 'admin-1',
@@ -92,6 +98,11 @@ describe('AdminReportsPage', () => {
         UNKNOWN: 0,
       },
     });
+    mockGetQualityReport.mockReset().mockResolvedValue({
+      period: { from: '2026-09-26', to: '2026-10-26' },
+      yieldByType: [],
+    });
+    mockGetStuckIssues.mockReset().mockResolvedValue({ stuckIssues: [] });
   });
 
   it('redirects a non-admin away from the page', async () => {
@@ -103,7 +114,7 @@ describe('AdminReportsPage', () => {
     expect(screen.queryByText('Operational Reports')).not.toBeInTheDocument();
   });
 
-  it('shows the Throughput tab by default, switches through Cost/Team Activity/Reliability, and still placeholders Quality', async () => {
+  it('shows the Throughput tab by default and switches through every other, now-real tab', async () => {
     setCurrentUser();
 
     renderPage();
@@ -115,9 +126,8 @@ describe('AdminReportsPage', () => {
     expect(await screen.findByText('Total Spent')).toBeInTheDocument();
     expect(screen.queryByText('Queue Wait')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Team Activity' }));
-    expect(await screen.findByText('No team reviews in this range.')).toBeInTheDocument();
-    expect(screen.queryByText('Queue Wait')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Quality' }));
+    expect(await screen.findByText('Yield by Suggestion Type')).toBeInTheDocument();
     expect(screen.queryByText('Total Spent')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('tab', { name: 'Reliability' }));
@@ -126,9 +136,10 @@ describe('AdminReportsPage', () => {
         (_, el) => el?.tagName === 'P' && el.textContent?.replace(/\s+/g, ' ').trim() === '0 interruptions · 0 failures in this period'
       )
     ).toBeInTheDocument();
-    expect(screen.queryByText('No team reviews in this range.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Yield by Suggestion Type')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Quality' }));
-    expect(screen.getByText('Fix quality / effectiveness reports are coming soon.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Team Activity' }));
+    expect(await screen.findByText('No team reviews in this range.')).toBeInTheDocument();
+    expect(screen.queryByText('Queue Wait')).not.toBeInTheDocument();
   });
 });

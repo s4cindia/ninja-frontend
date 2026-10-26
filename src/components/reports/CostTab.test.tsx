@@ -6,11 +6,12 @@ import { reportsService } from '@/services/reports.service';
 import type { CostReport } from '@/types/reports.types';
 
 vi.mock('@/services/reports.service', () => ({
-  reportsService: { getCostReport: vi.fn(), getCostRoundTrend: vi.fn() },
+  reportsService: { getCostReport: vi.fn(), getCostRoundTrend: vi.fn(), getScoreTrend: vi.fn() },
 }));
 
 const mockGetCostReport = vi.mocked(reportsService.getCostReport);
 const mockGetCostRoundTrend = vi.mocked(reportsService.getCostRoundTrend);
+const mockGetScoreTrend = vi.mocked(reportsService.getScoreTrend);
 
 function mockReport(overrides?: Partial<CostReport>): CostReport {
   return {
@@ -42,6 +43,7 @@ describe('CostTab', () => {
   beforeEach(() => {
     mockGetCostReport.mockReset();
     mockGetCostRoundTrend.mockReset().mockResolvedValue({ jobId: 'job-aaa111', rounds: [] });
+    mockGetScoreTrend.mockReset().mockResolvedValue({ jobId: 'job-aaa111', rounds: [] });
   });
 
   it('renders summary cards and the cap-hit breakdown', async () => {
@@ -91,8 +93,11 @@ describe('CostTab', () => {
     const row = await screen.findByText('job-aaa1…');
     fireEvent.click(row);
 
-    expect(await screen.findByText(/Per-Round Cost/)).toBeInTheDocument();
+    expect(await screen.findByText(/Job History/)).toBeInTheDocument();
+    expect(screen.getByText('Per-Round Cost')).toBeInTheDocument();
+    expect(screen.getByText('Score Trend (Resolution Rate)')).toBeInTheDocument();
     expect(mockGetCostRoundTrend).toHaveBeenCalledWith('job-aaa111');
+    expect(mockGetScoreTrend).toHaveBeenCalledWith('job-aaa111');
   });
 
   it('shows a retry-able error banner on failure', async () => {
