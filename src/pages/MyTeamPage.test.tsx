@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import axios from 'axios';
 import MyTeamPage from './MyTeamPage';
 import { teamService } from '@/services/team.service';
+import { reportsService } from '@/services/reports.service';
 import type { TeamJob } from '@/types/team.types';
 
 vi.mock('@/services/team.service', async () => {
@@ -17,7 +18,12 @@ vi.mock('@/services/team.service', async () => {
   };
 });
 
+vi.mock('@/services/reports.service', () => ({
+  reportsService: { getTeamActivityReport: vi.fn() },
+}));
+
 const mockListTeamJobs = vi.mocked(teamService.listTeamJobs);
+const mockGetTeamActivityReport = vi.mocked(reportsService.getTeamActivityReport);
 
 function mockTeamJob(overrides?: Partial<TeamJob>): TeamJob {
   return {
@@ -47,6 +53,11 @@ describe('MyTeamPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     mockListTeamJobs.mockReset();
+    mockGetTeamActivityReport.mockReset().mockResolvedValue({
+      period: { from: '2026-09-26', to: '2026-10-26' },
+      reviewThroughput: [],
+      ownership: [],
+    });
   });
 
   it('lists teammates\' jobs with file, type, status, owner id, and a view link', async () => {
@@ -102,5 +113,43 @@ describe('MyTeamPage', () => {
 
     await waitFor(() => expect(mockListTeamJobs).toHaveBeenCalled());
     expect(await screen.findByText('No team jobs yet')).toBeInTheDocument();
+  });
+
+  it("shows the caller's own Team Activity section below the job list", async () => {
+    mockListTeamJobs.mockResolvedValue({
+      jobs: [],
+      pagination: { page: 1, limit: 20, total: 0, pages: 1 },
+    });
+    mockGetTeamActivityReport.mockResolvedValue({
+      period: { from: '2026-09-26', to: '2026-10-26' },
+      reviewThroughput: [
+        { reviewerId: 'leader-1', reviewerName: 'Lee Leader', reviewerEmail: 'lee@example.com', okCount: 3, needsCorrectionCount: 1, total: 4 },
+      ],
+      ownership: [],
+    });
+
+    renderPage();
+
+    expect(await screen.findByText('Team Activity')).toBeInTheDocument();
+    expect(await screen.findByText('Lee Leader')).toBeInTheDocument();
+    expect(mockGetTeamActivityReport).toHaveBeenCalledWith('self', expect.anything());
+  });
+
+  it('does not show the Team Activity section for a caller who is not a Team Leader/Viewer on any team', async () => {
+    const error = Object.assign(new Error('Forbidden'), {
+      isAxiosError: true,
+      response: {
+        status: 403,
+        data: { success: false, error: { code: 'NOT_TEAM_LEADER_OR_VIEWER', message: 'nope' } },
+      },
+    });
+    vi.spyOn(axios, 'isAxiosError').mockReturnValue(true);
+    mockListTeamJobs.mockRejectedValue(error);
+
+    renderPage();
+
+    await screen.findByText(/not a Team Leader or Viewer on any team/i);
+    expect(screen.queryByText('Team Activity')).not.toBeInTheDocument();
+    expect(mockGetTeamActivityReport).not.toHaveBeenCalled();
   });
 });

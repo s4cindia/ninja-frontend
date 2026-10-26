@@ -97,6 +97,7 @@ import AnnotatorGuideHelpPage from '@/pages/help/AnnotatorGuidePage';
 import AdminCorpusPage from '@/pages/admin/AdminCorpusPage';
 import AdminUsersPage from '@/pages/admin/AdminUsersPage';
 import AdminTeamsPage from '@/pages/admin/AdminTeamsPage';
+import AdminReportsPage from '@/pages/admin/AdminReportsPage';
 import MyTeamPage from '@/pages/MyTeamPage';
 import ComparisonStudyConsolePage from '@/pages/comparison-study/ComparisonStudyConsolePage';
 import ComparisonTrialWorkspacePage from '@/pages/comparison-study/ComparisonTrialWorkspacePage';
@@ -305,6 +306,7 @@ function AppRoutes() {
           <Route path="/admin/corpus" element={<AdminCorpusPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/teams" element={<AdminTeamsPage />} />
+          <Route path="/admin/reports" element={<AdminReportsPage />} />
 
           {/* Test Editor Page (protected) */}
           <Route path="/test/editor" element={<TestEditorPage />} />
