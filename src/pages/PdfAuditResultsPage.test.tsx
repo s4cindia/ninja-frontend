@@ -3444,4 +3444,102 @@ describe('PdfAuditResultsPage', () => {
       expect(screen.queryByTestId('auto-mode-stop-error')).not.toBeInTheDocument();
     });
   });
+
+  describe('Team Review Panel', () => {
+    function mockGetsFor(auditResultOverrides: Partial<PdfAuditResult>) {
+      const mockResult = createMockAuditResult(auditResultOverrides);
+      mockApi.get.mockImplementation((url: string) => {
+        if (url.includes('/audit/result')) return Promise.resolve({ data: { data: mockResult } });
+        if (url.includes('/auto-tag/status')) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url.includes('/ai-analysis')) return Promise.resolve({ data: { data: { suggestions: [], analyzed: 0, total: 0, status: 'complete' } } });
+        if (url.startsWith('/jobs/')) return Promise.resolve({ data: { data: { output: {} } } });
+        return Promise.resolve({ data: { data: {} } });
+      });
+      return mockResult;
+    }
+
+    it('shows the panel with existing review history for a teammate\'s job (isOwner: false)', async () => {
+      mockGetsFor({
+        isOwner: false,
+        teamReviews: [
+          {
+            id: 'review-1',
+            jobId: 'job-123',
+            reviewedBy: 'leader-1',
+            reviewedAt: '2026-10-20T00:00:00Z',
+            outcome: 'OK',
+            notes: 'Looks good',
+            reviewer: { id: 'leader-1', firstName: 'Lee', lastName: 'Leader', email: 'lee@example.com' },
+          },
+        ],
+      });
+
+      renderWithRouter('job-123');
+
+      expect(await screen.findByText('Team Review')).toBeInTheDocument();
+      expect(screen.getByText('Lee Leader')).toBeInTheDocument();
+      expect(screen.getByText('Looks good')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /submit review/i })).toBeInTheDocument();
+    });
+
+    it('hides the panel for the owning job (isOwner: true)', async () => {
+      mockGetsFor({ isOwner: true, teamReviews: [] });
+
+      renderWithRouter('job-123');
+
+      await screen.findByText('test-document.pdf');
+      expect(screen.queryByText('Team Review')).not.toBeInTheDocument();
+    });
+
+    it('hides the panel when isOwner is absent from the response (older backend before this field shipped)', async () => {
+      mockGetsFor({ teamReviews: undefined });
+
+      renderWithRouter('job-123');
+
+      await screen.findByText('test-document.pdf');
+      expect(screen.queryByText('Team Review')).not.toBeInTheDocument();
+    });
+
+    it('refetches the audit result after a successful review submission, picking up the new entry', async () => {
+      mockGetsFor({ isOwner: false, teamReviews: [] });
+      mockApi.post.mockResolvedValueOnce({
+        data: {
+          data: { id: 'review-2', jobId: 'job-123', reviewedBy: 'leader-1', reviewedAt: '2026-10-27T00:00:00Z', outcome: 'OK', notes: null },
+        },
+      });
+
+      renderWithRouter('job-123');
+      await screen.findByText('Team Review');
+
+      const getCallsBefore = mockApi.get.mock.calls.filter((c) => String(c[0]).includes('/audit/result')).length;
+
+      // The next audit/result fetch (triggered by onSubmitted) returns the
+      // review now present, proving the panel re-renders off a real refetch
+      // rather than just locally appending the raw POST response.
+      mockGetsFor({
+        isOwner: false,
+        teamReviews: [
+          {
+            id: 'review-2',
+            jobId: 'job-123',
+            reviewedBy: 'leader-1',
+            reviewedAt: '2026-10-27T00:00:00Z',
+            outcome: 'OK',
+            notes: null,
+            reviewer: { id: 'leader-1', firstName: 'Lee', lastName: 'Leader', email: 'lee@example.com' },
+          },
+        ],
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: /submit review/i }));
+
+      await waitFor(() =>
+        expect(mockApi.post).toHaveBeenCalledWith('/jobs/job-123/team-review', { outcome: 'OK', notes: undefined })
+      );
+      await waitFor(() => expect(screen.getByText('Lee Leader')).toBeInTheDocument());
+
+      const getCallsAfter = mockApi.get.mock.calls.filter((c) => String(c[0]).includes('/audit/result')).length;
+      expect(getCallsAfter).toBeGreaterThan(getCallsBefore);
+    });
+  });
 });

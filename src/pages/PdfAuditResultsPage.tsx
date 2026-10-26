@@ -94,6 +94,7 @@ import { derivePhases } from '@/utils/pdfPhaseStepper';
 import { deriveCurrentRoundPhase } from '@/utils/autoModeRoundPhase';
 import type { ComparisonTrialMode } from '@/types/comparisonStudy.types';
 import type { PdfAuditResult, PdfAuditIssue } from '@/types/pdf.types';
+import { TeamReviewPanel } from '@/components/pdf/TeamReviewPanel';
 import type { IssueSeverity } from '@/types/accessibility.types';
 import type { ScanLevel } from '@/types/scan-level.types';
 
@@ -1725,6 +1726,14 @@ export const PdfAuditResultsPage: React.FC = () => {
         remediationCycleInProgress={remediationCycleActive}
         refreshTrigger={historyRefreshTrigger}
       />
+
+      {auditResult.isOwner === false && (
+        <TeamReviewPanel
+          jobId={jobId!}
+          teamReviews={auditResult.teamReviews ?? []}
+          onSubmitted={fetchAuditResult}
+        />
+      )}
 
       {/* Matterhorn Summary */}
       <div className="px-6 py-4 bg-white border-b border-gray-200">
