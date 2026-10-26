@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { useTeamJobs } from '@/hooks/useTeamJobs';
 import { isNotTeamLeaderOrViewerError } from '@/services/team.service';
+import { TeamActivitySection } from '@/components/reports/TeamActivitySection';
 import type { TeamJob } from '@/types/team.types';
 import { getJobTypeLabel, extractFileNameFromJob } from '@/utils/jobTypes';
 import { getStatusIcon, getStatusBadgeClass, formatRelativeTime } from '@/utils/jobHelpers';
@@ -241,6 +242,13 @@ export default function MyTeamPage() {
           </>
         )}
       </div>
+
+      {/* Gated on `data` (the primary team-jobs query having actually
+          succeeded), not just `!notApplicable` -- that flag is only known
+          once the query settles, so gating on it alone would mount this
+          section (and fire its own fetch) during the initial loading state
+          too, before we know the caller even qualifies. */}
+      {data && <TeamActivitySection />}
     </div>
   );
 }

@@ -31,6 +31,7 @@ import {
   GitCompare,
   UsersRound,
   Network,
+  BarChart3,
 } from 'lucide-react';
 
 type NavItem = {
@@ -111,6 +112,7 @@ export function MainLayout() {
         { to: '/admin/corpus', icon: Database, label: 'Corpus Management', activePrefix: '/admin/corpus' },
         { to: '/admin/users', icon: Users, label: 'User Management', activePrefix: '/admin/users' },
         { to: '/admin/teams', icon: Network, label: 'Team Management', activePrefix: '/admin/teams' },
+        { to: '/admin/reports', icon: BarChart3, label: 'Operational Reports', activePrefix: '/admin/reports' },
         { to: '/bootstrap', icon: Shield, label: 'Bootstrap Console', activePrefix: '/bootstrap' },
         { to: '/comparison-study', icon: GitCompare, label: 'Comparison Study', activePrefix: '/comparison-study' },
       ],
