@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { api, ApiResponse } from './api';
-import type { TeamJob } from '@/types/team.types';
+import type { TeamJob, TeamReviewOutcome } from '@/types/team.types';
 
 export interface TeamJobsResponse {
   jobs: TeamJob[];
@@ -30,7 +30,34 @@ export const teamService = {
     });
     return res.data.data;
   },
+
+  // POST /jobs/:jobId/team-review -- TEAM_LEADER-only (an ADMIN may also
+  // write one; a VIEWER-only teammate is server-rejected with a 403 whose
+  // message is fine to surface directly, since there's no client-side way
+  // to distinguish TEAM_LEADER from VIEWER ahead of time). Returns the raw
+  // created row, with no nested reviewer -- refetch the job's audit result
+  // to pick up the new entry in its joined `teamReviews` history instead of
+  // trying to merge this response into it.
+  async submitTeamReview(
+    jobId: string,
+    body: { outcome: TeamReviewOutcome; notes?: string }
+  ): Promise<TeamReviewSubmitResponse> {
+    const res = await api.post<ApiResponse<TeamReviewSubmitResponse>>(
+      `/jobs/${encodeURIComponent(jobId)}/team-review`,
+      body
+    );
+    return res.data.data;
+  },
 };
+
+export interface TeamReviewSubmitResponse {
+  id: string;
+  jobId: string;
+  reviewedBy: string;
+  reviewedAt: string;
+  outcome: TeamReviewOutcome;
+  notes: string | null;
+}
 
 // True when `error` is the specific 403 GET /jobs/team returns for a caller
 // who isn't a TEAM_LEADER/VIEWER on any team -- an expected "not applicable

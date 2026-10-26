@@ -30,6 +30,31 @@ export interface Team {
   members?: TeamMembership[];
 }
 
+// A Team Leader's non-blocking spot-check of a job they don't own -- an
+// audit-trail write, never a gate on the owning Executive's own flow.
+// Job-type-agnostic (PDF or EPUB) -- see team-review.routes.ts.
+export type TeamReviewOutcome = 'OK' | 'NEEDS_CORRECTION';
+
+export interface TeamReviewer {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
+// The shape nested in GET /pdf/job/:jobId/audit/result's `teamReviews`
+// (reviewer joined in). POST .../team-review's own response is the raw
+// created row with no nested reviewer -- see submitTeamReview's doc comment.
+export interface TeamReviewRecord {
+  id: string;
+  jobId: string;
+  reviewedBy: string;
+  reviewedAt: string;
+  outcome: TeamReviewOutcome;
+  notes: string | null;
+  reviewer: TeamReviewer;
+}
+
 // GET /jobs/team's shape -- mirrors job.controller.ts's respondWithJobList()
 // select exactly (notably: no `updatedAt`, unlike jobs.service.ts's `Job`,
 // and `userId` is included so a Team Leader/Viewer can tell whose job it is,

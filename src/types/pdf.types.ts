@@ -1,4 +1,5 @@
 import type { IssueSeverity } from './accessibility.types';
+import type { TeamReviewRecord } from './team.types';
 
 /**
  * Timestamp type for ISO 8601 formatted date strings
@@ -167,6 +168,19 @@ export interface PdfAuditResult {
   autoTagError?: string | null;
   /** Why tagging was skipped, when autoTagStatus is 'skipped' */
   autoTagSkipReason?: 'already-tagged' | 'no-tagger-configured' | null;
+  /**
+   * Whether the current viewer owns this job -- lets the frontend decide
+   * whether to show the Team Review panel (never shown to the owner).
+   * Always present on this route's COMPLETED response (see
+   * pdf.controller.ts's getAuditResult); optional here only because other
+   * code in this codebase (tests, mocks, older cached data) may omit it.
+   */
+  isOwner?: boolean;
+  /**
+   * Existing Team Review spot-check history for this job, newest first.
+   * Always present (possibly empty) alongside isOwner.
+   */
+  teamReviews?: TeamReviewRecord[];
 }
 
 /**
