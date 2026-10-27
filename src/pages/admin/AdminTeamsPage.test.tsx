@@ -7,6 +7,7 @@ import {
   createAdminTeam,
   addAdminTeamMember,
   removeAdminTeamMember,
+  deleteAdminTeam,
   listAdminUsers,
 } from '@/services/adminApi';
 import type { AdminUser } from '@/services/adminApi';
@@ -19,6 +20,7 @@ vi.mock('@/services/adminApi', () => ({
   createAdminTeam: vi.fn(),
   addAdminTeamMember: vi.fn(),
   removeAdminTeamMember: vi.fn(),
+  deleteAdminTeam: vi.fn(),
   listAdminUsers: vi.fn(),
 }));
 
@@ -26,6 +28,7 @@ const mockListAdminTeams = vi.mocked(listAdminTeams);
 const mockCreateAdminTeam = vi.mocked(createAdminTeam);
 const mockAddAdminTeamMember = vi.mocked(addAdminTeamMember);
 const mockRemoveAdminTeamMember = vi.mocked(removeAdminTeamMember);
+const mockDeleteAdminTeam = vi.mocked(deleteAdminTeam);
 const mockListAdminUsers = vi.mocked(listAdminUsers);
 
 const adminUser: User = {
@@ -81,7 +84,9 @@ describe('AdminTeamsPage', () => {
     mockCreateAdminTeam.mockReset();
     mockAddAdminTeamMember.mockReset();
     mockRemoveAdminTeamMember.mockReset();
+    mockDeleteAdminTeam.mockReset();
     mockListAdminUsers.mockReset().mockResolvedValue({ users: mockUsers });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
 
   it('redirects a non-admin away from the page', async () => {
@@ -191,5 +196,51 @@ describe('AdminTeamsPage', () => {
     await waitFor(() =>
       expect(mockRemoveAdminTeamMember).toHaveBeenCalledWith('team-1', 'user-1')
     );
+  });
+
+  it('deletes a team after confirming', async () => {
+    setCurrentUser();
+    mockListAdminTeams.mockResolvedValueOnce({ teams: [mockTeam()] });
+    mockDeleteAdminTeam.mockResolvedValue({ id: 'team-1' });
+    mockListAdminTeams.mockResolvedValueOnce({ teams: [] });
+
+    renderPage();
+
+    fireEvent.click(await screen.findByTitle('Delete team'));
+
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringContaining('Cell A')
+    );
+    await waitFor(() => expect(mockDeleteAdminTeam).toHaveBeenCalledWith('team-1'));
+    await waitFor(() => expect(screen.queryByText('Cell A')).not.toBeInTheDocument());
+  });
+
+  it('does not delete a team when the confirm dialog is cancelled', async () => {
+    setCurrentUser();
+    mockListAdminTeams.mockResolvedValue({ teams: [mockTeam()] });
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    renderPage();
+
+    fireEvent.click(await screen.findByTitle('Delete team'));
+
+    expect(mockDeleteAdminTeam).not.toHaveBeenCalled();
+    expect(screen.getByText('Cell A')).toBeInTheDocument();
+  });
+
+  it('shows an error inline and keeps the team when deletion fails', async () => {
+    setCurrentUser();
+    mockListAdminTeams.mockResolvedValue({ teams: [mockTeam()] });
+    mockDeleteAdminTeam.mockRejectedValue({
+      response: { data: { error: { message: 'Team not found' } } },
+    });
+
+    renderPage();
+
+    fireEvent.click(await screen.findByTitle('Delete team'));
+
+    await waitFor(() => expect(mockDeleteAdminTeam).toHaveBeenCalledWith('team-1'));
+    expect(await screen.findByText('Team not found')).toBeInTheDocument();
+    expect(screen.getByText('Cell A')).toBeInTheDocument();
   });
 });

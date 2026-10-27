@@ -7,6 +7,7 @@ import {
   createAdminTeam,
   addAdminTeamMember,
   removeAdminTeamMember,
+  deleteAdminTeam,
   listAdminUsers,
 } from '@/services/adminApi';
 import type { AdminUser } from '@/services/adminApi';
@@ -37,6 +38,9 @@ export default function AdminTeamsPage() {
   const [memberFormRole, setMemberFormRole] = useState<TeamRole>('EXECUTIVE');
   const [addingMember, setAddingMember] = useState(false);
   const [memberError, setMemberError] = useState<string | null>(null);
+
+  const [deletingTeamId, setDeletingTeamId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<{ teamId: string; message: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -122,6 +126,30 @@ export default function AdminTeamsPage() {
     } catch {
       // The member list is re-fetched regardless, so a transient failure
       // just leaves the row in place for the admin to retry.
+    }
+  };
+
+  const handleDeleteTeam = async (team: Team) => {
+    if (
+      !window.confirm(
+        `Delete "${team.name}"? This permanently deletes the team and all its memberships. This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    setDeletingTeamId(team.id);
+    setDeleteError(null);
+    try {
+      await deleteAdminTeam(team.id);
+      await load();
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: { message?: string } } }; message?: string };
+      setDeleteError({
+        teamId: team.id,
+        message: axiosErr.response?.data?.error?.message ?? axiosErr.message ?? 'Failed to delete team',
+      });
+    } finally {
+      setDeletingTeamId(null);
     }
   };
 
@@ -219,14 +247,30 @@ export default function AdminTeamsPage() {
               <div key={team.id} className="rounded-lg border border-gray-200 overflow-hidden">
                 <div className="bg-gray-50 px-4 py-3 flex items-center justify-between">
                   <div className="font-medium text-gray-900">{team.name}</div>
-                  <button
-                    onClick={() => openMemberForm(team.id)}
-                    className="flex items-center gap-1 text-sm text-[#006B6B] hover:text-[#005858]"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                    Add Member
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => openMemberForm(team.id)}
+                      className="flex items-center gap-1 text-sm text-[#006B6B] hover:text-[#005858]"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      Add Member
+                    </button>
+                    <button
+                      onClick={() => handleDeleteTeam(team)}
+                      disabled={deletingTeamId === team.id}
+                      className="text-gray-400 hover:text-red-600 disabled:opacity-50"
+                      title="Delete team"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
+
+                {deleteError?.teamId === team.id && (
+                  <div className="px-4 py-2 border-t border-gray-200 bg-red-50 text-sm text-red-700">
+                    {deleteError.message}
+                  </div>
+                )}
 
                 {memberFormTeamId === team.id && (
                   <form
