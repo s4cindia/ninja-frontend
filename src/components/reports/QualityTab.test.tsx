@@ -32,7 +32,16 @@ function mockQualityReport(overrides?: Partial<QualityReport>): QualityReport {
 
 function mockStuckIssues(overrides?: Partial<StuckIssuesResponse>): StuckIssuesResponse {
   return {
-    stuckIssues: [{ code: 'MISSING_ALT_TEXT', count: 12, sampleJobIds: ['job-aaa111', 'job-bbb222'] }],
+    stuckIssues: [
+      {
+        code: 'MISSING_ALT_TEXT',
+        count: 12,
+        sampleJobs: [
+          { jobId: 'job-aaa111', fileName: 'figures.pdf' },
+          { jobId: 'job-bbb222', fileName: null },
+        ],
+      },
+    ],
     ...overrides,
   };
 }
@@ -63,8 +72,8 @@ describe('QualityTab', () => {
     expect(await screen.findByText('Yield by Suggestion Type')).toBeInTheDocument();
     expect(await screen.findByText('MISSING_ALT_TEXT')).toBeInTheDocument();
     expect(screen.getByText('12')).toBeInTheDocument();
-    expect(screen.getByText('job-aaa1…')).toBeInTheDocument();
-    expect(screen.getByText('job-bbb2…')).toBeInTheDocument();
+    expect(screen.getByText('figures.pdf')).toBeInTheDocument();
+    expect(screen.getByText('job-bbb222')).toBeInTheDocument();
   });
 
   it('shows empty states when there is no activity', async () => {
@@ -77,12 +86,12 @@ describe('QualityTab', () => {
     expect(screen.getByText('No stuck issues right now.')).toBeInTheDocument();
   });
 
-  it('opens the shared job drill-down dialog when a sample job id is clicked', async () => {
+  it('opens the shared job drill-down dialog when a sample job is clicked', async () => {
     mockGetQualityReport.mockResolvedValue(mockQualityReport());
     mockGetStuckIssues.mockResolvedValue(mockStuckIssues());
 
     renderTab();
-    const sampleJobButton = await screen.findByText('job-aaa1…');
+    const sampleJobButton = await screen.findByText('figures.pdf');
     fireEvent.click(sampleJobButton);
 
     expect(await screen.findByText(/Job History — job-aaa111/)).toBeInTheDocument();

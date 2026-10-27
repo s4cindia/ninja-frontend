@@ -209,7 +209,12 @@ export function CostTab() {
                           className="border-b last:border-0 hover:bg-gray-50 cursor-pointer"
                           onClick={() => setDrilldownJobId(run.jobId)}
                         >
-                          <td className="py-2 pr-3 font-mono text-xs text-gray-900">{run.jobId.slice(0, 8)}…</td>
+                          <td
+                            className="py-2 pr-3 text-xs text-gray-900 max-w-[200px] truncate"
+                            title={run.fileName ?? run.jobId}
+                          >
+                            {run.fileName ?? run.jobId}
+                          </td>
                           <td className="py-2 pr-3 text-gray-600">{SPEND_SOURCE_LABELS[run.source]}</td>
                           <td className="py-2 pr-3 text-right">{formatUsd(run.costUsd)}</td>
                           <td className="py-2 pr-3 text-gray-600">{run.stopReason ?? 'not stopped'}</td>
