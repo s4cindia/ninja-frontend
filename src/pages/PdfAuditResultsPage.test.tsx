@@ -345,6 +345,21 @@ describe('PdfAuditResultsPage', () => {
       });
     });
 
+    it('shows the backend\'s error message for a 404 (e.g. access denied), not axios\'s generic status-code text', async () => {
+      mockApi.get.mockRejectedValueOnce({
+        isAxiosError: true,
+        message: 'Request failed with status code 404',
+        response: { status: 404, data: { error: { message: 'Job not found or access denied' } } },
+      });
+
+      renderWithRouter();
+
+      await waitFor(() => {
+        expect(screen.getByText('Job not found or access denied')).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/Request failed with status code/)).not.toBeInTheDocument();
+    });
+
     it('prefers data.error over data.message for a FAILED job, not a generic message (regression: job.error was previously dropped for a non-COMPLETED job, always showing "Audit failed. Please try again." with nothing to act on)', async () => {
       // Deliberately distinct message/error values (CodeRabbit catch on PR
       // #334) -- identical fixture values would let this test pass even if
