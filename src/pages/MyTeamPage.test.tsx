@@ -60,7 +60,7 @@ describe('MyTeamPage', () => {
     });
   });
 
-  it('lists teammates\' jobs with file, type, status, owner id, and a view link', async () => {
+  it('lists teammates\' jobs with file, type, status, owner id, and a view link routed to the PDF audit page', async () => {
     mockListTeamJobs.mockResolvedValue({
       jobs: [mockTeamJob()],
       pagination: { page: 1, limit: 20, total: 1, pages: 1 },
@@ -72,6 +72,20 @@ describe('MyTeamPage', () => {
     expect(screen.getByText('PDF Accessibility Audit')).toBeInTheDocument();
     expect(screen.getByText('COMPLETED')).toBeInTheDocument();
     expect(screen.getByTitle('teammate-user-id-123')).toBeInTheDocument();
+    // /jobs/:id never renders the Team Review Panel -- a PDF job's view
+    // link must go to /pdf/audit/:id, the only route that does.
+    expect(screen.getByRole('link', { name: /view/i })).toHaveAttribute('href', '/pdf/audit/job-1');
+  });
+
+  it('routes a view link to the generic job detail page for a job type with no dedicated route', async () => {
+    mockListTeamJobs.mockResolvedValue({
+      jobs: [mockTeamJob({ type: 'EPUB_ACCESSIBILITY' })],
+      pagination: { page: 1, limit: 20, total: 1, pages: 1 },
+    });
+
+    renderPage();
+
+    expect(await screen.findByText('teammate-file.pdf')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /view/i })).toHaveAttribute('href', '/jobs/job-1');
   });
 
