@@ -487,6 +487,19 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
 
         {(state === 'uploading' || state === 'queued' || state === 'processing') && (
           <div className="space-y-4">
+            {/* Carried over from the pre-upload confirmation step above --
+                selectedFile stays populated throughout (only cleared on
+                handleReset), but this branch used to render nothing from it,
+                so the file name/size disappeared the moment upload started. */}
+            {selectedFile && (
+              <div className="flex items-center justify-center gap-3">
+                <FileText className="h-8 w-8 text-primary-600 flex-shrink-0" />
+                <div className="text-left">
+                  <p className="font-medium text-gray-900">{selectedFile.name}</p>
+                  <p className="text-sm text-gray-500">{formatBytes(selectedFile.size)}</p>
+                </div>
+              </div>
+            )}
             <Loader2 className="h-12 w-12 mx-auto text-primary-600 animate-spin" />
             <p className="font-medium text-gray-900">
               {state === 'uploading' && 'Uploading and auditing...'}
