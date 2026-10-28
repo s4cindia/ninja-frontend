@@ -89,6 +89,88 @@ export interface Axes4QuotaStatus {
   periodResetAt: string | null;
 }
 
+// ─── External PAC report upload (job-native) ──────────────────────────────────
+//
+// Job-native counterpart to comparisonStudy.service.ts's own
+// ExternalPacReport upload flow (same shape, keyed on jobId instead of
+// trialId) — lets an operator upload a real, external PAC-tool report
+// against a regular PDF Accessibility job that has no linked Comparison
+// Study trial. Defined here (not reused from comparisonStudy.types.ts)
+// since that type's `trialId` field doesn't translate directly.
+
+export interface JobExternalPacReport {
+  id: string;
+  jobId: string;
+  s3Key: string;
+  originalFileName: string;
+  mimeType: string;
+  size: number;
+  pass: number | null;
+  fail: number | null;
+  untested: number | null;
+  humanRequired: number | null;
+  notApplicable: number | null;
+  uploadedById: string;
+  createdAt: string;
+  /** Presigned GET, generated fresh on every fetch of this report — link to it directly, no extra request needed. */
+  downloadUrl: string;
+}
+
+export interface JobExternalPacReportSummary {
+  pass?: number;
+  fail?: number;
+  untested?: number;
+  humanRequired?: number;
+  notApplicable?: number;
+}
+
+export async function getJobExternalPacReportUploadUrl(
+  jobId: string,
+  filename: string,
+  contentType: string,
+): Promise<{ uploadUrl: string; expiresIn: number }> {
+  const response = await api.post(`/pdf/${encodeURIComponent(jobId)}/pac-report/external/upload-url`, { filename, contentType });
+  return response.data.data;
+}
+
+export async function confirmJobExternalPacReportUpload(
+  jobId: string,
+  data: { originalFileName: string; mimeType: string; summary: JobExternalPacReportSummary },
+): Promise<JobExternalPacReport> {
+  const response = await api.post(`/pdf/${encodeURIComponent(jobId)}/pac-report/external/confirm`, data);
+  return response.data.data;
+}
+
+// data.data is null when nothing has been uploaded yet — a valid "no report
+// attached" state, not an error, so callers shouldn't treat a null
+// resolution as a failure (matches getExternalPacReport's own convention).
+export async function getJobExternalPacReport(jobId: string): Promise<JobExternalPacReport | null> {
+  const response = await api.get(`/pdf/${encodeURIComponent(jobId)}/pac-report/external`);
+  return response.data.data;
+}
+
+export async function deleteJobExternalPacReport(jobId: string): Promise<void> {
+  await api.delete(`/pdf/${encodeURIComponent(jobId)}/pac-report/external`);
+}
+
+/**
+ * Uploads the file half of the flow — presign, then PUT straight to S3
+ * (same WAF-bypass reasoning as comparisonStudy.service.ts's
+ * uploadExternalPacReportFile). Caller still has to call
+ * confirmJobExternalPacReportUpload afterward with the summary counts.
+ */
+export async function uploadJobExternalPacReportFile(jobId: string, file: File): Promise<void> {
+  const { uploadUrl } = await getJobExternalPacReportUploadUrl(jobId, file.name, file.type || 'application/pdf');
+  const s3Res = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': file.type || 'application/pdf' },
+    body: file,
+  });
+  if (!s3Res.ok) {
+    throw new Error(`S3 upload failed: ${s3Res.status}`);
+  }
+}
+
 // ─── API calls ────────────────────────────────────────────────────────────────
 
 export async function getPacReport(jobId: string): Promise<PacReport> {
