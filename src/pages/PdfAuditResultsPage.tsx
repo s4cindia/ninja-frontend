@@ -605,8 +605,7 @@ export const PdfAuditResultsPage: React.FC = () => {
       // Only update state if component is still mounted
       if (!isMountedRef.current) return;
 
-      const message = err instanceof Error ? err.message : 'Failed to load audit results';
-      setError(message);
+      setError(getErrorMessage(err) || 'Failed to load audit results');
       setIsLoading(false);
       setIsPolling(false);
     }
