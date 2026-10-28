@@ -145,14 +145,15 @@ export function QualityTab() {
                       <td className="py-2 pr-3 text-right">{issue.count}</td>
                       <td className="py-2">
                         <div className="flex flex-wrap gap-2">
-                          {issue.sampleJobIds.map((jobId) => (
+                          {issue.sampleJobs.map((sample) => (
                             <button
-                              key={jobId}
+                              key={sample.jobId}
                               type="button"
-                              className="font-mono text-xs text-[#006B6B] hover:underline"
-                              onClick={() => setDrilldownJobId(jobId)}
+                              title={sample.fileName ?? sample.jobId}
+                              className="max-w-[160px] truncate text-xs text-[#006B6B] hover:underline"
+                              onClick={() => setDrilldownJobId(sample.jobId)}
                             >
-                              {jobId.slice(0, 8)}…
+                              {sample.fileName ?? sample.jobId}
                             </button>
                           ))}
                         </div>

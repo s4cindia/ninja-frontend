@@ -22,9 +22,9 @@ function mockReport(overrides?: Partial<CostReport>): CostReport {
     avgCostPerPageUsd: 0.05,
     capHitFrequency: { converged: 2, budget_limit: 1 },
     spendByRun: [
-      { jobId: 'job-aaa111', source: 'job_native', costUsd: 10, stopReason: 'budget_limit', pageCount: 100 },
-      { jobId: 'job-bbb222', source: 'comparison_trial', costUsd: 2.5, stopReason: 'converged', pageCount: 50 },
-      { jobId: 'job-ccc333', source: 'job_native', costUsd: 0, stopReason: 'converged', pageCount: null },
+      { jobId: 'job-aaa111', fileName: 'report-a.pdf', source: 'job_native', costUsd: 10, stopReason: 'budget_limit', pageCount: 100 },
+      { jobId: 'job-bbb222', fileName: null, source: 'comparison_trial', costUsd: 2.5, stopReason: 'converged', pageCount: 50 },
+      { jobId: 'job-ccc333', fileName: 'zero-cost.pdf', source: 'job_native', costUsd: 0, stopReason: 'converged', pageCount: null },
     ],
     ...overrides,
   };
@@ -62,10 +62,18 @@ describe('CostTab', () => {
 
     renderTab();
 
-    const row = await screen.findByText('job-ccc3…');
+    const row = await screen.findByText('zero-cost.pdf');
     const tr = row.closest('tr');
     expect(tr).not.toBeNull();
     expect(within(tr as HTMLElement).getByText('$0.00')).toBeInTheDocument();
+  });
+
+  it('falls back to the job id when no file name is available', async () => {
+    mockGetCostReport.mockResolvedValue(mockReport());
+
+    renderTab();
+
+    expect(await screen.findByText('job-bbb222')).toBeInTheDocument();
   });
 
   it('sorts spend by run when a column header is clicked', async () => {
@@ -75,11 +83,11 @@ describe('CostTab', () => {
     await screen.findByText('Spend by Run');
 
     const rowsDescByDefault = screen.getAllByRole('row').slice(1); // skip header row
-    expect(within(rowsDescByDefault[0]).getByText('job-aaa1…')).toBeInTheDocument();
+    expect(within(rowsDescByDefault[0]).getByText('report-a.pdf')).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('Cost'));
     const rowsAsc = screen.getAllByRole('row').slice(1);
-    expect(within(rowsAsc[0]).getByText('job-ccc3…')).toBeInTheDocument();
+    expect(within(rowsAsc[0]).getByText('zero-cost.pdf')).toBeInTheDocument();
   });
 
   it('opens the drill-down dialog when a row is clicked', async () => {
@@ -90,7 +98,7 @@ describe('CostTab', () => {
     });
 
     renderTab();
-    const row = await screen.findByText('job-aaa1…');
+    const row = await screen.findByText('report-a.pdf');
     fireEvent.click(row);
 
     expect(await screen.findByText(/Job History/)).toBeInTheDocument();

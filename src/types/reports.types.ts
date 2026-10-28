@@ -94,6 +94,7 @@ export interface TeamActivityReportFilters {
 // backend treats these as plain strings, not a Prisma enum.
 export interface SpendEntry {
   jobId: string;
+  fileName: string | null;
   source: 'comparison_trial' | 'job_native';
   costUsd: number;
   stopReason: string | null;
@@ -184,11 +185,16 @@ export interface QualityReportFilters {
   to?: string;
 }
 
+export interface StuckIssueSampleJob {
+  jobId: string;
+  fileName: string | null;
+}
+
 export interface StuckIssueEntry {
   code: string;
   count: number;
   /** Capped at 5 by the backend -- examples to go look at, not exhaustive. */
-  sampleJobIds: string[];
+  sampleJobs: StuckIssueSampleJob[];
 }
 
 export interface StuckIssuesResponse {
