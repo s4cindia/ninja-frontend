@@ -1,8 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { PacReportModal } from './PacReportModal';
-import { getPacReport, runLivePacCheck, getAxes4QuotaStatus } from '../../services/pac-report.service';
-import type { PacReport, Axes4LiveResult, Axes4QuotaStatus } from '../../services/pac-report.service';
+import {
+  getPacReport,
+  runLivePacCheck,
+  getAxes4QuotaStatus,
+  getJobExternalPacReport,
+  uploadJobExternalPacReportFile,
+  confirmJobExternalPacReportUpload,
+  deleteJobExternalPacReport,
+} from '../../services/pac-report.service';
+import type { PacReport, Axes4LiveResult, Axes4QuotaStatus, JobExternalPacReport } from '../../services/pac-report.service';
 
 vi.mock('../../services/pac-report.service', async () => {
   const actual = await vi.importActual<typeof import('../../services/pac-report.service')>(
@@ -13,12 +21,40 @@ vi.mock('../../services/pac-report.service', async () => {
     getPacReport: vi.fn(),
     runLivePacCheck: vi.fn(),
     getAxes4QuotaStatus: vi.fn(),
+    getJobExternalPacReport: vi.fn(),
+    uploadJobExternalPacReportFile: vi.fn(),
+    confirmJobExternalPacReportUpload: vi.fn(),
+    deleteJobExternalPacReport: vi.fn(),
   };
 });
 
 const mockGetPacReport = getPacReport as unknown as ReturnType<typeof vi.fn>;
 const mockRunLivePacCheck = runLivePacCheck as unknown as ReturnType<typeof vi.fn>;
 const mockGetAxes4QuotaStatus = getAxes4QuotaStatus as unknown as ReturnType<typeof vi.fn>;
+const mockGetJobExternalPacReport = getJobExternalPacReport as unknown as ReturnType<typeof vi.fn>;
+const mockUploadJobExternalPacReportFile = uploadJobExternalPacReportFile as unknown as ReturnType<typeof vi.fn>;
+const mockConfirmJobExternalPacReportUpload = confirmJobExternalPacReportUpload as unknown as ReturnType<typeof vi.fn>;
+const mockDeleteJobExternalPacReport = deleteJobExternalPacReport as unknown as ReturnType<typeof vi.fn>;
+
+function buildExternalReport(overrides?: Partial<JobExternalPacReport>): JobExternalPacReport {
+  return {
+    id: 'ext-report-1',
+    jobId: 'job-1',
+    s3Key: 'job-storage/job-1/external-pac-report/report.pdf',
+    originalFileName: 'report.pdf',
+    mimeType: 'application/pdf',
+    size: 1024,
+    pass: 40,
+    fail: 2,
+    untested: 5,
+    humanRequired: 1,
+    notApplicable: 0,
+    uploadedById: 'user-1',
+    createdAt: '2026-10-28T10:00:00Z',
+    downloadUrl: 'https://s3.example.com/download-url',
+    ...overrides,
+  };
+}
 
 function buildReport(source?: 'ninja' | 'verapdf' | 'pdfa11y'): PacReport {
   return {
@@ -77,6 +113,10 @@ describe('PacReportModal', () => {
     mockGetPacReport.mockReset();
     mockRunLivePacCheck.mockReset();
     mockGetAxes4QuotaStatus.mockReset().mockResolvedValue(buildQuota({ configured: false }));
+    mockGetJobExternalPacReport.mockReset().mockResolvedValue(null);
+    mockUploadJobExternalPacReportFile.mockReset();
+    mockConfirmJobExternalPacReportUpload.mockReset();
+    mockDeleteJobExternalPacReport.mockReset();
   });
 
   it('shows a provenance badge on a failing condition when the backend attributes a source', async () => {
@@ -346,6 +386,111 @@ describe('PacReportModal', () => {
       await act(async () => { resolveFirstRunQuota(buildQuota({ pagesUsedThisPeriod: 20 })); });
       expect(screen.getByText(/30 of 100 pages used this period/)).toBeInTheDocument();
       expect(screen.queryByText(/20 of 100 pages used this period/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('External PAC Report tab', () => {
+    beforeEach(() => {
+      mockGetPacReport.mockResolvedValue(buildReport());
+    });
+
+    it('shows the upload form when the viewer is the owner and nothing has been uploaded yet', async () => {
+      mockGetJobExternalPacReport.mockResolvedValue(null);
+
+      render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} isOwner />);
+
+      fireEvent.click(await screen.findByRole('tab', { name: 'External PAC Report' }));
+
+      expect(await screen.findByLabelText('PAC Report File')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Upload PAC Report' })).toBeInTheDocument();
+    });
+
+    it('shows a view-only message (no upload form) for a non-owner when nothing has been uploaded yet', async () => {
+      mockGetJobExternalPacReport.mockResolvedValue(null);
+
+      render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} isOwner={false} />);
+
+      fireEvent.click(await screen.findByRole('tab', { name: 'External PAC Report' }));
+
+      expect(await screen.findByText('No external PAC report has been uploaded for this job.')).toBeInTheDocument();
+      expect(screen.queryByLabelText('PAC Report File')).not.toBeInTheDocument();
+    });
+
+    it('uploads the file then confirms it, and renders the resulting report', async () => {
+      mockGetJobExternalPacReport.mockResolvedValue(null);
+      mockUploadJobExternalPacReportFile.mockResolvedValue(undefined);
+      mockConfirmJobExternalPacReportUpload.mockResolvedValue(buildExternalReport());
+
+      render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} isOwner />);
+      fireEvent.click(await screen.findByRole('tab', { name: 'External PAC Report' }));
+      await screen.findByLabelText('PAC Report File');
+
+      const file = new File(['pac-bytes'], 'report.pdf', { type: 'application/pdf' });
+      fireEvent.change(screen.getByLabelText('PAC Report File'), { target: { files: [file] } });
+      fireEvent.change(screen.getByLabelText('Pass'), { target: { value: '40' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Upload PAC Report' }));
+
+      await waitFor(() => expect(mockUploadJobExternalPacReportFile).toHaveBeenCalledWith('job-1', file));
+      expect(mockConfirmJobExternalPacReportUpload).toHaveBeenCalledWith('job-1', {
+        originalFileName: 'report.pdf',
+        mimeType: 'application/pdf',
+        summary: { pass: 40 },
+      });
+      expect(await screen.findByText('report.pdf')).toBeInTheDocument();
+      expect(screen.getByText('Download')).toBeInTheDocument();
+    });
+
+    it('rejects a negative summary count client-side without ever calling the upload service', async () => {
+      mockGetJobExternalPacReport.mockResolvedValue(null);
+
+      render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} isOwner />);
+      fireEvent.click(await screen.findByRole('tab', { name: 'External PAC Report' }));
+      await screen.findByLabelText('PAC Report File');
+
+      const file = new File(['pac-bytes'], 'report.pdf', { type: 'application/pdf' });
+      fireEvent.change(screen.getByLabelText('PAC Report File'), { target: { files: [file] } });
+      fireEvent.change(screen.getByLabelText('Fail'), { target: { value: '-1' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Upload PAC Report' }));
+
+      expect(await screen.findByText('Fail must be a whole number of 0 or more.')).toBeInTheDocument();
+      expect(mockUploadJobExternalPacReportFile).not.toHaveBeenCalled();
+    });
+
+    it('shows Remove for the owner, removes the report, and reverts to the upload form', async () => {
+      mockGetJobExternalPacReport.mockResolvedValue(buildExternalReport());
+      mockDeleteJobExternalPacReport.mockResolvedValue(undefined);
+
+      render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} isOwner />);
+      fireEvent.click(await screen.findByRole('tab', { name: 'External PAC Report' }));
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Remove' }));
+
+      await waitFor(() => expect(mockDeleteJobExternalPacReport).toHaveBeenCalledWith('job-1'));
+      expect(await screen.findByLabelText('PAC Report File')).toBeInTheDocument();
+    });
+
+    it('hides Remove for a non-owner viewing an existing report, but still shows Download', async () => {
+      mockGetJobExternalPacReport.mockResolvedValue(buildExternalReport());
+
+      render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} isOwner={false} />);
+      fireEvent.click(await screen.findByRole('tab', { name: 'External PAC Report' }));
+
+      expect(await screen.findByText('Download')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument();
+    });
+
+    it('refetches before navigating on Download, since the baked-in presigned URL can go stale', async () => {
+      mockGetJobExternalPacReport
+        .mockResolvedValueOnce(buildExternalReport({ downloadUrl: 'https://s3.example.com/stale' }))
+        .mockResolvedValueOnce(buildExternalReport({ downloadUrl: 'https://s3.example.com/fresh' }));
+
+      render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} isOwner />);
+      fireEvent.click(await screen.findByRole('tab', { name: 'External PAC Report' }));
+      await screen.findByText('Download');
+
+      fireEvent.click(screen.getByText('Download'));
+
+      await waitFor(() => expect(mockGetJobExternalPacReport).toHaveBeenCalledTimes(2));
     });
   });
 });

@@ -2143,6 +2143,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         onClose={() => setShowPacReport(false)}
         jobId={jobId!}
         onGenerated={() => setJobFlags(prev => ({ acrGenerated: prev?.acrGenerated ?? false, pacReportGenerated: true, lastReauditAt: prev?.lastReauditAt }))}
+        isOwner={auditResult?.isOwner ?? false}
       />
     </div>
   );

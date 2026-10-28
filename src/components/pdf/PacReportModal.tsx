@@ -20,7 +20,15 @@ import {
 import { Button } from '../ui/Button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs';
 import { Loader2, CheckCircle2, XCircle, AlertTriangle, HelpCircle, ChevronDown, ChevronRight } from 'lucide-react';
-import { getPacReport, runLivePacCheck, getAxes4QuotaStatus } from '../../services/pac-report.service';
+import {
+  getPacReport,
+  runLivePacCheck,
+  getAxes4QuotaStatus,
+  getJobExternalPacReport,
+  uploadJobExternalPacReportFile,
+  confirmJobExternalPacReportUpload,
+  deleteJobExternalPacReport,
+} from '../../services/pac-report.service';
 import type {
   PacReport,
   PacCheckpointResult,
@@ -29,6 +37,8 @@ import type {
   Axes4LiveResult,
   Axes4QuotaStatus,
   Axes4Failure,
+  JobExternalPacReport,
+  JobExternalPacReportSummary,
 } from '../../services/pac-report.service';
 import { SourceBadge } from '../audit';
 
@@ -254,6 +264,186 @@ function Axes4LiveCheckPanel({
   );
 }
 
+// ─── External PAC report upload tab ───────────────────────────────────────────
+//
+// Job-native counterpart to ComparisonTrialReportPage.tsx's own
+// ExternalPacReportCard — same upload-a-real-PAC-tool-export-by-hand
+// capability, for a regular (non-trial) job. report/isLoading/error/
+// isUploading/isDeleting are owned by the parent modal (not this panel) for
+// the same reason axes4Result/isAxes4Running live there: TabsContent
+// unmounts inactive tabs, and losing track of an in-flight upload/delete on
+// a tab switch would be confusing even though (unlike axes4) it isn't a
+// billed request. The unsubmitted file/count draft is fine to live locally
+// here — losing an unsaved draft on tab switch is normal form behavior, not
+// data loss of a completed action.
+
+const EXTERNAL_PAC_SUMMARY_FIELDS: { key: keyof JobExternalPacReportSummary; label: string }[] = [
+  { key: 'pass', label: 'Pass' },
+  { key: 'fail', label: 'Fail' },
+  { key: 'untested', label: 'Untested' },
+  { key: 'humanRequired', label: 'Human Required' },
+  { key: 'notApplicable', label: 'Not Applicable' },
+];
+
+function ExternalPacReportPanel({
+  report,
+  isLoading,
+  error,
+  isOwner,
+  isUploading,
+  isDeleting,
+  uploadError,
+  onUpload,
+  onDelete,
+  onRefreshDownload,
+}: {
+  report: JobExternalPacReport | null;
+  isLoading: boolean;
+  error: string | null;
+  isOwner: boolean;
+  isUploading: boolean;
+  isDeleting: boolean;
+  uploadError: string | null;
+  onUpload: (file: File, summary: JobExternalPacReportSummary) => void;
+  onDelete: () => void;
+  onRefreshDownload: () => Promise<string | null>;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [counts, setCounts] = useState<Record<keyof JobExternalPacReportSummary, string>>({
+    pass: '', fail: '', untested: '', humanRequired: '', notApplicable: '',
+  });
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isRefreshingDownload, setIsRefreshingDownload] = useState(false);
+
+  const handleDownloadClick = async (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    if (isRefreshingDownload) return;
+    setIsRefreshingDownload(true);
+    try {
+      const freshUrl = await onRefreshDownload();
+      if (freshUrl) window.location.href = freshUrl;
+    } finally {
+      setIsRefreshingDownload(false);
+    }
+  };
+
+  const handleUpload = () => {
+    setFormError(null);
+    if (!file) {
+      setFormError('Choose a PAC report file first.');
+      return;
+    }
+    const summary: JobExternalPacReportSummary = {};
+    for (const { key, label } of EXTERNAL_PAC_SUMMARY_FIELDS) {
+      const raw = counts[key].trim();
+      if (!raw) continue;
+      const n = Number(raw);
+      if (!Number.isInteger(n) || n < 0) {
+        setFormError(`${label} must be a whole number of 0 or more.`);
+        return;
+      }
+      summary[key] = n;
+    }
+    onUpload(file, summary);
+  };
+
+  if (isLoading) {
+    return <p className="text-sm text-gray-400 py-8 text-center">Loading…</p>;
+  }
+
+  if (error) {
+    return <div className="py-8 text-center text-red-600 text-sm">{error}</div>;
+  }
+
+  if (report) {
+    return (
+      <div>
+        <p className="text-xs text-gray-400 mb-4">{report.originalFileName}</p>
+        <div className="grid grid-cols-5 gap-3 mb-4">
+          {[
+            { label: 'Pass', value: report.pass },
+            { label: 'Fail', value: report.fail },
+            { label: 'Untested', value: report.untested },
+            { label: 'Human Required', value: report.humanRequired },
+            { label: 'Not Applicable', value: report.notApplicable },
+          ].map((c) => (
+            <div key={c.label} className="text-center">
+              <p className="text-lg font-bold tabular-nums text-gray-800">{c.value ?? '--'}</p>
+              <p className="text-xs text-gray-400 mt-1">{c.label}</p>
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-4">
+          <a
+            href={report.downloadUrl}
+            onClick={handleDownloadClick}
+            aria-disabled={isRefreshingDownload}
+            className={`text-xs font-medium text-blue-600 hover:text-blue-700 ${isRefreshingDownload ? 'opacity-50 pointer-events-none' : ''}`}
+          >
+            {isRefreshingDownload ? 'Preparing…' : 'Download'}
+          </a>
+          {isOwner && (
+            <button
+              onClick={onDelete}
+              disabled={isDeleting}
+              className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50"
+            >
+              {isDeleting ? 'Removing…' : 'Remove'}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (!isOwner) {
+    return <p className="text-sm text-gray-400 py-8 text-center">No external PAC report has been uploaded for this job.</p>;
+  }
+
+  return (
+    <div>
+      <p className="text-xs text-gray-400 mb-4">
+        Upload the real PAC-tool export for this document and enter its summary counts — there's no automated parser, so these are hand-entered.
+      </p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
+        <div className="col-span-2 sm:col-span-3">
+          <label htmlFor="job-external-pac-report-file" className="block text-xs font-medium text-gray-600 mb-1">PAC Report File</label>
+          <input
+            id="job-external-pac-report-file"
+            type="file"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            className="block w-full text-sm text-gray-600 file:mr-3 file:py-1 file:px-2 file:rounded file:border file:border-gray-300 file:text-xs file:bg-white hover:file:bg-gray-50"
+          />
+        </div>
+        {EXTERNAL_PAC_SUMMARY_FIELDS.map(({ key, label }) => (
+          <div key={key}>
+            <label htmlFor={`job-external-pac-report-${key}`} className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+            <input
+              id={`job-external-pac-report-${key}`}
+              type="number"
+              min={0}
+              step={1}
+              value={counts[key]}
+              onChange={(e) => setCounts((prev) => ({ ...prev, [key]: e.target.value }))}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+        ))}
+      </div>
+      {(formError || uploadError) && <p className="text-sm text-red-600 mb-3">{formError || uploadError}</p>}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleUpload}
+        disabled={isUploading}
+      >
+        {isUploading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+        Upload PAC Report
+      </Button>
+    </div>
+  );
+}
+
 // ─── Modal ────────────────────────────────────────────────────────────────────
 
 interface PacReportModalProps {
@@ -262,9 +452,11 @@ interface PacReportModalProps {
   jobId: string;
   /** Called once the report has successfully loaded/generated (fires each open, not just the first). */
   onGenerated?: () => void;
+  /** Gates upload/delete on the External PAC Report tab — matches the backend's authorizeJob (owner/admin-only) semantics; viewing stays open to anyone who can open this modal. Defaults to false (view-only) so an omitted prop fails closed, not open. */
+  isOwner?: boolean;
 }
 
-export function PacReportModal({ isOpen, onClose, jobId, onGenerated }: PacReportModalProps) {
+export function PacReportModal({ isOpen, onClose, jobId, onGenerated, isOwner = false }: PacReportModalProps) {
   const [report, setReport] = useState<PacReport | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -357,6 +549,69 @@ export function PacReportModal({ isOpen, onClose, jobId, onGenerated }: PacRepor
     return () => { cancelled = true; };
   }, [isOpen, jobId]);
 
+  // External PAC Report tab state -- lifted to the modal for the same
+  // reason as the axes4 state above (TabsContent unmounts inactive tabs).
+  const [externalReport, setExternalReport] = useState<JobExternalPacReport | null>(null);
+  const [isExternalLoading, setIsExternalLoading] = useState(false);
+  const [externalError, setExternalError] = useState<string | null>(null);
+  const [isUploadingExternal, setIsUploadingExternal] = useState(false);
+  const [externalUploadError, setExternalUploadError] = useState<string | null>(null);
+  const [isDeletingExternal, setIsDeletingExternal] = useState(false);
+
+  const refetchExternalReport = (): Promise<JobExternalPacReport | null> =>
+    getJobExternalPacReport(jobId).then((r) => { setExternalReport(r); return r; });
+
+  useEffect(() => {
+    if (!isOpen || !jobId) return;
+    let cancelled = false;
+    setIsExternalLoading(true);
+    setExternalError(null);
+    getJobExternalPacReport(jobId)
+      .then((r) => { if (!cancelled) setExternalReport(r); })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setExternalError(err instanceof Error ? err.message : 'Failed to load external PAC report');
+      })
+      .finally(() => { if (!cancelled) setIsExternalLoading(false); });
+    return () => { cancelled = true; };
+  }, [isOpen, jobId]);
+
+  const handleUploadExternal = async (file: File, summary: JobExternalPacReportSummary) => {
+    setIsUploadingExternal(true);
+    setExternalUploadError(null);
+    try {
+      await uploadJobExternalPacReportFile(jobId, file);
+      const report = await confirmJobExternalPacReportUpload(jobId, {
+        originalFileName: file.name,
+        mimeType: file.type || 'application/pdf',
+        summary,
+      });
+      setExternalReport(report);
+    } catch (err) {
+      setExternalUploadError(err instanceof Error ? err.message : 'Failed to upload External PAC Report — please retry.');
+    } finally {
+      setIsUploadingExternal(false);
+    }
+  };
+
+  const handleDeleteExternal = async () => {
+    setIsDeletingExternal(true);
+    try {
+      await deleteJobExternalPacReport(jobId);
+      setExternalReport(null);
+    } finally {
+      setIsDeletingExternal(false);
+    }
+  };
+
+  // The presigned URL is generated fresh per fetch, so on a long-lived tab
+  // the one baked into externalReport can go stale (S3 403s on click) --
+  // refetch right before navigating rather than trusting a URL that may be old.
+  const handleRefreshExternalDownload = async (): Promise<string | null> => {
+    const fresh = await refetchExternalReport();
+    return fresh?.downloadUrl ?? null;
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
@@ -377,6 +632,7 @@ export function PacReportModal({ isOpen, onClose, jobId, onGenerated }: PacRepor
               {axes4Quota?.configured && (
                 <TabsTrigger value="axes4">axes4 Live Check</TabsTrigger>
               )}
+              <TabsTrigger value="external">External PAC Report</TabsTrigger>
             </TabsList>
 
             <TabsContent value="ninja">
@@ -420,6 +676,21 @@ export function PacReportModal({ isOpen, onClose, jobId, onGenerated }: PacRepor
                 />
               </TabsContent>
             )}
+
+            <TabsContent value="external">
+              <ExternalPacReportPanel
+                report={externalReport}
+                isLoading={isExternalLoading}
+                error={externalError}
+                isOwner={isOwner}
+                isUploading={isUploadingExternal}
+                isDeleting={isDeletingExternal}
+                uploadError={externalUploadError}
+                onUpload={handleUploadExternal}
+                onDelete={handleDeleteExternal}
+                onRefreshDownload={handleRefreshExternalDownload}
+              />
+            </TabsContent>
           </Tabs>
         </div>
 
