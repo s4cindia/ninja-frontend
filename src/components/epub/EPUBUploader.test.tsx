@@ -113,4 +113,29 @@ describe('DocumentUploader upload progress', () => {
       expect(bar).toHaveAttribute('aria-valuenow', '15');
     });
   });
+
+  it('regression: keeps showing the file name and size once upload starts, instead of it disappearing the moment the pre-upload confirmation step is left', async () => {
+    let capturedProgress: ProgressCallback | undefined;
+    mockUploadService.uploadFile.mockImplementation((_file, onProgress) => {
+      capturedProgress = onProgress as ProgressCallback;
+      return new Promise(() => {}); // never resolves — stay in the 'uploading' state
+    });
+
+    render(
+      <DocumentUploader
+        acceptedFileTypes={['pdf']}
+        endpoints={{ pdf: { directUpload: '/pdf/audit-upload', auditFile: '/pdf/audit-file' } }}
+      />
+    );
+
+    await selectFileAndStartUpload(pdfFile('Bressler_187513.pdf', 9.2 * 1024 * 1024));
+
+    await waitFor(() => expect(capturedProgress).toBeDefined());
+    act(() => {
+      capturedProgress!({ loaded: 3.7 * 1024 * 1024, total: 9.2 * 1024 * 1024, percentage: 40 });
+    });
+
+    expect(await screen.findByText('Bressler_187513.pdf')).toBeInTheDocument();
+    expect(screen.getByText('Uploading and auditing...')).toBeInTheDocument();
+  });
 });
