@@ -164,3 +164,8 @@ export async function removeAdminTeamMember(
     `/admin/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}`
   );
 }
+
+export async function deleteAdminTeam(teamId: string): Promise<{ id: string }> {
+  const res = await api.delete(`/admin/teams/${encodeURIComponent(teamId)}`);
+  return res.data.data;
+}
