@@ -589,10 +589,37 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
             })),
           ];
 
+          // Wall-clock from the first row's own start to the last row's own
+          // end -- NOT a sum of each row's individual duration, since
+          // several validator rows share the same start timestamp (recorded
+          // the instant Extraction finishes) and summing would double-count
+          // that overlap. Same convention PdfJobProgressPanel's own Total
+          // row uses (#369); every row here already has both a start and
+          // end by construction (this only renders once the audit itself
+          // has completed), so there's no "still running" case to guard.
+          const timingStarts = timingRows.map(r => r.start).filter((d): d is Date => d !== null);
+          const timingEnds = timingRows.map(r => r.end).filter((d): d is Date => d !== null);
+          const timingFirstStart = timingStarts.length > 0 ? new Date(Math.min(...timingStarts.map(d => d.getTime()))) : null;
+          const timingLastEnd = timingEnds.length > 0 ? new Date(Math.max(...timingEnds.map(d => d.getTime()))) : null;
+
           return (
             <div className="space-y-4">
               <CheckCircle className="h-12 w-12 mx-auto text-green-600" />
               <p className="font-semibold text-lg text-gray-900">Audit Complete</p>
+              {/* Carried over from the pre-upload/uploading steps -- this
+                  branch never read selectedFile at all, so the file name/
+                  size disappeared the moment the audit finished (#368 only
+                  fixed the uploading/queued/processing branch above, not
+                  this separately-rendered complete branch). */}
+              {selectedFile && (
+                <div className="flex items-center justify-center gap-3">
+                  <FileText className="h-8 w-8 text-primary-600 flex-shrink-0" />
+                  <div className="text-left">
+                    <p className="font-medium text-gray-900">{selectedFile.name}</p>
+                    <p className="text-sm text-gray-500">{formatBytes(selectedFile.size)}</p>
+                  </div>
+                </div>
+              )}
               <div className="text-left border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm">
                 {/* Summary header */}
                 <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 space-y-1.5">
@@ -677,6 +704,16 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
                           </tr>
                         ))}
                       </tbody>
+                      {timingFirstStart && (
+                        <tfoot>
+                          <tr className="border-t-2 border-gray-200 bg-gray-50">
+                            <td className="px-4 py-2 font-semibold text-gray-800" colSpan={3}>Total</td>
+                            <td className="px-4 py-2 font-mono text-xs font-semibold text-gray-800">
+                              {fmtDur(timingFirstStart, timingLastEnd)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      )}
                     </table>
                   </div>
                 )}
