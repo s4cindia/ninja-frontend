@@ -9,7 +9,7 @@ import { FilesList } from '@/components/files/FilesList';
 import { FileDetailsModal } from '@/components/files/FileDetailsModal';
 import { useFiles, useUploadFile, useDeleteFile, useTriggerAudit, useBulkDeleteFiles, useBulkAuditFiles } from '@/hooks/useFiles';
 import { cn } from '@/utils/cn';
-import { isEpubFile } from '@/utils/fileUtils';
+import { isEpubFile, isPdfFile } from '@/utils/fileUtils';
 import toast from 'react-hot-toast';
 import type { FileItem } from '@/services/files.service';
 
@@ -46,7 +46,9 @@ export function Files() {
   };
 
   const handleView = (file: FileItem) => {
-    if (file.latestJobId) {
+    if (file.latestJobId && isPdfFile(file)) {
+      navigate(`/pdf/audit/${file.latestJobId}`);
+    } else if (file.latestJobId) {
       navigate(`/epub?jobId=${file.latestJobId}`);
     } else {
       navigate(`/validation/${file.id}`);

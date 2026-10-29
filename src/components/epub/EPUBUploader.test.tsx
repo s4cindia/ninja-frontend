@@ -201,4 +201,59 @@ describe('DocumentUploader upload progress', () => {
     expect(durationCell?.textContent).not.toBe('—');
     expect(durationCell?.textContent?.trim()).not.toBe('');
   });
+
+  it('calls onJobCreated as soon as a PDF job exists, without waiting for the audit to complete or starting its own polling', async () => {
+    mockUploadService.uploadFile.mockResolvedValue({
+      uploadMethod: 'direct',
+      jobId: 'job-456',
+    } as Awaited<ReturnType<typeof uploadService.uploadFile>>);
+
+    const onJobCreated = vi.fn();
+
+    render(
+      <DocumentUploader
+        acceptedFileTypes={['pdf']}
+        endpoints={{ pdf: { directUpload: '/pdf/audit-upload', auditFile: '/pdf/audit-file' } }}
+        onJobCreated={onJobCreated}
+      />
+    );
+
+    await selectFileAndStartUpload(pdfFile('Farrar.pdf', 12 * 1024 * 1024));
+
+    await waitFor(() => expect(onJobCreated).toHaveBeenCalledWith('job-456'));
+    expect(onJobCreated).toHaveBeenCalledTimes(1);
+    // Never reaches the "Audit Complete" panel or polls job status -- the
+    // caller is expected to navigate away (unmounting this component)
+    // immediately upon onJobCreated, so starting polling here would just
+    // be wasted/orphaned work.
+    expect(screen.queryByText('Audit Complete')).not.toBeInTheDocument();
+    expect(mockApiGet).not.toHaveBeenCalled();
+  });
+
+  it('does not call onJobCreated for an EPUB upload, even when the prop is provided -- auto-navigate is PDF-only', async () => {
+    mockUploadService.uploadFile.mockResolvedValue({
+      uploadMethod: 'direct',
+      jobId: 'job-789',
+    } as Awaited<ReturnType<typeof uploadService.uploadFile>>);
+    mockApiGet.mockResolvedValue({ data: { data: { status: 'pending' } } });
+
+    const onJobCreated = vi.fn();
+    const epubFile = new File(['test'], 'book.epub', { type: 'application/epub+zip' });
+
+    render(
+      <DocumentUploader
+        acceptedFileTypes={['epub']}
+        endpoints={{ epub: { directUpload: '/epub/audit-upload', auditFile: '/epub/audit-file' } }}
+        onJobCreated={onJobCreated}
+      />
+    );
+
+    await selectFileAndStartUpload(epubFile);
+
+    // Normal polling-driven flow proceeds (api.get gets called at least
+    // once for job-status polling) -- confirms this upload wasn't routed
+    // down the early-return PDF path at all.
+    await waitFor(() => expect(mockApiGet).toHaveBeenCalled());
+    expect(onJobCreated).not.toHaveBeenCalled();
+  });
 });

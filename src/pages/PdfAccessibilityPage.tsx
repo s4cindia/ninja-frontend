@@ -12,15 +12,25 @@ export const PdfAccessibilityPage: React.FC = () => {
   const navigate = useNavigate();
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  const handleUploadComplete = (summary: AuditSummary) => {
+  const navigateToResults = (jobId: string) => {
     // Validate jobId format to prevent path traversal
-    if (!validateJobId(summary.jobId)) {
+    if (!validateJobId(jobId)) {
       setUploadError('Unable to process upload. Please try again or contact support.');
       return;
     }
     // Redirect to the PDF audit results page
-    navigate(`/pdf/audit/${summary.jobId}`);
+    navigate(`/pdf/audit/${jobId}`);
   };
+
+  const handleUploadComplete = (summary: AuditSummary) => navigateToResults(summary.jobId);
+
+  // Fires as soon as the job exists (right after upload, before the audit
+  // itself has even started) -- navigating here rather than waiting for
+  // handleUploadComplete removes the window where a browser refresh on
+  // this page (pure component state, no job ID in the URL) loses the
+  // completed-audit view entirely. /pdf/audit/:jobId is fully
+  // URL/API-driven and shows its own live progress for a still-running job.
+  const handleJobCreated = (jobId: string) => navigateToResults(jobId);
 
   const handleUploadError = (error: string) => {
     setUploadError(error);
@@ -58,6 +68,7 @@ export const PdfAccessibilityPage: React.FC = () => {
         <CardContent>
           <DocumentUploader
             onUploadComplete={handleUploadComplete}
+            onJobCreated={handleJobCreated}
             onError={handleUploadError}
             acceptedFileTypes={['pdf']}
             endpoints={{

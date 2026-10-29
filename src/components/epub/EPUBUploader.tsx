@@ -29,6 +29,17 @@ interface DocumentUploaderProps {
     };
   };
   onUploadComplete?: (result: AuditSummary) => void;
+  /**
+   * Fires as soon as a job ID exists (right after upload, before the audit
+   * or AI analysis have even started) -- opt-in, so only a caller that
+   * passes this prop changes behavior. PdfAccessibilityPage uses it to
+   * navigate to /pdf/audit/:jobId immediately, removing the window where
+   * a browser refresh on this page (pure component state, no job ID in
+   * the URL) loses the completed-audit view entirely. When this fires,
+   * handleUpload returns before starting this component's own polling --
+   * the destination page (/pdf/audit/:jobId) has its own.
+   */
+  onJobCreated?: (jobId: string) => void;
   onError?: (error: string) => void;
 }
 
@@ -60,6 +71,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   acceptedFileTypes = ['epub', 'pdf'],
   endpoints,
   onUploadComplete,
+  onJobCreated,
   onError,
 }) => {
   const [state, setState] = useState<UploadState>('idle');
@@ -351,11 +363,19 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
       // Store workflowId in ref so it's available in handleJobComplete
       workflowIdRef.current = workflowId;
 
-      if (jobId) {
-        startPolling(jobId);
-      } else {
+      if (!jobId) {
         throw new Error('No job ID returned from audit endpoint');
       }
+
+      if (fileType === 'pdf' && onJobCreated) {
+        // Caller takes over immediately (navigates to the job's own
+        // results page) -- don't start this component's own polling, it's
+        // about to unmount.
+        onJobCreated(jobId);
+        return;
+      }
+
+      startPolling(jobId);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Upload failed';
       setError(errorMessage);

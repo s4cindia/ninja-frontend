@@ -39,6 +39,9 @@ function getJobDetailPath(job: Job): string {
   if (job.type === 'EDITORIAL_FULL' && job.documentId) {
     return `/validator/editor/${job.documentId}`;
   }
+  if (job.type === 'PDF_ACCESSIBILITY') {
+    return `/pdf/audit/${job.id}`;
+  }
   return `/jobs/${job.id}`;
 }
 
