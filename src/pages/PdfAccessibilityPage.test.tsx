@@ -16,8 +16,9 @@ vi.mock('react-router-dom', async () => {
 });
 
 vi.mock('@/components/epub/EPUBUploader', () => ({
-  DocumentUploader: ({ onUploadComplete, onError, acceptedFileTypes, endpoints }: {
+  DocumentUploader: ({ onUploadComplete, onJobCreated, onError, acceptedFileTypes, endpoints }: {
     onUploadComplete: (summary: { jobId: string }) => void;
+    onJobCreated?: (jobId: string) => void;
     onError: (error: string) => void;
     acceptedFileTypes?: string[];
     endpoints?: Record<string, unknown>;
@@ -30,6 +31,12 @@ vi.mock('@/components/epub/EPUBUploader', () => ({
       </button>
       <button onClick={() => onUploadComplete({ jobId: '../malicious' })}>
         Upload Malicious
+      </button>
+      <button onClick={() => onJobCreated?.('job-just-created-456')}>
+        Job Created
+      </button>
+      <button onClick={() => onJobCreated?.('../malicious')}>
+        Job Created Malicious
       </button>
       <button onClick={() => onError('Upload failed')}>Upload Error</button>
     </div>
@@ -201,6 +208,64 @@ describe('PdfAccessibilityPage', () => {
         expect(screen.queryByText(/job ID/i)).not.toBeInTheDocument();
         // Instead should have user-friendly message
         expect(screen.getByText(/try again or contact support/i)).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('auto-navigate on job creation', () => {
+    // Fixes a real reported bug: the "Audit Complete" panel this page's
+    // DocumentUploader shows is pure component state with no job ID in
+    // the URL, so a browser refresh while still on it loses the
+    // completed-audit view entirely. Navigating as soon as the job
+    // exists -- instead of waiting for the full audit+AI-analysis
+    // sequence and a manual "View Full Results" click -- removes that
+    // window: /pdf/audit/:jobId is fully URL/API-driven and shows its
+    // own live progress for a still-running job.
+    it('navigates to the audit results page as soon as the job is created, not waiting for upload completion', async () => {
+      const user = userEvent.setup();
+
+      render(
+        <MemoryRouter>
+          <PdfAccessibilityPage />
+        </MemoryRouter>
+      );
+
+      await user.click(screen.getByText('Job Created'));
+
+      expect(mockNavigate).toHaveBeenCalledWith('/pdf/audit/job-just-created-456');
+    });
+
+    it('validates the jobId from onJobCreated the same way as onUploadComplete', async () => {
+      const user = userEvent.setup();
+      const validateSpy = vi.spyOn(validation, 'validateJobId');
+
+      render(
+        <MemoryRouter>
+          <PdfAccessibilityPage />
+        </MemoryRouter>
+      );
+
+      await user.click(screen.getByText('Job Created'));
+
+      expect(validateSpy).toHaveBeenCalledWith('job-just-created-456');
+    });
+
+    it('does not navigate if onJobCreated fires with an invalid jobId', async () => {
+      const user = userEvent.setup();
+
+      render(
+        <MemoryRouter>
+          <PdfAccessibilityPage />
+        </MemoryRouter>
+      );
+
+      await user.click(screen.getByText('Job Created Malicious'));
+
+      expect(mockNavigate).not.toHaveBeenCalled();
+      await waitFor(() => {
+        expect(
+          screen.getByText('Unable to process upload. Please try again or contact support.')
+        ).toBeInTheDocument();
       });
     });
   });
