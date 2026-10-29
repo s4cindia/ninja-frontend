@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { DocumentUploader } from './EPUBUploader';
 import { uploadService } from '@/services/upload.service';
 import { tenantConfigService } from '@/services/tenant-config.service';
+import { api } from '@/services/api';
 
 vi.mock('@/services/upload.service');
 vi.mock('@/services/tenant-config.service');
@@ -10,6 +11,7 @@ vi.mock('@/services/api', () => ({ api: { get: vi.fn(), post: vi.fn() } }));
 
 const mockUploadService = vi.mocked(uploadService);
 const mockTenantConfig = vi.mocked(tenantConfigService);
+const mockApiGet = vi.mocked(api.get);
 
 function pdfFile(name: string, sizeBytes: number): File {
   const file = new File(['%PDF-1.4 test content'], name, { type: 'application/pdf' });
@@ -137,5 +139,66 @@ describe('DocumentUploader upload progress', () => {
 
     expect(await screen.findByText('Bressler_187513.pdf')).toBeInTheDocument();
     expect(screen.getByText('Uploading and auditing...')).toBeInTheDocument();
+  });
+
+  it('regression: keeps showing the file name and a Total row in the Timing table once the audit reaches Complete, not just during upload', async () => {
+    mockUploadService.uploadFile.mockResolvedValue({
+      uploadMethod: 'direct',
+      jobId: 'job-123',
+    } as Awaited<ReturnType<typeof uploadService.uploadFile>>);
+
+    mockApiGet.mockImplementation((url: string) => {
+      if (url.startsWith('/jobs/')) {
+        return Promise.resolve({
+          data: {
+            data: {
+              id: 'job-123',
+              status: 'COMPLETED',
+              type: 'PDF_ACCESSIBILITY',
+              startedAt: '2026-01-01T00:00:00.000Z',
+              completedAt: '2026-01-01T00:10:00.000Z',
+              input: {
+                validatorProgress: [
+                  { label: 'Color Contrast', issuesFound: 2, startedAt: '2026-01-01T00:02:00.000Z', completedAt: '2026-01-01T00:05:00.000Z' },
+                ],
+              },
+              output: { auditReport: { issues: [] } },
+            },
+          },
+        });
+      }
+      // AI-analysis status poll (fires once state is 'complete' for a PDF) —
+      // keep it pending so this test only has to assert the Timing table.
+      return Promise.resolve({ data: { data: { status: 'pending' } } });
+    });
+
+    render(
+      <DocumentUploader
+        acceptedFileTypes={['pdf']}
+        endpoints={{ pdf: { directUpload: '/pdf/audit-upload', auditFile: '/pdf/audit-file' } }}
+      />
+    );
+
+    await selectFileAndStartUpload(pdfFile('Farrar.pdf', 12 * 1024 * 1024));
+
+    expect(await screen.findByText('Audit Complete')).toBeInTheDocument();
+    // The file name must still be shown once the audit has finished, not
+    // just during the uploading/queued/processing states (#368 fixed only
+    // those; the Complete branch is rendered separately and never read
+    // selectedFile at all).
+    expect(screen.getByText('Farrar.pdf')).toBeInTheDocument();
+    // The Timing table's own Total row (PdfJobProgressPanel got this in
+    // #369, but the Complete branch builds its own separate table that
+    // never got it). Asserting the duration cell is real, computed content
+    // (not the "—" placeholder fmtDur falls back to) rather than an exact
+    // value, since the Upload/Queue rows are timestamped off the real
+    // wall clock (uploadStartRef/uploadEndRef), not the fixed fake dates
+    // used for the rest of this job's data.
+    const totalCell = screen.getByText('Total');
+    const totalRow = totalCell.closest('tr');
+    expect(totalRow).not.toBeNull();
+    const durationCell = totalRow!.querySelector('td:last-child');
+    expect(durationCell?.textContent).not.toBe('—');
+    expect(durationCell?.textContent?.trim()).not.toBe('');
   });
 });
