@@ -56,6 +56,14 @@ export function JobDetails() {
     return <Navigate to={`/editorial/citations/${job.id}`} replace />;
   }
 
+  // Redirect PDF accessibility jobs to their own dedicated results page
+  // (richer than this page's generic parseJobOutput rendering, and the
+  // page every other navigation path -- Jobs list, Files list, upload
+  // flow, notifications -- already targets for this job type).
+  if (job && job.type === 'PDF_ACCESSIBILITY') {
+    return <Navigate to={`/pdf/audit/${job.id}`} replace />;
+  }
+
   const handleCancel = async () => {
     if (!jobId) return;
     try {

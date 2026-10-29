@@ -37,3 +37,7 @@ export function getAcceptedMimeTypes(fileTypes: DocumentFileType[]): string {
 export function isEpubFile(file: { mimeType: string; originalName: string }): boolean {
   return file.mimeType.includes('epub') || file.originalName.toLowerCase().endsWith('.epub');
 }
+
+export function isPdfFile(file: { mimeType: string; originalName: string }): boolean {
+  return file.mimeType.includes('pdf') || file.originalName.toLowerCase().endsWith('.pdf');
+}
