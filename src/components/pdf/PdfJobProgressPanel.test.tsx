@@ -297,4 +297,57 @@ describe('PdfJobProgressPanel', () => {
     expect(screen.getByText('Timing')).toBeInTheDocument();
     expect(screen.getByText('Queue')).toBeInTheDocument();
   });
+
+  describe('Total row', () => {
+    it('shows Total as the wall-clock span from the first row\'s start to the last row\'s end once every phase is done, not a sum of each phase\'s own duration (several validator rows share the same start timestamp)', () => {
+      render(
+        <PdfJobProgressPanel
+          jobData={job({
+            startedAt: '2026-08-01T10:00:15.000Z',
+            input: {
+              totalPages: 40,
+              validatorProgress: [
+                { label: 'Structure & Tags', issuesFound: 7, startedAt: '2026-08-01T10:00:20.000Z', completedAt: '2026-08-01T10:00:50.000Z' },
+                { label: 'Alt Text', issuesFound: 91, startedAt: '2026-08-01T10:00:20.000Z', completedAt: '2026-08-01T10:01:25.000Z' },
+                { label: 'Color Contrast', issuesFound: 193, startedAt: '2026-08-01T10:00:20.000Z', completedAt: '2026-08-01T10:00:48.000Z' },
+                { label: 'Tables', issuesFound: 5, startedAt: '2026-08-01T10:00:20.000Z', completedAt: '2026-08-01T10:00:50.000Z' },
+              ],
+            },
+          })}
+          progress={100}
+          showUploadRow
+          uploadStart={new Date('2026-08-01T09:59:50.000Z')}
+          uploadEnd={new Date('2026-08-01T10:00:10.000Z')}
+        />
+      );
+
+      // Upload starts 09:59:50, the latest-finishing row (Alt Text) ends
+      // 10:01:25 -- total wall-clock span is 1m 35s, not the sum of every
+      // row's own duration (which would be well over 3 minutes).
+      expect(screen.getByText('Total')).toBeInTheDocument();
+      const totalRow = screen.getByText('Total').closest('tr')!;
+      expect(totalRow).toHaveTextContent('1m 35s');
+    });
+
+    it('does not render a Total row when no phase has started yet', () => {
+      render(<PdfJobProgressPanel jobData={job({ createdAt: undefined as unknown as string, startedAt: undefined })} progress={0} />);
+
+      expect(screen.queryByText('Total')).not.toBeInTheDocument();
+    });
+
+    it('shows a live, still-ticking Total while a phase is still pending (not frozen at a partial span)', () => {
+      render(
+        <PdfJobProgressPanel
+          jobData={job({ input: { totalPages: 40, validatorProgress: [] } })}
+          progress={95}
+        />
+      );
+
+      // Not all rows are done (validators still pending) -- the Total row
+      // must still render (Queue has a real start), using a live elapsed
+      // span rather than silently disappearing mid-run.
+      const totalRow = screen.getByText('Total').closest('tr')!;
+      expect(totalRow.textContent).toMatch(/\d+[sm]/);
+    });
+  });
 });

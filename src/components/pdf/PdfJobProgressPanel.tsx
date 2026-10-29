@@ -212,6 +212,21 @@ export function PdfJobProgressPanel({
     }),
   ];
 
+  // ─── Total duration ──────────────────────────────────────────────────────
+  // Wall-clock from the first row's own start to the last row's own end --
+  // NOT a sum of each row's individual duration, since several validator
+  // rows share the same start timestamp (they're recorded as starting the
+  // instant Extraction finishes) and summing would double-count that
+  // overlap. While anything is still running/pending, ends live (ticks off
+  // "now" the same way an individual running row's duration already does);
+  // once every row is done, it locks to the real first-start/last-end span
+  // instead of continuing to grow on an unrelated re-render.
+  const rowStarts = rows.map(r => r.start).filter((d): d is Date => d !== null);
+  const rowEnds = rows.map(r => r.end).filter((d): d is Date => d !== null);
+  const firstStart = rowStarts.length > 0 ? new Date(Math.min(...rowStarts.map(d => d.getTime()))) : null;
+  const allDone = rows.length > 0 && rows.every(r => r.status === 'done');
+  const lastEnd = allDone && rowEnds.length > 0 ? new Date(Math.max(...rowEnds.map(d => d.getTime()))) : null;
+
   return (
     <>
       {stepChecklist}
@@ -260,6 +275,16 @@ export function PdfJobProgressPanel({
               </tr>
             ))}
           </tbody>
+          {firstStart && (
+            <tfoot>
+              <tr className="border-t-2 border-gray-200 bg-gray-50">
+                <td className="px-4 py-2 font-semibold text-gray-800" colSpan={3}>Total</td>
+                <td className="px-4 py-2 font-mono text-xs font-semibold text-gray-800">
+                  {fmtDur(firstStart, lastEnd)}
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </>
