@@ -209,6 +209,17 @@ export function RemediationChecklist({
   );
 
   const step2Done = aiAnalysisStatus === 'complete';
+  // The very first AI Analysis pass is auto-triggered by the backend worker
+  // right after the initial audit completes (accessibility.processor.ts),
+  // fire-and-forget, outside the explicit POST /ai-analysis controller route
+  // -- so it never holds the remediation-cycle lock with source
+  // 'analyze_job', and the status endpoint reports 'pending' (never
+  // 'processing') for that run's entire duration. Treat 'pending' as active
+  // too, same as step 5's reanalysisInProgress below and the page's own
+  // pending-or-processing definition of "analysis is under way" (fetchAiSuggestions)
+  // -- otherwise this step falsely reads "Not started" on every fresh upload,
+  // the single most common way analysis actually starts.
+  const step2InProgress = aiAnalysisStatus === 'processing' || aiAnalysisStatus === 'pending';
 
   // Step 4: first re-audit.
   const automatedVerificationDone = postRemediationStatus === 'complete';
@@ -350,7 +361,7 @@ export function RemediationChecklist({
         // in lockstep with step 5 every time a re-run kicks off — the two
         // steps share one live status flag, but only step 5 should reflect
         // it once step 2 has genuinely already happened.
-        status: aiAnalysisEverCompleted ? 'done' : aiAnalysisStatus === 'processing' ? 'in-progress' : 'not-started',
+        status: aiAnalysisEverCompleted ? 'done' : step2InProgress ? 'in-progress' : 'not-started',
       },
       {
         id: 3,
@@ -487,7 +498,7 @@ export function RemediationChecklist({
 
     return list;
   }, [
-    aiAnalysisStatus, step2Done, aiAnalysisEverCompleted, step3Done, step3Started, guidanceFullyResolved, guidanceAcknowledgedFlag, guidanceAcknowledgmentStale, guidanceAcknowledgment,
+    step2Done, step2InProgress, aiAnalysisEverCompleted, step3Done, step3Started, guidanceFullyResolved, guidanceAcknowledgedFlag, guidanceAcknowledgmentStale, guidanceAcknowledgment,
     noteInput, isSubmittingAck, handleAcknowledge, pendingGuidance.length, pendingFixable.length,
     verificationDone, postRemediationStatus, reanalysisDone, reanalysisInProgress,
     guidanceResolved, secondReauditDone, artifactsStepDone, acrGenerated, pacReportGenerated,
