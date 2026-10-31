@@ -77,6 +77,14 @@ describe('RemediationChecklist', () => {
     expect(step2Row).toHaveTextContent('In progress');
   });
 
+  it('regression: step 2 also reads "In progress" (not "Not started") while aiAnalysisStatus is "pending" -- the very first AI Analysis pass is auto-triggered by the backend worker right after the audit completes, outside the controller route that holds the lock with source \'analyze_job\', so its status is \'pending\' for its whole duration, never \'processing\'', () => {
+    render(<RemediationChecklist {...baseProps} aiAnalysisStatus="pending" />);
+
+    const step2Row = screen.getByText('2. Run AI Analysis').closest('div')!.parentElement!;
+    expect(step2Row).toHaveTextContent('In progress');
+    expect(step2Row).not.toHaveTextContent('Not started');
+  });
+
   it('regression: right after AI Analysis finishes, before anything is applied, step 3 reads "Not started" — never "In progress" alongside "Recommended next"', () => {
     render(
       <RemediationChecklist
