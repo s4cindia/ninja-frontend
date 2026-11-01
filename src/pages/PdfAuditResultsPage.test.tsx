@@ -545,6 +545,39 @@ describe('PdfAuditResultsPage', () => {
       expect(await screen.findByText('Audit in progress...')).toBeInTheDocument();
       expect(screen.queryByText('Timing')).not.toBeInTheDocument();
     });
+
+    it('gives the "Check Status" button its own visible loading state and a "Checked just now" confirmation, independent of whether the underlying status actually changed (the reported confusion: clicking it while the audit is genuinely still processing looked like nothing happened)', async () => {
+      const jobId = 'job-check-status';
+      let resolveManualCheck!: (value: { data: { data: { status: string } } }) => void;
+      let manualCheckCallCount = 0;
+
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === `/pdf/job/${jobId}/audit/result`) {
+          manualCheckCallCount++;
+          if (manualCheckCallCount === 1) {
+            // Initial load, resolves immediately.
+            return Promise.resolve({ data: { data: { status: 'processing' } } });
+          }
+          // The manual click's own request -- held open so the in-flight
+          // "Checking..." state is actually observable, not just flashed.
+          return new Promise((resolve) => { resolveManualCheck = resolve; });
+        }
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      const checkButton = await screen.findByRole('button', { name: 'Check Status' });
+      fireEvent.click(checkButton);
+
+      expect(await screen.findByRole('button', { name: 'Checking...' })).toBeDisabled();
+      expect(screen.queryByText('Checked just now — still in progress')).not.toBeInTheDocument();
+
+      resolveManualCheck({ data: { data: { status: 'processing' } } });
+
+      expect(await screen.findByText('Checked just now — still in progress')).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Check Status' })).not.toBeDisabled();
+    });
   });
 
   describe('Component Integration', () => {

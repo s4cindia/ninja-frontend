@@ -272,6 +272,13 @@ export const PdfAuditResultsPage: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [isDownloading] = useState(false);
   const [isReScanning, setIsReScanning] = useState(false);
+  // "Check Status" manually re-fetches the exact same thing the 5s poll
+  // already does in the background, so clicking it while the audit is
+  // genuinely still in-progress looks like nothing happened -- these give
+  // the click its own visible, immediate confirmation independent of
+  // whether the underlying status actually changed.
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [justCheckedStatus, setJustCheckedStatus] = useState(false);
   const [currentScanLevel, setCurrentScanLevel] = useState<ScanLevel>('basic');
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -610,6 +617,28 @@ export const PdfAuditResultsPage: React.FC = () => {
       setIsPolling(false);
     }
   }, [jobId]);
+
+  // "Check Status" button's own click handler -- see isCheckingStatus's doc
+  // comment above for why this exists separately from fetchAuditResult
+  // itself (which the 5s background poll also calls, silently).
+  const handleCheckStatusClick = useCallback(async () => {
+    setJustCheckedStatus(false);
+    setIsCheckingStatus(true);
+    await fetchAuditResult();
+    if (isMountedRef.current) {
+      setIsCheckingStatus(false);
+      setJustCheckedStatus(true);
+    }
+  }, [fetchAuditResult]);
+
+  // Flashes the "Checked just now" confirmation for a few seconds rather
+  // than leaving it up indefinitely, where it would go stale and read as a
+  // false claim about when the check actually happened.
+  useEffect(() => {
+    if (!justCheckedStatus) return;
+    const timer = setTimeout(() => setJustCheckedStatus(false), 4000);
+    return () => clearTimeout(timer);
+  }, [justCheckedStatus]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -1407,9 +1436,19 @@ export const PdfAuditResultsPage: React.FC = () => {
                   <PdfJobProgressPanel jobData={pollJobData} progress={pollJobData.progress ?? 0} />
                 </div>
               )}
-              <Button variant="outline" size="sm" onClick={fetchAuditResult} className="mt-4">
-                Check Status
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCheckStatusClick}
+                disabled={isCheckingStatus}
+                className="mt-4"
+              >
+                {isCheckingStatus && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
+                {isCheckingStatus ? 'Checking...' : 'Check Status'}
               </Button>
+              {justCheckedStatus && (
+                <p className="text-xs text-gray-400">Checked just now — still in progress</p>
+              )}
             </div>
           </CardContent>
         </Card>
