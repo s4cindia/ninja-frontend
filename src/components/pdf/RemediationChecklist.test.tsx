@@ -125,7 +125,9 @@ describe('RemediationChecklist', () => {
     );
     expect(screen.getByText('3. Apply AI-suggested fixes').closest('div')!.parentElement).toHaveTextContent('Not started');
 
-    // Some (but not all) eligible suggestions applied — now it's genuinely in progress.
+    // Some (but not all) eligible suggestions applied — "Partially applied",
+    // not "In progress": no live signal here says an apply is actually
+    // running right now, only that some fixes landed and some didn't yet.
     rerender(
       <RemediationChecklist
         {...baseProps}
@@ -136,7 +138,7 @@ describe('RemediationChecklist', () => {
         ])}
       />
     );
-    expect(screen.getByText('3. Apply AI-suggested fixes').closest('div')!.parentElement).toHaveTextContent('In progress');
+    expect(screen.getByText('3. Apply AI-suggested fixes').closest('div')!.parentElement).toHaveTextContent('Partially applied');
 
     rerender(
       <RemediationChecklist
@@ -255,10 +257,11 @@ describe('RemediationChecklist', () => {
     // 5 at all), and a fresh analysis pass can legitimately prune the
     // suggestion rows that proved it, resetting appliedFixableCount to 0 in
     // the current snapshot even though real progress genuinely happened.
-    // "Not started" flatly denies that; "In progress" — the step-3 work is
-    // ongoing across repeated apply/verify/re-analyze loops — is accurate.
+    // "Not started" flatly denies that; "Partially applied" — real progress
+    // happened across repeated apply/verify/re-analyze loops, even though
+    // nothing is actively running on this particular snapshot — is accurate.
     const step3Container = screen.getByText('3. Apply AI-suggested fixes').closest('div')!.parentElement!;
-    expect(step3Container).toHaveTextContent('In progress');
+    expect(step3Container).toHaveTextContent('Partially applied');
     expect(step3Container).not.toHaveTextContent('Not started');
   });
 
@@ -294,8 +297,25 @@ describe('RemediationChecklist', () => {
     );
 
     const step3Container = screen.getByText('3. Apply AI-suggested fixes').closest('div')!.parentElement!;
-    expect(step3Container).toHaveTextContent('In progress');
+    expect(step3Container).toHaveTextContent('Partially applied');
     expect(step3Container).not.toHaveTextContent('Not started');
+  });
+
+  it('regression: step 3 reads "Partially applied" (not "In progress") once some but not all fixes have landed — this component has no live signal for "an apply request is actually running right now" (that lives in useApplyProgress at the page level), so it must never render the animated in-progress spinner for step 3, which real operators read as "something is actively happening, just wait" when it actually just means "N of M applied, click Apply Fixes again for the rest"', () => {
+    render(
+      <RemediationChecklist
+        {...baseProps}
+        aiAnalysisStatus="complete"
+        aiSuggestions={suggestionsMap([
+          suggestion({ issueId: 'a', applyMode: 'apply-to-pdf', status: 'applied' }),
+          suggestion({ issueId: 'b', applyMode: 'apply-to-pdf', status: 'pending' }),
+        ])}
+      />
+    );
+
+    const step3Container = screen.getByText('3. Apply AI-suggested fixes').closest('div')!.parentElement!;
+    expect(step3Container).toHaveTextContent('Partially applied');
+    expect(step3Container).not.toHaveTextContent('In progress');
   });
 
   it('regression: a manual "Re-run Audit" click before AI Analysis has EVER run must not falsely mark steps 2/3 Done — that button is deliberately always-available, so lastVerifiedAt (and hence verificationDone) can be truthy with aiAnalysisStatus still null. aiAnalyzedAt (the AI-analysis pass\'s own completion timestamp, never set by an unrelated re-audit) is what actually gates this, not verificationDone alone.', () => {
