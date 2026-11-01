@@ -1601,7 +1601,7 @@ describe('PdfAuditResultsPage', () => {
 
       const rerunButton = await screen.findByRole('button', { name: 'Re-run AI Analysis' });
       await waitFor(() => expect(rerunButton).not.toBeDisabled());
-      fireEvent.click(screen.getByRole('checkbox', { name: 'Include color-contrast auto-fix on re-run' }));
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Include color-contrast auto-fix on Re-run AI Analysis only' }));
 
       vi.useFakeTimers();
       try {
@@ -1621,13 +1621,13 @@ describe('PdfAuditResultsPage', () => {
       renderWithRouter(jobId);
 
       await screen.findByRole('button', { name: 'Re-run AI Analysis' });
-      const checkbox = screen.getByRole('checkbox', { name: 'Include color-contrast auto-fix on re-run' });
+      const checkbox = screen.getByRole('checkbox', { name: 'Include color-contrast auto-fix on Re-run AI Analysis only' });
       expect(checkbox).toHaveAttribute('aria-checked', 'false');
 
-      fireEvent.click(screen.getByText('Include color-contrast auto-fix'));
+      fireEvent.click(screen.getByText('Include color-contrast auto-fix (re-run only)'));
       expect(checkbox).toHaveAttribute('aria-checked', 'true');
 
-      fireEvent.click(screen.getByText('Include color-contrast auto-fix'));
+      fireEvent.click(screen.getByText('Include color-contrast auto-fix (re-run only)'));
       expect(checkbox).toHaveAttribute('aria-checked', 'false');
     });
 
@@ -3108,6 +3108,20 @@ describe('PdfAuditResultsPage', () => {
           autoColorContrastMode: 'disabled',
         });
       });
+    });
+
+    it('regression: the popover\'s own Color-contrast handling note cross-references the page-level checkbox by its current label, so an operator sees the two settings are independent and don\'t share a default (the reported confusion: leaving the page checkbox unchecked does not keep Auto Remediation from auto-applying contrast)', async () => {
+      mockCommonGets();
+
+      renderWithRouter(jobId);
+
+      expect(await screen.findByText('Include color-contrast auto-fix (re-run only)')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Start Auto Remediation' }));
+
+      expect(screen.getByText(/Independent of the page.s own/)).toHaveTextContent(
+        'Applies to every round of this run. Independent of the page’s own “Include color-contrast auto-fix (re-run only)” checkbox — defaults to Auto-apply here even when that checkbox is unchecked.'
+      );
     });
 
     it('regression: disables Start Auto Remediation, hides the bulk Apply Fixes button, and renders the status card once a run is active on a regular job — Auto Mode is no longer Comparison-Study-trial-exclusive', async () => {

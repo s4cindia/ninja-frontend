@@ -49,9 +49,20 @@ interface AutoModeStartControlProps {
    * regression path while historical data is still thin).
    */
   budgetEstimate?: BudgetEstimate;
+  /**
+   * True only where this popover's "Color-contrast handling" sits alongside
+   * a page-level "Include color-contrast auto-fix" checkbox that looks
+   * related but isn't (PdfAuditResultsPage's single-file view) -- confirmed
+   * live confusion: an operator assumed leaving that checkbox unchecked
+   * would also keep Auto Remediation from auto-applying contrast fixes,
+   * when the two are fully independent settings with opposite defaults.
+   * Batch processing has no such checkbox, so it omits this and gets the
+   * shorter, checkbox-agnostic note instead.
+   */
+  mentionsPageCheckbox?: boolean;
 }
 
-export function AutoModeStartControl({ onStart, isPending, disabled, disabledTitle, showConfig, triggerLabel = 'Start Auto Remediation', budgetEstimate }: AutoModeStartControlProps) {
+export function AutoModeStartControl({ onStart, isPending, disabled, disabledTitle, showConfig, triggerLabel = 'Start Auto Remediation', budgetEstimate, mentionsPageCheckbox = false }: AutoModeStartControlProps) {
   const [open, setOpen] = useState(false);
   const [maxRoundsInput, setMaxRoundsInput] = useState(String(DEFAULT_MAX_ROUNDS));
   const [costLimitInput, setCostLimitInput] = useState(String(DEFAULT_COST_LIMIT_USD));
@@ -162,6 +173,11 @@ export function AutoModeStartControl({ onStart, isPending, disabled, disabledTit
                 <option value="disabled">Disabled — skip contrast entirely</option>
                 <option value="apply-to-pdf">Auto-apply — fix contrast automatically</option>
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                {mentionsPageCheckbox
+                  ? 'Applies to every round of this run. Independent of the page’s own “Include color-contrast auto-fix (re-run only)” checkbox — defaults to Auto-apply here even when that checkbox is unchecked.'
+                  : 'Applies to every round of this run.'}
+              </p>
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-4">
