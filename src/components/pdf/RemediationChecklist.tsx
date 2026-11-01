@@ -21,7 +21,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle, Circle, Loader2, AlertTriangle, ListChecks } from 'lucide-react';
+import { CheckCircle, Circle, CircleDashed, Loader2, AlertTriangle, ListChecks } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -39,7 +39,18 @@ export interface GuidanceAcknowledgment {
   acknowledgedBy: string;
 }
 
-type StepStatus = 'not-started' | 'in-progress' | 'done' | 'skipped';
+// 'partial' is distinct from 'in-progress': 'in-progress' means a live,
+// polled backend signal says work is actively happening right now (e.g.
+// aiAnalysisStatus/postRemediationStatus) and pairs with an animated spinner
+// to say "this will finish on its own, just wait". 'partial' means real
+// progress has been made but nothing is currently running -- the step needs
+// another manual action to continue. Steps 2/4/5 have a genuine live signal
+// and use 'in-progress'; step 3 (see step3Started below) never did, and
+// mislabeling it 'in-progress' read as "an apply is actively running" to
+// operators checking back after Auto Mode had already stopped, when it
+// actually just meant "N of M fixes applied, M-N still need another Apply
+// Fixes click".
+type StepStatus = 'not-started' | 'in-progress' | 'partial' | 'done' | 'skipped';
 
 interface RemediationChecklistProps {
   jobId: string;
@@ -70,6 +81,7 @@ interface RemediationChecklistProps {
 const STATUS_LABEL: Record<StepStatus, string> = {
   'not-started': 'Not started',
   'in-progress': 'In progress',
+  partial: 'Partially applied',
   done: 'Done',
   skipped: 'Acknowledged',
 };
@@ -77,6 +89,7 @@ const STATUS_LABEL: Record<StepStatus, string> = {
 const STATUS_BADGE_VARIANT: Record<StepStatus, 'default' | 'success' | 'warning' | 'info'> = {
   'not-started': 'default',
   'in-progress': 'info',
+  partial: 'warning',
   done: 'success',
   skipped: 'warning',
 };
@@ -103,6 +116,9 @@ function StatusIcon({ status }: { status: StepStatus }) {
       return <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />;
     case 'in-progress':
       return <Loader2 className="h-4 w-4 text-blue-600 flex-shrink-0 animate-spin" />;
+    case 'partial':
+      // Deliberately not animated -- nothing is actively running.
+      return <CircleDashed className="h-4 w-4 text-amber-600 flex-shrink-0" />;
     case 'skipped':
       return <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0" />;
     default:
@@ -254,6 +270,13 @@ export function RemediationChecklist({
   // before. Gated on aiAnalysisEverCompleted too, for the same reason as
   // above — verificationDone alone could come from a re-audit that preceded
   // any AI analysis ever running.
+  //
+  // This component has no live signal for "an Apply Fixes/Apply All request
+  // is actually in flight right now" (that lives in useApplyProgress/
+  // isApplyAllPending at the page level, not here) — step3Started only ever
+  // means "some fixes have landed, more remain", never "something is
+  // currently executing". See the 'partial' StepStatus case above for why
+  // that distinction matters for how this renders.
   const step3Started = appliedFixableCount > 0 || (aiAnalysisEverCompleted && verificationDone);
 
   // Step 5: re-run AI Analysis (final check) — done once AI Analysis has
@@ -366,7 +389,7 @@ export function RemediationChecklist({
       {
         id: 3,
         label: 'Apply AI-suggested fixes',
-        status: !aiAnalysisEverCompleted ? 'not-started' : step3Done ? 'done' : step3Started ? 'in-progress' : 'not-started',
+        status: !aiAnalysisEverCompleted ? 'not-started' : step3Done ? 'done' : step3Started ? 'partial' : 'not-started',
       },
       {
         id: 4,
