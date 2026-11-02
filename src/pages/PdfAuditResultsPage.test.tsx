@@ -2385,6 +2385,116 @@ describe('PdfAuditResultsPage', () => {
         expect(statusCallsAfter).toBeGreaterThan(statusCallsBefore);
       });
     });
+
+    it('regression: refreshRemediationCycleLock retries with backoff after a raw network error instead of giving up after one failed status check -- a connectivity blip outlasting a single request previously left the lock stuck with nothing ever scheduled to re-check (confirmed live: the toolbar stayed disabled until a full page reload even though the server had actually finished the apply and its own post-fix re-audit)', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        const mockResult = createMockAuditResult();
+        // Counted separately from the mount-time /auto-tag/status fetch --
+        // otherwise that first, unrelated call would eat into the "first
+        // two attempts fail" budget below and the retry would appear to
+        // succeed on attempt 2 instead of exercising attempt 3.
+        let clicked = false;
+        let retryAttempt = 0;
+        mockApi.get.mockImplementation((url: string) => {
+          if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+          if (url === statusUrl) {
+            if (!clicked) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+            retryAttempt++;
+            // The reconciliation's own first two attempts both fail --
+            // simulating an extended blip, not a single transient hiccup.
+            if (retryAttempt <= 2) return Promise.reject(new Error('Network Error'));
+            return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe', remediationCycleInProgress: false } } });
+          }
+          if (url === aiUrl) return Promise.resolve(emptyAiResponse);
+          return Promise.resolve({ data: { data: {} } });
+        });
+        // A raw network error -- no `response` field at all, so
+        // getRemediationCycleLockDetails returns null and the generic
+        // error path's own refreshRemediationCycleLock() call runs.
+        mockApi.post.mockRejectedValue(new Error('Network Error'));
+
+        renderWithRouter(jobId);
+
+        const reRunButton = await screen.findByRole('button', { name: 'Re-run Audit' });
+        const statusCallsBefore = mockApi.get.mock.calls.filter(([url]) => url === statusUrl).length;
+
+        clicked = true;
+        fireEvent.click(reRunButton);
+        // One generous combined advance rather than three precisely-sized
+        // steps -- advanceTimersByTimeAsync flushes microtasks as it goes,
+        // so it correctly carries the chain through all 3 attempts (delay
+        // 0, then 2000, then 5000 = 7000ms) scheduled progressively as
+        // each prior attempt's catch block runs.
+        await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+
+        const statusCallsAfter = mockApi.get.mock.calls.filter(([url]) => url === statusUrl).length;
+        expect(statusCallsAfter - statusCallsBefore).toBeGreaterThanOrEqual(3);
+
+        // The lock correctly ends up cleared once the retry finally succeeds
+        // -- not stuck disabled forever from the first two failures.
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Re-run Audit' })).not.toBeDisabled());
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('regression: a stale, out-of-order /auto-tag/status response from the periodic lock-poll does not re-lock the toolbar after a fresher response already cleared it -- applyRemediationCycleLock had no ordering guard at all, so a response whose own request was sent before one that already applied could silently overwrite correct state with stale data', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        const mockResult = createMockAuditResult();
+        let statusMode: 'locked' | 'hold-a' | 'resolve-b' = 'locked';
+        let resolveA!: (v: unknown) => void;
+        const aPromise = new Promise((resolve) => { resolveA = resolve; });
+
+        mockApi.get.mockImplementation((url: string) => {
+          if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+          if (url === statusUrl) {
+            if (statusMode === 'hold-a') return aPromise;
+            if (statusMode === 'resolve-b') {
+              return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe', remediationCycleInProgress: false } } });
+            }
+            // Initial mount -- reports locked, so the periodic lock-poll
+            // effect (gated on remediationCycleLock.inProgress) arms.
+            return Promise.resolve({
+              data: { data: { status: 'complete', taggerSource: 'adobe', remediationCycleInProgress: true, remediationCycleSource: 'apply_all' } },
+            });
+          }
+          if (url === aiUrl) return Promise.resolve(emptyAiResponse);
+          return Promise.resolve({ data: { data: {} } });
+        });
+
+        renderWithRouter(jobId);
+        await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+        const reRunButton = await screen.findByRole('button', { name: 'Re-run Audit' });
+        await waitFor(() => expect(reRunButton).toBeDisabled());
+
+        // Tick 1 ("A"): held pending -- the older in-flight poll that will
+        // resolve LATE, reporting stale "still locked" data.
+        statusMode = 'hold-a';
+        await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+
+        // Tick 2 ("B"): resolves immediately, correctly reporting the lock
+        // cleared -- it must win even though A's own request was sent first.
+        statusMode = 'resolve-b';
+        await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+
+        await waitFor(() => expect(reRunButton).not.toBeDisabled());
+
+        // A finally resolves, reporting stale "locked" data -- it must be
+        // discarded rather than re-lock the toolbar after B already cleared it.
+        await act(async () => {
+          resolveA({
+            data: { data: { status: 'complete', taggerSource: 'adobe', remediationCycleInProgress: true, remediationCycleSource: 'apply_all' } },
+          });
+          await vi.advanceTimersByTimeAsync(0);
+        });
+
+        expect(reRunButton).not.toBeDisabled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe('Manual remediation time log', () => {
