@@ -376,6 +376,20 @@ export const PdfAuditResultsPage: React.FC = () => {
     lockedBy: string | null;
     source: RemediationCycleSource | null;
   }>({ inProgress: false, lockedAt: null, lockedBy: null, source: null });
+  // Monotonic sequence for every /auto-tag/status request that feeds the
+  // remediation-cycle lock, across every call site that fetches it
+  // (refreshRemediationCycleLock, the periodic lock-poll effect,
+  // fetchAutoTagStatus, handleRetryAutoTag's poll, handleManualFixReaudited,
+  // pollPostRemediationStatus) -- stamped when a request is SENT (so
+  // send-order, not arrival-order, is what's compared), checked when its
+  // response is about to apply. applyRemediationCycleLock had no ordering
+  // guard at all: an out-of-order response (sent earlier, arriving later
+  // than a fresher one already applied) could silently overwrite correct
+  // state with stale data -- confirmed live as one real cause of the
+  // toolbar staying stuck disabled ("Applying AI fixes still in progress")
+  // long after the server had actually finished.
+  const lockRequestSeqRef = useRef(0);
+  const lastAppliedLockSeqRef = useRef(0);
   // remediationCycleLock is a snapshot from /auto-tag/status — nothing
   // re-polls that endpoint while AI Analysis's own 3s poll (fetchAiSuggestions)
   // is what's actually running, so remediationCycleLock.inProgress can stay
@@ -409,8 +423,17 @@ export const PdfAuditResultsPage: React.FC = () => {
     remediationCycleLockedAt?: string | null;
     remediationCycleLockedBy?: string | null;
     remediationCycleSource?: RemediationCycleSource | null;
-  } | undefined) => {
+  } | undefined, seq?: number) => {
     if (requestJobId !== activeJobIdRef.current) return;
+    // A response whose own request was sent BEFORE one that already
+    // applied is stale, regardless of which one's response arrived first
+    // -- ignore it rather than let it overwrite fresher, correct state.
+    // Callers that don't participate in the shared sequence (seq
+    // omitted) always apply, same as before this guard existed.
+    if (seq !== undefined) {
+      if (seq < lastAppliedLockSeqRef.current) return;
+      lastAppliedLockSeqRef.current = seq;
+    }
     setRemediationCycleLock({
       inProgress: info?.remediationCycleInProgress ?? false,
       lockedAt: info?.remediationCycleLockedAt ?? null,
@@ -422,17 +445,34 @@ export const PdfAuditResultsPage: React.FC = () => {
   // On-demand refresh used after any of the 5 lock-gated actions errors:
   // rather than a client-side guess at how long to block a retry (the old
   // approach), ask the server what's actually true right now and gate the
-  // retry on that.
+  // retry on that. Retries with backoff instead of a single silent
+  // attempt -- the single-shot version's own comment here previously
+  // claimed "the next regular poll will pick it up", but that poll (the
+  // effect right below) only ever runs while remediationCycleLock.inProgress
+  // is ALREADY true, which this call is specifically trying to establish
+  // in the first place right after an error. A connectivity blip that
+  // outlasted one request previously left nothing scheduled to ever
+  // re-check at all -- confirmed live: the toolbar stayed stuck disabled
+  // until a full page reload even though the server had actually finished
+  // the apply and its own post-fix re-audit successfully.
   const refreshRemediationCycleLock = useCallback(async () => {
     if (!jobId) return;
     const requestJobId = jobId;
-    try {
-      const res = await api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`);
-      if (!isMountedRef.current) return;
-      applyRemediationCycleLock(requestJobId, res.data.data);
-    } catch {
-      // Non-fatal — the lock state just won't refresh from this attempt;
-      // the next regular poll will pick it up.
+    const RETRY_DELAYS_MS = [0, 2000, 5000];
+    for (const delay of RETRY_DELAYS_MS) {
+      if (delay > 0) await new Promise(resolve => setTimeout(resolve, delay));
+      if (!isMountedRef.current || requestJobId !== activeJobIdRef.current) return;
+      const lockSeq = ++lockRequestSeqRef.current;
+      try {
+        const res = await api.get(`/pdf/${encodeURIComponent(requestJobId)}/auto-tag/status`);
+        if (!isMountedRef.current) return;
+        applyRemediationCycleLock(requestJobId, res.data.data, lockSeq);
+        return;
+      } catch {
+        // Try the next delay; the loop falling through after the last one
+        // leaves the lock as its last-known state, same as before this
+        // retry loop existed.
+      }
     }
   }, [jobId, applyRemediationCycleLock]);
 
@@ -447,10 +487,11 @@ export const PdfAuditResultsPage: React.FC = () => {
     if (!jobId || !remediationCycleLock.inProgress) return;
     const requestJobId = jobId;
     const interval = setInterval(async () => {
+      const lockSeq = ++lockRequestSeqRef.current;
       try {
         const res = await api.get(`/pdf/${encodeURIComponent(requestJobId)}/auto-tag/status`);
         if (!isMountedRef.current) return;
-        applyRemediationCycleLock(requestJobId, res.data.data);
+        applyRemediationCycleLock(requestJobId, res.data.data, lockSeq);
       } catch {
         // Transient — try again next tick.
       }
@@ -1051,6 +1092,7 @@ export const PdfAuditResultsPage: React.FC = () => {
     if (!jobId) return;
     const requestId = ++autoTagFetchRequestIdRef.current;
     const requestJobId = jobId;
+    const lockSeq = ++lockRequestSeqRef.current;
     try {
       const res = await api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`);
       const info = res.data.data;
@@ -1065,7 +1107,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         autoTagFetchAppliedIdRef.current = requestId;
         setAutoTagInfo(info);
         applyAutoTagStatus(info);
-        applyRemediationCycleLock(jobId, info);
+        applyRemediationCycleLock(jobId, info, lockSeq);
         setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
         setManualRemediationLastLoggedAt(prev => latestTimestamp(prev, info?.manualRemediationLastLoggedAt));
       }
@@ -1176,13 +1218,14 @@ export const PdfAuditResultsPage: React.FC = () => {
       // on unmount and so state updates are guarded against late firings.
       if (autoTagPollRef.current) clearInterval(autoTagPollRef.current);
       autoTagPollRef.current = setInterval(async () => {
+        const lockSeq = ++lockRequestSeqRef.current;
         try {
           const res = await api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`);
           const info = res.data.data;
           if (isMountedRef.current) {
             setAutoTagInfo(info);
             applyAutoTagStatus(info);
-            applyRemediationCycleLock(jobId, info);
+            applyRemediationCycleLock(jobId, info, lockSeq);
             setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
         setManualRemediationLastLoggedAt(prev => latestTimestamp(prev, info?.manualRemediationLastLoggedAt));
           }
@@ -1218,13 +1261,14 @@ export const PdfAuditResultsPage: React.FC = () => {
     await fetchAuditResult();
     bumpHistoryRefreshTrigger();
     if (!jobId) return;
+    const lockSeq = ++lockRequestSeqRef.current;
     try {
       const res = await api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`);
       if (!isMountedRef.current) return;
       const info = res.data.data;
       setAutoTagInfo(info);
       applyAutoTagStatus(info);
-      applyRemediationCycleLock(jobId, info);
+      applyRemediationCycleLock(jobId, info, lockSeq);
       setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
       setManualRemediationLastLoggedAt(prev => latestTimestamp(prev, info?.manualRemediationLastLoggedAt));
     } catch {
@@ -1267,12 +1311,13 @@ export const PdfAuditResultsPage: React.FC = () => {
     if (autoTagPollRef.current) clearInterval(autoTagPollRef.current);
     setAutoTagInfo(prev => prev ? { ...prev, postRemediationStatus: 'pending', postRemediationProgress: undefined } : prev);
     autoTagPollRef.current = setInterval(async () => {
+      const lockSeq = ++lockRequestSeqRef.current;
       try {
         const res = await api.get(`/pdf/${encodeURIComponent(jobId)}/auto-tag/status`);
         const info = res.data.data;
         if (isMountedRef.current) {
           setAutoTagInfo(info);
-          applyRemediationCycleLock(jobId, info);
+          applyRemediationCycleLock(jobId, info, lockSeq);
           setManualRemediationMs(prev => Math.max(prev, info?.manualRemediationMs ?? 0));
         setManualRemediationLastLoggedAt(prev => latestTimestamp(prev, info?.manualRemediationLastLoggedAt));
         }
