@@ -13,6 +13,7 @@ import type {
   AutoRemediationResult,
   ReauditComparisonResult,
   RemediationHistoryRun,
+  ApplyFailureReport,
 } from '@/types/pdf-remediation.types';
 
 /**
@@ -135,6 +136,17 @@ export async function getRemediationHistory(jobId: string): Promise<RemediationH
   return (response.data.data ?? response.data)?.runs ?? [];
 }
 
+/**
+ * Get the Apply Failure Report — a job's permanently-failed AI suggestions,
+ * grouped by (suggestionType, reason) and classified into an operator-facing
+ * category + plain-English explanation.
+ */
+export async function getApplyFailureReport(jobId: string): Promise<ApplyFailureReport> {
+  const response = await api.get(`/pdf/${jobId}/remediation/apply-failures`);
+  const data = response.data.data ?? response.data;
+  return { totalFailed: data?.totalFailed ?? 0, groups: data?.groups ?? [] };
+}
+
 export const pdfRemediationService = {
   createRemediationPlan,
   getRemediationPlan,
@@ -145,4 +157,5 @@ export const pdfRemediationService = {
   applyQuickFix,
   reauditPdf,
   getRemediationHistory,
+  getApplyFailureReport,
 };

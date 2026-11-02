@@ -19,7 +19,9 @@ export interface AiAnalysis {
   rationale: string;
   model: string;
   applyMode: 'apply-to-pdf' | 'guidance-only' | 'auto-resolve';
-  status: 'pending' | 'approved' | 'rejected' | 'applied';
+  status: 'pending' | 'approved' | 'rejected' | 'applied' | 'failed';
+  /** Set once status reaches 'failed' (recordApplyFailure, ai-analysis.service.ts) -- the same reason text shown transiently in the Apply All results modal, given a durable home here so it can still be read after that modal closes. */
+  lastErrorReason?: string | null;
   requiresManualReview?: boolean;
   /** Who approved this suggestion — 'auto-mode' for Comparison Study auto-mode's own auto-approval, null/undefined for anything not yet approved or approved before this field existed. */
   approvedBy?: 'operator' | 'auto-mode' | null;
@@ -112,6 +114,7 @@ export function IssueCard({
 }: IssueCardProps) {
   const isPdf = isPdfIssue(issue);
   const [explanationOpen, setExplanationOpen] = useState(false);
+  const [failureExplanationOpen, setFailureExplanationOpen] = useState(false);
   const [editedValue, setEditedValue] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
@@ -439,6 +442,12 @@ export function IssueCard({
                   </span>
                 ) : aiSuggestion.status === 'rejected' ? (
                   <span className="text-gray-500 italic">Dismissed</span>
+                ) : aiSuggestion.status === 'failed' ? (
+                  // Terminal (MAX_APPLY_ATTEMPTS exhausted) -- no Approve/Apply/
+                  // Dismiss actions, since nothing about retrying would change.
+                  <span className="flex items-center gap-1 text-red-700 font-medium">
+                    <AlertTriangle size={12} /> Failed
+                  </span>
                 ) : (
                   <div className="flex items-center gap-1.5">
                     {aiSuggestion.status === 'approved' ? (
@@ -497,6 +506,30 @@ export function IssueCard({
               )}
               {aiSuggestion.rationale && (
                 <p className="text-purple-500 mt-1 italic">{aiSuggestion.rationale}</p>
+              )}
+              {aiSuggestion.status === 'failed' && aiSuggestion.lastErrorReason && (
+                <div className="mt-1.5 pt-1.5 border-t border-purple-200/60">
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 text-red-700 hover:text-red-800 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFailureExplanationOpen(o => !o);
+                    }}
+                  >
+                    <HelpCircle size={12} />
+                    <span>Why did this fail?</span>
+                    {failureExplanationOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                  </button>
+                  {failureExplanationOpen && (
+                    <p
+                      className="mt-1.5 text-red-700 leading-relaxed font-mono break-all"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {aiSuggestion.lastErrorReason}
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           )}
