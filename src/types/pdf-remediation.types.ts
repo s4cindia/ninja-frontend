@@ -327,3 +327,27 @@ export interface RemediationHistoryRun {
   cycleNumber: number;
   events: RemediationHistoryEvent[];
 }
+
+/** Mirrors backend ApplyFailureCategory (apply-failure-classification.ts). */
+export type ApplyFailureCategory = 'correctly_skipped' | 'likely_resolved' | 'needs_investigation';
+
+/**
+ * One (suggestionType, reason) bucket of a job's permanently-failed AI
+ * suggestions — the Apply Failure Report's unit of display. Pre-sorted by
+ * the backend: needs_investigation groups first (most actionable), then
+ * likely_resolved, then correctly_skipped, each by count descending.
+ */
+export interface ApplyFailureGroup {
+  suggestionType: string;
+  reason: string;
+  category: ApplyFailureCategory;
+  categoryLabel: string;
+  explanation: string;
+  count: number;
+  issueIds: string[];
+}
+
+export interface ApplyFailureReport {
+  totalFailed: number;
+  groups: ApplyFailureGroup[];
+}

@@ -627,4 +627,51 @@ describe('IssueCard', () => {
       expect(screen.queryByText('Auto-approved')).not.toBeInTheDocument();
     });
   });
+
+  describe('Permanently-failed AI suggestion (Apply Failure Report, status: "failed")', () => {
+    const mockAiSuggestion: AiAnalysis = {
+      id: 'ai-1',
+      jobId: 'job-1',
+      issueId: 'pdf-issue-1',
+      suggestionType: 'color-contrast-fix',
+      value: null,
+      guidance: null,
+      confidence: 0.92,
+      rationale: 'because',
+      model: 'gemini',
+      applyMode: 'apply-to-pdf',
+      status: 'failed',
+      lastErrorReason: 'Fix did not verify even after escalating to #000000 (measured ratio 1.06:1, needs 4.5:1)',
+      createdAt: '2024-01-15T10:00:00Z',
+      updatedAt: '2024-01-15T10:00:00Z',
+    };
+
+    it('shows a Failed indicator instead of the Approve/Apply/Dismiss actions -- retrying would not change anything (MAX_APPLY_ATTEMPTS exhausted)', () => {
+      renderWithQuery(<IssueCard issue={mockPdfIssue} jobId="job-1" aiSuggestion={mockAiSuggestion} />);
+
+      expect(screen.getByText('Failed')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Apply' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Dismiss' })).not.toBeInTheDocument();
+    });
+
+    it('reveals lastErrorReason under a "Why did this fail?" toggle, collapsed by default', () => {
+      renderWithQuery(<IssueCard issue={mockPdfIssue} jobId="job-1" aiSuggestion={mockAiSuggestion} />);
+
+      expect(screen.queryByText(mockAiSuggestion.lastErrorReason!)).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Why did this fail?' }));
+
+      expect(screen.getByText(mockAiSuggestion.lastErrorReason!)).toBeInTheDocument();
+    });
+
+    it('does not render the "Why did this fail?" toggle when lastErrorReason is absent (rows that failed before this field existed)', () => {
+      renderWithQuery(
+        <IssueCard issue={mockPdfIssue} jobId="job-1" aiSuggestion={{ ...mockAiSuggestion, lastErrorReason: null }} />
+      );
+
+      expect(screen.getByText('Failed')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Why did this fail?' })).not.toBeInTheDocument();
+    });
+  });
 });

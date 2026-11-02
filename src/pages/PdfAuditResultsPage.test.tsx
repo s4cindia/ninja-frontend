@@ -2102,6 +2102,47 @@ describe('PdfAuditResultsPage', () => {
       expect(screen.getByRole('button', { name: 'Guidance only (1)' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Applied (1)' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Rejected (0)' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Failed (0)' })).toBeInTheDocument();
+      // Nothing has permanently failed yet -- the on-demand report has
+      // nothing to show, so it stays hidden rather than an always-visible
+      // dead control.
+      expect(screen.queryByRole('button', { name: 'Apply Failure Report' })).not.toBeInTheDocument();
+    });
+
+    it('regression: the 27-stuck-apply-failures gap -- a permanently-failed suggestion now has its own "Failed (N)" chip and filters the Issues panel down to just itself, instead of being invisible everywhere except the "All" count', async () => {
+      const mockResult = createMockAuditResult({ issues: [issueA, issueB, issueC, issueD] });
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) {
+          return Promise.resolve({
+            data: {
+              data: {
+                suggestions: [
+                  mockAiSuggestion('b', 'apply-to-pdf', 'pending'),
+                  mockAiSuggestion('c', 'guidance-only', 'pending'),
+                  mockAiSuggestion('d', 'apply-to-pdf', 'failed'),
+                ],
+                analyzed: 3,
+                total: 3,
+                status: 'complete',
+              },
+            },
+          });
+        }
+        return Promise.resolve({ data: { data: {} } });
+      });
+      renderWithRouter(jobId);
+      await screen.findByText('test-document.pdf');
+
+      expect(await screen.findByRole('button', { name: 'Failed (1)' })).toBeInTheDocument();
+      // Now that something HAS permanently failed, the on-demand report
+      // button appears next to the chip.
+      expect(screen.getByRole('button', { name: 'Apply Failure Report' })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Failed (1)' }));
+
+      expect(visibleIssueIds().sort()).toEqual(['d']);
     });
 
     it('multi-selects categories as a union, and toggling one off narrows back', async () => {

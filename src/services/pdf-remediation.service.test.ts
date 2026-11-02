@@ -78,3 +78,40 @@ describe('pdfRemediationService.getRemediationHistory', () => {
     expect(result).toEqual([]);
   });
 });
+
+describe('pdfRemediationService.getApplyFailureReport', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('fetches the apply-failures endpoint and returns the report', async () => {
+    const report = {
+      totalFailed: 2,
+      groups: [
+        {
+          suggestionType: 'color-contrast-fix',
+          reason: 'Fix did not verify even after escalating to #000000',
+          category: 'needs_investigation',
+          categoryLabel: 'Needs investigation -- contrast verification',
+          explanation: 'explanation text',
+          count: 2,
+          issueIds: ['issue-1', 'issue-2'],
+        },
+      ],
+    };
+    mockApi.get.mockResolvedValueOnce({ data: { success: true, data: report } });
+
+    const result = await pdfRemediationService.getApplyFailureReport('job-123');
+
+    expect(mockApi.get).toHaveBeenCalledWith('/pdf/job-123/remediation/apply-failures');
+    expect(result).toEqual(report);
+  });
+
+  it('falls back to an empty report when the response has no data payload', async () => {
+    mockApi.get.mockResolvedValueOnce({ data: { success: true, data: null } });
+
+    const result = await pdfRemediationService.getApplyFailureReport('job-123');
+
+    expect(result).toEqual({ totalFailed: 0, groups: [] });
+  });
+});

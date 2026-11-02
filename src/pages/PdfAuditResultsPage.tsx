@@ -23,7 +23,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { FileText, Loader2, Download, Share2, RotateCw, Filter, X, ChevronDown, ListChecks, Maximize2, Minimize2, Zap, Sparkles } from 'lucide-react';
+import { FileText, Loader2, Download, Share2, RotateCw, Filter, X, ChevronDown, ListChecks, Maximize2, Minimize2, Zap, Sparkles, FileWarning } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
@@ -45,6 +45,7 @@ import type { ReauditComparisonResult } from '@/types/pdf-remediation.types';
 import type { GuidanceAcknowledgment } from '@/components/pdf/RemediationChecklist';
 import { IssueCard, AiAnalysis } from '@/components/remediation/IssueCard';
 import { ApplyAllSuggestionsPanel } from '@/components/remediation/ApplyAllSuggestionsPanel';
+import { ApplyFailureReportModal } from '@/components/remediation/ApplyFailureReportModal';
 import { useRemediationTimer } from '@/hooks/useRemediationTimer';
 import { triggerAiAnalysis } from '@/services/api/pdfAiAnalysis.service';
 import type { ApplyAllAiSuggestionsResult } from '@/services/api/pdfAiAnalysis.service';
@@ -104,7 +105,7 @@ interface IssueFilters {
   wcagCriterion: string | 'all';
   matterhornCategory: string | 'all';
   categories: Set<string>;
-  aiAction: 'all' | 'fixable' | 'guidance-only' | 'applied' | 'rejected';
+  aiAction: 'all' | 'fixable' | 'guidance-only' | 'applied' | 'rejected' | 'failed';
   pageNumber: number | 'all';
   searchText: string;
   showMatterhornOnly: boolean;
@@ -488,6 +489,7 @@ export const PdfAuditResultsPage: React.FC = () => {
   const [isReRunningAudit, setIsReRunningAudit] = useState(false);
   const [showPacReport, setShowPacReport] = useState(false);
   const [showApplyAllPanel, setShowApplyAllPanel] = useState(false);
+  const [showApplyFailureReport, setShowApplyFailureReport] = useState(false);
   // Lifted from ApplyAllSuggestionsPanel's own mutation (via onPendingChange)
   // — the panel owns the mutation, but the live-progress SSE connection
   // below needs to span both that step and Auto Mode's own apply step, so
@@ -760,6 +762,8 @@ export const PdfAuditResultsPage: React.FC = () => {
             return suggestion?.status === 'applied';
           case 'rejected':
             return suggestion?.status === 'rejected';
+          case 'failed':
+            return suggestion?.status === 'failed';
           default:
             return true;
         }
@@ -821,7 +825,7 @@ export const PdfAuditResultsPage: React.FC = () => {
   // Mirrors the "fixable" definition used in the filteredIssues filter logic
   // below — keep both in sync if that logic ever changes.
   const aiActionCounts = useMemo(() => {
-    let fixable = 0, guidanceOnly = 0, applied = 0, rejected = 0;
+    let fixable = 0, guidanceOnly = 0, applied = 0, rejected = 0, failed = 0;
     for (const suggestion of aiSuggestions.values()) {
       if (suggestion.applyMode === 'apply-to-pdf' && (suggestion.status === 'pending' || suggestion.status === 'approved')) {
         fixable++;
@@ -829,8 +833,9 @@ export const PdfAuditResultsPage: React.FC = () => {
       if (suggestion.applyMode === 'guidance-only') guidanceOnly++;
       if (suggestion.status === 'applied') applied++;
       if (suggestion.status === 'rejected') rejected++;
+      if (suggestion.status === 'failed') failed++;
     }
-    return { fixable, guidanceOnly, applied, rejected };
+    return { fixable, guidanceOnly, applied, rejected, failed };
   }, [aiSuggestions]);
 
   // Handlers
@@ -2004,6 +2009,7 @@ export const PdfAuditResultsPage: React.FC = () => {
                   ['guidance-only', 'Guidance only', aiActionCounts.guidanceOnly],
                   ['applied', 'Applied', aiActionCounts.applied],
                   ['rejected', 'Rejected', aiActionCounts.rejected],
+                  ['failed', 'Failed', aiActionCounts.failed],
                 ] as const
               ).map(([value, label, count]) => (
                 <button
@@ -2015,6 +2021,8 @@ export const PdfAuditResultsPage: React.FC = () => {
                     filters.aiAction === value
                       ? value === 'fixable'
                         ? 'bg-green-100 text-green-800 border-green-300'
+                        : value === 'failed'
+                        ? 'bg-red-100 text-red-800 border-red-300'
                         : 'bg-primary-100 text-primary-700 border-primary-300'
                       : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
                   )}
@@ -2022,6 +2030,20 @@ export const PdfAuditResultsPage: React.FC = () => {
                   {label} ({count})
                 </button>
               ))}
+              {/* On-demand, same convention as Download Report/Generate ACR --
+                  not a new always-visible panel. Only worth surfacing once
+                  there's something to report. */}
+              {aiActionCounts.failed > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowApplyFailureReport(true)}
+                  className="ml-1"
+                >
+                  <FileWarning className="h-3.5 w-3.5 mr-1" />
+                  Apply Failure Report
+                </Button>
+              )}
             </div>
 
             {hasActiveFilters && (
@@ -2184,6 +2206,12 @@ export const PdfAuditResultsPage: React.FC = () => {
         jobId={jobId!}
         onGenerated={() => setJobFlags(prev => ({ acrGenerated: prev?.acrGenerated ?? false, pacReportGenerated: true, lastReauditAt: prev?.lastReauditAt }))}
         isOwner={auditResult?.isOwner ?? false}
+      />
+
+      <ApplyFailureReportModal
+        isOpen={showApplyFailureReport}
+        onClose={() => setShowApplyFailureReport(false)}
+        jobId={jobId!}
       />
     </div>
   );
