@@ -201,9 +201,57 @@ describe('derivePhases', () => {
       expect(byId(phases, 'verification').status).toBe('not-started');
     });
 
-    it('is in-progress once the first re-audit is done but re-analysis/guidance resolution has not caught up', () => {
-      const phases = derivePhases(baseInput({ postRemediationStatus: 'complete', lastVerifiedAt: '2026-10-01T12:00:00.000Z' }));
-      expect(byId(phases, 'verification').status).toBe('in-progress');
+    it('regression (CodeRabbit): carries no detail text while still not-started, even when pendingGuidanceCount is already 0 -- guidanceResolved alone being true must not leak a "Needs: Re-run AI Analysis" instruction onto a phase that has not begun', () => {
+      const phases = derivePhases(baseInput({ pendingGuidanceCount: 0 }));
+      const verification = byId(phases, 'verification');
+      expect(verification.status).toBe('not-started');
+      expect(verification.detail).toBeUndefined();
+    });
+
+    it('regression (CodeRabbit): is in-progress (not action-needed), with no stale "Needs: Re-run AI Analysis" detail, while a re-analysis is actually running -- telling the operator to click the button they just clicked would look exactly like the Check Status bug this component already had to fix once', () => {
+      const phases = derivePhases(baseInput({
+        postRemediationStatus: 'complete',
+        lastVerifiedAt: '2026-10-01T12:00:00.000Z',
+        aiAnalysisStatus: 'processing',
+        pendingGuidanceCount: 5,
+      }));
+      const verification = byId(phases, 'verification');
+      expect(verification.status).toBe('in-progress');
+      expect(verification.detail).toBeUndefined();
+    });
+
+    it('is action-needed (not in-progress -- no live process is actually running) once the first re-audit is done but re-analysis/guidance resolution has not caught up, and names both missing actions', () => {
+      const phases = derivePhases(baseInput({
+        postRemediationStatus: 'complete',
+        lastVerifiedAt: '2026-10-01T12:00:00.000Z',
+        pendingGuidanceCount: 5,
+      }));
+      const verification = byId(phases, 'verification');
+      expect(verification.status).toBe('action-needed');
+      expect(verification.detail).toBe('Needs: Re-run AI Analysis, then resolve guidance');
+    });
+
+    it('names only the re-analysis step once guidance is already resolved', () => {
+      const phases = derivePhases(baseInput({
+        postRemediationStatus: 'complete',
+        lastVerifiedAt: '2026-10-01T12:00:00.000Z',
+        pendingGuidanceCount: 0,
+      }));
+      const verification = byId(phases, 'verification');
+      expect(verification.status).toBe('action-needed');
+      expect(verification.detail).toBe('Needs: Re-run AI Analysis (final check)');
+    });
+
+    it('names only guidance resolution once a fresh re-analysis has already run', () => {
+      const phases = derivePhases(baseInput({
+        postRemediationStatus: 'complete',
+        lastVerifiedAt: '2026-10-01T12:00:00.000Z',
+        aiAnalyzedAt: '2026-10-01T12:05:00.000Z',
+        pendingGuidanceCount: 3,
+      }));
+      const verification = byId(phases, 'verification');
+      expect(verification.status).toBe('action-needed');
+      expect(verification.detail).toBe('Needs: resolve guidance-only items');
     });
 
     it('is done once re-analyzed after the last verification AND no pending guidance remains', () => {
@@ -223,7 +271,7 @@ describe('derivePhases', () => {
         aiAnalyzedAt: '2026-10-01T11:00:00.000Z',
         pendingGuidanceCount: 0,
       }));
-      expect(byId(phases, 'verification').status).toBe('in-progress');
+      expect(byId(phases, 'verification').status).toBe('action-needed');
     });
 
     it('treats an acknowledged guidance set as resolved, even with a nonzero pending count', () => {

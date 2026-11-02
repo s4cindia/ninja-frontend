@@ -44,6 +44,19 @@ describe('PdfPhaseStepper', () => {
     expect(screen.getByTestId('pdf-phase-remediation')).toHaveTextContent('Round 3');
   });
 
+  it('regression: renders action-needed without an animated spinner, and shows its detail text -- an "action-needed" phase has no live process actually running (unlike in-progress), so animating it read as a stuck/hung backend to an operator checking back hours later', () => {
+    const phases = FIVE_PHASES.map(p => p.id === 'verification'
+      ? { ...p, status: 'action-needed' as const, detail: 'Needs: Re-run AI Analysis (final check)' }
+      : p
+    );
+
+    render(<PdfPhaseStepper phases={phases} />);
+
+    const verification = screen.getByTestId('pdf-phase-verification');
+    expect(verification).toHaveTextContent('Needs: Re-run AI Analysis (final check)');
+    expect(verification.querySelector('.animate-spin')).not.toBeInTheDocument();
+  });
+
   it('combines detail and a live-ticking duration for a phase with a liveSince anchor', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-01T12:00:10.000Z'));
