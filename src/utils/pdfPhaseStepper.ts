@@ -23,7 +23,18 @@ import type { RemediationCycleSource } from '@/services/api';
 import type { GuidanceAcknowledgment } from '@/components/pdf/RemediationChecklist';
 
 export type PhaseId = 'audit' | 'ai-analysis' | 'remediation' | 'verification' | 'compliance';
-export type PhaseStatus = 'not-started' | 'in-progress' | 'done';
+// 'action-needed' is distinct from 'in-progress': 'in-progress' means a live
+// backend process is actually running right now (audit executing,
+// aiAnalysisStatus processing/pending, Auto Mode mid-round) and pairs with
+// an animated spinner to say "this will finish on its own, just wait".
+// 'action-needed' means the phase has started but nothing is currently
+// running -- it's waiting on the operator's next click, same distinction
+// RemediationChecklist's own 'partial' status already draws (see its doc
+// comment) for the identical reason: Verification showing an animated
+// spinner for hours after its last real backend activity (a completed
+// re-audit) read as a stuck/hung process to an operator checking back,
+// when it actually just meant "re-run AI Analysis, then resolve guidance".
+export type PhaseStatus = 'not-started' | 'in-progress' | 'action-needed' | 'done';
 
 export interface Phase {
   id: PhaseId;
@@ -169,6 +180,20 @@ export function derivePhases(input: DerivePhasesInput): Phase[] {
   const verificationStarted = input.postRemediationStatus === 'complete' || !!input.lastVerifiedAt;
   const reanalysisDone = verificationStarted && !!input.aiAnalyzedAt && isAfter(input.aiAnalyzedAt, input.lastVerifiedAt);
   const guidanceResolved = input.pendingGuidanceCount === 0 || input.guidanceAcknowledgment != null;
+  // Names the specific next click rather than leaving an operator to guess
+  // between this and Start Auto Remediation -- a real, reported point of
+  // confusion once Remediation's own loop had already stopped (converged or
+  // stalled): Auto Remediation's own re-analysis step already covers this
+  // exact need, so re-running the whole loop again here is a strictly
+  // bigger, more expensive hammer than the one specific action actually
+  // required.
+  const verificationDetail = !reanalysisDone && !guidanceResolved
+    ? 'Needs: Re-run AI Analysis, then resolve guidance'
+    : !reanalysisDone
+      ? 'Needs: Re-run AI Analysis (final check)'
+      : !guidanceResolved
+        ? 'Needs: resolve guidance-only items'
+        : undefined;
   const verification: Phase = {
     id: 'verification',
     label: 'Verification',
@@ -176,7 +201,8 @@ export function derivePhases(input: DerivePhasesInput): Phase[] {
       ? 'not-started'
       : reanalysisDone && guidanceResolved
         ? 'done'
-        : 'in-progress',
+        : 'action-needed',
+    detail: verificationDetail,
   };
 
   // --- Compliance ---

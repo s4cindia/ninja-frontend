@@ -13,7 +13,7 @@
  */
 
 import { Fragment, useRef } from 'react';
-import { CheckCircle, Circle, Loader2 } from 'lucide-react';
+import { CheckCircle, Circle, CircleDashed, Loader2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { formatDuration } from '@/utils/duration';
 import { useLiveTick } from '@/hooks/useLiveTick';
@@ -37,6 +37,11 @@ function StatusIcon({ status }: { status: PhaseStatus }) {
       return <CheckCircle className="h-5 w-5 text-green-600 shrink-0" />;
     case 'in-progress':
       return <Loader2 className="h-5 w-5 text-blue-600 shrink-0 animate-spin" />;
+    case 'action-needed':
+      // Deliberately not animated -- nothing is actively running, this
+      // phase is waiting on the operator's next click (see PhaseStatus's
+      // own doc comment in pdfPhaseStepper.ts).
+      return <CircleDashed className="h-5 w-5 text-amber-600 shrink-0" />;
     default:
       return <Circle className="h-5 w-5 text-gray-300 shrink-0" />;
   }
@@ -45,6 +50,7 @@ function StatusIcon({ status }: { status: PhaseStatus }) {
 const LABEL_COLOR: Record<PhaseStatus, string> = {
   done: 'text-gray-900',
   'in-progress': 'text-blue-700',
+  'action-needed': 'text-amber-700',
   'not-started': 'text-gray-400',
 };
 
