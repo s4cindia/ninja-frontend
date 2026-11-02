@@ -1640,14 +1640,14 @@ export const PdfAuditResultsPage: React.FC = () => {
                     <Checkbox
                       checked={includeColorContrastFix}
                       onChange={setIncludeColorContrastFix}
-                      aria-label="Include color-contrast auto-fix on re-run"
+                      aria-label="Include color-contrast auto-fix on Re-run AI Analysis only"
                     />
                     <span
                       className="cursor-pointer"
                       onClick={() => setIncludeColorContrastFix(v => !v)}
-                      title="When checked, the system attempts to locate each contrast issue's text run on the page and, if confidently found, offers a real Apply-to-PDF fix instead of guidance only. Issues it can't confidently locate still fall back to guidance-only either way."
+                      title="When checked, the system attempts to locate each contrast issue's text run on the page and, if confidently found, offers a real Apply-to-PDF fix instead of guidance only. Issues it can't confidently locate still fall back to guidance-only either way. Scope: this only affects the Re-run AI Analysis button above — Start Auto Remediation has its own separate Color-contrast handling setting in its popover, with its own default."
                     >
-                      Include color-contrast auto-fix
+                      Include color-contrast auto-fix (re-run only)
                     </span>
                   </div>
                 </div>
@@ -1668,6 +1668,7 @@ export const PdfAuditResultsPage: React.FC = () => {
                   // config form for a job with no trial at all.
                   showConfig={!comparisonTrialId}
                   budgetEstimate={budgetEstimateQuery.data}
+                  mentionsPageCheckbox
                 />
               </>
             )}
