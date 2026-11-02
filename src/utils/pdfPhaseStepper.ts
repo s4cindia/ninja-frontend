@@ -180,20 +180,35 @@ export function derivePhases(input: DerivePhasesInput): Phase[] {
   const verificationStarted = input.postRemediationStatus === 'complete' || !!input.lastVerifiedAt;
   const reanalysisDone = verificationStarted && !!input.aiAnalyzedAt && isAfter(input.aiAnalyzedAt, input.lastVerifiedAt);
   const guidanceResolved = input.pendingGuidanceCount === 0 || input.guidanceAcknowledgment != null;
+  // A genuine live signal (same pending-or-processing definition the AI
+  // Analysis phase above and RemediationChecklist's own step 5 already use)
+  // -- without this, telling the operator "Needs: Re-run AI Analysis" while
+  // that exact re-analysis is already running (CodeRabbit finding,
+  // confirmed real) would silently recreate the Check Status button's own
+  // "looks like nothing happened" bug in a new spot: it reads as the click
+  // did nothing, when it's actually working.
+  const reanalysisInFlight = verificationStarted
+    && (input.aiAnalysisStatus === 'processing' || input.aiAnalysisStatus === 'pending');
   // Names the specific next click rather than leaving an operator to guess
   // between this and Start Auto Remediation -- a real, reported point of
   // confusion once Remediation's own loop had already stopped (converged or
   // stalled): Auto Remediation's own re-analysis step already covers this
   // exact need, so re-running the whole loop again here is a strictly
   // bigger, more expensive hammer than the one specific action actually
-  // required.
-  const verificationDetail = !reanalysisDone && !guidanceResolved
-    ? 'Needs: Re-run AI Analysis, then resolve guidance'
-    : !reanalysisDone
-      ? 'Needs: Re-run AI Analysis (final check)'
-      : !guidanceResolved
-        ? 'Needs: resolve guidance-only items'
-        : undefined;
+  // required. Gated on verificationStarted too (CodeRabbit finding,
+  // confirmed real) -- guidanceResolved alone can already be true before
+  // verification has even started (e.g. a document with zero guidance-only
+  // items from the start), which would otherwise leak this instruction onto
+  // a phase still showing 'not-started'.
+  const verificationDetail = !verificationStarted || reanalysisInFlight
+    ? undefined
+    : !reanalysisDone && !guidanceResolved
+      ? 'Needs: Re-run AI Analysis, then resolve guidance'
+      : !reanalysisDone
+        ? 'Needs: Re-run AI Analysis (final check)'
+        : !guidanceResolved
+          ? 'Needs: resolve guidance-only items'
+          : undefined;
   const verification: Phase = {
     id: 'verification',
     label: 'Verification',
@@ -201,7 +216,9 @@ export function derivePhases(input: DerivePhasesInput): Phase[] {
       ? 'not-started'
       : reanalysisDone && guidanceResolved
         ? 'done'
-        : 'action-needed',
+        : reanalysisInFlight
+          ? 'in-progress'
+          : 'action-needed',
     detail: verificationDetail,
   };
 
