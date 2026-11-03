@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: deploy-frontend-staging
+  cancel-in-progress: false
+
 env:
   AWS_REGION: ap-south-1
   S3_BUCKET: s4carlisle-ninja-frontend-staging
