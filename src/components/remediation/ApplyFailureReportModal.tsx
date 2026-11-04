@@ -10,10 +10,11 @@
  * button, next to its "Failed (N)" filter chip.
  */
 import { useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, HelpCircle, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Check, Copy, HelpCircle, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/Dialog';
 import { Button } from '@/components/ui/Button';
 import { pdfRemediationService } from '@/services/pdf-remediation.service';
+import { formatApplyFailureReport } from './apply-failure-report-text';
 import type { ApplyFailureCategory, ApplyFailureGroup, ApplyFailureReport } from '@/types/pdf-remediation.types';
 
 const CATEGORY_ICON: Record<ApplyFailureCategory, React.ReactNode> = {
@@ -74,6 +75,14 @@ export function ApplyFailureReportModal({ isOpen, onClose, jobId }: ApplyFailure
   const [report, setReport] = useState<ApplyFailureReport | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    if (!report) return;
+    await navigator.clipboard.writeText(formatApplyFailureReport(report));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   useEffect(() => {
     if (!isOpen || !jobId) return;
@@ -131,7 +140,11 @@ export function ApplyFailureReportModal({ isOpen, onClose, jobId }: ApplyFailure
           )}
         </div>
 
-        <div className="flex justify-end pt-3 border-t">
+        <div className="flex justify-between pt-3 border-t">
+          <Button variant="outline" size="sm" onClick={handleCopy} disabled={!report || report.groups.length === 0}>
+            {copied ? <Check className="h-3.5 w-3.5 mr-1.5" /> : <Copy className="h-3.5 w-3.5 mr-1.5" />}
+            {copied ? 'Copied!' : 'Copy report'}
+          </Button>
           <Button variant="outline" size="sm" onClick={onClose}>Close</Button>
         </div>
       </DialogContent>
