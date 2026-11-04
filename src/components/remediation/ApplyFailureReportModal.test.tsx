@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { ApplyFailureReportModal } from './ApplyFailureReportModal';
+import { formatApplyFailureReport } from './apply-failure-report-text';
 import { pdfRemediationService } from '@/services/pdf-remediation.service';
 import type { ApplyFailureReport } from '@/types/pdf-remediation.types';
 
@@ -49,6 +50,7 @@ function buildReport(overrides?: Partial<ApplyFailureReport>): ApplyFailureRepor
 describe('ApplyFailureReportModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
   });
 
   it('does not fetch while closed', () => {
@@ -108,6 +110,25 @@ describe('ApplyFailureReportModal', () => {
     render(<ApplyFailureReportModal isOpen onClose={vi.fn()} jobId="job-1" />);
 
     expect(await screen.findByText('network blip')).toBeInTheDocument();
+  });
+
+  it('disables the copy button when there is nothing to copy', async () => {
+    mockGetApplyFailureReport.mockResolvedValue(buildReport({ totalFailed: 0, groups: [] }));
+    render(<ApplyFailureReportModal isOpen onClose={vi.fn()} jobId="job-1" />);
+
+    await screen.findByText('Nothing has permanently failed on this job.');
+    expect(screen.getByRole('button', { name: /copy report/i })).toBeDisabled();
+  });
+
+  it('copies the formatted report to the clipboard and shows transient confirmation', async () => {
+    mockGetApplyFailureReport.mockResolvedValue(buildReport());
+    render(<ApplyFailureReportModal isOpen onClose={vi.fn()} jobId="job-1" />);
+
+    const copyButton = await screen.findByRole('button', { name: /copy report/i });
+    fireEvent.click(copyButton);
+
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(formatApplyFailureReport(buildReport())));
+    expect(await screen.findByText('Copied!')).toBeInTheDocument();
   });
 
   it('calls onClose when Close is clicked', async () => {
