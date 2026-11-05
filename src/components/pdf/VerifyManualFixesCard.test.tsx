@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, type Mocked } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { VerifyManualFixesCard } from './VerifyManualFixesCard';
 import { pdfRemediationService } from '@/services/pdf-remediation.service';
 import type { ReauditComparisonResult } from '@/types/pdf-remediation.types';
@@ -9,7 +10,18 @@ vi.mock('@/services/pdf-remediation.service', () => ({
   pdfRemediationService: { reauditPdf: vi.fn() },
 }));
 
+const START_TOAST_ID = 'start-toast-id';
+vi.mock('react-hot-toast', () => {
+  const toastFn = Object.assign(vi.fn(), {
+    loading: vi.fn().mockReturnValue('start-toast-id'),
+    success: vi.fn(),
+    error: vi.fn(),
+  });
+  return { default: toastFn };
+});
+
 const mockService = pdfRemediationService as Mocked<typeof pdfRemediationService>;
+const mockToast = toast as unknown as Mocked<typeof toast>;
 
 function renderCard(
   onReaudited = vi.fn(),
@@ -99,6 +111,40 @@ describe('VerifyManualFixesCard', () => {
     });
     expect(screen.getByText(/2/)).toBeInTheDocument();
     expect(screen.getByText(/Re-run AI Analysis \(above\) to/)).toBeInTheDocument();
+  });
+
+  // Real, live-confirmed confusion, 2026-11-05: the only in-progress signal
+  // was the small "Re-auditing…" button label — an operator who checked
+  // back before the ~2-minute upload+audit cycle finished saw neither an
+  // error nor any confirmation, reasonably unsure their click registered.
+  it('shows an immediate loading toast on upload start, then replaces it (by the same id) with the success toast', async () => {
+    const result = successResult();
+    mockService.reauditPdf.mockResolvedValueOnce(result);
+    const { container } = renderCard();
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { files: [pdfFile()] } });
+
+    expect(mockToast.loading).toHaveBeenCalledWith(expect.stringMatching(/Re-auditing.*minute/i));
+
+    await waitFor(() => {
+      expect(mockToast.success).toHaveBeenCalledWith(
+        expect.stringContaining('issue(s) resolved'),
+        { id: START_TOAST_ID }
+      );
+    });
+  });
+
+  it('replaces the loading toast (by the same id) with an error toast when the re-audit itself reports failure', async () => {
+    mockService.reauditPdf.mockResolvedValueOnce(successResult({ success: false }));
+    const { container } = renderCard();
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+
+    fireEvent.change(input, { target: { files: [pdfFile()] } });
+
+    await waitFor(() => {
+      expect(mockToast.error).toHaveBeenCalledWith('Re-audit failed', { id: START_TOAST_ID });
+    });
   });
 
   it('shows a disabled "Re-auditing…" state while the request is in flight', async () => {
