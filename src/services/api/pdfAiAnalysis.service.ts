@@ -23,6 +23,7 @@ export async function applyAllAiSuggestions(
 
 export interface AiRemediationOverrides {
   colorContrastMode?: 'guidance-only' | 'disabled' | 'apply-to-pdf';
+  linkTextMode?: 'guidance-only' | 'disabled' | 'apply-to-pdf';
 }
 
 export interface TriggerAiAnalysisResult {
