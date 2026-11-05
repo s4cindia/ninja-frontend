@@ -6,6 +6,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { api } from './api';
+import { uploadService } from './upload.service';
 import type {
   RemediationPlan,
   UpdateTaskStatusRequest,
@@ -104,14 +105,28 @@ async function applyQuickFix(jobId: string, issueId: string, field: string, valu
 }
 
 /**
- * Re-audit a remediated PDF file
+ * Re-audit a remediated PDF file.
+ *
+ * Uploads via the generic presigned-S3 flow (uploadService: presign -> PUT
+ * directly to S3 -> confirm) rather than posting the file to this backend
+ * directly, then hands the backend only a fileId. The old direct-multipart
+ * POST to /pdf/:jobId/remediation/re-audit shares this backend's own
+ * CloudFront distribution, which has AWSManagedRulesCommonRuleSet actively
+ * enforced -- the same WAF this codebase's main PDF upload was already
+ * migrated off of (CLAUDE.md's "WAF Blocking File Uploads"), but this
+ * endpoint alone had never been moved onto that pattern. Confirmed live,
+ * 2026-11-05: a 15MB "Upload Fixed PDF" attempt produced a browser "Network
+ * Error" and left zero trace in the backend's own logs across two
+ * attempts -- the request never reached the Express app at all.
  */
 async function reauditPdf(jobId: string, file: File): Promise<ReauditComparisonResult> {
-  const formData = new FormData();
-  formData.append('file', file);
+  const contentType = file.type || 'application/pdf';
+  const presigned = await uploadService.getPresignedUrl(file.name, file.size, contentType);
+  await uploadService.uploadToS3(presigned.uploadUrl, file, undefined, contentType);
+  await uploadService.confirmUpload(presigned.fileId);
 
-  const response = await api.post(`/pdf/${jobId}/remediation/re-audit`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+  const response = await api.post(`/pdf/${jobId}/remediation/re-audit-from-file`, {
+    fileId: presigned.fileId,
   });
 
   // Unlike this file's other endpoints (which fall back to response.data for
