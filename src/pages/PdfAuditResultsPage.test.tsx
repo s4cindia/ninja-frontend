@@ -1616,6 +1616,68 @@ describe('PdfAuditResultsPage', () => {
       expect(mockApi.post).toHaveBeenCalledWith(aiUrl, { overrides: { colorContrastMode: 'apply-to-pdf' } });
     });
 
+    it('POSTs the linkTextMode override when that checkbox is checked first', async () => {
+      mockCommonGets();
+      mockApi.post.mockResolvedValue({ data: { data: { status: 'processing', total: 5, message: 'started' } } });
+
+      renderWithRouter(jobId);
+
+      const rerunButton = await screen.findByRole('button', { name: 'Re-run AI Analysis' });
+      await waitFor(() => expect(rerunButton).not.toBeDisabled());
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Include link-text auto-fix on Re-run AI Analysis only' }));
+
+      vi.useFakeTimers();
+      try {
+        await act(async () => {
+          fireEvent.click(rerunButton);
+          await vi.advanceTimersByTimeAsync(3000);
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+
+      expect(mockApi.post).toHaveBeenCalledWith(aiUrl, { overrides: { linkTextMode: 'apply-to-pdf' } });
+    });
+
+    it('POSTs both overrides together when both checkboxes are checked', async () => {
+      mockCommonGets();
+      mockApi.post.mockResolvedValue({ data: { data: { status: 'processing', total: 5, message: 'started' } } });
+
+      renderWithRouter(jobId);
+
+      const rerunButton = await screen.findByRole('button', { name: 'Re-run AI Analysis' });
+      await waitFor(() => expect(rerunButton).not.toBeDisabled());
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Include color-contrast auto-fix on Re-run AI Analysis only' }));
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Include link-text auto-fix on Re-run AI Analysis only' }));
+
+      vi.useFakeTimers();
+      try {
+        await act(async () => {
+          fireEvent.click(rerunButton);
+          await vi.advanceTimersByTimeAsync(3000);
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+
+      expect(mockApi.post).toHaveBeenCalledWith(aiUrl, { overrides: { colorContrastMode: 'apply-to-pdf', linkTextMode: 'apply-to-pdf' } });
+    });
+
+    it('clicking the link-text checkbox label text toggles it exactly once (same double-toggle regression as the color-contrast checkbox)', async () => {
+      mockCommonGets();
+      renderWithRouter(jobId);
+
+      await screen.findByRole('button', { name: 'Re-run AI Analysis' });
+      const checkbox = screen.getByRole('checkbox', { name: 'Include link-text auto-fix on Re-run AI Analysis only' });
+      expect(checkbox).toHaveAttribute('aria-checked', 'false');
+
+      fireEvent.click(screen.getByText('Include link-text auto-fix (re-run only)'));
+      expect(checkbox).toHaveAttribute('aria-checked', 'true');
+
+      fireEvent.click(screen.getByText('Include link-text auto-fix (re-run only)'));
+      expect(checkbox).toHaveAttribute('aria-checked', 'false');
+    });
+
     it('clicking the checkbox label text toggles it exactly once (regression: a native <label> would double-toggle via its own click-forwarding to the nested button)', async () => {
       mockCommonGets();
       renderWithRouter(jobId);

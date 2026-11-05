@@ -47,7 +47,7 @@ import { IssueCard, AiAnalysis } from '@/components/remediation/IssueCard';
 import { ApplyAllSuggestionsPanel } from '@/components/remediation/ApplyAllSuggestionsPanel';
 import { ApplyFailureReportModal } from '@/components/remediation/ApplyFailureReportModal';
 import { useRemediationTimer } from '@/hooks/useRemediationTimer';
-import { triggerAiAnalysis } from '@/services/api/pdfAiAnalysis.service';
+import { triggerAiAnalysis, type AiRemediationOverrides } from '@/services/api/pdfAiAnalysis.service';
 import type { ApplyAllAiSuggestionsResult } from '@/services/api/pdfAiAnalysis.service';
 import {
   api,
@@ -301,6 +301,13 @@ export const PdfAuditResultsPage: React.FC = () => {
   // Session-only — resets on reload/revisit, never persisted server-side
   // (an explicit, deliberate scope limit: no per-tenant sticky preference).
   const [includeColorContrastFix, setIncludeColorContrastFix] = useState(false);
+  // Same scope/lifetime as includeColorContrastFix above -- linkTextMode's
+  // apply-to-pdf path only sets the Link annotation's own /Contents (the
+  // accessible description screen readers announce), never the page's
+  // visible link text, so it carries the same "additive, not a content
+  // rewrite" risk profile that already justified color-contrast's own
+  // re-run-only checkbox.
+  const [includeLinkTextFix, setIncludeLinkTextFix] = useState(false);
   const [aiStats, setAiStats] = useState<{
     gemini: { totalTokens: number; estimatedCostUsd: number };
     claude: { totalTokens: number; estimatedCostUsd: number };
@@ -1004,8 +1011,21 @@ export const PdfAuditResultsPage: React.FC = () => {
     if (!jobId || remediationCycleLock.inProgress) return;
     setIsRerunningAiAnalysis(true);
     try {
-      await triggerAiAnalysis(jobId, includeColorContrastFix ? { colorContrastMode: 'apply-to-pdf' } : undefined);
-      toast.success(includeColorContrastFix ? 'Re-running AI analysis with color-contrast auto-fix…' : 'Re-running AI analysis…');
+      const overrides: AiRemediationOverrides = {
+        ...(includeColorContrastFix ? { colorContrastMode: 'apply-to-pdf' as const } : {}),
+        ...(includeLinkTextFix ? { linkTextMode: 'apply-to-pdf' as const } : {}),
+      };
+      const activeFixLabels = [
+        includeColorContrastFix && 'color-contrast',
+        includeLinkTextFix && 'link-text',
+      ].filter((v): v is string => typeof v === 'string');
+
+      await triggerAiAnalysis(jobId, Object.keys(overrides).length > 0 ? overrides : undefined);
+      toast.success(
+        activeFixLabels.length > 0
+          ? `Re-running AI analysis with ${activeFixLabels.join(' + ')} auto-fix…`
+          : 'Re-running AI analysis…'
+      );
       setIsAnalyzingAi(true);
       if (!aiPollingRef.current) {
         aiPollingRef.current = setInterval(fetchAiSuggestions, 3000);
@@ -1025,7 +1045,7 @@ export const PdfAuditResultsPage: React.FC = () => {
     } finally {
       setIsRerunningAiAnalysis(false);
     }
-  }, [jobId, includeColorContrastFix, fetchAiSuggestions, remediationCycleLock.inProgress, refreshRemediationCycleLock]);
+  }, [jobId, includeColorContrastFix, includeLinkTextFix, fetchAiSuggestions, remediationCycleLock.inProgress, refreshRemediationCycleLock]);
 
   // Keep activeJobIdRef in sync with jobId, and stop any AI-analysis
   // polling interval left over from a previous jobId before it can run
@@ -1698,6 +1718,22 @@ export const PdfAuditResultsPage: React.FC = () => {
                       title="When checked, the system attempts to locate each contrast issue's text run on the page and, if confidently found, offers a real Apply-to-PDF fix instead of guidance only. Issues it can't confidently locate still fall back to guidance-only either way. Scope: this only affects the Re-run AI Analysis button above — Start Auto Remediation has its own separate Color-contrast handling setting in its popover, with its own default."
                     >
                       Include color-contrast auto-fix (re-run only)
+                    </span>
+                  </div>
+                  {/* Same double-toggle-avoidance reasoning as the color-contrast
+                      checkbox above — see that one's own comment. */}
+                  <div className="flex items-center gap-1.5 text-xs text-gray-600 select-none">
+                    <Checkbox
+                      checked={includeLinkTextFix}
+                      onChange={setIncludeLinkTextFix}
+                      aria-label="Include link-text auto-fix on Re-run AI Analysis only"
+                    />
+                    <span
+                      className="cursor-pointer"
+                      onClick={() => setIncludeLinkTextFix(v => !v)}
+                      title="When checked, the system positionally matches each non-descriptive link to its Link annotation and, if confidently found (and unambiguous), sets the link's accessible description instead of guidance only. This only sets the link's accessible description (what a screen reader announces) — the visible link text on the page is never changed. Links it can't confidently or unambiguously locate still fall back to guidance-only either way. Scope: this only affects the Re-run AI Analysis button above."
+                    >
+                      Include link-text auto-fix (re-run only)
                     </span>
                   </div>
                 </div>
