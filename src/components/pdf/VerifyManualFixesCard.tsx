@@ -66,23 +66,33 @@ export function VerifyManualFixesCard({
     // resolved/remaining counts on screen alongside the new error toast,
     // misleadingly implying this attempt also succeeded.
     setLastResult(null);
+    // Real, live-confirmed confusion, 2026-11-05: the only in-progress
+    // signal here was the small "Re-auditing…" label on the button itself
+    // — easy to miss, with nothing telling the operator this routinely
+    // takes a minute or two (upload + a full comprehensive audit,
+    // including veraPDF). An operator who checked back before it finished
+    // reported seeing neither an error nor any confirmation, reasonably
+    // unsure whether their click had even registered. This loading toast
+    // (kept and replaced by its own id, same pattern ReauditButton already
+    // uses) gives immediate feedback distinct from the eventual result.
+    const toastId = toast.loading('Re-auditing your PDF — this can take a minute or two…');
     try {
       const result = await reauditPdf(jobId, file);
       if (result.success) {
-        toast.success(`Re-audit complete — ${result.metrics.resolvedCount} issue(s) resolved`);
+        toast.success(`Re-audit complete — ${result.metrics.resolvedCount} issue(s) resolved`, { id: toastId });
         setLastResult(result);
         onReaudited(result);
       } else {
-        toast.error('Re-audit failed');
+        toast.error('Re-audit failed', { id: toastId });
       }
     } catch (err) {
       const lockDetails = getRemediationCycleLockDetails(err);
       if (lockDetails) {
         // Not fatal — a genuine click/poll race (should be rare, the button
         // is pre-disabled once the lock is known).
-        toast('A remediation cycle is already in progress. This page will update automatically.');
+        toast('A remediation cycle is already in progress. This page will update automatically.', { id: toastId });
       } else {
-        toast.error(getErrorMessage(err));
+        toast.error(getErrorMessage(err), { id: toastId });
       }
       onApplyError?.();
     } finally {
