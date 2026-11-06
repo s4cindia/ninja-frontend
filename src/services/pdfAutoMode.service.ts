@@ -22,6 +22,14 @@ export interface StartAutoModeOverrides {
   autoMaxRounds?: number;
   autoCostLimitUsd?: number;
   autoColorContrastMode?: 'guidance-only' | 'disabled' | 'apply-to-pdf';
+  /**
+   * Per-job override for "this client supplies their own alt text" — unlike
+   * autoColorContrastMode, this is only ever sent from the single-job Audit
+   * Results page (AutoModeStartControl's showAltTextOption), never from PDF
+   * Batch, since PdfBatch has no matching column and would 400 on an
+   * unexpected field.
+   */
+  autoAltTextMode?: 'apply-to-pdf' | 'guidance-only';
 }
 
 /**

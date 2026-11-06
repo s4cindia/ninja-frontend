@@ -54,6 +54,24 @@ export interface ReportsConfig {
 }
 
 /**
+ * Tenant-wide defaults for the PDF AI remediation pipeline — the backend
+ * bucket (`Tenant.settings.aiRemediation`) also holds tableFixMode,
+ * listMode, languageMode, formFieldMode, bookmarkMode,
+ * confidenceThreshold, and autoApplyHighConfidence, but this UI only
+ * exposes the three fields operators actually need a saved default for:
+ * what to do with a client's own alt text, and whether color-contrast /
+ * link-text fixes get written into the PDF automatically. A per-job
+ * override (the Re-run AI Analysis checkboxes, Auto Remediation's own
+ * color-contrast dropdown) always wins over this default when one is
+ * explicitly sent for that run.
+ */
+export interface AiRemediationConfig {
+  altTextMode: 'apply-to-pdf' | 'guidance-only';
+  colorContrastMode: 'guidance-only' | 'disabled' | 'apply-to-pdf';
+  linkTextMode: 'guidance-only' | 'disabled' | 'apply-to-pdf';
+}
+
+/**
  * Complete workflow configuration.
  */
 export interface WorkflowConfig {
@@ -181,6 +199,42 @@ class TenantConfigService {
       data: TimeMetricsConfig;
       message: string;
     }>('/tenant/config/time-metrics', updates);
+    return response.data.data;
+  }
+
+  /**
+   * Get the tenant-wide PDF AI remediation defaults (alt text, color
+   * contrast, link text). Readable by any authenticated user — only the
+   * PATCH below is admin-restricted.
+   */
+  async getAiRemediationConfig(): Promise<AiRemediationConfig> {
+    try {
+      const response = await api.get<{ success: boolean; data: AiRemediationConfig }>(
+        '/tenant/config/ai-remediation'
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error('[TenantConfig] Failed to fetch AI remediation config:', error);
+      // Matches the backend's own DEFAULT_AI_REMEDIATION_CONFIG for these
+      // three fields, so a 403 (non-admin) or network failure still renders
+      // something sensible rather than leaving the section blank.
+      return { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only' };
+    }
+  }
+
+  /**
+   * Update the tenant-wide PDF AI remediation defaults. Admin-only
+   * server-side — a non-admin PATCH gets a 403, which this does not
+   * swallow (same as updateAxes4Config above). Sending only the fields this
+   * UI manages is safe: the backend shallow-merges onto the existing
+   * aiRemediation bucket, so tableFixMode/listMode/etc. are left untouched.
+   */
+  async updateAiRemediationConfig(updates: Partial<AiRemediationConfig>): Promise<AiRemediationConfig> {
+    const response = await api.patch<{
+      success: boolean;
+      data: AiRemediationConfig;
+      message: string;
+    }>('/tenant/config/ai-remediation', updates);
     return response.data.data;
   }
 

@@ -88,6 +88,38 @@ describe('AutoModeStartControl', () => {
     });
   });
 
+  it('does not render or send an alt-text option when showAltTextOption is omitted (e.g. PDF Batch, which has no matching backend column)', () => {
+    const { onStart } = renderControl({ showConfig: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Start Auto Remediation' }));
+
+    expect(screen.queryByLabelText('Alt text handling')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+
+    expect(onStart).toHaveBeenCalledWith({
+      autoMaxRounds: 10,
+      autoCostLimitUsd: 2,
+      autoColorContrastMode: 'apply-to-pdf',
+    });
+  });
+
+  it('renders the Alt text handling select, defaulted to apply-to-pdf, when showAltTextOption is true', () => {
+    const { onStart } = renderControl({ showConfig: true, showAltTextOption: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Start Auto Remediation' }));
+
+    expect(screen.getByLabelText('Alt text handling')).toHaveValue('apply-to-pdf');
+
+    fireEvent.change(screen.getByLabelText('Alt text handling'), { target: { value: 'guidance-only' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+
+    expect(onStart).toHaveBeenCalledWith({
+      autoMaxRounds: 10,
+      autoCostLimitUsd: 2,
+      autoColorContrastMode: 'apply-to-pdf',
+      autoAltTextMode: 'guidance-only',
+    });
+  });
+
   it('falls back to the default for an invalid (non-positive or non-numeric) max rounds / cost limit, rather than sending garbage to the backend', () => {
     const { onStart } = renderControl({ showConfig: true });
     fireEvent.click(screen.getByRole('button', { name: 'Start Auto Remediation' }));

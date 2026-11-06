@@ -4,7 +4,7 @@ import { TenantWorkflowSettings } from './TenantWorkflowSettings';
 import { tenantConfigService } from '../services/tenant-config.service';
 import { useAuthStore } from '@/stores/auth.store';
 import type { User } from '@/types/auth.types';
-import type { WorkflowConfig, ReportsConfig, Axes4Config } from '../services/tenant-config.service';
+import type { WorkflowConfig, ReportsConfig, Axes4Config, AiRemediationConfig } from '../services/tenant-config.service';
 
 vi.mock('../services/tenant-config.service', () => ({
   tenantConfigService: {
@@ -14,6 +14,8 @@ vi.mock('../services/tenant-config.service', () => ({
     updateReportsConfig: vi.fn(),
     getAxes4Config: vi.fn(),
     updateAxes4Config: vi.fn(),
+    getAiRemediationConfig: vi.fn(),
+    updateAiRemediationConfig: vi.fn(),
   },
 }));
 
@@ -59,12 +61,18 @@ function mockAxes4Config(overrides?: Partial<Axes4Config>): Axes4Config {
   return { enabled: false, enabledBy: null, enabledAt: null, ...overrides };
 }
 
+function mockAiRemediationConfig(overrides?: Partial<AiRemediationConfig>): AiRemediationConfig {
+  return { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only', ...overrides };
+}
+
 describe('TenantWorkflowSettings — axes4 PAC Cloud toggle', () => {
   beforeEach(() => {
     mockService.getWorkflowConfig.mockReset().mockResolvedValue(mockWorkflowConfig());
     mockService.getReportsConfig.mockReset().mockResolvedValue(mockReportsConfig());
     mockService.getAxes4Config.mockReset().mockResolvedValue(mockAxes4Config());
     mockService.updateAxes4Config.mockReset();
+    mockService.getAiRemediationConfig.mockReset().mockResolvedValue(mockAiRemediationConfig());
+    mockService.updateAiRemediationConfig.mockReset();
   });
 
   it('is visible (read-only) to a non-admin, showing the current state but no save control', async () => {
@@ -149,5 +157,88 @@ describe('TenantWorkflowSettings — axes4 PAC Cloud toggle', () => {
     });
     // Still rendered, not crashed — the checkbox reflects the unsaved attempt.
     expect(screen.getByRole('checkbox', { name: /Enable axes4 PAC Cloud live checks/ })).toBeInTheDocument();
+  });
+});
+
+describe('TenantWorkflowSettings — PDF AI Remediation tenant defaults', () => {
+  beforeEach(() => {
+    mockService.getWorkflowConfig.mockReset().mockResolvedValue(mockWorkflowConfig());
+    mockService.getReportsConfig.mockReset().mockResolvedValue(mockReportsConfig());
+    mockService.getAxes4Config.mockReset().mockResolvedValue(mockAxes4Config());
+    mockService.updateAxes4Config.mockReset();
+    mockService.getAiRemediationConfig.mockReset().mockResolvedValue(mockAiRemediationConfig());
+    mockService.updateAiRemediationConfig.mockReset();
+  });
+
+  it('is visible (read-only) to a non-admin, showing the loaded values but no save control', async () => {
+    setCurrentUser({ role: 'OPERATOR' });
+    mockService.getAiRemediationConfig.mockResolvedValue(
+      mockAiRemediationConfig({ altTextMode: 'guidance-only', colorContrastMode: 'apply-to-pdf', linkTextMode: 'disabled' })
+    );
+
+    render(<TenantWorkflowSettings />);
+
+    expect(await screen.findByLabelText('Alt text')).toHaveValue('guidance-only');
+    expect(screen.getByLabelText('Color contrast')).toHaveValue('apply-to-pdf');
+    expect(screen.getByLabelText('Link text')).toHaveValue('disabled');
+    expect(screen.getByLabelText('Alt text')).toBeDisabled();
+    expect(screen.getByLabelText('Color contrast')).toBeDisabled();
+    expect(screen.getByLabelText('Link text')).toBeDisabled();
+    expect(screen.getByText('Only administrators can change these settings.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Save PDF AI Remediation Settings/ })).not.toBeInTheDocument();
+  });
+
+  it('is editable for an ADMIN, and saves all three fields together', async () => {
+    setCurrentUser({ role: 'ADMIN' });
+    mockService.updateAiRemediationConfig.mockResolvedValue(
+      mockAiRemediationConfig({ altTextMode: 'guidance-only', colorContrastMode: 'apply-to-pdf', linkTextMode: 'guidance-only' })
+    );
+
+    render(<TenantWorkflowSettings />);
+
+    const altText = await screen.findByLabelText('Alt text');
+    expect(altText).not.toBeDisabled();
+
+    fireEvent.change(altText, { target: { value: 'guidance-only' } });
+    fireEvent.change(screen.getByLabelText('Color contrast'), { target: { value: 'apply-to-pdf' } });
+    fireEvent.click(screen.getByRole('button', { name: /Save PDF AI Remediation Settings/ }));
+
+    await waitFor(() => {
+      expect(mockService.updateAiRemediationConfig).toHaveBeenCalledWith({
+        altTextMode: 'guidance-only',
+        colorContrastMode: 'apply-to-pdf',
+        linkTextMode: 'guidance-only',
+      });
+    });
+  });
+
+  it('disables the Save button until at least one select actually differs from the saved values', async () => {
+    setCurrentUser({ role: 'ADMIN' });
+
+    render(<TenantWorkflowSettings />);
+
+    const saveButton = await screen.findByRole('button', { name: /Save PDF AI Remediation Settings/ });
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Link text'), { target: { value: 'disabled' } });
+    expect(saveButton).not.toBeDisabled();
+  });
+
+  it('shows an error toast and does not crash when the save is rejected (e.g. a 403)', async () => {
+    setCurrentUser({ role: 'ADMIN' });
+    mockService.updateAiRemediationConfig.mockRejectedValue({
+      response: { data: { error: 'Only administrators may change this setting.' } },
+    });
+
+    render(<TenantWorkflowSettings />);
+
+    fireEvent.change(await screen.findByLabelText('Alt text'), { target: { value: 'guidance-only' } });
+    fireEvent.click(screen.getByRole('button', { name: /Save PDF AI Remediation Settings/ }));
+
+    await waitFor(() => {
+      expect(mockService.updateAiRemediationConfig).toHaveBeenCalled();
+    });
+    // Still rendered, not crashed — the select reflects the unsaved attempt.
+    expect(screen.getByLabelText('Alt text')).toHaveValue('guidance-only');
   });
 });
