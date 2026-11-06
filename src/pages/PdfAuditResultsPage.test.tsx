@@ -1639,6 +1639,29 @@ describe('PdfAuditResultsPage', () => {
       expect(mockApi.post).toHaveBeenCalledWith(aiUrl, { overrides: { linkTextMode: 'apply-to-pdf' } });
     });
 
+    it('POSTs the altTextMode override (downgraded to guidance-only) when the client-alt-text checkbox is checked first', async () => {
+      mockCommonGets();
+      mockApi.post.mockResolvedValue({ data: { data: { status: 'processing', total: 5, message: 'started' } } });
+
+      renderWithRouter(jobId);
+
+      const rerunButton = await screen.findByRole('button', { name: 'Re-run AI Analysis' });
+      await waitFor(() => expect(rerunButton).not.toBeDisabled());
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Use client-supplied alt text on Re-run AI Analysis only' }));
+
+      vi.useFakeTimers();
+      try {
+        await act(async () => {
+          fireEvent.click(rerunButton);
+          await vi.advanceTimersByTimeAsync(3000);
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+
+      expect(mockApi.post).toHaveBeenCalledWith(aiUrl, { overrides: { altTextMode: 'guidance-only' } });
+    });
+
     it('POSTs both overrides together when both checkboxes are checked', async () => {
       mockCommonGets();
       mockApi.post.mockResolvedValue({ data: { data: { status: 'processing', total: 5, message: 'started' } } });
@@ -3319,6 +3342,7 @@ describe('PdfAuditResultsPage', () => {
           autoMaxRounds: 3,
           autoCostLimitUsd: 0.5,
           autoColorContrastMode: 'disabled',
+          autoAltTextMode: 'apply-to-pdf',
         });
       });
     });

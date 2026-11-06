@@ -16,6 +16,7 @@ function status(overrides?: Partial<AutoModeStatusResponse>): AutoModeStatusResp
     autoCostSpentUsd: 0.42,
     autoCostLimitUsd: 2,
     autoColorContrastMode: null,
+    autoAltTextMode: null,
     ...overrides,
   };
 }

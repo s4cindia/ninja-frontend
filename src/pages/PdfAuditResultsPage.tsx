@@ -308,6 +308,12 @@ export const PdfAuditResultsPage: React.FC = () => {
   // rewrite" risk profile that already justified color-contrast's own
   // re-run-only checkbox.
   const [includeLinkTextFix, setIncludeLinkTextFix] = useState(false);
+  // Same scope/lifetime as the two above, but the opposite direction: the
+  // tenant default for altTextMode is 'apply-to-pdf' (AI generates alt
+  // text), so this checkbox exists to DOWNGRADE to guidance-only for one
+  // re-run — the "this client supplies their own alt text" case — rather
+  // than to promote a fix up to apply-to-pdf like the other two.
+  const [useClientAltText, setUseClientAltText] = useState(false);
   const [aiStats, setAiStats] = useState<{
     gemini: { totalTokens: number; estimatedCostUsd: number };
     claude: { totalTokens: number; estimatedCostUsd: number };
@@ -1014,10 +1020,12 @@ export const PdfAuditResultsPage: React.FC = () => {
       const overrides: AiRemediationOverrides = {
         ...(includeColorContrastFix ? { colorContrastMode: 'apply-to-pdf' as const } : {}),
         ...(includeLinkTextFix ? { linkTextMode: 'apply-to-pdf' as const } : {}),
+        ...(useClientAltText ? { altTextMode: 'guidance-only' as const } : {}),
       };
       const activeFixLabels = [
         includeColorContrastFix && 'color-contrast',
         includeLinkTextFix && 'link-text',
+        useClientAltText && 'client alt text',
       ].filter((v): v is string => typeof v === 'string');
 
       await triggerAiAnalysis(jobId, Object.keys(overrides).length > 0 ? overrides : undefined);
@@ -1045,7 +1053,7 @@ export const PdfAuditResultsPage: React.FC = () => {
     } finally {
       setIsRerunningAiAnalysis(false);
     }
-  }, [jobId, includeColorContrastFix, includeLinkTextFix, fetchAiSuggestions, remediationCycleLock.inProgress, refreshRemediationCycleLock]);
+  }, [jobId, includeColorContrastFix, includeLinkTextFix, useClientAltText, fetchAiSuggestions, remediationCycleLock.inProgress, refreshRemediationCycleLock]);
 
   // Keep activeJobIdRef in sync with jobId, and stop any AI-analysis
   // polling interval left over from a previous jobId before it can run
@@ -1736,6 +1744,24 @@ export const PdfAuditResultsPage: React.FC = () => {
                       Include link-text auto-fix (re-run only)
                     </span>
                   </div>
+                  {/* Same double-toggle-avoidance reasoning as the two
+                      checkboxes above. Opposite direction from them, though:
+                      checking this DOWNGRADES alt text to guidance-only for
+                      this re-run, since the tenant default is apply-to-pdf. */}
+                  <div className="flex items-center gap-1.5 text-xs text-gray-600 select-none">
+                    <Checkbox
+                      checked={useClientAltText}
+                      onChange={setUseClientAltText}
+                      aria-label="Use client-supplied alt text on Re-run AI Analysis only"
+                    />
+                    <span
+                      className="cursor-pointer"
+                      onClick={() => setUseClientAltText(v => !v)}
+                      title="When checked, AI-generated alt text is skipped for this re-run — every alt-text suggestion comes back as guidance only, so the client's own alt text can be applied instead without being overwritten. Scope: this only affects the Re-run AI Analysis button above — Start Auto Remediation has its own separate Alt text handling setting in its popover, with its own default."
+                    >
+                      Client supplied their own alt text (re-run only)
+                    </span>
+                  </div>
                 </div>
                 <AutoModeStartControl
                   onStart={(overrides) => startAutoMode.mutate(overrides, {
@@ -1755,6 +1781,7 @@ export const PdfAuditResultsPage: React.FC = () => {
                   showConfig={!comparisonTrialId}
                   budgetEstimate={budgetEstimateQuery.data}
                   mentionsPageCheckbox
+                  showAltTextOption
                 />
               </>
             )}

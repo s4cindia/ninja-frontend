@@ -10,6 +10,14 @@
 
 import type { AutoColorContrastMode, AutoModeStatus, AutoModeStopReason } from './comparisonStudy.types';
 
+/**
+ * Only PdfAutoRemediationRun (the job-native path) has this column —
+ * ComparisonTrial doesn't, so a trial-linked job always reports null here
+ * (inherits the tenant/default altTextMode). See the backend schema's own
+ * doc comment on PdfAutoRemediationRun.autoAltTextMode.
+ */
+export type AutoAltTextMode = 'apply-to-pdf' | 'guidance-only' | null;
+
 export interface AutoModeStatusResponse {
   mode: 'manual' | 'auto';
   autoStatus: AutoModeStatus;
@@ -19,6 +27,7 @@ export interface AutoModeStatusResponse {
   autoCostSpentUsd: number;
   autoCostLimitUsd: number;
   autoColorContrastMode: AutoColorContrastMode;
+  autoAltTextMode: AutoAltTextMode;
   /**
    * When the CURRENT run started (ninja-backend#671) — null if no run has
    * ever started, or once a run has stopped. Anchors a live elapsed-time

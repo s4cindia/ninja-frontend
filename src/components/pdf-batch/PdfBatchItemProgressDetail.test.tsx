@@ -36,6 +36,7 @@ const NEVER_RUN_STATUS: AutoModeStatusResponse = {
   autoCostSpentUsd: 0,
   autoCostLimitUsd: 2,
   autoColorContrastMode: null,
+  autoAltTextMode: null,
 };
 
 function makeItem(overrides: Partial<PdfBatchItem> = {}): PdfBatchItem {

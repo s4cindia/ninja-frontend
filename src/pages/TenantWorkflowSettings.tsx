@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Button } from '../components/ui/Button';
-import { tenantConfigService, WorkflowConfig, ExplanationSource, Axes4Config } from '../services/tenant-config.service';
+import { tenantConfigService, WorkflowConfig, ExplanationSource, Axes4Config, AiRemediationConfig } from '../services/tenant-config.service';
 import { Loader2, Save, X } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 
@@ -32,6 +32,18 @@ export const TenantWorkflowSettings: React.FC = () => {
   const [explanationSource, setExplanationSource] = useState<ExplanationSource>('hardcoded');
   const [savingReports, setSavingReports] = useState(false);
 
+  // Form state — PDF AI remediation tenant defaults. Readable by everyone,
+  // but only an ADMIN can actually change them (enforced both here and by
+  // the backend's own authorize('ADMIN') on the PATCH route) — same pattern
+  // as axes4 above. This is the tenant-wide default every job falls back to
+  // when it doesn't send its own per-run override (the Re-run AI Analysis
+  // checkboxes, Auto Remediation's own popover) on PdfAuditResultsPage.
+  const [aiRemediationConfig, setAiRemediationConfig] = useState<AiRemediationConfig | null>(null);
+  const [altTextMode, setAltTextMode] = useState<AiRemediationConfig['altTextMode']>('apply-to-pdf');
+  const [colorContrastMode, setColorContrastMode] = useState<AiRemediationConfig['colorContrastMode']>('guidance-only');
+  const [linkTextMode, setLinkTextMode] = useState<AiRemediationConfig['linkTextMode']>('guidance-only');
+  const [savingAiRemediation, setSavingAiRemediation] = useState(false);
+
   // Load current configuration
   useEffect(() => {
     loadConfig();
@@ -40,10 +52,11 @@ export const TenantWorkflowSettings: React.FC = () => {
   const loadConfig = async () => {
     try {
       setLoading(true);
-      const [currentConfig, reportsConfig, currentAxes4Config] = await Promise.all([
+      const [currentConfig, reportsConfig, currentAxes4Config, currentAiRemediationConfig] = await Promise.all([
         tenantConfigService.getWorkflowConfig(),
         tenantConfigService.getReportsConfig(),
         tenantConfigService.getAxes4Config(),
+        tenantConfigService.getAiRemediationConfig(),
       ]);
       setConfig(currentConfig);
 
@@ -59,6 +72,10 @@ export const TenantWorkflowSettings: React.FC = () => {
       setExplanationSource(reportsConfig.explanationSource);
       setAxes4Config(currentAxes4Config);
       setAxes4Enabled(currentAxes4Config.enabled);
+      setAiRemediationConfig(currentAiRemediationConfig);
+      setAltTextMode(currentAiRemediationConfig.altTextMode);
+      setColorContrastMode(currentAiRemediationConfig.colorContrastMode);
+      setLinkTextMode(currentAiRemediationConfig.linkTextMode);
 
       setIsDirty(false);
     } catch (err) {
@@ -172,6 +189,24 @@ export const TenantWorkflowSettings: React.FC = () => {
       toast.error(errorMessage, { duration: 5000 });
     } finally {
       setSavingAxes4(false);
+    }
+  };
+
+  const handleSaveAiRemediationConfig = async () => {
+    try {
+      setSavingAiRemediation(true);
+      const updated = await tenantConfigService.updateAiRemediationConfig({ altTextMode, colorContrastMode, linkTextMode });
+      setAiRemediationConfig(updated);
+      setAltTextMode(updated.altTextMode);
+      setColorContrastMode(updated.colorContrastMode);
+      setLinkTextMode(updated.linkTextMode);
+      toast.success('PDF AI remediation settings saved!', { duration: 3000, icon: '✅' });
+    } catch (err: unknown) {
+      const errorMessage = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        || 'Failed to save PDF AI remediation settings. Please try again.';
+      toast.error(errorMessage, { duration: 5000 });
+    } finally {
+      setSavingAiRemediation(false);
     }
   };
 
@@ -545,6 +580,103 @@ export const TenantWorkflowSettings: React.FC = () => {
                 <>
                   <Save className="h-4 w-4 mr-2" />
                   Save axes4 Setting
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* PDF AI Remediation Configuration */}
+      <div className="mt-8">
+        <h1 className="text-3xl font-bold text-gray-900">PDF AI Remediation</h1>
+        <p className="mt-2 text-gray-600">
+          Tenant-wide defaults for the PDF accessibility AI pipeline. Every job falls back to these
+          unless it sends its own per-run override (the Re-run AI Analysis checkboxes, or Auto
+          Remediation's own popover, on the Audit Results page) — changing these does not affect a
+          run already in progress.
+        </p>
+      </div>
+
+      <div className="mt-4 bg-white rounded-lg border border-gray-200 p-6 space-y-5">
+        {!isAdmin && (
+          <p className="text-xs text-amber-600">Only administrators can change these settings.</p>
+        )}
+
+        <div>
+          <label htmlFor="altTextMode" className="block text-sm font-medium text-gray-700 mb-1">
+            Alt text
+          </label>
+          <p className="text-xs text-gray-500 mb-2">
+            Set to guidance-only when clients generally supply their own alt text — operators can
+            still override per job from the Audit Results page for a one-off exception either way.
+          </p>
+          <select
+            id="altTextMode"
+            value={altTextMode}
+            disabled={!isAdmin || savingAiRemediation}
+            onChange={(e) => setAltTextMode(e.target.value as AiRemediationConfig['altTextMode'])}
+            className="w-full max-w-sm px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <option value="apply-to-pdf">Generate AI alt text</option>
+            <option value="guidance-only">Guidance only — clients supply their own</option>
+          </select>
+        </div>
+
+        <div>
+          <label htmlFor="colorContrastMode" className="block text-sm font-medium text-gray-700 mb-1">
+            Color contrast
+          </label>
+          <select
+            id="colorContrastMode"
+            value={colorContrastMode}
+            disabled={!isAdmin || savingAiRemediation}
+            onChange={(e) => setColorContrastMode(e.target.value as AiRemediationConfig['colorContrastMode'])}
+            className="w-full max-w-sm px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <option value="guidance-only">Guidance only — flag but never auto-apply</option>
+            <option value="disabled">Disabled — skip contrast entirely</option>
+            <option value="apply-to-pdf">Auto-apply — fix contrast automatically</option>
+          </select>
+        </div>
+
+        <div>
+          <label htmlFor="linkTextMode" className="block text-sm font-medium text-gray-700 mb-1">
+            Link text
+          </label>
+          <select
+            id="linkTextMode"
+            value={linkTextMode}
+            disabled={!isAdmin || savingAiRemediation}
+            onChange={(e) => setLinkTextMode(e.target.value as AiRemediationConfig['linkTextMode'])}
+            className="w-full max-w-sm px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <option value="guidance-only">Guidance only — flag but never auto-apply</option>
+            <option value="disabled">Disabled — skip link text entirely</option>
+            <option value="apply-to-pdf">Auto-apply — fix link text automatically</option>
+          </select>
+        </div>
+
+        {isAdmin && (
+          <div className="flex justify-end pt-1">
+            <Button
+              onClick={handleSaveAiRemediationConfig}
+              disabled={
+                savingAiRemediation ||
+                (altTextMode === (aiRemediationConfig?.altTextMode ?? 'apply-to-pdf') &&
+                  colorContrastMode === (aiRemediationConfig?.colorContrastMode ?? 'guidance-only') &&
+                  linkTextMode === (aiRemediationConfig?.linkTextMode ?? 'guidance-only'))
+              }
+            >
+              {savingAiRemediation ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save PDF AI Remediation Settings
                 </>
               )}
             </Button>
