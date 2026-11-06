@@ -150,7 +150,7 @@ export function PdfJobProgressPanel({
       ? 'Adobe AutoTag'
       : autoTagSkipped
         ? 'AutoTag'
-        : 'Adobe AutoTag'; // still running — genuinely not yet known
+        : 'Tagging'; // still running — genuinely not yet known which engine; see the detail column
   const extractionDone = (totalPages ? progress >= 88 : false) || vp.length > 0 || auditEnd !== null;
   const extractionEnd = vp.length > 0 ? new Date(vp[0].startedAt) : (extractionDone ? auditEnd : null);
   const extractionStart = hasAutoTag ? autoTagEnd : auditStart;
@@ -185,6 +185,7 @@ export function PdfJobProgressPanel({
         : autoTagProg?.status === 'failed' ? 'failed'
         : autoTagSkipped && autoTagSkipReason === 'no-tagger-configured' ? 'no tagger available'
         : autoTagSkipped ? 'already tagged — used existing structure'
+        : !taggerSource ? 'engine confirmed at completion'
         : undefined,
     }] : []),
     { label: 'Extraction', start: extractionStart, end: extractionEnd, status: extractionDone ? 'done' as const : (hasAutoTag ? autoTagEnd : auditStart) ? 'running' as const : 'pending' as const },

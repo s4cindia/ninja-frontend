@@ -196,7 +196,7 @@ describe('PdfJobProgressPanel', () => {
     expect(screen.getByText('Queue')).toBeInTheDocument();
   });
 
-  it('shows an Adobe AutoTag row with element-count detail when autoTagProgress is present and complete', () => {
+  it('shows the real tagger\'s row with element-count detail when autoTagProgress is present and complete', () => {
     const { container } = render(
       <PdfJobProgressPanel
         jobData={job({
@@ -208,15 +208,40 @@ describe('PdfJobProgressPanel', () => {
               elementCounts: { figures: 2, tables: 1, headings: 5 },
             },
           },
+          // A completed run with real element counts has a known tagger by
+          // definition -- Seam-C is the default engine for a normal upload.
+          output: { taggerSource: 'seam-c' },
         })}
         progress={15}
       />
     );
 
-    expect(screen.getByText('Adobe AutoTag')).toBeInTheDocument();
+    expect(screen.getByText('Seam-C (YOLO)')).toBeInTheDocument();
     expect(container.textContent).toContain('2F');
     expect(container.textContent).toContain('1T');
     expect(container.textContent).toContain('5H');
+  });
+
+  it('labels the row "Tagging" (not a specific engine) while still running and the tagger isn\'t known yet, with a detail explaining why', () => {
+    // Regression for a real point of user confusion: the row used to default
+    // to the literal text "Adobe AutoTag" while taggerSource was still
+    // unresolved, even though Seam-C is the default engine and is almost
+    // certainly what's actually running -- misleadingly implying Adobe ran
+    // when nothing had been decided yet.
+    const { container } = render(
+      <PdfJobProgressPanel
+        jobData={job({
+          input: { autoTagProgress: { startedAt: '2026-08-01T10:00:05.000Z', status: 'processing' } },
+          // No output.taggerSource yet -- genuinely not yet known.
+        })}
+        progress={15}
+      />
+    );
+
+    expect(screen.getByText('Tagging')).toBeInTheDocument();
+    expect(screen.queryByText('Adobe AutoTag')).not.toBeInTheDocument();
+    expect(screen.queryByText('Seam-C (YOLO)')).not.toBeInTheDocument();
+    expect(container.textContent).toContain('engine confirmed at completion');
   });
 
   it('labels the row "Seam-C (YOLO)" instead of "Adobe AutoTag" when that\'s the tagger that actually ran (regression: used to say Adobe unconditionally)', () => {
