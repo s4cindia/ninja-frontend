@@ -169,6 +169,12 @@ export function IssueCard({
       } else {
         toast.error(getErrorMessage(err));
       }
+      // Covers Retry on an already-'failed' suggestion: the backend now
+      // refreshes failedAttempts/lastErrorReason on a renewed failure too
+      // (not just the first one), so re-fetch rather than leave this card
+      // showing the PREVIOUS attempt's stale reason under "Why did this
+      // fail?" after a retry that failed differently.
+      if (jobId) queryClient.invalidateQueries({ queryKey: ['ai-analysis', jobId] });
       onApplyError?.();
     },
   });
@@ -443,11 +449,32 @@ export function IssueCard({
                 ) : aiSuggestion.status === 'rejected' ? (
                   <span className="text-gray-500 italic">Dismissed</span>
                 ) : aiSuggestion.status === 'failed' ? (
-                  // Terminal (MAX_APPLY_ATTEMPTS exhausted) -- no Approve/Apply/
-                  // Dismiss actions, since nothing about retrying would change.
-                  <span className="flex items-center gap-1 text-red-700 font-medium">
-                    <AlertTriangle size={12} /> Failed
-                  </span>
+                  // Terminal (MAX_APPLY_ATTEMPTS exhausted) -- Approve/Dismiss
+                  // stay hidden (nothing to decide anymore), but a manual
+                  // Retry is still offered: the underlying apply endpoint has
+                  // no "already failed, decline" gate of its own, and a fresh
+                  // attempt is the only way to tell a since-fixed root cause
+                  // (or a since-redeployed fix) apart from a genuinely
+                  // unfixable one, rather than waiting on the next full
+                  // Auto Mode round, which skips already-'failed' rows.
+                  <div className="flex items-center gap-1.5">
+                    <span className="flex items-center gap-1 text-red-700 font-medium">
+                      <AlertTriangle size={12} /> Failed
+                    </span>
+                    <button
+                      type="button"
+                      className="px-2 py-0.5 bg-white text-red-700 border border-red-300 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
+                      disabled={!jobId || applyMutation.isPending || remediationCycleInProgress || disableManualActions}
+                      title={
+                        disableManualActions ? 'Auto Remediation is running — manual actions are disabled.'
+                          : remediationCycleInProgress ? remediationCycleSourceMessage(remediationCycleSource)
+                          : undefined
+                      }
+                      onClick={() => applyMutation.mutate()}
+                    >
+                      {applyMutation.isPending ? <><Loader2 size={11} className="animate-spin" /> Retrying…</> : 'Retry'}
+                    </button>
+                  </div>
                 ) : (
                   <div className="flex items-center gap-1.5">
                     {aiSuggestion.status === 'approved' ? (
