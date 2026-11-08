@@ -646,13 +646,42 @@ describe('IssueCard', () => {
       updatedAt: '2024-01-15T10:00:00Z',
     };
 
-    it('shows a Failed indicator instead of the Approve/Apply/Dismiss actions -- retrying would not change anything (MAX_APPLY_ATTEMPTS exhausted)', () => {
+    it('shows a Failed indicator with a Retry action, but no Approve/Apply(initial)/Dismiss actions', () => {
       renderWithQuery(<IssueCard issue={mockPdfIssue} jobId="job-1" aiSuggestion={mockAiSuggestion} />);
 
       expect(screen.getByText('Failed')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Apply' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Dismiss' })).not.toBeInTheDocument();
+    });
+
+    it('calls the same per-issue apply endpoint when Retry is clicked', async () => {
+      const mockApi = api as Mocked<typeof api>;
+      mockApi.post.mockResolvedValue({ data: { data: { ...mockAiSuggestion, status: 'applied' } } });
+      renderWithQuery(<IssueCard issue={mockPdfIssue} jobId="job-1" aiSuggestion={mockAiSuggestion} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+      await waitFor(() =>
+        expect(mockApi.post).toHaveBeenCalledWith(`/pdf/job-1/ai-analysis/${mockAiSuggestion.issueId}/apply`, undefined)
+      );
+    });
+
+    it('disables Retry and explains why when remediationCycleInProgress is true', () => {
+      renderWithQuery(
+        <IssueCard
+          issue={mockPdfIssue}
+          jobId="job-1"
+          aiSuggestion={mockAiSuggestion}
+          remediationCycleInProgress={true}
+          remediationCycleSource="apply_all"
+        />
+      );
+
+      const retryButton = screen.getByRole('button', { name: 'Retry' });
+      expect(retryButton).toBeDisabled();
+      expect(retryButton).toHaveAttribute('title', 'Applying fixes is still in progress.');
     });
 
     it('reveals lastErrorReason under a "Why did this fail?" toggle, collapsed by default', () => {
