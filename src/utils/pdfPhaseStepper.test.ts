@@ -299,5 +299,24 @@ describe('derivePhases', () => {
     it('is done once both artifacts have been generated', () => {
       expect(byId(derivePhases(baseInput({ acrGenerated: true, pacReportGenerated: true })), 'compliance').status).toBe('done');
     });
+
+    // acrRequiredForCompliance mirrors the tenant-level ComplianceConfig
+    // toggle (default true) -- these cases cover the opt-out path.
+    it('still requires both artifacts when acrRequiredForCompliance is omitted (default true)', () => {
+      expect(byId(derivePhases(baseInput({ pacReportGenerated: true })), 'compliance').status).toBe('in-progress');
+    });
+
+    it('still requires both artifacts when acrRequiredForCompliance is explicitly true', () => {
+      expect(byId(derivePhases(baseInput({ pacReportGenerated: true, acrRequiredForCompliance: true })), 'compliance').status).toBe('in-progress');
+      expect(byId(derivePhases(baseInput({ acrGenerated: true, pacReportGenerated: true, acrRequiredForCompliance: true })), 'compliance').status).toBe('done');
+    });
+
+    it('is done from the PAC Report alone when acrRequiredForCompliance is false', () => {
+      expect(byId(derivePhases(baseInput({ pacReportGenerated: true, acrRequiredForCompliance: false })), 'compliance').status).toBe('done');
+    });
+
+    it('is not-started when acrRequiredForCompliance is false and the PAC Report hasn\'t been generated either, even if the ACR has', () => {
+      expect(byId(derivePhases(baseInput({ acrGenerated: true, acrRequiredForCompliance: false })), 'compliance').status).toBe('not-started');
+    });
   });
 });

@@ -4,7 +4,7 @@ import { TenantWorkflowSettings } from './TenantWorkflowSettings';
 import { tenantConfigService } from '../services/tenant-config.service';
 import { useAuthStore } from '@/stores/auth.store';
 import type { User } from '@/types/auth.types';
-import type { WorkflowConfig, ReportsConfig, Axes4Config, AiRemediationConfig } from '../services/tenant-config.service';
+import type { WorkflowConfig, ReportsConfig, Axes4Config, AiRemediationConfig, ComplianceConfig } from '../services/tenant-config.service';
 
 vi.mock('../services/tenant-config.service', () => ({
   tenantConfigService: {
@@ -16,6 +16,8 @@ vi.mock('../services/tenant-config.service', () => ({
     updateAxes4Config: vi.fn(),
     getAiRemediationConfig: vi.fn(),
     updateAiRemediationConfig: vi.fn(),
+    getComplianceConfig: vi.fn(),
+    updateComplianceConfig: vi.fn(),
   },
 }));
 
@@ -65,6 +67,10 @@ function mockAiRemediationConfig(overrides?: Partial<AiRemediationConfig>): AiRe
   return { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only', ...overrides };
 }
 
+function mockComplianceConfig(overrides?: Partial<ComplianceConfig>): ComplianceConfig {
+  return { acrRequired: true, acrRequiredChangedBy: null, acrRequiredChangedAt: null, ...overrides };
+}
+
 describe('TenantWorkflowSettings — axes4 PAC Cloud toggle', () => {
   beforeEach(() => {
     mockService.getWorkflowConfig.mockReset().mockResolvedValue(mockWorkflowConfig());
@@ -73,6 +79,8 @@ describe('TenantWorkflowSettings — axes4 PAC Cloud toggle', () => {
     mockService.updateAxes4Config.mockReset();
     mockService.getAiRemediationConfig.mockReset().mockResolvedValue(mockAiRemediationConfig());
     mockService.updateAiRemediationConfig.mockReset();
+    mockService.getComplianceConfig.mockReset().mockResolvedValue(mockComplianceConfig());
+    mockService.updateComplianceConfig.mockReset();
   });
 
   it('is visible (read-only) to a non-admin, showing the current state but no save control', async () => {
@@ -168,6 +176,8 @@ describe('TenantWorkflowSettings — PDF AI Remediation tenant defaults', () => 
     mockService.updateAxes4Config.mockReset();
     mockService.getAiRemediationConfig.mockReset().mockResolvedValue(mockAiRemediationConfig());
     mockService.updateAiRemediationConfig.mockReset();
+    mockService.getComplianceConfig.mockReset().mockResolvedValue(mockComplianceConfig());
+    mockService.updateComplianceConfig.mockReset();
   });
 
   it('is visible (read-only) to a non-admin, showing the loaded values but no save control', async () => {
@@ -240,5 +250,103 @@ describe('TenantWorkflowSettings — PDF AI Remediation tenant defaults', () => 
     });
     // Still rendered, not crashed — the select reflects the unsaved attempt.
     expect(screen.getByLabelText('Alt text')).toHaveValue('guidance-only');
+  });
+});
+
+describe('TenantWorkflowSettings — Compliance ACR-required toggle', () => {
+  beforeEach(() => {
+    mockService.getWorkflowConfig.mockReset().mockResolvedValue(mockWorkflowConfig());
+    mockService.getReportsConfig.mockReset().mockResolvedValue(mockReportsConfig());
+    mockService.getAxes4Config.mockReset().mockResolvedValue(mockAxes4Config());
+    mockService.updateAxes4Config.mockReset();
+    mockService.getAiRemediationConfig.mockReset().mockResolvedValue(mockAiRemediationConfig());
+    mockService.updateAiRemediationConfig.mockReset();
+    mockService.getComplianceConfig.mockReset().mockResolvedValue(mockComplianceConfig());
+    mockService.updateComplianceConfig.mockReset();
+  });
+
+  it('is visible (read-only) to a non-admin, showing the current state but no save control', async () => {
+    setCurrentUser({ role: 'OPERATOR' });
+    mockService.getComplianceConfig.mockResolvedValue(mockComplianceConfig({ acrRequired: false, acrRequiredChangedBy: 'admin@example.com', acrRequiredChangedAt: '2026-11-01T00:00:00Z' }));
+
+    render(<TenantWorkflowSettings />);
+
+    const checkbox = await screen.findByRole('checkbox', { name: /Require ACR for Compliance/ }) as HTMLInputElement;
+    expect(checkbox.checked).toBe(false);
+    expect(checkbox).toBeDisabled();
+    expect(screen.getByText('Only administrators can change this compliance setting.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Save Compliance Setting/ })).not.toBeInTheDocument();
+  });
+
+  it('is editable for an ADMIN, and saves the new value', async () => {
+    setCurrentUser({ role: 'ADMIN' });
+    mockService.updateComplianceConfig.mockResolvedValue(
+      mockComplianceConfig({ acrRequired: false, acrRequiredChangedBy: 'admin@example.com', acrRequiredChangedAt: '2026-11-10T00:00:00Z' })
+    );
+
+    render(<TenantWorkflowSettings />);
+
+    const checkbox = await screen.findByRole('checkbox', { name: /Require ACR for Compliance/ }) as HTMLInputElement;
+    expect(checkbox).not.toBeDisabled();
+    expect(checkbox.checked).toBe(true);
+
+    fireEvent.click(checkbox);
+    fireEvent.click(screen.getByRole('button', { name: /Save Compliance Setting/ }));
+
+    await waitFor(() => {
+      expect(mockService.updateComplianceConfig).toHaveBeenCalledWith({ acrRequired: false });
+    });
+  });
+
+  it('shows the audit trail (last changed by / on) once it has been changed at least once', async () => {
+    setCurrentUser({ role: 'ADMIN' });
+    mockService.getComplianceConfig.mockResolvedValue(
+      mockComplianceConfig({ acrRequired: false, acrRequiredChangedBy: 'jane@example.com', acrRequiredChangedAt: '2026-11-01T00:00:00Z' })
+    );
+
+    render(<TenantWorkflowSettings />);
+
+    expect(await screen.findByText(/Last changed by jane@example.com on/)).toBeInTheDocument();
+  });
+
+  it('shows no audit trail line when the setting has never been changed', async () => {
+    setCurrentUser({ role: 'ADMIN' });
+    mockService.getComplianceConfig.mockResolvedValue(mockComplianceConfig({ acrRequired: true, acrRequiredChangedBy: null, acrRequiredChangedAt: null }));
+
+    render(<TenantWorkflowSettings />);
+
+    await screen.findByRole('checkbox', { name: /Require ACR for Compliance/ });
+    expect(screen.queryByText(/Last changed by/)).not.toBeInTheDocument();
+  });
+
+  it('disables the Save button until the checkbox actually differs from the saved value', async () => {
+    setCurrentUser({ role: 'ADMIN' });
+    mockService.getComplianceConfig.mockResolvedValue(mockComplianceConfig({ acrRequired: true }));
+
+    render(<TenantWorkflowSettings />);
+
+    const saveButton = await screen.findByRole('button', { name: /Save Compliance Setting/ });
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Require ACR for Compliance/ }));
+    expect(saveButton).not.toBeDisabled();
+  });
+
+  it('shows an error toast and does not crash when the save is rejected (e.g. a 403)', async () => {
+    setCurrentUser({ role: 'ADMIN' });
+    mockService.updateComplianceConfig.mockRejectedValue({
+      response: { data: { error: 'Only administrators may change this setting.' } },
+    });
+
+    render(<TenantWorkflowSettings />);
+
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Require ACR for Compliance/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Save Compliance Setting/ }));
+
+    await waitFor(() => {
+      expect(mockService.updateComplianceConfig).toHaveBeenCalled();
+    });
+    // Still rendered, not crashed — the checkbox reflects the unsaved attempt.
+    expect(screen.getByRole('checkbox', { name: /Require ACR for Compliance/ })).toBeInTheDocument();
   });
 });

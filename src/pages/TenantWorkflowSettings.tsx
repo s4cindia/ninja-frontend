@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Button } from '../components/ui/Button';
-import { tenantConfigService, WorkflowConfig, ExplanationSource, Axes4Config, AiRemediationConfig } from '../services/tenant-config.service';
+import { tenantConfigService, WorkflowConfig, ExplanationSource, Axes4Config, AiRemediationConfig, ComplianceConfig } from '../services/tenant-config.service';
 import { Loader2, Save, X } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 
@@ -44,6 +44,17 @@ export const TenantWorkflowSettings: React.FC = () => {
   const [linkTextMode, setLinkTextMode] = useState<AiRemediationConfig['linkTextMode']>('guidance-only');
   const [savingAiRemediation, setSavingAiRemediation] = useState(false);
 
+  // Form state — compliance tenant toggle. Readable by everyone, but only
+  // an ADMIN can actually change it (enforced both here and by the
+  // backend). Scoped to the single-job PDF Audit Results page's own
+  // Compliance phase indicator only — never read by the separate Workflow
+  // Agent, whose own ACR sign-off gate (Gate 4) stays non-skippable
+  // regardless of this setting; see compliance-tenant-config.service.ts's
+  // header on the backend.
+  const [complianceConfig, setComplianceConfig] = useState<ComplianceConfig | null>(null);
+  const [acrRequired, setAcrRequired] = useState(true);
+  const [savingCompliance, setSavingCompliance] = useState(false);
+
   // Load current configuration
   useEffect(() => {
     loadConfig();
@@ -52,11 +63,12 @@ export const TenantWorkflowSettings: React.FC = () => {
   const loadConfig = async () => {
     try {
       setLoading(true);
-      const [currentConfig, reportsConfig, currentAxes4Config, currentAiRemediationConfig] = await Promise.all([
+      const [currentConfig, reportsConfig, currentAxes4Config, currentAiRemediationConfig, currentComplianceConfig] = await Promise.all([
         tenantConfigService.getWorkflowConfig(),
         tenantConfigService.getReportsConfig(),
         tenantConfigService.getAxes4Config(),
         tenantConfigService.getAiRemediationConfig(),
+        tenantConfigService.getComplianceConfig(),
       ]);
       setConfig(currentConfig);
 
@@ -76,6 +88,8 @@ export const TenantWorkflowSettings: React.FC = () => {
       setAltTextMode(currentAiRemediationConfig.altTextMode);
       setColorContrastMode(currentAiRemediationConfig.colorContrastMode);
       setLinkTextMode(currentAiRemediationConfig.linkTextMode);
+      setComplianceConfig(currentComplianceConfig);
+      setAcrRequired(currentComplianceConfig.acrRequired);
 
       setIsDirty(false);
     } catch (err) {
@@ -207,6 +221,22 @@ export const TenantWorkflowSettings: React.FC = () => {
       toast.error(errorMessage, { duration: 5000 });
     } finally {
       setSavingAiRemediation(false);
+    }
+  };
+
+  const handleSaveComplianceConfig = async () => {
+    try {
+      setSavingCompliance(true);
+      const updated = await tenantConfigService.updateComplianceConfig({ acrRequired });
+      setComplianceConfig(updated);
+      setAcrRequired(updated.acrRequired);
+      toast.success('Compliance setting saved!', { duration: 3000, icon: '✅' });
+    } catch (err: unknown) {
+      const errorMessage = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        || 'Failed to save compliance setting. Please try again.';
+      toast.error(errorMessage, { duration: 5000 });
+    } finally {
+      setSavingCompliance(false);
     }
   };
 
@@ -580,6 +610,76 @@ export const TenantWorkflowSettings: React.FC = () => {
                 <>
                   <Save className="h-4 w-4 mr-2" />
                   Save axes4 Setting
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Compliance Configuration */}
+      <div className="mt-8">
+        <h1 className="text-3xl font-bold text-gray-900">Compliance</h1>
+        <p className="mt-2 text-gray-600">
+          Controls what the single-job PDF Audit Results page's "Compliance" progress step requires
+          to show done.
+        </p>
+      </div>
+
+      <div className="mt-4 bg-white rounded-lg border border-gray-200 p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold text-gray-900">Require ACR for Compliance</h3>
+            <p className="mt-1 text-sm text-gray-600">
+              When on (default), a job's Compliance step needs both a generated PAC Report and a
+              generated ACR to show done. Turn off to let the PAC Report alone count as done, for
+              teams that don't produce an ACR for every job.
+            </p>
+            <p className="mt-2 text-xs text-gray-500">
+              Scope: this only changes the single-job Audit Results page's own Compliance indicator.
+              It does not affect the separate agentic Workflow's ACR Sign-off gate above, which stays
+              a mandatory, non-skippable attestation step regardless of this setting.
+            </p>
+            {complianceConfig?.acrRequiredChangedAt && (
+              <p className="mt-1 text-xs text-gray-400">
+                Last changed by {complianceConfig.acrRequiredChangedBy ?? 'unknown'} on{' '}
+                {new Date(complianceConfig.acrRequiredChangedAt).toLocaleDateString('en-US', {
+                  month: 'short', day: 'numeric', year: 'numeric',
+                })}
+              </p>
+            )}
+            {!isAdmin && (
+              <p className="mt-1 text-xs text-amber-600">Only administrators can change this compliance setting.</p>
+            )}
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer ml-4">
+            <input
+              type="checkbox"
+              aria-label="Require ACR for Compliance"
+              className="sr-only peer"
+              checked={acrRequired}
+              disabled={!isAdmin || savingCompliance}
+              onChange={(e) => setAcrRequired(e.target.checked)}
+            />
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600 peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"></div>
+          </label>
+        </div>
+
+        {isAdmin && (
+          <div className="flex justify-end mt-5">
+            <Button
+              onClick={handleSaveComplianceConfig}
+              disabled={savingCompliance || acrRequired === (complianceConfig?.acrRequired ?? true)}
+            >
+              {savingCompliance ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Compliance Setting
                 </>
               )}
             </Button>

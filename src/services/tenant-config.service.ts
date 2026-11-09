@@ -46,6 +46,21 @@ export interface Axes4Config {
 }
 
 /**
+ * Per-tenant admin toggle controlling whether the single-job PDF Audit
+ * Results page's Compliance phase requires a generated ACR, in addition
+ * to the PAC Report, to show done. Scoped to that page's own progress
+ * stepper only -- the separate Workflow Agent's ACR sign-off gate (Gate 4)
+ * never reads this and stays non-skippable regardless of this setting.
+ * acrRequiredChangedBy/acrRequiredChangedAt form a lightweight audit
+ * trail of the last change, same shape as Axes4Config above.
+ */
+export interface ComplianceConfig {
+  acrRequired: boolean;
+  acrRequiredChangedBy: string | null;
+  acrRequiredChangedAt: string | null;
+}
+
+/**
  * Tenant-level reports configuration.
  * Controls how AI explanations are sourced for issue explainability.
  */
@@ -267,6 +282,39 @@ class TenantConfigService {
       data: Axes4Config;
       message: string;
     }>('/tenant/config/axes4', updates);
+    return response.data.data;
+  }
+
+  /**
+   * Get the compliance "ACR required" tenant toggle. Readable by any
+   * authenticated user (not just admins) — only the PATCH below is
+   * admin-restricted.
+   */
+  async getComplianceConfig(): Promise<ComplianceConfig> {
+    try {
+      const response = await api.get<{ success: boolean; data: ComplianceConfig }>(
+        '/tenant/config/compliance'
+      );
+      return response.data.data;
+    } catch (error) {
+      console.error('[TenantConfig] Failed to fetch compliance config:', error);
+      // Required by default on error, matching the backend's own default
+      // and the page's pre-existing behavior.
+      return { acrRequired: true, acrRequiredChangedBy: null, acrRequiredChangedAt: null };
+    }
+  }
+
+  /**
+   * Update the compliance tenant toggle. Admin-only server-side — a
+   * non-admin PATCH gets a 403, which this does not swallow (same as
+   * updateAxes4Config above).
+   */
+  async updateComplianceConfig(updates: { acrRequired: boolean }): Promise<ComplianceConfig> {
+    const response = await api.patch<{
+      success: boolean;
+      data: ComplianceConfig;
+      message: string;
+    }>('/tenant/config/compliance', updates);
     return response.data.data;
   }
 }
