@@ -57,6 +57,8 @@ import {
   type RemediationCycleSource,
 } from '@/services/api';
 import { useAuthStore } from '@/stores/auth.store';
+import { tenantConfigService } from '@/services/tenant-config.service';
+import { JobSettingsMenu } from '@/components/pdf/JobSettingsMenu';
 import { isMatterhornIssue, getMatterhornCheckpoint } from '@/utils/matterhorn';
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -565,6 +567,20 @@ export const PdfAuditResultsPage: React.FC = () => {
   const [jobFlags, setJobFlags] = useState<{ acrGenerated: boolean; pacReportGenerated: boolean; lastReauditAt?: string } | null>(null);
   const jobFlagsFetchedRef = useRef<string | null>(null);
 
+  // Tenant-level override for whether Compliance needs a generated ACR, in
+  // addition to the PAC Report, to show done (defaults to true — the
+  // pre-existing, pre-toggle behavior — until this loads). Fetched once
+  // per page load, not per job, same pattern EPUBUploader uses for its own
+  // one-off workflow-config fetch.
+  const [acrRequiredForCompliance, setAcrRequiredForCompliance] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    tenantConfigService.getComplianceConfig()
+      .then((cfg) => { if (!cancelled) setAcrRequiredForCompliance(cfg.acrRequired); })
+      .catch((error) => console.error('[PdfAuditResultsPage] Failed to fetch compliance config:', error));
+    return () => { cancelled = true; };
+  }, []);
+
   // Counts driving the "Apply All Approved" bulk action — only apply-to-pdf
   // suggestions are eligible; guidance-only/auto-resolve ones have nothing to apply.
   const eligibleForApplyAll = useMemo(
@@ -600,11 +616,12 @@ export const PdfAuditResultsPage: React.FC = () => {
     guidanceAcknowledgment,
     acrGenerated: jobFlags?.acrGenerated ?? false,
     pacReportGenerated: jobFlags?.pacReportGenerated ?? false,
+    acrRequiredForCompliance,
   }), [
     auditResult, aiAnalysisStatus, aiStats?.analyzedAt, remediationHistoryQuery.data, autoModeStatusQuery.data,
     remediationCycleActive, remediationCycleActiveSource, autoTagInfo?.postRemediationStatus,
     autoTagInfo?.postRemediationAudit?.runAt, jobFlags?.lastReauditAt, pendingGuidanceCount, guidanceAcknowledgment,
-    jobFlags?.acrGenerated, jobFlags?.pacReportGenerated,
+    jobFlags?.acrGenerated, jobFlags?.pacReportGenerated, acrRequiredForCompliance,
   ]);
 
   const currentRoundPhase = useMemo(() => {
@@ -1785,18 +1802,12 @@ export const PdfAuditResultsPage: React.FC = () => {
                 />
               </>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/acr/workflow?jobId=${jobId}&jobType=PDF_ACCESSIBILITY`)}
-              disabled={autoTagInfo?.postRemediationStatus === 'pending'}
-              title={autoTagInfo?.postRemediationStatus === 'pending' ? 'Validating fixes — please wait…' : undefined}
-            >
-              {autoTagInfo?.postRemediationStatus === 'pending'
-                ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Validating…</>
-                : <><FileText className="h-4 w-4 mr-1" />Generate ACR</>
-              }
-            </Button>
+            <JobSettingsMenu
+              onGenerateAcr={() => navigate(`/acr/workflow?jobId=${jobId}&jobType=PDF_ACCESSIBILITY`)}
+              generateAcrPending={autoTagInfo?.postRemediationStatus === 'pending'}
+              generateAcrDisabled={autoTagInfo?.postRemediationStatus === 'pending'}
+              generateAcrDisabledTitle={autoTagInfo?.postRemediationStatus === 'pending' ? 'Validating fixes — please wait…' : undefined}
+            />
             <Button
               variant="outline"
               size="sm"

@@ -30,6 +30,16 @@ vi.mock('@/services/pdf-remediation.service', () => ({
 vi.mock('@/services/comparisonStudy.service', () => ({
   comparisonStudyService: { getTrial: vi.fn() },
 }));
+// Mocked at the module level (not routed through the shared api.get queue
+// above) so this page's own compliance-config fetch on mount can't shift
+// the call order every other test's positional mockResolvedValueOnce
+// chains depend on. Defaults to acrRequired: true, matching the service's
+// own real default and this page's pre-toggle behavior.
+vi.mock('@/services/tenant-config.service', () => ({
+  tenantConfigService: {
+    getComplianceConfig: vi.fn().mockResolvedValue({ acrRequired: true, acrRequiredChangedBy: null, acrRequiredChangedAt: null }),
+  },
+}));
 vi.mock('@/services/pdfAutoMode.service', () => ({
   pdfAutoModeService: {
     startAutoMode: vi.fn(),
@@ -3136,7 +3146,11 @@ describe('PdfAuditResultsPage', () => {
         renderWithRouter(jobId, `?comparisonTrialId=${trialId}`);
         await act(async () => { await vi.advanceTimersByTimeAsync(0); });
         await screen.findByRole('button', { name: 'Share' });
-        expect(screen.getByRole('button', { name: 'Generate ACR' })).not.toBeDisabled();
+        // "Generate ACR" lives inside the Settings menu now — open it once;
+        // it stays open (the trigger itself is never re-rendered away) for
+        // the rest of this test's assertions.
+        fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+        expect(screen.getByRole('menuitem', { name: 'Generate ACR' })).not.toBeDisabled();
 
         // Round 1 -> 2: this call ("A") is held pending — the older in-flight
         // request that will resolve LATE with stale data.
@@ -3156,7 +3170,7 @@ describe('PdfAuditResultsPage', () => {
         });
         await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
 
-        expect(screen.getByRole('button', { name: 'Generate ACR' })).not.toBeDisabled();
+        expect(screen.getByRole('menuitem', { name: 'Generate ACR' })).not.toBeDisabled();
 
         // A finally resolves, reporting stale 'pending' data — it must be
         // discarded rather than overwrite B's already-applied 'complete' state.
@@ -3165,8 +3179,8 @@ describe('PdfAuditResultsPage', () => {
           await vi.advanceTimersByTimeAsync(0);
         });
 
-        expect(screen.getByRole('button', { name: 'Generate ACR' })).not.toBeDisabled();
-        expect(screen.queryByRole('button', { name: /Validating/ })).not.toBeInTheDocument();
+        expect(screen.getByRole('menuitem', { name: 'Generate ACR' })).not.toBeDisabled();
+        expect(screen.queryByRole('menuitem', { name: /Validating/ })).not.toBeInTheDocument();
       } finally {
         vi.useRealTimers();
       }

@@ -62,6 +62,17 @@ export interface DerivePhasesInput {
   guidanceAcknowledgment: GuidanceAcknowledgment | null;
   acrGenerated: boolean;
   pacReportGenerated: boolean;
+  /**
+   * Tenant-level override (ComplianceConfig.acrRequired) for whether
+   * Compliance needs a generated ACR, in addition to the PAC Report, to
+   * show done. Defaults to true (the pre-existing, pre-toggle behavior)
+   * so a caller that hasn't loaded the tenant setting yet -- or a tenant
+   * that's never touched it -- sees no change. See
+   * compliance-tenant-config.service.ts's own header on the backend for
+   * why this is scoped away from the separate Workflow Agent's
+   * non-skippable ACR sign-off gate.
+   */
+  acrRequiredForCompliance?: boolean;
 }
 
 /** Exported for reuse by autoModeRoundPhase.ts's own sub-phase derivation. */
@@ -223,12 +234,19 @@ export function derivePhases(input: DerivePhasesInput): Phase[] {
   };
 
   // --- Compliance ---
+  const acrRequired = input.acrRequiredForCompliance ?? true;
+  const complianceDone = acrRequired
+    ? input.acrGenerated && input.pacReportGenerated
+    : input.pacReportGenerated;
+  const complianceStarted = acrRequired
+    ? input.acrGenerated || input.pacReportGenerated
+    : input.pacReportGenerated;
   const compliance: Phase = {
     id: 'compliance',
     label: 'Compliance',
-    status: input.acrGenerated && input.pacReportGenerated
+    status: complianceDone
       ? 'done'
-      : (input.acrGenerated || input.pacReportGenerated)
+      : complianceStarted
         ? 'in-progress'
         : 'not-started',
   };
