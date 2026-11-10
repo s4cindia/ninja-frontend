@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { Zap, CheckCircle, AlertTriangle, FileText, ExternalLink, ChevronDown, ChevronUp, HelpCircle, Wrench, User, Sparkles, Info, Loader2, ShieldAlert } from 'lucide-react';
+import { Zap, CheckCircle, AlertTriangle, FileText, ExternalLink, ChevronDown, ChevronUp, HelpCircle, Wrench, User, Sparkles, Info, Loader2, ShieldAlert, Copy, Check } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/utils/cn';
 import { Tooltip } from '../ui/Tooltip';
@@ -14,6 +14,8 @@ export interface AiAnalysis {
   issueId: string;
   suggestionType: string;
   value: string | null;
+  /** Long-form alt text, only ever set on a requiresManualReview alt-text suggestion the fallback Alt-Text Generator drafted -- a copy-into-Acrobat-Pro aid, never auto-applied. */
+  extendedAlt?: string | null;
   guidance: string | null;
   confidence: number;
   rationale: string;
@@ -91,6 +93,45 @@ function AutoApprovedBadge({ approvedBy }: { approvedBy: AiAnalysis['approvedBy'
     <span className="ml-1 px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] font-semibold">
       Auto-approved
     </span>
+  );
+}
+
+/**
+ * Short/long AI-drafted alt text shown on a manual-review decline -- never
+ * editable and never auto-applied (the suggestion stays guidance-only), just
+ * a draft the operator copies into Acrobat Pro.
+ */
+function CopyableAltTextBlock({ label, text }: { label: string; text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Clipboard access can be denied/unavailable (older desktop apps, some
+      // app webviews) -- the text is still visible and selectable, so this
+      // is a degraded-but-usable failure, not worth surfacing an error for.
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="bg-white border border-amber-200 rounded p-1.5">
+      <div className="flex items-center justify-between gap-2 mb-0.5">
+        <span className="text-[10px] font-medium text-amber-700 uppercase tracking-wide">{label}</span>
+        <button
+          type="button"
+          className="flex items-center gap-1 text-[10px] text-amber-700 hover:text-amber-900 flex-shrink-0"
+          onClick={handleCopy}
+        >
+          {copied ? <Check size={11} /> : <Copy size={11} />}
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <p className="text-amber-900 leading-relaxed">{text}</p>
+    </div>
   );
 }
 
@@ -402,6 +443,12 @@ export function IssueCard({
                 <p className="text-amber-700 mt-0.5 leading-relaxed">
                   {aiSuggestion.guidance || 'This issue requires a subject matter expert to review and remediate.'}
                 </p>
+                {(aiSuggestion.value || aiSuggestion.extendedAlt) && (
+                  <div className="mt-2 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                    {aiSuggestion.value && <CopyableAltTextBlock label="Short alt text" text={aiSuggestion.value} />}
+                    {aiSuggestion.extendedAlt && <CopyableAltTextBlock label="Long description" text={aiSuggestion.extendedAlt} />}
+                  </div>
+                )}
               </div>
             </div>
           ) : aiSuggestion.applyMode === 'auto-resolve' ? (
