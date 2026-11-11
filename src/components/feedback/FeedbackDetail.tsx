@@ -8,7 +8,7 @@ import { AttachmentList } from './AttachmentList';
 import { AttachmentUploader } from './AttachmentUploader';
 import { feedbackAttachmentService } from '@/services/feedback-attachment.service';
 import { useAuthStore } from '@/stores/auth.store';
-import type { FeedbackItem, FeedbackStatus, FeedbackAttachment } from '@/types/feedback.types';
+import type { FeedbackItem, FeedbackStatus, FeedbackSeverity, FeedbackAttachment } from '@/types/feedback.types';
 
 interface FeedbackDetailProps {
   item: FeedbackItem;
@@ -23,6 +23,14 @@ const STATUS_OPTIONS: { value: FeedbackStatus; label: string }[] = [
   { value: 'IN_PROGRESS', label: 'In Progress' },
   { value: 'RESOLVED', label: 'Resolved' },
   { value: 'DISMISSED', label: 'Dismissed' },
+];
+
+const SEVERITY_OPTIONS: { value: FeedbackSeverity | ''; label: string }[] = [
+  { value: '', label: 'Not specified' },
+  { value: 'CRITICAL', label: '🔴 Critical' },
+  { value: 'HIGH', label: '🟠 High' },
+  { value: 'MEDIUM', label: '🟡 Medium' },
+  { value: 'LOW', label: '⚪ Low' },
 ];
 
 const STATUS_VARIANTS: Record<FeedbackStatus, 'default' | 'info' | 'warning' | 'success' | 'error'> = {
@@ -50,6 +58,7 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
   onStatusUpdate,
 }) => {
   const [status, setStatus] = useState<FeedbackStatus>(item.status);
+  const [severity, setSeverity] = useState<FeedbackSeverity | ''>(item.severity ?? '');
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -62,6 +71,10 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
   useEffect(() => {
     setStatus(item.status);
   }, [item.status]);
+
+  useEffect(() => {
+    setSeverity(item.severity ?? '');
+  }, [item.severity]);
 
   useEffect(() => {
     setAttachments(item.attachments || []);
@@ -142,7 +155,7 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
     setSuccess(false);
 
     try {
-      await api.patch(`/feedback/${item.id}`, { status: newStatus });
+      await api.patch(`/feedback/${item.id}`, { status: newStatus, severity: severity || undefined });
       setStatus(newStatus);
       setSuccess(true);
       onStatusUpdate?.(item.id, newStatus);
@@ -154,7 +167,29 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
     } finally {
       setIsUpdating(false);
     }
-  }, [item.id, onStatusUpdate]);
+  }, [item.id, severity, onStatusUpdate]);
+
+  const handleSeverityChange = useCallback(async (newSeverity: FeedbackSeverity | '') => {
+    setIsUpdating(true);
+    setError(null);
+    setSuccess(false);
+
+    try {
+      // The PATCH endpoint requires `status` on every call -- send the
+      // current one unchanged, same pattern as handleStatusChange sending
+      // the current severity.
+      await api.patch(`/feedback/${item.id}`, { status, severity: newSeverity || undefined });
+      setSeverity(newSeverity);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 2000);
+    } catch (err: unknown) {
+      console.error('[FeedbackDetail] Failed to update severity:', err);
+      setError('Failed to update severity');
+      setTimeout(() => setError(null), 3000);
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [item.id, status]);
 
   if (!isOpen) return null;
 
@@ -270,6 +305,23 @@ export const FeedbackDetail: React.FC<FeedbackDetailProps> = ({
               <Badge variant={STATUS_VARIANTS[status]}>
                 Current: {status.replace(/_/g, ' ')}
               </Badge>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-sm font-medium text-gray-700 mb-2">Severity</p>
+            <div className="flex items-center gap-2">
+              <select
+                value={severity}
+                onChange={(e) => handleSeverityChange(e.target.value as FeedbackSeverity | '')}
+                disabled={isUpdating}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50"
+              >
+                {SEVERITY_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              {isUpdating && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
             </div>
           </div>
 

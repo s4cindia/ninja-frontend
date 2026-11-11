@@ -8,11 +8,20 @@ import { api } from '@/services/api';
 
 type FeedbackType = 'ACCESSIBILITY_ISSUE' | 'ALT_TEXT_QUALITY' | 'AUDIT_ACCURACY' | 'REMEDIATION_SUGGESTION' | 'GENERAL' | 'BUG_REPORT' | 'FEATURE_REQUEST';
 type FeedbackStatus = 'NEW' | 'REVIEWED' | 'IN_PROGRESS' | 'RESOLVED' | 'DISMISSED';
+type FeedbackSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+
+const SEVERITY_BADGE: Record<FeedbackSeverity, string> = {
+  CRITICAL: '🔴 Critical',
+  HIGH: '🟠 High',
+  MEDIUM: '🟡 Medium',
+  LOW: '⚪ Low',
+};
 
 export interface AttentionItem {
   id: string;
   type: FeedbackType;
   status: FeedbackStatus;
+  severity?: FeedbackSeverity | null;
   comment: string;
   isPositive: boolean | null;
   createdAt: string;
@@ -145,6 +154,11 @@ export const RequiringAttention: React.FC<RequiringAttentionProps> = ({
                       <Badge variant={item.status === 'NEW' ? 'info' : 'warning'} size="sm">
                         {item.status}
                       </Badge>
+                      {item.severity && (
+                        <span className="text-xs font-medium text-gray-600">
+                          {SEVERITY_BADGE[item.severity]}
+                        </span>
+                      )}
                       <span className="text-xs text-gray-500">
                         {formatTimeAgo(item.createdAt)}
                       </span>

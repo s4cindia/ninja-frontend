@@ -16,6 +16,7 @@ function notificationIcon(type: Notification['type']): string {
   if (type === 'BATCH_COMPLETED' || type === 'JOB_COMPLETED') return '✅';
   if (type === 'SYSTEM_ALERT' || type === 'TEAM_REVIEW_NEEDS_CORRECTION') return '⚠️';
   if (type === 'TEAM_REVIEW_RESUBMIT_REQUESTED') return '🔄';
+  if (type === 'FEEDBACK_STATUS_CHANGED') return '📋';
   return '❌';
 }
 

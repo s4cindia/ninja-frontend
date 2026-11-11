@@ -1,9 +1,10 @@
-import React, { useState, useCallback } from 'react';
-import { Send, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import React, { useState, useCallback, useId } from 'react';
+import { Send, Loader2, CheckCircle, AlertCircle, Paperclip, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { api } from '@/services/api';
+import { feedbackAttachmentService } from '@/services/feedback-attachment.service';
 
-type FeedbackType = 
+type FeedbackType =
   | 'ACCESSIBILITY_ISSUE'
   | 'ALT_TEXT_QUALITY'
   | 'AUDIT_ACCURACY'
@@ -11,6 +12,8 @@ type FeedbackType =
   | 'GENERAL'
   | 'BUG_REPORT'
   | 'FEATURE_REQUEST';
+
+type FeedbackSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 
 interface FeedbackFormProps {
   prefillType?: FeedbackType;
@@ -32,6 +35,27 @@ const FEEDBACK_TYPE_OPTIONS: { value: FeedbackType; label: string }[] = [
   { value: 'FEATURE_REQUEST', label: 'Feature Request' },
 ];
 
+const SEVERITY_OPTIONS: { value: FeedbackSeverity | ''; label: string }[] = [
+  { value: '', label: 'Not specified' },
+  { value: 'CRITICAL', label: '🔴 Critical — blocks the workflow entirely' },
+  { value: 'HIGH', label: '🟠 High — wrong or misleading result' },
+  { value: 'MEDIUM', label: '🟡 Medium — confusing or awkward' },
+  { value: 'LOW', label: '⚪ Low — cosmetic / nice-to-have' },
+];
+
+const MAX_ATTACHMENTS = 5;
+const MAX_ATTACHMENT_MB = 10;
+
+// Every job id in this app is a UUID that appears verbatim in the URL
+// (e.g. /pdf/audit/<jobId>, /epub/remediate/<jobId>) -- pulling it out with
+// a generic UUID match is simpler and more maintainable than hardcoding
+// every route pattern that happens to carry one.
+const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+function extractJobIdFromPath(pathname: string): string | undefined {
+  return pathname.match(UUID_PATTERN)?.[0];
+}
+
 export const FeedbackForm: React.FC<FeedbackFormProps> = ({
   prefillType = 'GENERAL',
   prefillContext = '',
@@ -41,12 +65,39 @@ export const FeedbackForm: React.FC<FeedbackFormProps> = ({
   onCancel,
   showCancelButton = false,
 }) => {
+  const attachmentInputId = useId();
   const [type, setType] = useState<FeedbackType>(prefillType);
+  const [severity, setSeverity] = useState<FeedbackSeverity | ''>('');
   const [message, setMessage] = useState('');
   const [context, setContext] = useState(prefillContext || `Page: ${window.location.pathname}`);
+  const [files, setFiles] = useState<File[]>([]);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [attachmentWarning, setAttachmentWarning] = useState<string | null>(null);
+
+  const handleFileSelect = useCallback((selected: FileList | null) => {
+    if (!selected) return;
+    const incoming = Array.from(selected);
+
+    if (incoming.length + files.length > MAX_ATTACHMENTS) {
+      setAttachmentError(`Maximum ${MAX_ATTACHMENTS} files allowed (${files.length} already selected)`);
+      return;
+    }
+    const tooLarge = incoming.find((f) => f.size > MAX_ATTACHMENT_MB * 1024 * 1024);
+    if (tooLarge) {
+      setAttachmentError(`File too large: ${tooLarge.name} (max ${MAX_ATTACHMENT_MB}MB)`);
+      return;
+    }
+
+    setAttachmentError(null);
+    setFiles((prev) => [...prev, ...incoming]);
+  }, [files.length]);
+
+  const removeFile = useCallback((index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  }, []);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,13 +109,22 @@ export const FeedbackForm: React.FC<FeedbackFormProps> = ({
 
     setIsSubmitting(true);
     setErrorMessage(null);
+    setAttachmentWarning(null);
 
     try {
+      const jobId = extractJobIdFromPath(window.location.pathname);
+      const contextPayload: Record<string, unknown> = { page: window.location.pathname };
+      if (jobId) contextPayload.jobId = jobId;
+
       const payload: Record<string, unknown> = {
         type,
         comment: message.trim(),
-        context: { page: window.location.pathname },
+        context: contextPayload,
       };
+
+      if (severity) {
+        payload.severity = severity;
+      }
 
       if (context.trim() && context.trim() !== `Page: ${window.location.pathname}`) {
         (payload.context as Record<string, string>).details = context.trim();
@@ -82,12 +142,26 @@ export const FeedbackForm: React.FC<FeedbackFormProps> = ({
         console.log('[FeedbackForm] Submitting payload:', JSON.stringify(payload, null, 2));
       }
 
-      await api.post('/feedback', payload);
+      const response = await api.post('/feedback', payload);
+      const createdId: string | undefined = response.data?.data?.id;
+
+      if (files.length > 0 && createdId) {
+        try {
+          await feedbackAttachmentService.upload(createdId, files);
+        } catch (attachErr) {
+          console.error('[FeedbackForm] Attachment upload failed (feedback itself was saved):', attachErr);
+          setAttachmentWarning(
+            'Your feedback was submitted, but one or more attachments failed to upload. You can add them later from the Feedback Dashboard.'
+          );
+        }
+      }
 
       setSubmitStatus('success');
       setMessage('');
       setContext(`Page: ${window.location.pathname}`);
       setType('GENERAL');
+      setSeverity('');
+      setFiles([]);
 
       setTimeout(() => {
         setSubmitStatus('idle');
@@ -95,25 +169,25 @@ export const FeedbackForm: React.FC<FeedbackFormProps> = ({
       }, 2000);
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: unknown; status?: number }; message?: string };
-      
+
       console.error('[FeedbackForm] Backend error response:', axiosError.response?.data);
       console.error('[FeedbackForm] Status:', axiosError.response?.status);
       console.error('[FeedbackForm] Full error:', err);
-      
+
       const responseData = axiosError.response?.data as { error?: string; message?: string; details?: string } | undefined;
-      const errorMsg = responseData?.error 
-        || responseData?.message 
+      const errorMsg = responseData?.error
+        || responseData?.message
         || responseData?.details
         || axiosError.message
         || 'Failed to submit feedback. Please try again.';
-      
+
       setSubmitStatus('error');
       setErrorMessage(errorMsg);
       setTimeout(() => setSubmitStatus('idle'), 5000);
     } finally {
       setIsSubmitting(false);
     }
-  }, [type, message, context, entityType, entityId, onSuccess]);
+  }, [type, severity, message, context, entityType, entityId, files, onSuccess]);
 
   if (submitStatus === 'success') {
     return (
@@ -123,6 +197,9 @@ export const FeedbackForm: React.FC<FeedbackFormProps> = ({
         <p className="text-sm text-gray-600 mt-1">
           Your feedback has been submitted successfully.
         </p>
+        {attachmentWarning && (
+          <p className="text-sm text-amber-600 mt-2 max-w-sm">{attachmentWarning}</p>
+        )}
       </div>
     );
   }
@@ -151,8 +228,29 @@ export const FeedbackForm: React.FC<FeedbackFormProps> = ({
       </div>
 
       <div>
-        <label 
-          htmlFor="feedback-message" 
+        <label
+          htmlFor="feedback-severity"
+          className="block text-sm font-medium text-gray-700 mb-1"
+        >
+          Severity <span className="text-gray-400">(optional)</span>
+        </label>
+        <select
+          id="feedback-severity"
+          value={severity}
+          onChange={(e) => setSeverity(e.target.value as FeedbackSeverity | '')}
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+        >
+          {SEVERITY_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label
+          htmlFor="feedback-message"
           className="block text-sm font-medium text-gray-700 mb-1"
         >
           Message <span className="text-red-500">*</span>
@@ -183,6 +281,46 @@ export const FeedbackForm: React.FC<FeedbackFormProps> = ({
           placeholder="Additional context (auto-filled with current page)"
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
         />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Attachments <span className="text-gray-400">(optional)</span>
+        </label>
+        <input
+          id={attachmentInputId}
+          type="file"
+          multiple
+          onChange={(e) => handleFileSelect(e.target.files)}
+          className="hidden"
+        />
+        <label
+          htmlFor={attachmentInputId}
+          className="flex items-center gap-2 text-sm text-gray-600 border border-dashed border-gray-300 rounded-md px-3 py-2 cursor-pointer hover:border-gray-400"
+        >
+          <Paperclip className="h-4 w-4 flex-shrink-0" />
+          Attach a screenshot or file (max {MAX_ATTACHMENTS}, {MAX_ATTACHMENT_MB}MB each)
+        </label>
+        {attachmentError && (
+          <p className="text-xs text-red-600 mt-1">{attachmentError}</p>
+        )}
+        {files.length > 0 && (
+          <ul className="mt-2 space-y-1">
+            {files.map((file, index) => (
+              <li key={`${file.name}-${index}`} className="flex items-center justify-between text-xs bg-gray-50 rounded px-2 py-1">
+                <span className="truncate">{file.name}</span>
+                <button
+                  type="button"
+                  onClick={() => removeFile(index)}
+                  className="text-gray-400 hover:text-red-600 flex-shrink-0 ml-2"
+                  aria-label={`Remove ${file.name}`}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {errorMessage && (
