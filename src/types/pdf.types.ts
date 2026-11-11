@@ -181,6 +181,15 @@ export interface PdfAuditResult {
    * Always present (possibly empty) alongside isOwner.
    */
   teamReviews?: TeamReviewRecord[];
+  /**
+   * True when teamReviews[0].outcome === 'NEEDS_CORRECTION' -- the job is
+   * blocked from shipment (its download/export endpoints return 403
+   * BLOCKED_NEEDS_CORRECTION) until a later review records OK. Computed
+   * server-side from the same most-recent-review rule as
+   * review-gate.service.ts's getActiveReviewBlock; always present alongside
+   * isOwner/teamReviews.
+   */
+  reviewBlocked?: boolean;
 }
 
 /**

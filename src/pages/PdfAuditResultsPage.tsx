@@ -96,6 +96,8 @@ import { deriveCurrentRoundPhase } from '@/utils/autoModeRoundPhase';
 import type { ComparisonTrialMode } from '@/types/comparisonStudy.types';
 import type { PdfAuditResult, PdfAuditIssue } from '@/types/pdf.types';
 import { TeamReviewPanel } from '@/components/pdf/TeamReviewPanel';
+import { OwnerReviewBlockedBanner } from '@/components/pdf/OwnerReviewBlockedBanner';
+import { isReviewBlockedError } from '@/services/team.service';
 import type { IssueSeverity } from '@/types/accessibility.types';
 import type { ScanLevel } from '@/types/scan-level.types';
 
@@ -1416,8 +1418,12 @@ export const PdfAuditResultsPage: React.FC = () => {
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
       toast.success('Download started');
-    } catch {
-      toast.error('Remediated PDF not available — apply at least one AI fix first');
+    } catch (err) {
+      toast.error(
+        isReviewBlockedError(err)
+          ? getErrorMessage(err)
+          : 'Remediated PDF not available — apply at least one AI fix first'
+      );
     } finally {
       setIsDownloadingRemediated(false);
     }
@@ -1639,7 +1645,8 @@ export const PdfAuditResultsPage: React.FC = () => {
                 variant="outline"
                 size="sm"
                 onClick={handleDownloadRemediatedPdf}
-                disabled={isDownloadingRemediated}
+                disabled={isDownloadingRemediated || auditResult.reviewBlocked}
+                title={auditResult.reviewBlocked ? 'Blocked: the most recent QC review flagged this job as needing correction' : undefined}
               >
                 {isDownloadingRemediated
                   ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Downloading…</>
@@ -1885,6 +1892,10 @@ export const PdfAuditResultsPage: React.FC = () => {
           teamReviews={auditResult.teamReviews ?? []}
           onSubmitted={fetchAuditResult}
         />
+      )}
+
+      {auditResult.isOwner === true && auditResult.reviewBlocked && auditResult.teamReviews?.[0] && (
+        <OwnerReviewBlockedBanner jobId={jobId!} latestReview={auditResult.teamReviews[0]} />
       )}
 
       {/* Matterhorn Summary */}

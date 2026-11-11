@@ -30,8 +30,9 @@ export interface Team {
   members?: TeamMembership[];
 }
 
-// A Team Leader's non-blocking spot-check of a job they don't own -- an
-// audit-trail write, never a gate on the owning Executive's own flow.
+// A Team Leader's spot-check of a job they don't own. The most recent
+// review gates shipment: NEEDS_CORRECTION blocks the job's download/export
+// endpoints (403 BLOCKED_NEEDS_CORRECTION) until a later review records OK.
 // Job-type-agnostic (PDF or EPUB) -- see team-review.routes.ts.
 export type TeamReviewOutcome = 'OK' | 'NEEDS_CORRECTION';
 
@@ -75,4 +76,8 @@ export interface TeamJob {
   product?: { id: string; title: string } | null;
   userId: string;
   documentId?: string;
+  /** True when the job's most recent TeamReview is NEEDS_CORRECTION --
+   * it's blocked from shipment. Only present when the server computed it
+   * (GET /jobs/team only; see job.controller.ts's respondWithJobList). */
+  reviewBlocked?: boolean;
 }
