@@ -13,6 +13,7 @@ import type {
   QualityReportFilters,
   StuckIssuesResponse,
   ScoreTrend,
+  JobReviewStatus,
 } from '@/types/reports.types';
 
 export type TeamActivityScope = 'admin' | 'self';
@@ -87,6 +88,15 @@ export const reportsService = {
   // belongs to another tenant (same guard as the cost drill-down).
   async getScoreTrend(jobId: string): Promise<ScoreTrend> {
     const res = await api.get<ApiResponse<ScoreTrend>>(`/admin/reports/quality/${jobId}/score-trend`);
+    return res.data.data;
+  },
+
+  // GET /admin/reports/jobs/:jobId/review-status -- same TeamReview
+  // history/gate state as PdfAuditResultsPage's audit-result endpoint and
+  // MyTeamPage's team-jobs listing, for the job drill-down dialog. 404s if
+  // the job doesn't exist or belongs to another tenant.
+  async getJobReviewStatus(jobId: string): Promise<JobReviewStatus> {
+    const res = await api.get<ApiResponse<JobReviewStatus>>(`/admin/reports/jobs/${jobId}/review-status`);
     return res.data.data;
   },
 };
