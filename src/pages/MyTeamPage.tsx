@@ -9,7 +9,7 @@ import { TeamActivitySection } from '@/components/reports/TeamActivitySection';
 import type { TeamJob } from '@/types/team.types';
 import { getJobTypeLabel, extractFileNameFromJob } from '@/utils/jobTypes';
 import { getStatusIcon, getStatusBadgeClass, formatRelativeTime } from '@/utils/jobHelpers';
-import { AlertCircle, ChevronLeft, ChevronRight, Eye, UsersRound, X } from 'lucide-react';
+import { AlertCircle, AlertTriangle, ChevronLeft, ChevronRight, Eye, UsersRound, X } from 'lucide-react';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -175,12 +175,23 @@ export default function MyTeamPage() {
                         <div className="text-sm text-gray-600">{getJobTypeLabel(job.type)}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-sm font-medium ${getStatusBadgeClass(job.status)}`}
-                        >
-                          {getStatusIcon(job.status)}
-                          {job.status}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-sm font-medium ${getStatusBadgeClass(job.status)}`}
+                          >
+                            {getStatusIcon(job.status)}
+                            {job.status}
+                          </span>
+                          {job.reviewBlocked && (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700"
+                              title="Blocked from shipment: most recent review is Needs Correction"
+                            >
+                              <AlertTriangle className="h-3 w-3" />
+                              Blocked
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {/* The team-jobs endpoint only returns the owner's raw

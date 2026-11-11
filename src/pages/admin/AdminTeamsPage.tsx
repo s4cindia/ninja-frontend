@@ -160,7 +160,8 @@ export default function AdminTeamsPage() {
         <p className="text-sm text-gray-500 mt-1">
           Production-oversight teams (Executive / Team Leader / Viewer) — orthogonal to
           platform roles. A Team Leader or Viewer can see their teammates' jobs under
-          "My Team"; a Team Leader can also leave a non-blocking spot-check review.
+          "My Team"; a Team Leader can also leave a spot-check review, and a Needs
+          Correction verdict blocks that job from shipment until a follow-up review clears it.
         </p>
       </div>
 

@@ -39,6 +39,36 @@ describe('TeamReviewPanel', () => {
     expect(screen.getByRole('button', { name: /submit review/i })).toBeInTheDocument();
   });
 
+  it('shows the blocked banner when the most recent (first) review is NEEDS_CORRECTION', () => {
+    render(
+      <TeamReviewPanel
+        jobId="job-123"
+        teamReviews={[
+          mockReview({ id: 'review-2', outcome: 'NEEDS_CORRECTION' }),
+          mockReview({ id: 'review-1', outcome: 'OK' }),
+        ]}
+        onSubmitted={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText(/blocked from shipment/i)).toBeInTheDocument();
+  });
+
+  it('does not show the blocked banner when the most recent review is OK (even if an earlier one was NEEDS_CORRECTION)', () => {
+    render(
+      <TeamReviewPanel
+        jobId="job-123"
+        teamReviews={[
+          mockReview({ id: 'review-2', outcome: 'OK' }),
+          mockReview({ id: 'review-1', outcome: 'NEEDS_CORRECTION' }),
+        ]}
+        onSubmitted={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByText(/blocked from shipment/i)).not.toBeInTheDocument();
+  });
+
   it('renders existing review history with reviewer name, outcome, and notes', () => {
     render(
       <TeamReviewPanel

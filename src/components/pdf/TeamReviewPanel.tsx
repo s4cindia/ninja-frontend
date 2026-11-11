@@ -2,12 +2,14 @@
  * TeamReviewPanel
  *
  * Shown on the PDF audit results page only when the viewer doesn't own the
- * job (auditResult.isOwner === false) -- a Team Leader's non-blocking
- * spot-check of a teammate's job, never a gate on the owning Executive's
- * own flow. The submit form is rendered for anyone who reaches this page
- * without owning the job (TEAM_LEADER, or an ADMIN), since there is no
- * client-side way to distinguish a TEAM_LEADER from a VIEWER teammate --
- * both read-access tiers land here with isOwner: false. A VIEWER's submit
+ * job (auditResult.isOwner === false) -- a Team Leader's spot-check of a
+ * teammate's job. The most recent review (teamReviews[0], newest first)
+ * gates shipment: NEEDS_CORRECTION blocks the job's download/export
+ * endpoints until a later review records OK -- see review-gate.service.ts.
+ * The submit form is rendered for anyone who reaches this page without
+ * owning the job (TEAM_LEADER, or an ADMIN), since there is no client-side
+ * way to distinguish a TEAM_LEADER from a VIEWER teammate -- both
+ * read-access tiers land here with isOwner: false. A VIEWER's submit
  * attempt is left to fail server-side with a clear error toast (the
  * backend's own message: "Only a Team Leader may write a review for this
  * job") rather than guessed around on the frontend.
@@ -49,6 +51,7 @@ export function TeamReviewPanel({ jobId, teamReviews, onSubmitted }: TeamReviewP
   const [outcome, setOutcome] = useState<TeamReviewOutcome>('OK');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const isBlocked = teamReviews[0]?.outcome === 'NEEDS_CORRECTION';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,8 +77,19 @@ export function TeamReviewPanel({ jobId, teamReviews, onSubmitted }: TeamReviewP
           <h3 className="text-sm font-semibold text-gray-900">Team Review</h3>
         </div>
         <p className="text-xs text-gray-500 mb-3">
-          A spot-check review from a teammate — informational, not a gate on this job.
+          A spot-check review from a teammate. A Needs Correction verdict blocks this job from
+          shipment until a follow-up review records OK.
         </p>
+
+        {isBlocked && (
+          <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+            <p className="text-sm text-amber-800">
+              This job is currently <span className="font-medium">blocked from shipment</span> by
+              the most recent review below.
+            </p>
+          </div>
+        )}
 
         {teamReviews.length > 0 && (
           <ul className="mb-4 space-y-2">

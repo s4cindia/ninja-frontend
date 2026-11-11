@@ -48,6 +48,18 @@ export const teamService = {
     );
     return res.data.data;
   },
+
+  // POST /jobs/:jobId/team-review/request-review -- owner/ADMIN-only. A
+  // notification nudge to the job's Team Leader(s) (typically sent after
+  // addressing a NEEDS_CORRECTION), not a TeamReview write -- it leaves no
+  // audit row of its own.
+  async requestReview(jobId: string, notes?: string): Promise<{ notified: number }> {
+    const res = await api.post<ApiResponse<{ notified: number }>>(
+      `/jobs/${encodeURIComponent(jobId)}/team-review/request-review`,
+      { notes }
+    );
+    return res.data.data;
+  },
 };
 
 export interface TeamReviewSubmitResponse {
@@ -66,4 +78,14 @@ export function isNotTeamLeaderOrViewerError(error: unknown): boolean {
   if (!axios.isAxiosError(error) || error.response?.status !== 403) return false;
   const data = error.response.data as { error?: { code?: string } } | undefined;
   return data?.error?.code === 'NOT_TEAM_LEADER_OR_VIEWER';
+}
+
+// True when `error` is the specific 403 the shipment endpoints
+// (remediation/download, EPUB download-remediated/export) return when the
+// job's most recent TeamReview is NEEDS_CORRECTION -- lets the frontend
+// show the real reason instead of a generic "not available" message.
+export function isReviewBlockedError(error: unknown): boolean {
+  if (!axios.isAxiosError(error) || error.response?.status !== 403) return false;
+  const data = error.response.data as { error?: { code?: string } } | undefined;
+  return data?.error?.code === 'BLOCKED_NEEDS_CORRECTION';
 }

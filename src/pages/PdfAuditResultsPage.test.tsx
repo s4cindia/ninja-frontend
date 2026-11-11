@@ -1392,6 +1392,23 @@ describe('PdfAuditResultsPage', () => {
         expect(screen.queryByRole('button', { name: /Download AI-Fixed PDF/ })).not.toBeInTheDocument();
       });
     });
+
+    it('disables the button when the job is reviewBlocked (QC NEEDS_CORRECTION gate)', async () => {
+      const mockResult = createMockAuditResult({ reviewBlocked: true });
+
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve(mockAiResponse([
+          { issueId: '1', applyMode: 'apply-to-pdf', status: 'applied' },
+        ]));
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      expect(await screen.findByRole('button', { name: /Download AI-Fixed PDF/ })).toBeDisabled();
+    });
   });
 
   describe('Post-fix validation completion refreshes the full page', () => {
@@ -3853,6 +3870,73 @@ describe('PdfAuditResultsPage', () => {
 
       const getCallsAfter = mockApi.get.mock.calls.filter((c) => String(c[0]).includes('/audit/result')).length;
       expect(getCallsAfter).toBeGreaterThan(getCallsBefore);
+    });
+  });
+
+  describe('Owner review-blocked banner', () => {
+    function mockGetsFor(auditResultOverrides: Partial<PdfAuditResult>) {
+      const mockResult = createMockAuditResult(auditResultOverrides);
+      mockApi.get.mockImplementation((url: string) => {
+        if (url.includes('/audit/result')) return Promise.resolve({ data: { data: mockResult } });
+        if (url.includes('/auto-tag/status')) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url.includes('/ai-analysis')) return Promise.resolve({ data: { data: { suggestions: [], analyzed: 0, total: 0, status: 'complete' } } });
+        if (url.startsWith('/jobs/')) return Promise.resolve({ data: { data: { output: {} } } });
+        return Promise.resolve({ data: { data: {} } });
+      });
+      return mockResult;
+    }
+
+    const blockedReview = {
+      id: 'review-1',
+      jobId: 'job-123',
+      reviewedBy: 'leader-1',
+      reviewedAt: '2026-11-01T00:00:00Z',
+      outcome: 'NEEDS_CORRECTION' as const,
+      notes: 'fix the alt text',
+      reviewer: { id: 'leader-1', firstName: 'Lee', lastName: 'Leader', email: 'lee@example.com' },
+    };
+
+    it('shows the banner to the owner when reviewBlocked is true', async () => {
+      mockGetsFor({ isOwner: true, reviewBlocked: true, teamReviews: [blockedReview] });
+
+      renderWithRouter('job-123');
+
+      expect(await screen.findByText(/blocked from shipment/i)).toBeInTheDocument();
+      expect(screen.getByText('fix the alt text')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /request re-review/i })).toBeInTheDocument();
+    });
+
+    it('hides the banner when reviewBlocked is false, even for the owner', async () => {
+      mockGetsFor({ isOwner: true, reviewBlocked: false, teamReviews: [] });
+
+      renderWithRouter('job-123');
+
+      await screen.findByText('test-document.pdf');
+      expect(screen.queryByText(/blocked from shipment/i)).not.toBeInTheDocument();
+    });
+
+    it('never shows the owner banner to a non-owner (that\'s the Team Review Panel\'s job)', async () => {
+      mockGetsFor({ isOwner: false, reviewBlocked: true, teamReviews: [blockedReview] });
+
+      renderWithRouter('job-123');
+
+      await screen.findByText('Team Review');
+      expect(screen.queryByRole('button', { name: /request re-review/i })).not.toBeInTheDocument();
+    });
+
+    it('requests a re-review via the real team.service endpoint', async () => {
+      mockGetsFor({ isOwner: true, reviewBlocked: true, teamReviews: [blockedReview] });
+      mockApi.post.mockResolvedValueOnce({ data: { data: { notified: 1 } } });
+
+      renderWithRouter('job-123');
+      await screen.findByRole('button', { name: /request re-review/i });
+
+      fireEvent.click(screen.getByRole('button', { name: /request re-review/i }));
+
+      await waitFor(() =>
+        expect(mockApi.post).toHaveBeenCalledWith('/jobs/job-123/team-review/request-review', { notes: undefined })
+      );
+      await waitFor(() => expect(screen.getByRole('button', { name: /requested/i })).toBeDisabled());
     });
   });
 });
