@@ -703,4 +703,70 @@ describe('IssueCard', () => {
       expect(screen.queryByRole('button', { name: 'Why did this fail?' })).not.toBeInTheDocument();
     });
   });
+
+  describe('Manual review with AI-drafted alt text (fallback Alt-Text Generator)', () => {
+    const mockManualReviewSuggestion: AiAnalysis = {
+      id: 'ai-2',
+      jobId: 'job-1',
+      issueId: 'pdf-issue-1',
+      suggestionType: 'alt-text',
+      value: null,
+      guidance: 'This equation requires a subject matter expert to write an accurate description.',
+      confidence: 0,
+      rationale: 'Image classified as equation (complex)',
+      model: 'gemini-flash',
+      applyMode: 'guidance-only',
+      requiresManualReview: true,
+      status: 'pending',
+      createdAt: '2024-01-15T10:00:00Z',
+      updatedAt: '2024-01-15T10:00:00Z',
+    };
+
+    it('shows both copyable short and long alt text when the fallback generator produced both', () => {
+      renderWithQuery(
+        <IssueCard
+          issue={mockPdfIssue}
+          jobId="job-1"
+          aiSuggestion={{
+            ...mockManualReviewSuggestion,
+            value: 'Quadratic formula showing x equals...',
+            extendedAlt: 'A multi-line derivation of the quadratic formula.',
+          }}
+        />
+      );
+
+      expect(screen.getByText('Manual Review Required')).toBeInTheDocument();
+      expect(screen.getByText('Short alt text')).toBeInTheDocument();
+      expect(screen.getByText('Quadratic formula showing x equals...')).toBeInTheDocument();
+      expect(screen.getByText('Long description')).toBeInTheDocument();
+      expect(screen.getByText('A multi-line derivation of the quadratic formula.')).toBeInTheDocument();
+    });
+
+    it('shows only the plain guidance text, no copy blocks, when the fallback generator produced nothing (e.g. PRH gate blocked it)', () => {
+      renderWithQuery(<IssueCard issue={mockPdfIssue} jobId="job-1" aiSuggestion={mockManualReviewSuggestion} />);
+
+      expect(screen.getByText('Manual Review Required')).toBeInTheDocument();
+      expect(screen.getByText(mockManualReviewSuggestion.guidance!)).toBeInTheDocument();
+      expect(screen.queryByText('Short alt text')).not.toBeInTheDocument();
+      expect(screen.queryByText('Long description')).not.toBeInTheDocument();
+    });
+
+    it('copies the short alt text to the clipboard when its Copy button is clicked', async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { writeText } });
+
+      renderWithQuery(
+        <IssueCard
+          issue={mockPdfIssue}
+          jobId="job-1"
+          aiSuggestion={{ ...mockManualReviewSuggestion, value: 'Quadratic formula showing x equals...' }}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /Copy/ }));
+
+      await waitFor(() => expect(writeText).toHaveBeenCalledWith('Quadratic formula showing x equals...'));
+      expect(await screen.findByText('Copied')).toBeInTheDocument();
+    });
+  });
 });
