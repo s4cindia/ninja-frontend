@@ -15,11 +15,13 @@ import { api } from '@/services/api';
 
 type FeedbackType = 'ACCESSIBILITY_ISSUE' | 'ALT_TEXT_QUALITY' | 'AUDIT_ACCURACY' | 'REMEDIATION_SUGGESTION' | 'GENERAL' | 'BUG_REPORT' | 'FEATURE_REQUEST';
 type FeedbackStatus = 'NEW' | 'REVIEWED' | 'IN_PROGRESS' | 'RESOLVED' | 'DISMISSED';
+type FeedbackSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 
 interface DashboardStats {
   total: number;
   byType: Record<string, number>;
   byStatus: Record<string, number>;
+  bySeverity: Record<string, number>;
   positiveCount: number;
   negativeCount: number;
   responseRate: number;
@@ -42,6 +44,12 @@ const generateDemoStats = (): DashboardStats => ({
     IN_PROGRESS: 15,
     RESOLVED: 48,
     DISMISSED: 10,
+  },
+  bySeverity: {
+    CRITICAL: 4,
+    HIGH: 12,
+    MEDIUM: 18,
+    LOW: 9,
   },
   positiveCount: 89,
   negativeCount: 38,
@@ -82,10 +90,12 @@ export const FeedbackDashboard: React.FC = () => {
   const [filters, setFilters] = useState<{
     type: FeedbackType | 'ALL';
     status: FeedbackStatus | 'ALL';
+    severity: FeedbackSeverity | 'ALL';
     rating: 'positive' | 'negative' | 'all';
   }>({
     type: 'ALL',
     status: 'ALL',
+    severity: 'ALL',
     rating: 'all',
   });
   const [selectedItem, setSelectedItem] = useState<FeedbackItem | null>(null);
@@ -120,6 +130,7 @@ export const FeedbackDashboard: React.FC = () => {
         });
         if (filters.type !== 'ALL') params.append('type', filters.type);
         if (filters.status !== 'ALL') params.append('status', filters.status);
+        if (filters.severity !== 'ALL') params.append('severity', filters.severity);
         if (filters.rating !== 'all') params.append('rating', filters.rating);
         params.append('sortBy', sortField);
         params.append('sortOrder', sortDirection);
@@ -252,7 +263,7 @@ export const FeedbackDashboard: React.FC = () => {
       </div>
 
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">By Type</CardTitle>
@@ -307,6 +318,49 @@ export const FeedbackDashboard: React.FC = () => {
                   );
                 })}
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">By Severity</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {Object.keys(stats.bySeverity).length === 0 ? (
+                <p className="text-sm text-gray-400">No severity set on any feedback yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {(() => {
+                    const severityTotal = Object.values(stats.bySeverity).reduce((sum, n) => sum + n, 0);
+                    const colors: Record<string, string> = {
+                      CRITICAL: 'bg-red-500',
+                      HIGH: 'bg-orange-500',
+                      MEDIUM: 'bg-amber-400',
+                      LOW: 'bg-gray-400',
+                    };
+                    const order = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
+                    return order
+                      .filter((s) => stats.bySeverity[s])
+                      .map((severity) => {
+                        const count = stats.bySeverity[severity];
+                        return (
+                          <div key={severity} className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">{severity}</span>
+                            <div className="flex items-center gap-2">
+                              <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full ${colors[severity]}`}
+                                  style={{ width: `${(count / severityTotal) * 100}%` }}
+                                />
+                              </div>
+                              <span className="text-sm font-medium text-gray-900 w-8 text-right">{count}</span>
+                            </div>
+                          </div>
+                        );
+                      });
+                  })()}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

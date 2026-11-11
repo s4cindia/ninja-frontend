@@ -43,8 +43,8 @@ export function useNotificationToast() {
         toast(message, { duration: 8000, position: 'bottom-right', icon: '⚠️' });
       } else if (n.type === 'BATCH_COMPLETED' || n.type === 'JOB_COMPLETED') {
         toast.success(message, { duration: 6000, position: 'bottom-right' });
-      } else if (n.type === 'TEAM_REVIEW_RESUBMIT_REQUESTED') {
-        toast(message, { duration: 6000, position: 'bottom-right', icon: '🔄' });
+      } else if (n.type === 'TEAM_REVIEW_RESUBMIT_REQUESTED' || n.type === 'FEEDBACK_STATUS_CHANGED') {
+        toast(message, { duration: 6000, position: 'bottom-right', icon: n.type === 'FEEDBACK_STATUS_CHANGED' ? '📋' : '🔄' });
       } else {
         toast.error(message, { duration: 6000, position: 'bottom-right' });
       }

@@ -5,7 +5,7 @@ export interface Notification {
   userId: string;
   tenantId: string;
   type: 'BATCH_COMPLETED' | 'BATCH_FAILED' | 'JOB_COMPLETED' | 'JOB_FAILED' | 'SYSTEM_ALERT'
-    | 'TEAM_REVIEW_NEEDS_CORRECTION' | 'TEAM_REVIEW_RESUBMIT_REQUESTED';
+    | 'TEAM_REVIEW_NEEDS_CORRECTION' | 'TEAM_REVIEW_RESUBMIT_REQUESTED' | 'FEEDBACK_STATUS_CHANGED';
   title: string;
   message: string;
   data?: Record<string, unknown>;

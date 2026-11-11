@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Spinner } from '../ui/Spinner';
-import type { FeedbackItem, FeedbackType, FeedbackStatus } from '@/types/feedback.types';
+import type { FeedbackItem, FeedbackType, FeedbackStatus, FeedbackSeverity } from '@/types/feedback.types';
 
 export type { FeedbackItem };
 
@@ -21,6 +21,7 @@ interface FeedbackListProps {
   filters: {
     type: FeedbackType | 'ALL';
     status: FeedbackStatus | 'ALL';
+    severity: FeedbackSeverity | 'ALL';
     rating: 'positive' | 'negative' | 'all';
   };
   onFilterChange: (filters: FeedbackListProps['filters']) => void;
@@ -48,6 +49,21 @@ const STATUS_OPTIONS: { value: FeedbackStatus | 'ALL'; label: string }[] = [
   { value: 'RESOLVED', label: 'Resolved' },
   { value: 'DISMISSED', label: 'Dismissed' },
 ];
+
+const SEVERITY_OPTIONS: { value: FeedbackSeverity | 'ALL'; label: string }[] = [
+  { value: 'ALL', label: 'All Severities' },
+  { value: 'CRITICAL', label: '🔴 Critical' },
+  { value: 'HIGH', label: '🟠 High' },
+  { value: 'MEDIUM', label: '🟡 Medium' },
+  { value: 'LOW', label: '⚪ Low' },
+];
+
+const SEVERITY_BADGE: Record<FeedbackSeverity, string> = {
+  CRITICAL: '🔴 Critical',
+  HIGH: '🟠 High',
+  MEDIUM: '🟡 Medium',
+  LOW: '⚪ Low',
+};
 
 const STATUS_VARIANTS: Record<FeedbackStatus, 'default' | 'info' | 'warning' | 'success' | 'error'> = {
   NEW: 'info',
@@ -112,10 +128,10 @@ export const FeedbackList: React.FC<FeedbackListProps> = ({
     </th>
   );
 
-  const hasActiveFilters = filters.type !== 'ALL' || filters.status !== 'ALL' || filters.rating !== 'all';
+  const hasActiveFilters = filters.type !== 'ALL' || filters.status !== 'ALL' || filters.severity !== 'ALL' || filters.rating !== 'all';
 
   const clearFilters = () => {
-    onFilterChange({ type: 'ALL', status: 'ALL', rating: 'all' });
+    onFilterChange({ type: 'ALL', status: 'ALL', severity: 'ALL', rating: 'all' });
   };
 
   return (
@@ -169,6 +185,19 @@ export const FeedbackList: React.FC<FeedbackListProps> = ({
               </select>
             </div>
             <div className="flex flex-col gap-1">
+              <label htmlFor="severity-filter" className="text-xs font-medium text-gray-600">Severity</label>
+              <select
+                id="severity-filter"
+                value={filters.severity}
+                onChange={(e) => handleFilterChange('severity', e.target.value)}
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-primary-500"
+              >
+                {SEVERITY_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
               <label htmlFor="rating-filter" className="text-xs font-medium text-gray-600">Rating</label>
               <select
                 id="rating-filter"
@@ -201,6 +230,7 @@ export const FeedbackList: React.FC<FeedbackListProps> = ({
                     <SortableHeader field="createdAt">Date</SortableHeader>
                     <th className="text-left py-3 px-2 text-sm font-medium text-gray-600">Submitted By</th>
                     <SortableHeader field="type">Type</SortableHeader>
+                    <th className="text-left py-3 px-2 text-sm font-medium text-gray-600">Severity</th>
                     <SortableHeader field="status">Status</SortableHeader>
                     <th className="text-left py-3 px-2 text-sm font-medium text-gray-600">Rating</th>
                     <th className="text-left py-3 px-2 text-sm font-medium text-gray-600">Message</th>
@@ -232,6 +262,9 @@ export const FeedbackList: React.FC<FeedbackListProps> = ({
                         <Badge variant="default" size="sm">
                           {item.type.replace(/_/g, ' ')}
                         </Badge>
+                      </td>
+                      <td className="py-3 px-2 text-sm text-gray-700 whitespace-nowrap">
+                        {item.severity ? SEVERITY_BADGE[item.severity] : <span className="text-gray-400">—</span>}
                       </td>
                       <td className="py-3 px-2">
                         <Badge variant={STATUS_VARIANTS[item.status]} size="sm">
