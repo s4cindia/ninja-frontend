@@ -1,8 +1,60 @@
+import { useState } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import type { TeamActivityReport } from '@/types/reports.types';
+import type { TeamActivityReport, OwnershipEntry } from '@/types/reports.types';
+import { getJobTypeLabel } from '@/utils/jobTypes';
+import { getStatusIcon, getStatusBadgeClass, formatRelativeTime } from '@/utils/jobHelpers';
 
 interface Props {
   data: TeamActivityReport;
+}
+
+// Same fallback this session's MyTeamPage.tsx uses for the one other
+// job-type-agnostic listing in this codebase (getTeamJobDetailPath) --
+// kept intentionally simpler here since JobAssignment carries no
+// documentId to special-case editorial/citation jobs.
+function jobDetailPath(job: { jobId: string; type: string }): string {
+  return job.type === 'PDF_ACCESSIBILITY' ? `/pdf/audit/${job.jobId}` : `/jobs/${job.jobId}`;
+}
+
+function OwnerAssignments({ owner }: { owner: OwnershipEntry }) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (owner.jobs.length === 0) return null;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 mt-1"
+        aria-expanded={expanded}
+      >
+        {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+        {expanded ? 'Hide assignments' : `Show ${owner.jobs.length} assignment${owner.jobs.length === 1 ? '' : 's'}`}
+      </button>
+      {expanded && (
+        <ul className="mt-2 space-y-1.5 border-l border-gray-100 pl-3">
+          {owner.jobs.map((job) => (
+            <li key={job.jobId} className="flex items-center justify-between gap-3 text-xs">
+              <Link to={jobDetailPath(job)} className="text-gray-700 hover:text-[#1B3A6B] truncate max-w-[14rem]" title={job.title}>
+                {job.title}
+              </Link>
+              <span className="text-gray-400 flex-shrink-0">{getJobTypeLabel(job.type)}</span>
+              <span
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${getStatusBadgeClass(job.status)}`}
+              >
+                {getStatusIcon(job.status)}
+                {job.status}
+              </span>
+              <span className="text-gray-400 flex-shrink-0">{formatRelativeTime(job.createdAt)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
 }
 
 // Shared by the admin hub's "Team Activity" tab and MyTeamPage's self-service
@@ -73,8 +125,11 @@ export function TeamActivityReportView({ data }: Props) {
                 </thead>
                 <tbody>
                   {data.ownership.map((o) => (
-                    <tr key={o.ownerId} className="border-b last:border-0">
-                      <td className="py-2 pr-3 text-gray-900">{o.ownerName}</td>
+                    <tr key={o.ownerId} className="border-b last:border-0 align-top">
+                      <td className="py-2 pr-3 text-gray-900">
+                        {o.ownerName}
+                        <OwnerAssignments owner={o} />
+                      </td>
                       <td className="py-2 pr-3 text-right">{o.totalJobs}</td>
                       <td className="py-2 pr-3 text-right">{o.completedJobs}</td>
                       <td className="py-2 pr-3 text-right">{o.failedJobs}</td>

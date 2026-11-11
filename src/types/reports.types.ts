@@ -2,6 +2,8 @@
 // PAC/ACR/VPAT compliance reports elsewhere in the app. Mirrors
 // ninja-backend's throughput-report.service.ts response shape exactly
 // (5 groups total are planned; this covers Group 1, Time/Throughput).
+import type { TeamReviewRecord } from './team.types';
+
 export type ReportGroupBy = 'day' | 'week';
 
 export interface DurationSummary {
@@ -66,6 +68,17 @@ export interface ReviewThroughputEntry {
   total: number;
 }
 
+// One job "assignment" under an owner -- title falls back to the upload's
+// own fileName when the job has no linked Product (nullable in the schema).
+export interface JobAssignment {
+  jobId: string;
+  title: string;
+  type: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface OwnershipEntry {
   ownerId: string;
   ownerName: string;
@@ -74,6 +87,8 @@ export interface OwnershipEntry {
   completedJobs: number;
   failedJobs: number;
   inProgressJobs: number;
+  /** Newest first. */
+  jobs: JobAssignment[];
 }
 
 export interface TeamActivityReport {
@@ -212,4 +227,13 @@ export interface ScoreTrendPoint {
 export interface ScoreTrend {
   jobId: string;
   rounds: ScoreTrendPoint[];
+}
+
+// GET /admin/reports/jobs/:jobId/review-status's response -- backs the
+// Cost/Quality tabs' job drill-down dialog with the same TeamReview
+// history/gate state PdfAuditResultsPage and MyTeamPage show.
+export interface JobReviewStatus {
+  jobId: string;
+  teamReviews: TeamReviewRecord[];
+  reviewBlocked: boolean;
 }

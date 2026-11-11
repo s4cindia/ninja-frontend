@@ -18,7 +18,13 @@ function mockReport(overrides?: Partial<TeamActivityReport>): TeamActivityReport
       { reviewerId: 'leader-1', reviewerName: 'Lee Leader', reviewerEmail: 'lee@example.com', okCount: 8, needsCorrectionCount: 2, total: 10 },
     ],
     ownership: [
-      { ownerId: 'exec-1', ownerName: 'Eve Exec', ownerEmail: 'eve@example.com', totalJobs: 20, completedJobs: 15, failedJobs: 2, inProgressJobs: 3 },
+      {
+        ownerId: 'exec-1', ownerName: 'Eve Exec', ownerEmail: 'eve@example.com',
+        totalJobs: 20, completedJobs: 15, failedJobs: 2, inProgressJobs: 3,
+        jobs: [
+          { jobId: 'job-1', title: 'The Great Gatsby', type: 'PDF_ACCESSIBILITY', status: 'COMPLETED', createdAt: '2026-10-20T00:00:00Z', updatedAt: '2026-10-21T00:00:00Z' },
+        ],
+      },
     ],
     ...overrides,
   };
