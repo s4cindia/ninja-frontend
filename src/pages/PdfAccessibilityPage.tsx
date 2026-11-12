@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
@@ -6,11 +6,29 @@ import { Alert } from '@/components/ui/Alert';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { DocumentUploader } from '@/components/epub/EPUBUploader';
 import { validateJobId } from '@/utils/validation';
+import { useAuthStore } from '@/stores/auth.store';
+import { useTeamExecutives } from '@/hooks/useTeamExecutives';
+import type { TeamExecutive } from '@/services/team.service';
 import type { AuditSummary } from '@/types/audit.types';
 
 export const PdfAccessibilityPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [assigneeUserId, setAssigneeUserId] = useState('');
+
+  // A Team Leader can lead more than one team, so each entry carries its
+  // own teamName -- group so the dropdown can label unambiguously which
+  // team's Executive is being picked.
+  const isTeamLeader = user?.teamMemberships?.some((m) => m.teamRole === 'TEAM_LEADER') ?? false;
+  const { data: executivesData } = useTeamExecutives(isTeamLeader);
+  const executivesByTeam = useMemo(() => {
+    const groups: Record<string, TeamExecutive[]> = {};
+    for (const exec of executivesData?.executives ?? []) {
+      (groups[exec.teamName] ??= []).push(exec);
+    }
+    return groups;
+  }, [executivesData]);
 
   const navigateToResults = (jobId: string) => {
     // Validate jobId format to prevent path traversal
@@ -65,7 +83,31 @@ export const PdfAccessibilityPage: React.FC = () => {
             Upload a PDF file to analyze its accessibility features and identify issues
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {isTeamLeader && (
+            <div>
+              <label htmlFor="pdf-assign-to" className="block text-sm font-medium text-gray-700 mb-1">
+                Assign to
+              </label>
+              <select
+                id="pdf-assign-to"
+                value={assigneeUserId}
+                onChange={(e) => setAssigneeUserId(e.target.value)}
+                className="w-full max-w-xs rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
+              >
+                <option value="">Myself</option>
+                {Object.entries(executivesByTeam).map(([teamName, executives]) => (
+                  <optgroup key={teamName} label={teamName}>
+                    {executives.map((exec) => (
+                      <option key={exec.userId} value={exec.userId}>
+                        {exec.firstName} {exec.lastName}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+          )}
           <DocumentUploader
             onUploadComplete={handleUploadComplete}
             onJobCreated={handleJobCreated}
@@ -77,6 +119,7 @@ export const PdfAccessibilityPage: React.FC = () => {
                 auditFile: '/pdf/audit-file',
               },
             }}
+            assigneeUserId={assigneeUserId || undefined}
           />
         </CardContent>
       </Card>

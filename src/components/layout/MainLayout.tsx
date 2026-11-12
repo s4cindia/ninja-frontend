@@ -43,6 +43,8 @@ type NavItem = {
   activePrefix?: string;
   /** If true, this item is hidden from users with the OPERATOR role. */
   operatorHidden?: boolean;
+  /** If true, this item is hidden unless the user holds a TEAM_LEADER team role on at least one team. */
+  teamLeaderOnly?: boolean;
 };
 
 type NavSection = {
@@ -69,6 +71,7 @@ export function MainLayout() {
   // A user could in principle belong to more than one team, but today's
   // reality is one flat team per person -- only show the first.
   const teamMembership = user?.teamMemberships?.[0];
+  const isTeamLeader = user?.teamMemberships?.some((m) => m.teamRole === 'TEAM_LEADER') ?? false;
 
   const handleLogout = () => {
     logout();
@@ -135,6 +138,7 @@ export function MainLayout() {
       items: [
         { to: '/help/annotator-guide', icon: HelpCircle, label: "Annotator's Guide" },
         { to: '/help/operator-guide', icon: HelpCircle, label: 'Operator Guide' },
+        { to: '/help/team-leader-guide', icon: HelpCircle, label: 'Team Leader Guide', teamLeaderOnly: true },
       ],
     },
   ];
@@ -203,7 +207,10 @@ export function MainLayout() {
                   <hr className="my-2 mx-2 border-gray-200" />
                 )}
                 <div className="space-y-1">
-                  {section.items.filter((item) => !(isOperator && item.operatorHidden)).map((item) => (
+                  {section.items
+                    .filter((item) => !(isOperator && item.operatorHidden))
+                    .filter((item) => !(item.teamLeaderOnly && !isTeamLeader))
+                    .map((item) => (
                     <Link
                       key={item.to}
                       to={item.to}

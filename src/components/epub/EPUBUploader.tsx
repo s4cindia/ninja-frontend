@@ -4,7 +4,7 @@ import { Button } from '../ui/Button';
 import { Progress } from '../ui/Progress';
 import { Alert } from '../ui/Alert';
 import { cn } from '@/utils/cn';
-import { api } from '@/services/api';
+import { api, getErrorMessage } from '@/services/api';
 import { uploadService } from '@/services/upload.service';
 import { tenantConfigService } from '@/services/tenant-config.service';
 import { useJobPolling, JobData } from '@/hooks/useJobPolling';
@@ -41,6 +41,15 @@ interface DocumentUploaderProps {
    */
   onJobCreated?: (jobId: string) => void;
   onError?: (error: string) => void;
+  /**
+   * PDF-only: when a Team Leader has picked an Executive to assign this
+   * upload to instead of uploading for themselves. Threaded into whichever
+   * upload call site actually fires (direct multipart FormData, or the
+   * JSON auditFile fallback after a presigned S3 upload) -- omitted
+   * entirely for a normal self-upload, matching the backend's own "absent
+   * or equal to the caller's own id" self-upload contract.
+   */
+  assigneeUserId?: string;
 }
 
 interface EPUBUploaderProps {
@@ -73,6 +82,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   onUploadComplete,
   onJobCreated,
   onError,
+  assigneeUserId,
 }) => {
   const [state, setState] = useState<UploadState>('idle');
   const [progress, setProgress] = useState(0);
@@ -332,7 +342,8 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
           setUploadBytes({ loaded: uploadProgress.loaded, total: uploadProgress.total });
           setUploadNow(Date.now());
         },
-        endpoint.directUpload
+        endpoint.directUpload,
+        assigneeUserId ? { assigneeUserId } : undefined
       );
 
       setProgress(5);
@@ -353,6 +364,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
         }
         const response = await api.post(endpoint.auditFile, {
           fileId: uploadResult.fileId,
+          ...(assigneeUserId ? { assigneeUserId } : {}),
         });
         const responseData = response.data.data || response.data;
         jobId = responseData.jobId || responseData.id;
@@ -377,7 +389,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
 
       startPolling(jobId);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Upload failed';
+      const errorMessage = getErrorMessage(err);
       setError(errorMessage);
       setState('error');
       onError?.(errorMessage);

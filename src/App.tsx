@@ -95,6 +95,7 @@ import AnnotationAnalysisPage from '@/pages/calibration/AnnotationAnalysisPage';
 import CorpusSummaryPage from '@/pages/calibration/CorpusSummaryPage';
 import AnnotatorGuideHelpPage from '@/pages/help/AnnotatorGuidePage';
 import OperatorGuideHelpPage from '@/pages/help/OperatorGuidePage';
+import TeamLeaderGuideHelpPage from '@/pages/help/TeamLeaderGuidePage';
 import AdminCorpusPage from '@/pages/admin/AdminCorpusPage';
 import AdminUsersPage from '@/pages/admin/AdminUsersPage';
 import AdminTeamsPage from '@/pages/admin/AdminTeamsPage';
@@ -303,6 +304,7 @@ function AppRoutes() {
           {/* In-app help */}
           <Route path="/help/annotator-guide" element={<AnnotatorGuideHelpPage />} />
           <Route path="/help/operator-guide" element={<OperatorGuideHelpPage />} />
+          <Route path="/help/team-leader-guide" element={<TeamLeaderGuideHelpPage />} />
 
           {/* Admin Console Routes */}
           <Route path="/admin/corpus" element={<AdminCorpusPage />} />

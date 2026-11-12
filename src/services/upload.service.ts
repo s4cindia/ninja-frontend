@@ -89,10 +89,14 @@ class UploadService {
   async uploadDirect(
     file: File,
     endpoint: string = '/epub/audit-upload',
-    onProgress?: ProgressCallback
+    onProgress?: ProgressCallback,
+    extraFields?: Record<string, string>
   ): Promise<DirectUploadResponse> {
     const formData = new FormData();
     formData.append('file', file);
+    for (const [key, value] of Object.entries(extraFields ?? {})) {
+      formData.append(key, value);
+    }
 
     const response = await api.post(endpoint, formData, {
       headers: { 'Content-Type': undefined },
@@ -117,7 +121,8 @@ class UploadService {
   async uploadFile(
     file: File,
     onProgress?: ProgressCallback,
-    directUploadEndpoint: string = '/epub/audit-upload'
+    directUploadEndpoint: string = '/epub/audit-upload',
+    extraFields?: Record<string, string>
   ): Promise<UploadResult> {
     let presigned: PresignedUploadResponse | null = null;
 
@@ -138,7 +143,7 @@ class UploadService {
       // Fallback to direct upload for both cases
       if (isAxiosError(error) && (error.response?.status === 500 || error.response?.status === 400)) {
         console.warn(`Presign failed (${error.response?.status}), using direct upload`);
-        const result = await this.uploadDirect(file, directUploadEndpoint, onProgress);
+        const result = await this.uploadDirect(file, directUploadEndpoint, onProgress, extraFields);
         return {
           fileId: result.fileId || result.jobId,
           fileKey: result.jobId,

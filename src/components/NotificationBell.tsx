@@ -18,6 +18,7 @@ function notificationIcon(type: Notification['type']): string {
   if (type === 'TEAM_REVIEW_RESUBMIT_REQUESTED') return '🔄';
   if (type === 'FEEDBACK_STATUS_CHANGED') return '📋';
   if (type === 'FEEDBACK_SUBMITTED') return '📝';
+  if (type === 'JOB_ASSIGNED') return '📌';
   return '❌';
 }
 

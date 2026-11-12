@@ -7,11 +7,24 @@ import { api } from '@/services/api';
 
 vi.mock('@/services/upload.service');
 vi.mock('@/services/tenant-config.service');
-vi.mock('@/services/api', () => ({ api: { get: vi.fn(), post: vi.fn() } }));
+vi.mock('@/services/api', () => ({
+  api: { get: vi.fn(), post: vi.fn() },
+  // Mirrors the real getErrorMessage (axios error -> backend message,
+  // falling back to err.message, falling back to a generic string) --
+  // used by the error-message test below.
+  getErrorMessage: (error: unknown) => {
+    const err = error as { isAxiosError?: boolean; response?: { data?: { error?: { message?: string } } }; message?: string };
+    if (err?.isAxiosError) {
+      return err.response?.data?.error?.message || err.message || 'An error occurred';
+    }
+    return error instanceof Error ? error.message : 'An unexpected error occurred';
+  },
+}));
 
 const mockUploadService = vi.mocked(uploadService);
 const mockTenantConfig = vi.mocked(tenantConfigService);
 const mockApiGet = vi.mocked(api.get);
+const mockApiPost = vi.mocked(api.post);
 
 function pdfFile(name: string, sizeBytes: number): File {
   const file = new File(['%PDF-1.4 test content'], name, { type: 'application/pdf' });
@@ -255,5 +268,111 @@ describe('DocumentUploader upload progress', () => {
     // down the early-return PDF path at all.
     await waitFor(() => expect(mockApiGet).toHaveBeenCalled());
     expect(onJobCreated).not.toHaveBeenCalled();
+  });
+
+  it('threads assigneeUserId into uploadService.uploadFile as an extra field, for the direct-upload fallback path', async () => {
+    mockUploadService.uploadFile.mockResolvedValue({
+      uploadMethod: 'direct',
+      jobId: 'job-999',
+    } as Awaited<ReturnType<typeof uploadService.uploadFile>>);
+
+    render(
+      <DocumentUploader
+        acceptedFileTypes={['pdf']}
+        endpoints={{ pdf: { directUpload: '/pdf/audit-upload', auditFile: '/pdf/audit-file' } }}
+        assigneeUserId="exec-1"
+        onJobCreated={vi.fn()}
+      />
+    );
+
+    await selectFileAndStartUpload(pdfFile('assigned.pdf', 1024));
+
+    await waitFor(() => expect(mockUploadService.uploadFile).toHaveBeenCalled());
+    expect(mockUploadService.uploadFile).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      '/pdf/audit-upload',
+      { assigneeUserId: 'exec-1' }
+    );
+  });
+
+  it('omits the extra-fields argument entirely for a normal self-upload (no assigneeUserId prop)', async () => {
+    mockUploadService.uploadFile.mockResolvedValue({
+      uploadMethod: 'direct',
+      jobId: 'job-999',
+    } as Awaited<ReturnType<typeof uploadService.uploadFile>>);
+
+    render(
+      <DocumentUploader
+        acceptedFileTypes={['pdf']}
+        endpoints={{ pdf: { directUpload: '/pdf/audit-upload', auditFile: '/pdf/audit-file' } }}
+        onJobCreated={vi.fn()}
+      />
+    );
+
+    await selectFileAndStartUpload(pdfFile('self.pdf', 1024));
+
+    await waitFor(() => expect(mockUploadService.uploadFile).toHaveBeenCalled());
+    expect(mockUploadService.uploadFile).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      '/pdf/audit-upload',
+      undefined
+    );
+  });
+
+  it('includes assigneeUserId in the JSON auditFile body for the presigned-S3 upload path', async () => {
+    mockUploadService.uploadFile.mockResolvedValue({
+      uploadMethod: 's3',
+      fileId: 'file-123',
+      fileKey: 'file-123',
+    } as Awaited<ReturnType<typeof uploadService.uploadFile>>);
+    mockApiPost.mockResolvedValue({ data: { data: { jobId: 'job-555' } } });
+
+    render(
+      <DocumentUploader
+        acceptedFileTypes={['pdf']}
+        endpoints={{ pdf: { directUpload: '/pdf/audit-upload', auditFile: '/pdf/audit-file' } }}
+        assigneeUserId="exec-1"
+        onJobCreated={vi.fn()}
+      />
+    );
+
+    await selectFileAndStartUpload(pdfFile('assigned-s3.pdf', 1024));
+
+    await waitFor(() =>
+      expect(mockApiPost).toHaveBeenCalledWith('/pdf/audit-file', {
+        fileId: 'file-123',
+        assigneeUserId: 'exec-1',
+      })
+    );
+  });
+
+  it('shows the backend error message (not axios\'s generic status-code text) when the upload is rejected, e.g. NOT_TEAM_LEADER_OF_EXECUTIVE', async () => {
+    mockUploadService.uploadFile.mockRejectedValue({
+      isAxiosError: true,
+      message: 'Request failed with status code 403',
+      response: {
+        status: 403,
+        data: { error: { message: 'You can only assign an upload to an Executive on a team you lead' } },
+      },
+    });
+    const onError = vi.fn();
+
+    render(
+      <DocumentUploader
+        acceptedFileTypes={['pdf']}
+        endpoints={{ pdf: { directUpload: '/pdf/audit-upload', auditFile: '/pdf/audit-file' } }}
+        assigneeUserId="not-my-executive"
+        onError={onError}
+      />
+    );
+
+    await selectFileAndStartUpload(pdfFile('bad-assign.pdf', 1024));
+
+    await waitFor(() =>
+      expect(screen.getByText('You can only assign an upload to an Executive on a team you lead')).toBeInTheDocument()
+    );
+    expect(onError).toHaveBeenCalledWith('You can only assign an upload to an Executive on a team you lead');
   });
 });
