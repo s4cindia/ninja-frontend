@@ -1,5 +1,7 @@
+import type { ReactElement } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TeamReviewPanel } from './TeamReviewPanel';
 import { teamService } from '@/services/team.service';
 import type { TeamReviewRecord } from '@/types/team.types';
@@ -13,6 +15,14 @@ vi.mock('react-hot-toast', () => ({
 }));
 
 const mockSubmitTeamReview = vi.mocked(teamService.submitTeamReview);
+
+// TeamReviewPanel invalidates React Query caches on submit, so it needs a
+// QueryClientProvider in the tree even though these tests never read from it.
+function renderPanel(ui: ReactElement) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const result = render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+  return { ...result, queryClient };
+}
 
 function mockReview(overrides?: Partial<TeamReviewRecord>): TeamReviewRecord {
   return {
@@ -33,14 +43,14 @@ describe('TeamReviewPanel', () => {
   });
 
   it('shows "no reviews" implicitly (empty list) when there is no history yet', () => {
-    render(<TeamReviewPanel jobId="job-123" teamReviews={[]} onSubmitted={vi.fn()} />);
+    renderPanel(<TeamReviewPanel jobId="job-123" teamReviews={[]} onSubmitted={vi.fn()} />);
 
     expect(screen.getByText('Team Review')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /submit review/i })).toBeInTheDocument();
   });
 
   it('shows the blocked banner when the most recent (first) review is NEEDS_CORRECTION', () => {
-    render(
+    renderPanel(
       <TeamReviewPanel
         jobId="job-123"
         teamReviews={[
@@ -55,7 +65,7 @@ describe('TeamReviewPanel', () => {
   });
 
   it('does not show the blocked banner when the most recent review is OK (even if an earlier one was NEEDS_CORRECTION)', () => {
-    render(
+    renderPanel(
       <TeamReviewPanel
         jobId="job-123"
         teamReviews={[
@@ -70,7 +80,7 @@ describe('TeamReviewPanel', () => {
   });
 
   it('renders existing review history with reviewer name, outcome, and notes', () => {
-    render(
+    renderPanel(
       <TeamReviewPanel
         jobId="job-123"
         teamReviews={[mockReview({ outcome: 'NEEDS_CORRECTION', notes: 'Check page 3 alt text' })]}
@@ -94,7 +104,7 @@ describe('TeamReviewPanel', () => {
     });
     const onSubmitted = vi.fn();
 
-    render(<TeamReviewPanel jobId="job-123" teamReviews={[]} onSubmitted={onSubmitted} />);
+    renderPanel(<TeamReviewPanel jobId="job-123" teamReviews={[]} onSubmitted={onSubmitted} />);
 
     fireEvent.change(screen.getByLabelText('Review outcome'), { target: { value: 'NEEDS_CORRECTION' } });
     fireEvent.change(screen.getByPlaceholderText('Notes (optional)'), { target: { value: '  looks off  ' } });
@@ -119,13 +129,33 @@ describe('TeamReviewPanel', () => {
       notes: null,
     });
 
-    render(<TeamReviewPanel jobId="job-123" teamReviews={[]} onSubmitted={vi.fn()} />);
+    renderPanel(<TeamReviewPanel jobId="job-123" teamReviews={[]} onSubmitted={vi.fn()} />);
 
     fireEvent.click(screen.getByRole('button', { name: /submit review/i }));
 
     await waitFor(() =>
       expect(mockSubmitTeamReview).toHaveBeenCalledWith('job-123', { outcome: 'OK', notes: undefined })
     );
+  });
+
+  it('invalidates the My Team roster and admin Team Activity caches on a successful submit', async () => {
+    mockSubmitTeamReview.mockResolvedValue({
+      id: 'review-4',
+      jobId: 'job-123',
+      reviewedBy: 'leader-1',
+      reviewedAt: '2026-10-27T00:00:00Z',
+      outcome: 'NEEDS_CORRECTION',
+      notes: null,
+    });
+
+    const { queryClient } = renderPanel(<TeamReviewPanel jobId="job-123" teamReviews={[]} onSubmitted={vi.fn()} />);
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    fireEvent.click(screen.getByRole('button', { name: /submit review/i }));
+
+    await waitFor(() => expect(mockSubmitTeamReview).toHaveBeenCalled());
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['team-jobs'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['team-activity-report'] });
   });
 
   it('does not call onSubmitted and leaves the form usable after a failed submit (e.g. a VIEWER server-rejection)', async () => {
@@ -139,7 +169,7 @@ describe('TeamReviewPanel', () => {
     mockSubmitTeamReview.mockRejectedValue(error);
     const onSubmitted = vi.fn();
 
-    render(<TeamReviewPanel jobId="job-123" teamReviews={[]} onSubmitted={onSubmitted} />);
+    renderPanel(<TeamReviewPanel jobId="job-123" teamReviews={[]} onSubmitted={onSubmitted} />);
 
     fireEvent.click(screen.getByRole('button', { name: /submit review/i }));
 

@@ -6,7 +6,7 @@ import { Alert } from '@/components/ui/Alert';
 import { useCostRoundTrend } from '@/hooks/useCostRoundTrend';
 import { useScoreTrend } from '@/hooks/useScoreTrend';
 import { useJobReviewStatus } from '@/hooks/useJobReviewStatus';
-import { formatUsd } from '@/utils/reportFormat';
+import { formatUsd, formatResolutionRate } from '@/utils/reportFormat';
 import type { TeamReviewRecord } from '@/types/team.types';
 
 interface Props {
@@ -101,9 +101,9 @@ export function JobDrilldownDialog({ jobId, onClose }: Props) {
                   <LineChart data={scoreChartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis dataKey="cycleNumber" tick={{ fontSize: 12 }} label={{ value: 'Round', position: 'insideBottom', offset: -2, fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${Math.round(Number(v) * 100)}%`} domain={[0, 1]} />
+                    <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => formatResolutionRate(Number(v))} domain={[0, 100]} />
                     <Tooltip
-                      formatter={(value) => (value === null ? 'n/a' : `${Math.round(Number(value) * 100)}%`)}
+                      formatter={(value) => (value === null ? 'n/a' : formatResolutionRate(Number(value)))}
                       labelFormatter={(label) => `Round ${label}`}
                     />
                     <Line type="monotone" dataKey="resolutionRate" name="Resolution Rate" stroke="#1B3A6B" connectNulls />

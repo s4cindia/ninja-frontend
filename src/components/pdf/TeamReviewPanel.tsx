@@ -16,6 +16,7 @@
  */
 
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { ClipboardCheck, CheckCircle2, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -52,6 +53,7 @@ export function TeamReviewPanel({ jobId, teamReviews, onSubmitted }: TeamReviewP
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const isBlocked = teamReviews[0]?.outcome === 'NEEDS_CORRECTION';
+  const queryClient = useQueryClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,6 +63,12 @@ export function TeamReviewPanel({ jobId, teamReviews, onSubmitted }: TeamReviewP
       toast.success('Review submitted');
       setNotes('');
       setOutcome('OK');
+      // This job's new blocked/unblocked state is read elsewhere from cached
+      // queries this submit doesn't otherwise touch -- My Team's roster and
+      // Admin's Team Activity report -- so both need invalidating here too,
+      // not just onSubmitted()'s own-page refetch.
+      queryClient.invalidateQueries({ queryKey: ['team-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['team-activity-report'] });
       onSubmitted();
     } catch (err) {
       toast.error(getErrorMessage(err));

@@ -12,7 +12,13 @@ import { formatUsd, defaultReportRange, rangeLastNDays, clampDateRange, toIsoDat
 import type { SimpleDateRange } from '@/utils/reportFormat';
 import { JobDrilldownDialog } from './JobDrilldownDialog';
 
-type SortKey = 'jobId' | 'source' | 'costUsd' | 'stopReason' | 'pageCount';
+type SortKey = 'jobId' | 'source' | 'costUsd' | 'stopReason' | 'pageCount' | 'completedAt';
+
+function formatRunTimestamp(iso: string | null): string {
+  if (iso === null) return '—';
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString();
+}
 
 export function CostTab() {
   const [range, setRange] = useState<SimpleDateRange>(defaultReportRange());
@@ -196,6 +202,7 @@ export function CostTab() {
                     <thead>
                       <tr className="border-b">
                         <SortHeader keyName="jobId" label="Job" align="left" />
+                        <SortHeader keyName="completedAt" label="Date" align="left" />
                         <SortHeader keyName="source" label="Source" align="left" />
                         <SortHeader keyName="costUsd" label="Cost" />
                         <SortHeader keyName="stopReason" label="Stop Reason" align="left" />
@@ -215,6 +222,7 @@ export function CostTab() {
                           >
                             {run.fileName ?? run.jobId}
                           </td>
+                          <td className="py-2 pr-3 text-gray-600 whitespace-nowrap">{formatRunTimestamp(run.completedAt)}</td>
                           <td className="py-2 pr-3 text-gray-600">{SPEND_SOURCE_LABELS[run.source]}</td>
                           <td className="py-2 pr-3 text-right">{formatUsd(run.costUsd)}</td>
                           <td className="py-2 pr-3 text-gray-600">{run.stopReason ?? 'not stopped'}</td>

@@ -45,7 +45,7 @@ describe('JobDrilldownDialog', () => {
     });
     mockGetScoreTrend.mockResolvedValue({
       jobId: 'job-1',
-      rounds: [{ cycleNumber: 1, resolvedCount: 3, remainingCount: 1, resolutionRate: 0.75, completedAt: '2026-10-01T00:00:00Z' }],
+      rounds: [{ cycleNumber: 1, resolvedCount: 3, remainingCount: 1, resolutionRate: 75, completedAt: '2026-10-01T00:00:00Z' }],
     });
 
     renderDialog('job-1');

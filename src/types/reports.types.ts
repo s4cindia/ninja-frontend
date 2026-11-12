@@ -114,6 +114,7 @@ export interface SpendEntry {
   costUsd: number;
   stopReason: string | null;
   pageCount: number | null;
+  completedAt: string | null;
 }
 
 export interface CostReport {
