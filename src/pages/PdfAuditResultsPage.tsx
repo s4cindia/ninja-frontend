@@ -1872,6 +1872,7 @@ export const PdfAuditResultsPage: React.FC = () => {
         comparisonTrialId={autoTagInfo?.comparisonTrialId}
         userRole={currentUser?.role}
         autoModeActive={autoModeStatusQuery.data?.autoStatus === 'running'}
+        applyProgress={applyProgress}
       />
 
       <ManualRemediationTimeLog
