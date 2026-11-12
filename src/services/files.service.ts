@@ -6,7 +6,7 @@ export interface FileItem {
   originalName: string;
   mimeType: string;
   size: number;
-  status: 'UPLOADED' | 'PROCESSING' | 'PROCESSED' | 'ERROR';
+  status: 'PENDING_UPLOAD' | 'UPLOADED' | 'PROCESSING' | 'PROCESSED' | 'ERROR';
   createdAt: string;
   updatedAt: string;
   latestJobId?: string;

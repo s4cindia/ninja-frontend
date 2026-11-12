@@ -5,7 +5,7 @@ import { Button } from '../ui/Button';
 import { Checkbox } from '../ui/Checkbox';
 import type { FileItem } from '../../services/files.service';
 
-type FileStatus = 'UPLOADED' | 'PROCESSING' | 'PROCESSED' | 'ERROR';
+type FileStatus = 'PENDING_UPLOAD' | 'UPLOADED' | 'PROCESSING' | 'PROCESSED' | 'ERROR';
 
 interface FilesListProps {
   files: FileItem[];
@@ -21,14 +21,21 @@ interface FilesListProps {
 }
 
 const statusConfig: Record<FileStatus, { icon: React.ElementType; color: string; label: string }> = {
+  PENDING_UPLOAD: { icon: Clock, color: 'text-gray-500 bg-gray-50', label: 'Pending Upload' },
   UPLOADED: { icon: Clock, color: 'text-yellow-500 bg-yellow-50', label: 'Uploaded' },
   PROCESSING: { icon: Loader2, color: 'text-blue-500 bg-blue-50', label: 'Processing' },
   PROCESSED: { icon: CheckCircle, color: 'text-green-500 bg-green-50', label: 'Processed' },
   ERROR: { icon: XCircle, color: 'text-red-500 bg-red-50', label: 'Error' },
 };
 
+// Falls back to a neutral badge for any status value outside FileStatus
+// (e.g. a future backend enum addition not yet known here) instead of
+// crashing the whole Files page -- this exact gap (PENDING_UPLOAD missing)
+// took down /files entirely for every viewer over one orphaned record.
+const UNKNOWN_STATUS_CONFIG = { icon: FileText, color: 'text-gray-500 bg-gray-50', label: 'Unknown' };
+
 function StatusBadge({ status }: { status: FileStatus }) {
-  const config = statusConfig[status];
+  const config = statusConfig[status] ?? UNKNOWN_STATUS_CONFIG;
   const Icon = config.icon;
 
   return (
