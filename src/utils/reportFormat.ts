@@ -9,6 +9,15 @@ export function formatUsd(value: number | null | undefined): string {
   return `$${value.toFixed(2)}`;
 }
 
+// The backend's resolutionRate (calculateSuccessMetrics in
+// pdf-reaudit.service.ts) is already resolvedCount/totalCount * 100 -- i.e.
+// already a 0-100 percentage, NOT a 0-1 fraction. Do not multiply by 100
+// again at any call site; that's exactly the bug this formatter closes
+// (a real 75.3% was rendered as "7528%").
+export function formatResolutionRate(value: number): string {
+  return `${Math.round(value)}%`;
+}
+
 export function formatMs(ms: number | null | undefined): string {
   if (ms === null || ms === undefined) return '—';
   if (ms < 1000) return `${ms}ms`;

@@ -22,9 +22,9 @@ function mockReport(overrides?: Partial<CostReport>): CostReport {
     avgCostPerPageUsd: 0.05,
     capHitFrequency: { converged: 2, budget_limit: 1 },
     spendByRun: [
-      { jobId: 'job-aaa111', fileName: 'report-a.pdf', source: 'job_native', costUsd: 10, stopReason: 'budget_limit', pageCount: 100 },
-      { jobId: 'job-bbb222', fileName: null, source: 'comparison_trial', costUsd: 2.5, stopReason: 'converged', pageCount: 50 },
-      { jobId: 'job-ccc333', fileName: 'zero-cost.pdf', source: 'job_native', costUsd: 0, stopReason: 'converged', pageCount: null },
+      { jobId: 'job-aaa111', fileName: 'report-a.pdf', source: 'job_native', costUsd: 10, stopReason: 'budget_limit', pageCount: 100, completedAt: '2026-10-20T14:30:00.000Z' },
+      { jobId: 'job-bbb222', fileName: null, source: 'comparison_trial', costUsd: 2.5, stopReason: 'converged', pageCount: 50, completedAt: '2026-10-21T09:00:00.000Z' },
+      { jobId: 'job-ccc333', fileName: 'zero-cost.pdf', source: 'job_native', costUsd: 0, stopReason: 'converged', pageCount: null, completedAt: null },
     ],
     ...overrides,
   };
@@ -66,6 +66,21 @@ describe('CostTab', () => {
     const tr = row.closest('tr');
     expect(tr).not.toBeNull();
     expect(within(tr as HTMLElement).getByText('$0.00')).toBeInTheDocument();
+  });
+
+  it('shows a Date column so same-named rows can be told apart, with a dash when no timestamp exists', async () => {
+    mockGetCostReport.mockResolvedValue(mockReport());
+
+    renderTab();
+
+    const row = await screen.findByText('report-a.pdf');
+    const tr = row.closest('tr') as HTMLElement;
+    expect(within(tr).getByText(new Date('2026-10-20T14:30:00.000Z').toLocaleString())).toBeInTheDocument();
+
+    // This row also has a null pageCount, which renders its own '—' -- so
+    // there are two dashes here (Date and Pages), not one.
+    const zeroCostRow = screen.getByText('zero-cost.pdf').closest('tr') as HTMLElement;
+    expect(within(zeroCostRow).getAllByText('—')).toHaveLength(2);
   });
 
   it('falls back to the job id when no file name is available', async () => {
