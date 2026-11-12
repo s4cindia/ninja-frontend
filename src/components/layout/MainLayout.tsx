@@ -1,6 +1,7 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth.store';
 import { Logo } from '@/components/ui/Logo';
+import { Badge } from '@/components/ui/Badge';
 import { FeedbackButton } from '@/components/feedback';
 import { NotificationBell } from '@/components/NotificationBell';
 import { useNotificationToast } from '@/hooks/useNotificationToast';
@@ -49,6 +50,15 @@ type NavSection = {
   items: NavItem[];
 };
 
+/** 'TEAM_LEADER' -> 'Team Leader', 'OPERATOR' -> 'Operator', etc. */
+function humanizeRole(role: string): string {
+  return role
+    .toLowerCase()
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 export function MainLayout() {
   useNotificationToast();
   const { user, logout } = useAuthStore();
@@ -56,6 +66,9 @@ export function MainLayout() {
   const location = useLocation();
   const { collapsed, toggle: toggleSidebar } = useSidebarCollapsed();
   const isOperator = user?.role === 'OPERATOR';
+  // A user could in principle belong to more than one team, but today's
+  // reality is one flat team per person -- only show the first.
+  const teamMembership = user?.teamMemberships?.[0];
 
   const handleLogout = () => {
     logout();
@@ -121,6 +134,7 @@ export function MainLayout() {
       title: 'Help',
       items: [
         { to: '/help/annotator-guide', icon: HelpCircle, label: "Annotator's Guide" },
+        { to: '/help/operator-guide', icon: HelpCircle, label: 'Operator Guide' },
       ],
     },
   ];
@@ -142,9 +156,21 @@ export function MainLayout() {
           </Link>
           
           <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600">
-              {user?.firstName} {user?.lastName}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">
+                {user?.firstName} {user?.lastName}
+              </span>
+              {user?.role && (
+                <Badge size="sm" variant="default">
+                  {humanizeRole(user.role)}
+                </Badge>
+              )}
+              {teamMembership && (
+                <Badge size="sm" variant="info">
+                  {humanizeRole(teamMembership.teamRole)} · {teamMembership.team.name}
+                </Badge>
+              )}
+            </div>
             <NotificationBell />
             <button
               onClick={handleLogout}
