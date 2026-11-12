@@ -10,6 +10,15 @@ export interface User {
     name: string;
     slug: string;
   };
+  /**
+   * Optional -- most users have 0 or 1 entries today. A user could in
+   * principle belong to more than one team (see ninja-backend's Team
+   * model), but the UI only surfaces the first membership for now.
+   */
+  teamMemberships?: Array<{
+    teamRole: 'EXECUTIVE' | 'TEAM_LEADER' | 'VIEWER';
+    team: { id: string; name: string };
+  }>;
 }
 
 export interface AuthState {
