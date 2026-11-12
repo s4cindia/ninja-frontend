@@ -31,6 +31,7 @@ import { api, getErrorMessage } from '@/services/api';
 import { comparisonStudyService } from '@/services/comparisonStudy.service';
 import type { AiAnalysis } from '@/components/remediation/IssueCard';
 import type { ComparisonTrialWithJob } from '@/types/comparisonStudy.types';
+import type { ApplyProgressState } from '@/hooks/useApplyProgress';
 
 export interface GuidanceAcknowledgment {
   note: string;
@@ -76,6 +77,24 @@ interface RemediationChecklistProps {
    * the step statuses themselves stay accurate and worth seeing.
    */
   autoModeActive?: boolean;
+  /**
+   * Live apply-step progress from the page-level useApplyProgress SSE hook
+   * (bulk Apply All, or Auto Mode's own apply step). This is the ONLY live
+   * "something is actively applying fixes right now" signal that exists
+   * anywhere on the page -- without it, step 3 can only ever read the
+   * aiSuggestions snapshot, which the page refreshes exclusively at ROUND
+   * boundaries (see PdfAuditResultsPage's autoModeProgressKey effect), not
+   * continuously while a round's apply step is in flight. That gap is real:
+   * an operator could watch "603/603 processed · 569 applied · 34 failed"
+   * on the AutoModeStatusCard above while this checklist still read step 3
+   * as "Not started", because the round hadn't crossed its own boundary yet
+   * to trigger the aiSuggestions refetch. `connected` + a non-null `source`
+   * means a progress message has genuinely arrived for an apply-all or
+   * auto-loop apply step currently in flight (or just finished, pending the
+   * round-boundary refresh that will supersede this) -- see
+   * useApplyProgress's own doc comment.
+   */
+  applyProgress?: ApplyProgressState;
 }
 
 const STATUS_LABEL: Record<StepStatus, string> = {
@@ -173,6 +192,7 @@ export function RemediationChecklist({
   comparisonTrialId,
   userRole,
   autoModeActive = false,
+  applyProgress,
 }: RemediationChecklistProps) {
   const [noteInput, setNoteInput] = useState('');
   const [isSubmittingAck, setIsSubmittingAck] = useState(false);
@@ -278,6 +298,16 @@ export function RemediationChecklist({
   // currently executing". See the 'partial' StepStatus case above for why
   // that distinction matters for how this renders.
   const step3Started = appliedFixableCount > 0 || (aiAnalysisEverCompleted && verificationDone);
+
+  // Live override for the exact gap described on the `applyProgress` prop's
+  // own doc comment: `connected` + a non-null `source` means an apply-all or
+  // auto-loop apply step has a genuinely live progress message in hand right
+  // now, regardless of whether the round-boundary-gated aiSuggestions
+  // snapshot has caught up yet. Takes priority over the snapshot-derived
+  // 'partial'/'not-started' below, but never over a confirmed step3Done --
+  // if the snapshot already says done, trust that over a possibly-stale
+  // live channel that hasn't disconnected yet.
+  const liveApplyInProgress = !step3Done && !!applyProgress?.connected && applyProgress.source !== null;
 
   // Step 5: re-run AI Analysis (final check) — done once AI Analysis has
   // been re-run at least once since the most recent verification.
@@ -389,7 +419,19 @@ export function RemediationChecklist({
       {
         id: 3,
         label: 'Apply AI-suggested fixes',
-        status: !aiAnalysisEverCompleted ? 'not-started' : step3Done ? 'done' : step3Started ? 'partial' : 'not-started',
+        status: step3Done
+          ? 'done'
+          : liveApplyInProgress
+            ? 'in-progress'
+            : !aiAnalysisEverCompleted
+              ? 'not-started'
+              : step3Started ? 'partial' : 'not-started',
+        detail: liveApplyInProgress ? (
+          <p className="text-xs text-blue-700">
+            {applyProgress!.processed ?? 0}/{applyProgress!.total ?? '?'} processed · {applyProgress!.applied ?? 0} applied
+            {applyProgress!.failed ? ` · ${applyProgress!.failed} failed` : ''}
+          </p>
+        ) : undefined,
       },
       {
         id: 4,
@@ -521,7 +563,7 @@ export function RemediationChecklist({
 
     return list;
   }, [
-    step2Done, step2InProgress, aiAnalysisEverCompleted, step3Done, step3Started, guidanceFullyResolved, guidanceAcknowledgedFlag, guidanceAcknowledgmentStale, guidanceAcknowledgment,
+    step2Done, step2InProgress, aiAnalysisEverCompleted, step3Done, step3Started, liveApplyInProgress, applyProgress, guidanceFullyResolved, guidanceAcknowledgedFlag, guidanceAcknowledgmentStale, guidanceAcknowledgment,
     noteInput, isSubmittingAck, handleAcknowledge, pendingGuidance.length, pendingFixable.length,
     verificationDone, postRemediationStatus, reanalysisDone, reanalysisInProgress,
     guidanceResolved, secondReauditDone, artifactsStepDone, acrGenerated, pacReportGenerated,

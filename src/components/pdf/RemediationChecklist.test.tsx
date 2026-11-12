@@ -318,6 +318,52 @@ describe('RemediationChecklist', () => {
     expect(step3Container).not.toHaveTextContent('In progress');
   });
 
+  it('bug fix: step 3 reads "In progress" (with live counts), not "Not started", while applyProgress reports an in-flight auto-loop apply step that the round-boundary-gated aiSuggestions snapshot has not caught up to yet', () => {
+    render(
+      <RemediationChecklist
+        {...baseProps}
+        aiAnalysisStatus="complete"
+        aiSuggestions={suggestionsMap([suggestion({ issueId: 'a', applyMode: 'apply-to-pdf', status: 'pending' })])}
+        applyProgress={{ connected: true, source: 'auto_loop', processed: 603, total: 603, applied: 569, failed: 34 }}
+      />
+    );
+
+    const step3Container = screen.getByText('3. Apply AI-suggested fixes').closest('div')!.parentElement!;
+    expect(step3Container).toHaveTextContent('In progress');
+    expect(step3Container).not.toHaveTextContent('Not started');
+    expect(step3Container).toHaveTextContent('603/603 processed · 569 applied · 34 failed');
+  });
+
+  it('live applyProgress never overrides a genuinely done step 3 back to "In progress"', () => {
+    render(
+      <RemediationChecklist
+        {...baseProps}
+        aiAnalysisStatus="complete"
+        aiSuggestions={suggestionsMap([suggestion({ issueId: 'a', applyMode: 'apply-to-pdf', status: 'applied' })])}
+        applyProgress={{ connected: true, source: 'auto_loop', processed: 1, total: 1, applied: 1, failed: 0 }}
+      />
+    );
+
+    const step3Container = screen.getByText('3. Apply AI-suggested fixes').closest('div')!.parentElement!;
+    expect(step3Container).toHaveTextContent('Done');
+    expect(step3Container).not.toHaveTextContent('In progress');
+  });
+
+  it('a disconnected/no-source applyProgress (the default, idle state) never triggers the live override', () => {
+    render(
+      <RemediationChecklist
+        {...baseProps}
+        aiAnalysisStatus="complete"
+        aiSuggestions={suggestionsMap([suggestion({ issueId: 'a', applyMode: 'apply-to-pdf', status: 'pending' })])}
+        applyProgress={{ connected: false, source: null, processed: null, total: null, applied: null, failed: null }}
+      />
+    );
+
+    const step3Container = screen.getByText('3. Apply AI-suggested fixes').closest('div')!.parentElement!;
+    expect(step3Container).toHaveTextContent('Not started');
+    expect(step3Container).not.toHaveTextContent('In progress');
+  });
+
   it('regression: a manual "Re-run Audit" click before AI Analysis has EVER run must not falsely mark steps 2/3 Done — that button is deliberately always-available, so lastVerifiedAt (and hence verificationDone) can be truthy with aiAnalysisStatus still null. aiAnalyzedAt (the AI-analysis pass\'s own completion timestamp, never set by an unrelated re-audit) is what actually gates this, not verificationDone alone.', () => {
     render(
       <RemediationChecklist
