@@ -392,6 +392,56 @@ describe('TenantConfigService', () => {
     });
   });
 
+  describe('getAiRemediationConfig', () => {
+    it('should fetch and return the config, including fullAutoModeDefault', async () => {
+      vi.mocked(api.get).mockResolvedValue({
+        data: {
+          success: true,
+          data: { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only', fullAutoModeDefault: true },
+        },
+      } as any);
+
+      const config = await tenantConfigService.getAiRemediationConfig();
+
+      expect(api.get).toHaveBeenCalledWith('/tenant/config/ai-remediation');
+      expect(config.fullAutoModeDefault).toBe(true);
+    });
+
+    it('should return fullAutoModeDefault: false among the other defaults on API error', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      vi.mocked(api.get).mockRejectedValue(new Error('Network error'));
+
+      const config = await tenantConfigService.getAiRemediationConfig();
+
+      expect(config).toEqual({
+        altTextMode: 'apply-to-pdf',
+        colorContrastMode: 'guidance-only',
+        linkTextMode: 'guidance-only',
+        fullAutoModeDefault: false,
+      });
+
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('updateAiRemediationConfig', () => {
+    it('should PATCH fullAutoModeDefault alongside the other fields and return the updated config', async () => {
+      vi.mocked(api.patch).mockResolvedValue({
+        data: {
+          success: true,
+          data: { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only', fullAutoModeDefault: true },
+          message: 'Updated',
+        },
+      } as any);
+
+      const config = await tenantConfigService.updateAiRemediationConfig({ fullAutoModeDefault: true });
+
+      expect(api.patch).toHaveBeenCalledWith('/tenant/config/ai-remediation', { fullAutoModeDefault: true });
+      expect(config.fullAutoModeDefault).toBe(true);
+    });
+  });
+
   describe('updateAxes4Config', () => {
     it('should PATCH the enabled flag and return the updated config', async () => {
       vi.mocked(api.patch).mockResolvedValue({
