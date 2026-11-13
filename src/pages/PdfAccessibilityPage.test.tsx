@@ -1,9 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
 import { PdfAccessibilityPage } from './PdfAccessibilityPage';
 import * as validation from '@/utils/validation';
+import { useAuthStore } from '@/stores/auth.store';
+import { teamService } from '@/services/team.service';
+import type { User } from '@/types/auth.types';
 
 // Mock dependencies
 const mockNavigate = vi.fn();
@@ -15,17 +19,24 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
+vi.mock('@/services/team.service', () => ({
+  teamService: { listTeamExecutives: vi.fn() },
+}));
+const mockListTeamExecutives = vi.mocked(teamService.listTeamExecutives);
+
 vi.mock('@/components/epub/EPUBUploader', () => ({
-  DocumentUploader: ({ onUploadComplete, onJobCreated, onError, acceptedFileTypes, endpoints }: {
+  DocumentUploader: ({ onUploadComplete, onJobCreated, onError, acceptedFileTypes, endpoints, assigneeUserId }: {
     onUploadComplete: (summary: { jobId: string }) => void;
     onJobCreated?: (jobId: string) => void;
     onError: (error: string) => void;
     acceptedFileTypes?: string[];
     endpoints?: Record<string, unknown>;
+    assigneeUserId?: string;
   }) => (
     <div data-testid="document-uploader">
       <div>Accepted Types: {acceptedFileTypes?.join(', ')}</div>
       <div>Endpoints: {JSON.stringify(endpoints)}</div>
+      <div>Assignee: {assigneeUserId ?? '(none)'}</div>
       <button onClick={() => onUploadComplete({ jobId: 'test-job-123' })}>
         Upload Success
       </button>
@@ -43,18 +54,52 @@ vi.mock('@/components/epub/EPUBUploader', () => ({
   ),
 }));
 
+const baseUser: User = {
+  id: 'user-1',
+  email: 'operator@example.com',
+  firstName: 'Ada',
+  lastName: 'Lovelace',
+  role: 'OPERATOR',
+  tenantId: 'tenant-1',
+};
+
+function setCurrentUser(overrides?: Partial<User>) {
+  useAuthStore.setState({
+    user: { ...baseUser, ...overrides },
+    isAuthenticated: true,
+    isLoading: false,
+    accessToken: 'token',
+    refreshToken: 'refresh',
+  });
+}
+
+function renderPage() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <PdfAccessibilityPage />
+      </MemoryRouter>
+    </QueryClientProvider>
+  );
+}
+
 describe('PdfAccessibilityPage', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
+    mockListTeamExecutives.mockReset();
+    useAuthStore.setState({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      accessToken: null,
+      refreshToken: null,
+    });
   });
 
   describe('rendering', () => {
     it('should render the page title and description', () => {
-      render(
-        <MemoryRouter>
-          <PdfAccessibilityPage />
-        </MemoryRouter>
-      );
+      renderPage();
 
       expect(screen.getByRole('heading', { name: /PDF Accessibility/i })).toBeInTheDocument();
       expect(
@@ -63,11 +108,7 @@ describe('PdfAccessibilityPage', () => {
     });
 
     it('should render breadcrumbs', () => {
-      render(
-        <MemoryRouter>
-          <PdfAccessibilityPage />
-        </MemoryRouter>
-      );
+      renderPage();
 
       // Breadcrumbs component renders the label text
       // We check for the presence of the breadcrumb navigation structure
@@ -76,11 +117,7 @@ describe('PdfAccessibilityPage', () => {
     });
 
     it('should render upload card with title and description', () => {
-      render(
-        <MemoryRouter>
-          <PdfAccessibilityPage />
-        </MemoryRouter>
-      );
+      renderPage();
 
       expect(screen.getByText('Upload PDF')).toBeInTheDocument();
       expect(
@@ -89,11 +126,7 @@ describe('PdfAccessibilityPage', () => {
     });
 
     it('should render DocumentUploader component', () => {
-      render(
-        <MemoryRouter>
-          <PdfAccessibilityPage />
-        </MemoryRouter>
-      );
+      renderPage();
 
       expect(screen.getByTestId('document-uploader')).toBeInTheDocument();
     });
@@ -101,21 +134,13 @@ describe('PdfAccessibilityPage', () => {
 
   describe('DocumentUploader configuration', () => {
     it('should configure DocumentUploader to accept only PDF files', () => {
-      render(
-        <MemoryRouter>
-          <PdfAccessibilityPage />
-        </MemoryRouter>
-      );
+      renderPage();
 
       expect(screen.getByText('Accepted Types: pdf')).toBeInTheDocument();
     });
 
     it('should configure DocumentUploader with correct endpoints', () => {
-      render(
-        <MemoryRouter>
-          <PdfAccessibilityPage />
-        </MemoryRouter>
-      );
+      renderPage();
 
       const endpointsText = screen.getByText(/Endpoints:/);
       expect(endpointsText.textContent).toContain('directUpload');
@@ -129,11 +154,7 @@ describe('PdfAccessibilityPage', () => {
     it('should navigate to audit results page on successful upload with valid jobId', async () => {
       const user = userEvent.setup();
 
-      render(
-        <MemoryRouter>
-          <PdfAccessibilityPage />
-        </MemoryRouter>
-      );
+      renderPage();
 
       const uploadButton = screen.getByText('Upload Success');
       await user.click(uploadButton);
@@ -145,11 +166,7 @@ describe('PdfAccessibilityPage', () => {
       const user = userEvent.setup();
       const validateSpy = vi.spyOn(validation, 'validateJobId');
 
-      render(
-        <MemoryRouter>
-          <PdfAccessibilityPage />
-        </MemoryRouter>
-      );
+      renderPage();
 
       const uploadButton = screen.getByText('Upload Success');
       await user.click(uploadButton);
@@ -160,11 +177,7 @@ describe('PdfAccessibilityPage', () => {
     it('should not navigate if jobId is invalid', async () => {
       const user = userEvent.setup();
 
-      render(
-        <MemoryRouter>
-          <PdfAccessibilityPage />
-        </MemoryRouter>
-      );
+      renderPage();
 
       const maliciousButton = screen.getByText('Upload Malicious');
       await user.click(maliciousButton);
@@ -175,11 +188,7 @@ describe('PdfAccessibilityPage', () => {
     it('should show user-friendly error message for invalid jobId', async () => {
       const user = userEvent.setup();
 
-      render(
-        <MemoryRouter>
-          <PdfAccessibilityPage />
-        </MemoryRouter>
-      );
+      renderPage();
 
       const maliciousButton = screen.getByText('Upload Malicious');
       await user.click(maliciousButton);
@@ -194,11 +203,7 @@ describe('PdfAccessibilityPage', () => {
     it('should not expose internal details in error message', async () => {
       const user = userEvent.setup();
 
-      render(
-        <MemoryRouter>
-          <PdfAccessibilityPage />
-        </MemoryRouter>
-      );
+      renderPage();
 
       const maliciousButton = screen.getByText('Upload Malicious');
       await user.click(maliciousButton);
@@ -224,11 +229,7 @@ describe('PdfAccessibilityPage', () => {
     it('navigates to the audit results page as soon as the job is created, not waiting for upload completion', async () => {
       const user = userEvent.setup();
 
-      render(
-        <MemoryRouter>
-          <PdfAccessibilityPage />
-        </MemoryRouter>
-      );
+      renderPage();
 
       await user.click(screen.getByText('Job Created'));
 
@@ -239,11 +240,7 @@ describe('PdfAccessibilityPage', () => {
       const user = userEvent.setup();
       const validateSpy = vi.spyOn(validation, 'validateJobId');
 
-      render(
-        <MemoryRouter>
-          <PdfAccessibilityPage />
-        </MemoryRouter>
-      );
+      renderPage();
 
       await user.click(screen.getByText('Job Created'));
 
@@ -253,11 +250,7 @@ describe('PdfAccessibilityPage', () => {
     it('does not navigate if onJobCreated fires with an invalid jobId', async () => {
       const user = userEvent.setup();
 
-      render(
-        <MemoryRouter>
-          <PdfAccessibilityPage />
-        </MemoryRouter>
-      );
+      renderPage();
 
       await user.click(screen.getByText('Job Created Malicious'));
 
@@ -274,11 +267,7 @@ describe('PdfAccessibilityPage', () => {
     it('should display error message when upload fails', async () => {
       const user = userEvent.setup();
 
-      render(
-        <MemoryRouter>
-          <PdfAccessibilityPage />
-        </MemoryRouter>
-      );
+      renderPage();
 
       const errorButton = screen.getByText('Upload Error');
       await user.click(errorButton);
@@ -291,11 +280,7 @@ describe('PdfAccessibilityPage', () => {
     it('should allow dismissing error alerts', async () => {
       const user = userEvent.setup();
 
-      render(
-        <MemoryRouter>
-          <PdfAccessibilityPage />
-        </MemoryRouter>
-      );
+      renderPage();
 
       const errorButton = screen.getByText('Upload Error');
       await user.click(errorButton);
@@ -319,11 +304,7 @@ describe('PdfAccessibilityPage', () => {
     it('should prevent path traversal attacks via jobId validation', async () => {
       const user = userEvent.setup();
 
-      render(
-        <MemoryRouter>
-          <PdfAccessibilityPage />
-        </MemoryRouter>
-      );
+      renderPage();
 
       const maliciousButton = screen.getByText('Upload Malicious');
       await user.click(maliciousButton);
@@ -336,11 +317,7 @@ describe('PdfAccessibilityPage', () => {
     it('should only accept alphanumeric, hyphen, and underscore in jobId', async () => {
       const user = userEvent.setup();
 
-      render(
-        <MemoryRouter>
-          <PdfAccessibilityPage />
-        </MemoryRouter>
-      );
+      renderPage();
 
       const successButton = screen.getByText('Upload Success');
       await user.click(successButton);
@@ -352,26 +329,81 @@ describe('PdfAccessibilityPage', () => {
 
   describe('accessibility', () => {
     it('should have proper heading hierarchy', () => {
-      render(
-        <MemoryRouter>
-          <PdfAccessibilityPage />
-        </MemoryRouter>
-      );
+      renderPage();
 
       const heading = screen.getByRole('heading', { name: /PDF Accessibility/i });
       expect(heading).toBeInTheDocument();
     });
 
     it('should have descriptive text for the upload section', () => {
-      render(
-        <MemoryRouter>
-          <PdfAccessibilityPage />
-        </MemoryRouter>
-      );
+      renderPage();
 
       expect(
         screen.getByText(/analyze its accessibility features and identify issues/i)
       ).toBeInTheDocument();
+    });
+  });
+
+  describe('Assign to Executive dropdown', () => {
+    it('does not show the dropdown for a user with no team membership at all', () => {
+      renderPage();
+
+      expect(screen.queryByLabelText('Assign to')).not.toBeInTheDocument();
+      expect(mockListTeamExecutives).not.toHaveBeenCalled();
+    });
+
+    it('does not show the dropdown for a team membership that is EXECUTIVE, not TEAM_LEADER', () => {
+      setCurrentUser({
+        teamMemberships: [{ teamRole: 'EXECUTIVE', team: { id: 'team-1', name: 'Cell A' } }],
+      });
+      renderPage();
+
+      expect(screen.queryByLabelText('Assign to')).not.toBeInTheDocument();
+    });
+
+    it('shows the dropdown, grouped by team, for a Team Leader', async () => {
+      setCurrentUser({
+        teamMemberships: [{ teamRole: 'TEAM_LEADER', team: { id: 'team-1', name: 'Cell A' } }],
+      });
+      mockListTeamExecutives.mockResolvedValue({
+        executives: [
+          { userId: 'exec-1', firstName: 'Grace', lastName: 'Hopper', email: 'grace@example.com', teamId: 'team-1', teamName: 'Cell A' },
+          { userId: 'exec-2', firstName: 'Margaret', lastName: 'Hamilton', email: 'margaret@example.com', teamId: 'team-2', teamName: 'Cell B' },
+        ],
+      });
+
+      renderPage();
+
+      const select = await screen.findByLabelText('Assign to');
+      expect(screen.getByRole('option', { name: 'Myself' })).toBeInTheDocument();
+      expect(await screen.findByRole('group', { name: 'Cell A' })).toBeInTheDocument();
+      expect(screen.getByRole('group', { name: 'Cell B' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Grace Hopper' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Margaret Hamilton' })).toBeInTheDocument();
+      expect(select).toHaveValue('');
+    });
+
+    it('passes the selected executive as assigneeUserId to the uploader, and omits it again when reset to Myself', async () => {
+      const user = userEvent.setup();
+      setCurrentUser({
+        teamMemberships: [{ teamRole: 'TEAM_LEADER', team: { id: 'team-1', name: 'Cell A' } }],
+      });
+      mockListTeamExecutives.mockResolvedValue({
+        executives: [
+          { userId: 'exec-1', firstName: 'Grace', lastName: 'Hopper', email: 'grace@example.com', teamId: 'team-1', teamName: 'Cell A' },
+        ],
+      });
+
+      renderPage();
+
+      expect(await screen.findByText('Assignee: (none)')).toBeInTheDocument();
+      await screen.findByRole('option', { name: 'Grace Hopper' });
+
+      await user.selectOptions(screen.getByLabelText('Assign to'), 'exec-1');
+      expect(screen.getByText('Assignee: exec-1')).toBeInTheDocument();
+
+      await user.selectOptions(screen.getByLabelText('Assign to'), '');
+      expect(screen.getByText('Assignee: (none)')).toBeInTheDocument();
     });
   });
 });

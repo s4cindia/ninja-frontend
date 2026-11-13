@@ -19,6 +19,19 @@ export interface TeamJobFilters {
   type?: string;
 }
 
+export interface TeamExecutive {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  teamId: string;
+  teamName: string;
+}
+
+export interface TeamExecutivesResponse {
+  executives: TeamExecutive[];
+}
+
 export const teamService = {
   // GET /jobs/team -- every job owned by anyone on a team the caller is a
   // TEAM_LEADER or VIEWER on. 403s with NOT_TEAM_LEADER_OR_VIEWER if the
@@ -28,6 +41,16 @@ export const teamService = {
     const res = await api.get<ApiResponse<TeamJobsResponse>>('/jobs/team', {
       params: filters,
     });
+    return res.data.data;
+  },
+
+  // GET /jobs/team/executives -- TEAM_LEADER-only roster of every Executive
+  // across every team the caller leads, used to populate the "Assign to"
+  // dropdown when uploading a title on their behalf. Each entry carries its
+  // own teamId/teamName since a Team Leader can lead more than one team.
+  // 403s with NOT_TEAM_LEADER if the caller doesn't lead any team.
+  async listTeamExecutives(): Promise<TeamExecutivesResponse> {
+    const res = await api.get<ApiResponse<TeamExecutivesResponse>>('/jobs/team/executives');
     return res.data.data;
   },
 
