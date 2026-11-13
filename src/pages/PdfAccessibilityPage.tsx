@@ -4,6 +4,7 @@ import { FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
+import { Checkbox } from '@/components/ui/Checkbox';
 import { DocumentUploader } from '@/components/epub/EPUBUploader';
 import { validateJobId } from '@/utils/validation';
 import { useAuthStore } from '@/stores/auth.store';
@@ -16,6 +17,12 @@ export const PdfAccessibilityPage: React.FC = () => {
   const { user } = useAuthStore();
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [assigneeUserId, setAssigneeUserId] = useState('');
+  // Unchecked (false) is sent to DocumentUploader as `undefined`, not
+  // `false` -- an omitted upload-time override inherits the tenant's own
+  // aiRemediation.fullAutoModeDefault setting, while an explicit `false`
+  // would force Full Auto Mode off for this file even if the tenant
+  // default is on. Checking the box only ever opts a file IN.
+  const [fullAutoMode, setFullAutoMode] = useState(false);
 
   // A Team Leader can lead more than one team, so each entry carries its
   // own teamName -- group so the dropdown can label unambiguously which
@@ -108,6 +115,25 @@ export const PdfAccessibilityPage: React.FC = () => {
               </select>
             </div>
           )}
+          {/* A <div>, not <label> -- <label> would auto-forward its click to
+              the nested Checkbox <button> (buttons are labelable elements),
+              which combined with this span's own onClick would
+              double-toggle. Same reasoning as PdfAuditResultsPage's own
+              Re-run AI Analysis checkboxes. */}
+          <div className="flex items-center gap-1.5 text-sm text-gray-700 select-none">
+            <Checkbox
+              checked={fullAutoMode}
+              onChange={setFullAutoMode}
+              aria-label="Full Auto Mode"
+            />
+            <span
+              className="cursor-pointer"
+              onClick={() => setFullAutoMode((v) => !v)}
+              title="Skips the manual &quot;Start Auto Remediation&quot; click for this file -- Auto Mode starts itself once the initial audit and AI analysis complete. Leave unchecked to use your tenant's own default instead."
+            >
+              Full Auto Mode (skip the manual "Start Auto Remediation" step for this file)
+            </span>
+          </div>
           <DocumentUploader
             onUploadComplete={handleUploadComplete}
             onJobCreated={handleJobCreated}
@@ -120,6 +146,7 @@ export const PdfAccessibilityPage: React.FC = () => {
               },
             }}
             assigneeUserId={assigneeUserId || undefined}
+            fullAutoMode={fullAutoMode || undefined}
           />
         </CardContent>
       </Card>

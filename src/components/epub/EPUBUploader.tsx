@@ -50,6 +50,17 @@ interface DocumentUploaderProps {
    * or equal to the caller's own id" self-upload contract.
    */
   assigneeUserId?: string;
+  /**
+   * PDF-only: upload-time override for "Full Auto Mode" (ninja-backend#823)
+   * -- when explicitly true, this job skips the manual "Start Auto
+   * Remediation" click and auto-starts Auto Mode itself once its initial
+   * audit + AI analysis complete. Omitted (not false) when the operator
+   * leaves the checkbox unchecked, so the job inherits whatever the
+   * tenant's own aiRemediation.fullAutoModeDefault setting is instead of
+   * forcing it off -- same "absent means inherit" contract as
+   * assigneeUserId above, just for a boolean instead of an id.
+   */
+  fullAutoMode?: boolean;
 }
 
 interface EPUBUploaderProps {
@@ -83,6 +94,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   onJobCreated,
   onError,
   assigneeUserId,
+  fullAutoMode,
 }) => {
   const [state, setState] = useState<UploadState>('idle');
   const [progress, setProgress] = useState(0);
@@ -343,7 +355,12 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
           setUploadNow(Date.now());
         },
         endpoint.directUpload,
-        assigneeUserId ? { assigneeUserId } : undefined
+        (assigneeUserId || fullAutoMode !== undefined)
+          ? {
+              ...(assigneeUserId ? { assigneeUserId } : {}),
+              ...(fullAutoMode !== undefined ? { fullAutoMode: String(fullAutoMode) } : {}),
+            }
+          : undefined
       );
 
       setProgress(5);
@@ -365,6 +382,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
         const response = await api.post(endpoint.auditFile, {
           fileId: uploadResult.fileId,
           ...(assigneeUserId ? { assigneeUserId } : {}),
+          ...(fullAutoMode !== undefined ? { fullAutoMode } : {}),
         });
         const responseData = response.data.data || response.data;
         jobId = responseData.jobId || responseData.id;

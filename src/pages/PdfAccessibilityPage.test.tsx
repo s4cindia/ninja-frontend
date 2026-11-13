@@ -25,18 +25,20 @@ vi.mock('@/services/team.service', () => ({
 const mockListTeamExecutives = vi.mocked(teamService.listTeamExecutives);
 
 vi.mock('@/components/epub/EPUBUploader', () => ({
-  DocumentUploader: ({ onUploadComplete, onJobCreated, onError, acceptedFileTypes, endpoints, assigneeUserId }: {
+  DocumentUploader: ({ onUploadComplete, onJobCreated, onError, acceptedFileTypes, endpoints, assigneeUserId, fullAutoMode }: {
     onUploadComplete: (summary: { jobId: string }) => void;
     onJobCreated?: (jobId: string) => void;
     onError: (error: string) => void;
     acceptedFileTypes?: string[];
     endpoints?: Record<string, unknown>;
     assigneeUserId?: string;
+    fullAutoMode?: boolean;
   }) => (
     <div data-testid="document-uploader">
       <div>Accepted Types: {acceptedFileTypes?.join(', ')}</div>
       <div>Endpoints: {JSON.stringify(endpoints)}</div>
       <div>Assignee: {assigneeUserId ?? '(none)'}</div>
+      <div>Full Auto Mode: {fullAutoMode === undefined ? '(unset)' : String(fullAutoMode)}</div>
       <button onClick={() => onUploadComplete({ jobId: 'test-job-123' })}>
         Upload Success
       </button>
@@ -404,6 +406,28 @@ describe('PdfAccessibilityPage', () => {
 
       await user.selectOptions(screen.getByLabelText('Assign to'), '');
       expect(screen.getByText('Assignee: (none)')).toBeInTheDocument();
+    });
+  });
+
+  describe('Full Auto Mode checkbox', () => {
+    it('is unchecked by default, and omits fullAutoMode entirely (not false) from the uploader', () => {
+      renderPage();
+
+      const checkbox = screen.getByRole('checkbox', { name: 'Full Auto Mode' });
+      expect(checkbox).toHaveAttribute('aria-checked', 'false');
+      expect(screen.getByText('Full Auto Mode: (unset)')).toBeInTheDocument();
+    });
+
+    it('passes fullAutoMode={true} to the uploader once checked, and back to unset when unchecked again', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      const checkbox = screen.getByRole('checkbox', { name: 'Full Auto Mode' });
+      await user.click(checkbox);
+      expect(screen.getByText('Full Auto Mode: true')).toBeInTheDocument();
+
+      await user.click(checkbox);
+      expect(screen.getByText('Full Auto Mode: (unset)')).toBeInTheDocument();
     });
   });
 });

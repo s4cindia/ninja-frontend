@@ -73,17 +73,27 @@ export interface ReportsConfig {
  * bucket (`Tenant.settings.aiRemediation`) also holds tableFixMode,
  * listMode, languageMode, formFieldMode, bookmarkMode,
  * confidenceThreshold, and autoApplyHighConfidence, but this UI only
- * exposes the three fields operators actually need a saved default for:
- * what to do with a client's own alt text, and whether color-contrast /
- * link-text fixes get written into the PDF automatically. A per-job
- * override (the Re-run AI Analysis checkboxes, Auto Remediation's own
- * color-contrast dropdown) always wins over this default when one is
- * explicitly sent for that run.
+ * exposes the four fields operators actually need a saved default for:
+ * what to do with a client's own alt text, whether color-contrast /
+ * link-text fixes get written into the PDF automatically, and whether a
+ * newly uploaded PDF auto-starts Auto Remediation on its own (see
+ * fullAutoModeDefault below). A per-job override (the Re-run AI Analysis
+ * checkboxes, Auto Remediation's own color-contrast dropdown, or
+ * DocumentUploader's own Full Auto Mode checkbox at upload time) always
+ * wins over this default when one is explicitly sent for that run.
  */
 export interface AiRemediationConfig {
   altTextMode: 'apply-to-pdf' | 'guidance-only';
   colorContrastMode: 'guidance-only' | 'disabled' | 'apply-to-pdf';
   linkTextMode: 'guidance-only' | 'disabled' | 'apply-to-pdf';
+  /**
+   * Tenant-wide default for "Full Auto Mode" (ninja-backend#823) -- when
+   * true, a newly uploaded PDF job with no upload-time override
+   * auto-starts the existing Auto Mode loop itself once its initial audit
+   * + AI analysis complete, instead of waiting for an operator to click
+   * "Start Auto Remediation". Off (false) by default.
+   */
+  fullAutoModeDefault: boolean;
 }
 
 /**
@@ -231,9 +241,9 @@ class TenantConfigService {
     } catch (error) {
       console.error('[TenantConfig] Failed to fetch AI remediation config:', error);
       // Matches the backend's own DEFAULT_AI_REMEDIATION_CONFIG for these
-      // three fields, so a 403 (non-admin) or network failure still renders
+      // four fields, so a 403 (non-admin) or network failure still renders
       // something sensible rather than leaving the section blank.
-      return { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only' };
+      return { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only', fullAutoModeDefault: false };
     }
   }
 

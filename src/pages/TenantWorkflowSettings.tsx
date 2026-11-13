@@ -42,6 +42,7 @@ export const TenantWorkflowSettings: React.FC = () => {
   const [altTextMode, setAltTextMode] = useState<AiRemediationConfig['altTextMode']>('apply-to-pdf');
   const [colorContrastMode, setColorContrastMode] = useState<AiRemediationConfig['colorContrastMode']>('guidance-only');
   const [linkTextMode, setLinkTextMode] = useState<AiRemediationConfig['linkTextMode']>('guidance-only');
+  const [fullAutoModeDefault, setFullAutoModeDefault] = useState(false);
   const [savingAiRemediation, setSavingAiRemediation] = useState(false);
 
   // Form state — compliance tenant toggle. Readable by everyone, but only
@@ -88,6 +89,7 @@ export const TenantWorkflowSettings: React.FC = () => {
       setAltTextMode(currentAiRemediationConfig.altTextMode);
       setColorContrastMode(currentAiRemediationConfig.colorContrastMode);
       setLinkTextMode(currentAiRemediationConfig.linkTextMode);
+      setFullAutoModeDefault(currentAiRemediationConfig.fullAutoModeDefault);
       setComplianceConfig(currentComplianceConfig);
       setAcrRequired(currentComplianceConfig.acrRequired);
 
@@ -209,11 +211,12 @@ export const TenantWorkflowSettings: React.FC = () => {
   const handleSaveAiRemediationConfig = async () => {
     try {
       setSavingAiRemediation(true);
-      const updated = await tenantConfigService.updateAiRemediationConfig({ altTextMode, colorContrastMode, linkTextMode });
+      const updated = await tenantConfigService.updateAiRemediationConfig({ altTextMode, colorContrastMode, linkTextMode, fullAutoModeDefault });
       setAiRemediationConfig(updated);
       setAltTextMode(updated.altTextMode);
       setColorContrastMode(updated.colorContrastMode);
       setLinkTextMode(updated.linkTextMode);
+      setFullAutoModeDefault(updated.fullAutoModeDefault);
       toast.success('PDF AI remediation settings saved!', { duration: 3000, icon: '✅' });
     } catch (err: unknown) {
       const errorMessage = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
@@ -757,6 +760,32 @@ export const TenantWorkflowSettings: React.FC = () => {
           </select>
         </div>
 
+        <div className="border-t border-gray-200 pt-5">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <h4 className="text-sm font-medium text-gray-700">Full Auto Mode</h4>
+              <p className="mt-1 text-xs text-gray-500">
+                When on, a newly uploaded PDF automatically starts Auto Remediation's own
+                analyze / apply / re-audit loop as soon as its initial audit and AI analysis
+                complete, instead of waiting for an operator to click "Start Auto Remediation".
+                An upload-time override on the PDF upload page always wins over this tenant
+                default when set. Off by default.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer ml-4">
+              <input
+                type="checkbox"
+                aria-label="Full Auto Mode"
+                className="sr-only peer"
+                checked={fullAutoModeDefault}
+                disabled={!isAdmin || savingAiRemediation}
+                onChange={(e) => setFullAutoModeDefault(e.target.checked)}
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600 peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"></div>
+            </label>
+          </div>
+        </div>
+
         {isAdmin && (
           <div className="flex justify-end pt-1">
             <Button
@@ -765,7 +794,8 @@ export const TenantWorkflowSettings: React.FC = () => {
                 savingAiRemediation ||
                 (altTextMode === (aiRemediationConfig?.altTextMode ?? 'apply-to-pdf') &&
                   colorContrastMode === (aiRemediationConfig?.colorContrastMode ?? 'guidance-only') &&
-                  linkTextMode === (aiRemediationConfig?.linkTextMode ?? 'guidance-only'))
+                  linkTextMode === (aiRemediationConfig?.linkTextMode ?? 'guidance-only') &&
+                  fullAutoModeDefault === (aiRemediationConfig?.fullAutoModeDefault ?? false))
               }
             >
               {savingAiRemediation ? (

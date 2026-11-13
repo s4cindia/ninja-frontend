@@ -64,7 +64,7 @@ function mockAxes4Config(overrides?: Partial<Axes4Config>): Axes4Config {
 }
 
 function mockAiRemediationConfig(overrides?: Partial<AiRemediationConfig>): AiRemediationConfig {
-  return { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only', ...overrides };
+  return { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only', fullAutoModeDefault: false, ...overrides };
 }
 
 function mockComplianceConfig(overrides?: Partial<ComplianceConfig>): ComplianceConfig {
@@ -218,6 +218,7 @@ describe('TenantWorkflowSettings — PDF AI Remediation tenant defaults', () => 
         altTextMode: 'guidance-only',
         colorContrastMode: 'apply-to-pdf',
         linkTextMode: 'guidance-only',
+        fullAutoModeDefault: false,
       });
     });
   });
@@ -250,6 +251,51 @@ describe('TenantWorkflowSettings — PDF AI Remediation tenant defaults', () => 
     });
     // Still rendered, not crashed — the select reflects the unsaved attempt.
     expect(screen.getByLabelText('Alt text')).toHaveValue('guidance-only');
+  });
+
+  it('is read-only (disabled) for a non-admin, reflecting the loaded Full Auto Mode default', async () => {
+    setCurrentUser({ role: 'OPERATOR' });
+    mockService.getAiRemediationConfig.mockResolvedValue(mockAiRemediationConfig({ fullAutoModeDefault: true }));
+
+    render(<TenantWorkflowSettings />);
+
+    const checkbox = await screen.findByRole('checkbox', { name: 'Full Auto Mode' }) as HTMLInputElement;
+    expect(checkbox.checked).toBe(true);
+    expect(checkbox).toBeDisabled();
+  });
+
+  it('is editable for an ADMIN, and saves it together with the other AI remediation fields', async () => {
+    setCurrentUser({ role: 'ADMIN' });
+    mockService.updateAiRemediationConfig.mockResolvedValue(mockAiRemediationConfig({ fullAutoModeDefault: true }));
+
+    render(<TenantWorkflowSettings />);
+
+    const checkbox = await screen.findByRole('checkbox', { name: 'Full Auto Mode' }) as HTMLInputElement;
+    expect(checkbox).not.toBeDisabled();
+
+    fireEvent.click(checkbox);
+    fireEvent.click(screen.getByRole('button', { name: /Save PDF AI Remediation Settings/ }));
+
+    await waitFor(() => {
+      expect(mockService.updateAiRemediationConfig).toHaveBeenCalledWith({
+        altTextMode: 'apply-to-pdf',
+        colorContrastMode: 'guidance-only',
+        linkTextMode: 'guidance-only',
+        fullAutoModeDefault: true,
+      });
+    });
+  });
+
+  it('enables the Save button when only the Full Auto Mode toggle differs from the saved value', async () => {
+    setCurrentUser({ role: 'ADMIN' });
+
+    render(<TenantWorkflowSettings />);
+
+    const saveButton = await screen.findByRole('button', { name: /Save PDF AI Remediation Settings/ });
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Full Auto Mode' }));
+    expect(saveButton).not.toBeDisabled();
   });
 });
 
