@@ -62,4 +62,22 @@ describe('pdfAutoModeService', () => {
     expect(mockApi.get).toHaveBeenCalledWith('/pdf/job-123/auto-mode/status');
     expect(result).toEqual(status);
   });
+
+  it('getAutoModeStatus passes pendingFullAutoMode through unchanged (ninja-backend#825)', async () => {
+    const status = {
+      mode: 'manual' as const,
+      autoStatus: null,
+      autoStopReason: null,
+      autoRoundsCompleted: 0,
+      autoMaxRounds: 10,
+      autoCostSpentUsd: 0,
+      autoCostLimitUsd: 2,
+      pendingFullAutoMode: true,
+    };
+    mockApi.get.mockResolvedValueOnce({ data: { success: true, data: status } });
+
+    const result = await pdfAutoModeService.getAutoModeStatus('job-123');
+
+    expect(result).toEqual(status);
+  });
 });
