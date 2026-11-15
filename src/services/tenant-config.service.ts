@@ -73,14 +73,17 @@ export interface ReportsConfig {
  * bucket (`Tenant.settings.aiRemediation`) also holds tableFixMode,
  * listMode, languageMode, formFieldMode, bookmarkMode,
  * confidenceThreshold, and autoApplyHighConfidence, but this UI only
- * exposes the four fields operators actually need a saved default for:
+ * exposes the five fields operators actually need a saved default for:
  * what to do with a client's own alt text, whether color-contrast /
- * link-text fixes get written into the PDF automatically, and whether a
+ * link-text fixes get written into the PDF automatically, whether a
  * newly uploaded PDF auto-starts Auto Remediation on its own (see
- * fullAutoModeDefault below). A per-job override (the Re-run AI Analysis
- * checkboxes, Auto Remediation's own color-contrast dropdown, or
- * DocumentUploader's own Full Auto Mode checkbox at upload time) always
- * wins over this default when one is explicitly sent for that run.
+ * fullAutoModeDefault below), and whether a stalled Auto Mode run
+ * auto-escalates guidance-only fixes for one more pass (see
+ * autoEscalateOnStallDefault below). A per-job override (the Re-run AI
+ * Analysis checkboxes, Auto Remediation's own color-contrast dropdown, the
+ * upload-time checkboxes, or JobSettingsMenu's visible-any-time per-job
+ * overrides) always wins over this default when one is explicitly set for
+ * that job.
  */
 export interface AiRemediationConfig {
   altTextMode: 'apply-to-pdf' | 'guidance-only';
@@ -94,6 +97,16 @@ export interface AiRemediationConfig {
    * "Start Auto Remediation". Off (false) by default.
    */
   fullAutoModeDefault: boolean;
+  /**
+   * Tenant-wide default for "Auto-escalate on stall" (ninja-backend#826)
+   * -- when true, an Auto Mode run (manual or Full-Auto-triggered) that
+   * would otherwise stop "stalled" with no further progress instead
+   * escalates its guidance-only Color Contrast/Link Text fixes to
+   * auto-apply for exactly one more pass before stopping. Off (false) by
+   * default -- deliberately opt-in, since it overrides a tenant's own
+   * guidance-only safety gate for that one pass.
+   */
+  autoEscalateOnStallDefault: boolean;
 }
 
 /**
@@ -241,9 +254,9 @@ class TenantConfigService {
     } catch (error) {
       console.error('[TenantConfig] Failed to fetch AI remediation config:', error);
       // Matches the backend's own DEFAULT_AI_REMEDIATION_CONFIG for these
-      // four fields, so a 403 (non-admin) or network failure still renders
+      // five fields, so a 403 (non-admin) or network failure still renders
       // something sensible rather than leaving the section blank.
-      return { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only', fullAutoModeDefault: false };
+      return { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only', fullAutoModeDefault: false, autoEscalateOnStallDefault: false };
     }
   }
 

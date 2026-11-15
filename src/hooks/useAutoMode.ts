@@ -8,6 +8,7 @@ import type { StartAutoModeOverrides } from '@/services/pdfAutoMode.service';
 import { pdfRemediationService } from '@/services/pdf-remediation.service';
 import { msBetween } from '@/utils/pdfPhaseStepper';
 import type { RemediationHistoryRun, RemediationHistoryEvent } from '@/types/pdf-remediation.types';
+import type { UpdateJobSettingsBody } from '@/types/pdfAutoMode.types';
 
 export type { StartAutoModeOverrides };
 
@@ -15,6 +16,7 @@ const STATUS_KEY = (jobId: string) => ['pdf-auto-mode-status', jobId] as const;
 const ROUND_HISTORY_KEY = (jobId: string) => ['auto-mode-round-history', jobId] as const;
 const RAW_HISTORY_KEY = (jobId: string) => ['remediation-history-raw', jobId] as const;
 const BUDGET_ESTIMATE_KEY = (jobId: string) => ['pdf-auto-mode-budget-estimate', jobId] as const;
+const JOB_SETTINGS_KEY = (jobId: string) => ['pdf-job-settings', jobId] as const;
 
 /**
  * Suggested cost limit for this job, to seed AutoModeStartControl's popover
@@ -197,6 +199,30 @@ export function useStartAutoMode(jobId: string | undefined) {
     mutationFn: (overrides?: StartAutoModeOverrides) => pdfAutoModeService.startAutoMode(jobId!, overrides),
     onSuccess: () => {
       if (jobId) queryClient.invalidateQueries({ queryKey: STATUS_KEY(jobId) });
+    },
+  });
+}
+
+/**
+ * This job's own fullAutoMode/autoEscalateOnStall overrides (ninja-backend
+ * #826) -- gated on `opts.enabled` (default true) so JobSettingsMenu, which
+ * renders unconditionally on every page load, can fetch this lazily only
+ * once its popover actually opens rather than on every single job view.
+ */
+export function useJobSettings(jobId: string | undefined, opts?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: JOB_SETTINGS_KEY(jobId ?? ''),
+    queryFn: () => pdfAutoModeService.getJobSettings(jobId!),
+    enabled: !!jobId && (opts?.enabled ?? true),
+  });
+}
+
+export function useUpdateJobSettings(jobId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (updates: UpdateJobSettingsBody) => pdfAutoModeService.updateJobSettings(jobId!, updates),
+    onSuccess: (updated) => {
+      if (jobId) queryClient.setQueryData(JOB_SETTINGS_KEY(jobId), updated);
     },
   });
 }

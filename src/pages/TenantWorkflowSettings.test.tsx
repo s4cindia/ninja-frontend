@@ -64,7 +64,7 @@ function mockAxes4Config(overrides?: Partial<Axes4Config>): Axes4Config {
 }
 
 function mockAiRemediationConfig(overrides?: Partial<AiRemediationConfig>): AiRemediationConfig {
-  return { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only', fullAutoModeDefault: false, ...overrides };
+  return { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only', fullAutoModeDefault: false, autoEscalateOnStallDefault: false, ...overrides };
 }
 
 function mockComplianceConfig(overrides?: Partial<ComplianceConfig>): ComplianceConfig {
@@ -219,6 +219,7 @@ describe('TenantWorkflowSettings — PDF AI Remediation tenant defaults', () => 
         colorContrastMode: 'apply-to-pdf',
         linkTextMode: 'guidance-only',
         fullAutoModeDefault: false,
+        autoEscalateOnStallDefault: false,
       });
     });
   });
@@ -282,6 +283,7 @@ describe('TenantWorkflowSettings — PDF AI Remediation tenant defaults', () => 
         colorContrastMode: 'guidance-only',
         linkTextMode: 'guidance-only',
         fullAutoModeDefault: true,
+        autoEscalateOnStallDefault: false,
       });
     });
   });
@@ -295,6 +297,52 @@ describe('TenantWorkflowSettings — PDF AI Remediation tenant defaults', () => 
     expect(saveButton).toBeDisabled();
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'Full Auto Mode' }));
+    expect(saveButton).not.toBeDisabled();
+  });
+
+  it('is read-only (disabled) for a non-admin, reflecting the loaded Auto-escalate on stall default', async () => {
+    setCurrentUser({ role: 'OPERATOR' });
+    mockService.getAiRemediationConfig.mockResolvedValue(mockAiRemediationConfig({ autoEscalateOnStallDefault: true }));
+
+    render(<TenantWorkflowSettings />);
+
+    const checkbox = await screen.findByRole('checkbox', { name: 'Auto-escalate on stall' }) as HTMLInputElement;
+    expect(checkbox.checked).toBe(true);
+    expect(checkbox).toBeDisabled();
+  });
+
+  it('is editable for an ADMIN, and saves Auto-escalate on stall together with the other AI remediation fields', async () => {
+    setCurrentUser({ role: 'ADMIN' });
+    mockService.updateAiRemediationConfig.mockResolvedValue(mockAiRemediationConfig({ autoEscalateOnStallDefault: true }));
+
+    render(<TenantWorkflowSettings />);
+
+    const checkbox = await screen.findByRole('checkbox', { name: 'Auto-escalate on stall' }) as HTMLInputElement;
+    expect(checkbox).not.toBeDisabled();
+
+    fireEvent.click(checkbox);
+    fireEvent.click(screen.getByRole('button', { name: /Save PDF AI Remediation Settings/ }));
+
+    await waitFor(() => {
+      expect(mockService.updateAiRemediationConfig).toHaveBeenCalledWith({
+        altTextMode: 'apply-to-pdf',
+        colorContrastMode: 'guidance-only',
+        linkTextMode: 'guidance-only',
+        fullAutoModeDefault: false,
+        autoEscalateOnStallDefault: true,
+      });
+    });
+  });
+
+  it('enables the Save button when only the Auto-escalate on stall toggle differs from the saved value', async () => {
+    setCurrentUser({ role: 'ADMIN' });
+
+    render(<TenantWorkflowSettings />);
+
+    const saveButton = await screen.findByRole('button', { name: /Save PDF AI Remediation Settings/ });
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Auto-escalate on stall' }));
     expect(saveButton).not.toBeDisabled();
   });
 });

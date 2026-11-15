@@ -3,7 +3,7 @@ import { pdfAutoModeService } from './pdfAutoMode.service';
 import { api } from './api';
 
 vi.mock('./api', () => ({
-  api: { get: vi.fn(), post: vi.fn() },
+  api: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
 }));
 
 const mockApi = api as Mocked<typeof api>;
@@ -79,5 +79,31 @@ describe('pdfAutoModeService', () => {
     const result = await pdfAutoModeService.getAutoModeStatus('job-123');
 
     expect(result).toEqual(status);
+  });
+
+  it('getJobSettings GETs the correct endpoint and unwraps the response envelope', async () => {
+    const settings = {
+      fullAutoMode: { override: true, tenantDefault: false, effective: true },
+      autoEscalateOnStall: { override: null, tenantDefault: false, effective: false },
+    };
+    mockApi.get.mockResolvedValueOnce({ data: { success: true, data: settings } });
+
+    const result = await pdfAutoModeService.getJobSettings('job-123');
+
+    expect(mockApi.get).toHaveBeenCalledWith('/pdf/job-123/settings');
+    expect(result).toEqual(settings);
+  });
+
+  it('updateJobSettings PATCHes the correct endpoint with the given body and unwraps the response envelope', async () => {
+    const updated = {
+      fullAutoMode: { override: null, tenantDefault: false, effective: false },
+      autoEscalateOnStall: { override: true, tenantDefault: false, effective: true },
+    };
+    mockApi.patch.mockResolvedValueOnce({ data: { success: true, data: updated } });
+
+    const result = await pdfAutoModeService.updateJobSettings('job-123', { fullAutoMode: null, autoEscalateOnStall: true });
+
+    expect(mockApi.patch).toHaveBeenCalledWith('/pdf/job-123/settings', { fullAutoMode: null, autoEscalateOnStall: true });
+    expect(result).toEqual(updated);
   });
 });
