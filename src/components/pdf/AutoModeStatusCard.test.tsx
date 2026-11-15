@@ -17,6 +17,11 @@ function status(overrides?: Partial<AutoModeStatusResponse>): AutoModeStatusResp
     autoCostLimitUsd: 2,
     autoColorContrastMode: null,
     autoAltTextMode: null,
+    autoLinkTextMode: null,
+    autoBookmarkMode: null,
+    autoStallEscalated: false,
+    fullAutoModeEffective: false,
+    autoEscalateOnStallEffective: false,
     ...overrides,
   };
 }
@@ -77,6 +82,45 @@ describe('AutoModeStatusCard', () => {
     renderCard({ autoStatus: 'stopped', autoStopReason: 'converged', autoColorContrastMode: 'apply-to-pdf' });
 
     expect(screen.getByText(/contrast: auto-apply/i)).toBeInTheDocument();
+  });
+
+  it('shows Full Auto Mode and Auto-escalate on stall status while running -- real incident (2026-11-16): neither was visible anywhere on this page', () => {
+    renderCard({ fullAutoModeEffective: true, autoEscalateOnStallEffective: true });
+
+    expect(screen.getByText(/full auto mode: on/i)).toBeInTheDocument();
+    expect(screen.getByText(/auto-escalate on stall: on/i)).toBeInTheDocument();
+  });
+
+  it('labels Full Auto Mode / Auto-escalate on stall as Off when the effective value resolves false', () => {
+    renderCard({ fullAutoModeEffective: false, autoEscalateOnStallEffective: false });
+
+    expect(screen.getByText(/full auto mode: off/i)).toBeInTheDocument();
+    expect(screen.getByText(/auto-escalate on stall: off/i)).toBeInTheDocument();
+  });
+
+  it('flags that the one-time stall escalation already fired for this run', () => {
+    renderCard({ autoEscalateOnStallEffective: true, autoStallEscalated: true });
+
+    expect(screen.getByText(/auto-escalate on stall: on \(escalated\)/i)).toBeInTheDocument();
+  });
+
+  it('does not show the escalated suffix when escalation has not fired', () => {
+    renderCard({ autoEscalateOnStallEffective: true, autoStallEscalated: false });
+
+    expect(screen.queryByText(/escalated/i)).not.toBeInTheDocument();
+  });
+
+  it('shows the effective-settings summary on the terminal (stopped) summary too', () => {
+    renderCard({
+      autoStatus: 'stopped',
+      autoStopReason: 'converged',
+      fullAutoModeEffective: true,
+      autoEscalateOnStallEffective: true,
+      autoStallEscalated: true,
+    });
+
+    expect(screen.getByText(/full auto mode: on/i)).toBeInTheDocument();
+    expect(screen.getByText(/auto-escalate on stall: on \(escalated\)/i)).toBeInTheDocument();
   });
 
   it('calls onStop when Stop is clicked', () => {

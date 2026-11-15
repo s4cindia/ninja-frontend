@@ -62,6 +62,26 @@ function contrastModeLabel(mode: AutoColorContrastMode): string {
   return mode ? CONTRAST_MODE_LABELS[mode] : 'inherited';
 }
 
+// Spelled out as "On"/"Off" rather than reusing contrastModeLabel's
+// inherited/mode vocabulary — these two are already the fully-resolved
+// effective booleans (job override ?? tenant default), not a raw per-run
+// mode column, so there's no separate "inherited" state left to distinguish.
+function onOffLabel(value: boolean): string {
+  return value ? 'On' : 'Off';
+}
+
+/**
+ * The one line an operator needs to answer "what is this run actually
+ * configured to do" without opening the Settings menu or guessing from
+ * the round numbers -- real incident (2026-11-16): a stall with no
+ * escalation was indistinguishable from "auto-escalate was never on for
+ * this run" until this was visible anywhere on the page.
+ */
+function effectiveSettingsSummary(status: AutoModeStatusResponse): string {
+  const escalatedSuffix = status.autoStallEscalated ? ' (escalated)' : '';
+  return `Full Auto Mode: ${onOffLabel(status.fullAutoModeEffective)} · Auto-escalate on stall: ${onOffLabel(status.autoEscalateOnStallEffective)}${escalatedSuffix} · contrast: ${contrastModeLabel(status.autoColorContrastMode)}`;
+}
+
 export function AutoModeStatusCard({ status, onStop, isStopping, stopError, stopSucceeded, rounds, applyProgress, currentPhase }: AutoModeStatusCardProps) {
   // Ticks every second only while there's a live phase anchor to display —
   // the 'stopped' branch below never reaches this, so no interval leaks
@@ -77,7 +97,9 @@ export function AutoModeStatusCard({ status, onStop, isStopping, stopError, stop
     return (
       <div className="mx-6 mt-4">
         <Alert variant={config?.variant ?? 'info'} title={config?.title ?? 'Auto remediation stopped.'}>
-          Ran {status.autoRoundsCompleted} of {status.autoMaxRounds} rounds, ${status.autoCostSpentUsd.toFixed(2)} of ${status.autoCostLimitUsd.toFixed(2)} spent · contrast: {contrastModeLabel(status.autoColorContrastMode)}.
+          Ran {status.autoRoundsCompleted} of {status.autoMaxRounds} rounds, ${status.autoCostSpentUsd.toFixed(2)} of ${status.autoCostLimitUsd.toFixed(2)} spent.
+          <br />
+          {effectiveSettingsSummary(status)}
         </Alert>
         <AutoModeRoundHistory rounds={rounds} />
       </div>
@@ -116,7 +138,10 @@ export function AutoModeStatusCard({ status, onStop, isStopping, stopError, stop
         )}
         <Progress value={status.autoRoundsCompleted} max={status.autoMaxRounds} size="sm" />
         <p className="text-xs text-gray-500 mt-2">
-          ${status.autoCostSpentUsd.toFixed(2)} of ${status.autoCostLimitUsd.toFixed(2)} spent · contrast: {contrastModeLabel(status.autoColorContrastMode)}
+          ${status.autoCostSpentUsd.toFixed(2)} of ${status.autoCostLimitUsd.toFixed(2)} spent
+        </p>
+        <p className="text-xs text-gray-500 mt-1">
+          {effectiveSettingsSummary(status)}
         </p>
         {applyProgress?.connected && applyProgress.total != null && (
           <p className="text-xs text-primary-700 mt-1">

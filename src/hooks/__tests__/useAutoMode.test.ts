@@ -347,6 +347,11 @@ function statusResponse(overrides: Partial<AutoModeStatusResponse> = {}): AutoMo
     autoCostLimitUsd: 2,
     autoColorContrastMode: 'guidance-only' as const,
     autoAltTextMode: null,
+    autoLinkTextMode: null,
+    autoBookmarkMode: null,
+    autoStallEscalated: false,
+    fullAutoModeEffective: false,
+    autoEscalateOnStallEffective: false,
     ...overrides,
   };
 }
