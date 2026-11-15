@@ -1810,6 +1810,7 @@ export const PdfAuditResultsPage: React.FC = () => {
               </>
             )}
             <JobSettingsMenu
+              jobId={jobId}
               onGenerateAcr={() => navigate(`/acr/workflow?jobId=${jobId}&jobType=PDF_ACCESSIBILITY`)}
               generateAcrPending={autoTagInfo?.postRemediationStatus === 'pending'}
               generateAcrDisabled={autoTagInfo?.postRemediationStatus === 'pending'}

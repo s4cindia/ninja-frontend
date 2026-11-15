@@ -38,6 +38,46 @@ export interface AutoModeStatusResponse {
 }
 
 /**
+ * One per-job boolean override as reported by GET/PATCH /pdf/:jobId/settings
+ * (ninja-backend#826) -- `override` is this job's own raw column value
+ * (null means "inherit the tenant default", distinct from an explicit
+ * true/false), `tenantDefault` is the current tenant-wide setting it falls
+ * back to, and `effective` is the already-resolved value actually in play
+ * for this job (what the backend's own resolveFullAutoMode/
+ * resolveEscalateOnStall would compute). Shown together so the UI can
+ * render "On (tenant default)" vs. "On (this job's own override)" without
+ * having to resolve it client-side itself.
+ */
+export interface JobSettingOverride {
+  override: boolean | null;
+  tenantDefault: boolean;
+  effective: boolean;
+}
+
+/**
+ * GET/PATCH /pdf/:jobId/settings response (ninja-backend#826) -- the
+ * visible, editable-any-time home for both Full Auto Mode's and
+ * Auto-escalate-on-stall's per-job overrides. Previously fullAutoMode was
+ * set-and-forget at upload time with no way to see or change it afterward;
+ * this is what JobSettingsMenu reads/writes instead.
+ */
+export interface JobSettingsResponse {
+  fullAutoMode: JobSettingOverride;
+  autoEscalateOnStall: JobSettingOverride;
+}
+
+/**
+ * PATCH body for /pdf/:jobId/settings. Omitting a field leaves it
+ * untouched; an explicit `null` resets it to "inherit the tenant default",
+ * distinct from omitting it -- mirrors updateJobSettingsSchema on the
+ * backend exactly.
+ */
+export interface UpdateJobSettingsBody {
+  fullAutoMode?: boolean | null;
+  autoEscalateOnStall?: boolean | null;
+}
+
+/**
  * Suggested autoCostLimitUsd, derived from real historical spend on
  * similarly-sized documents instead of a flat hardcoded default (see
  * ninja-backend's auto-mode-budget-estimate.service.ts). `confidence: 'low'`

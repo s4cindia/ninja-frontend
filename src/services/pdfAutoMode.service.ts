@@ -10,7 +10,7 @@
  */
 
 import { api } from './api';
-import type { AutoModeStatusResponse, BudgetEstimate } from '@/types/pdfAutoMode.types';
+import type { AutoModeStatusResponse, BudgetEstimate, JobSettingsResponse, UpdateJobSettingsBody } from '@/types/pdfAutoMode.types';
 
 /**
  * Per-run overrides for a job with no linked Comparison Study trial — a
@@ -58,9 +58,31 @@ export async function getBudgetEstimate(jobId: string): Promise<BudgetEstimate> 
   return response.data.data;
 }
 
+/**
+ * GET /pdf/:jobId/settings (ninja-backend#826) -- this job's own
+ * fullAutoMode/autoEscalateOnStall overrides, each with its tenant default
+ * and already-resolved effective value. Visible/editable any time, not
+ * just at upload.
+ */
+export async function getJobSettings(jobId: string): Promise<JobSettingsResponse> {
+  const response = await api.get(`/pdf/${encodeURIComponent(jobId)}/settings`);
+  return response.data.data;
+}
+
+/**
+ * PATCH /pdf/:jobId/settings -- omitting a field leaves it untouched;
+ * an explicit `null` resets it to "inherit the tenant default".
+ */
+export async function updateJobSettings(jobId: string, updates: UpdateJobSettingsBody): Promise<JobSettingsResponse> {
+  const response = await api.patch(`/pdf/${encodeURIComponent(jobId)}/settings`, updates);
+  return response.data.data;
+}
+
 export const pdfAutoModeService = {
   startAutoMode,
   getAutoModeStatus,
   stopAutoMode,
   getBudgetEstimate,
+  getJobSettings,
+  updateJobSettings,
 };

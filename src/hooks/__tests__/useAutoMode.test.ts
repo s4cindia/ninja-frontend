@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
-import { useAutoModeRoundHistory, useStartAutoMode, useBudgetEstimate, useRemediationHistory } from '../useAutoMode';
+import { useAutoModeRoundHistory, useStartAutoMode, useBudgetEstimate, useRemediationHistory, useJobSettings, useUpdateJobSettings } from '../useAutoMode';
 import { pdfRemediationService } from '@/services/pdf-remediation.service';
 import { pdfAutoModeService } from '@/services/pdfAutoMode.service';
 import type { RemediationHistoryRun, RemediationHistoryEvent } from '@/types/pdf-remediation.types';
@@ -12,7 +12,14 @@ vi.mock('@/services/pdf-remediation.service', () => ({
 }));
 
 vi.mock('@/services/pdfAutoMode.service', () => ({
-  pdfAutoModeService: { startAutoMode: vi.fn(), getAutoModeStatus: vi.fn(), stopAutoMode: vi.fn(), getBudgetEstimate: vi.fn() },
+  pdfAutoModeService: {
+    startAutoMode: vi.fn(),
+    getAutoModeStatus: vi.fn(),
+    stopAutoMode: vi.fn(),
+    getBudgetEstimate: vi.fn(),
+    getJobSettings: vi.fn(),
+    updateJobSettings: vi.fn(),
+  },
 }));
 
 const mockService = vi.mocked(pdfRemediationService);
@@ -325,6 +332,102 @@ describe('useBudgetEstimate', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockAutoModeService.getBudgetEstimate).toHaveBeenCalledWith('job-1');
+  });
+});
+
+describe('useJobSettings', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function settings(overrides: { fullAutoMode?: Partial<{ override: boolean | null; tenantDefault: boolean; effective: boolean }>; autoEscalateOnStall?: Partial<{ override: boolean | null; tenantDefault: boolean; effective: boolean }> } = {}) {
+    return {
+      fullAutoMode: { override: null, tenantDefault: false, effective: false, ...overrides.fullAutoMode },
+      autoEscalateOnStall: { override: null, tenantDefault: false, effective: false, ...overrides.autoEscalateOnStall },
+    };
+  }
+
+  it('is disabled without a jobId', () => {
+    const { result } = renderHook(() => useJobSettings(undefined), { wrapper: createWrapper() });
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(mockAutoModeService.getJobSettings).not.toHaveBeenCalled();
+  });
+
+  it('is disabled when opts.enabled is false, even with a jobId -- lets JobSettingsMenu defer the fetch until its popover actually opens', () => {
+    const { result } = renderHook(() => useJobSettings('job-1', { enabled: false }), { wrapper: createWrapper() });
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(mockAutoModeService.getJobSettings).not.toHaveBeenCalled();
+  });
+
+  it('fetches once enabled and returns both overrides', async () => {
+    mockAutoModeService.getJobSettings.mockResolvedValue(settings({ fullAutoMode: { override: true, effective: true } }));
+    const { result } = renderHook(() => useJobSettings('job-1', { enabled: true }), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockAutoModeService.getJobSettings).toHaveBeenCalledWith('job-1');
+    expect(result.current.data?.fullAutoMode).toEqual({ override: true, tenantDefault: false, effective: true });
+  });
+
+  it('fetches once opts.enabled flips true (the popover opening after this hook was already mounted)', async () => {
+    mockAutoModeService.getJobSettings.mockResolvedValue(settings());
+    const { result, rerender } = renderHook(
+      ({ enabled }: { enabled: boolean }) => useJobSettings('job-1', { enabled }),
+      { wrapper: createWrapper(), initialProps: { enabled: false } }
+    );
+    expect(mockAutoModeService.getJobSettings).not.toHaveBeenCalled();
+
+    rerender({ enabled: true });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockAutoModeService.getJobSettings).toHaveBeenCalledWith('job-1');
+  });
+});
+
+describe('useUpdateJobSettings', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls the service with the given partial update', async () => {
+    const updated = {
+      fullAutoMode: { override: true, tenantDefault: false, effective: true },
+      autoEscalateOnStall: { override: null, tenantDefault: false, effective: false },
+    };
+    mockAutoModeService.updateJobSettings.mockResolvedValue(updated);
+    const { result } = renderHook(() => useUpdateJobSettings('job-1'), { wrapper: createWrapper() });
+
+    act(() => { result.current.mutate({ fullAutoMode: true }); });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockAutoModeService.updateJobSettings).toHaveBeenCalledWith('job-1', { fullAutoMode: true });
+  });
+
+  it('seeds useJobSettings\' own cache with the mutation result, so the menu reflects the change without a second fetch', async () => {
+    const initial = {
+      fullAutoMode: { override: null, tenantDefault: false, effective: false },
+      autoEscalateOnStall: { override: null, tenantDefault: false, effective: false },
+    };
+    const updated = {
+      fullAutoMode: { override: null, tenantDefault: false, effective: false },
+      autoEscalateOnStall: { override: true, tenantDefault: false, effective: true },
+    };
+    mockAutoModeService.getJobSettings.mockResolvedValue(initial);
+    mockAutoModeService.updateJobSettings.mockResolvedValue(updated);
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      createElement(QueryClientProvider, { client: queryClient }, children);
+
+    const settingsHook = renderHook(() => useJobSettings('job-1'), { wrapper });
+    await waitFor(() => expect(settingsHook.result.current.isSuccess).toBe(true));
+
+    const updateHook = renderHook(() => useUpdateJobSettings('job-1'), { wrapper });
+    act(() => { updateHook.result.current.mutate({ autoEscalateOnStall: true }); });
+    await waitFor(() => expect(updateHook.result.current.isSuccess).toBe(true));
+
+    expect(queryClient.getQueryData(['pdf-job-settings', 'job-1'])).toEqual(updated);
   });
 });
 

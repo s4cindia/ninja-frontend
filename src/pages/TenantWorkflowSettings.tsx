@@ -43,6 +43,7 @@ export const TenantWorkflowSettings: React.FC = () => {
   const [colorContrastMode, setColorContrastMode] = useState<AiRemediationConfig['colorContrastMode']>('guidance-only');
   const [linkTextMode, setLinkTextMode] = useState<AiRemediationConfig['linkTextMode']>('guidance-only');
   const [fullAutoModeDefault, setFullAutoModeDefault] = useState(false);
+  const [autoEscalateOnStallDefault, setAutoEscalateOnStallDefault] = useState(false);
   const [savingAiRemediation, setSavingAiRemediation] = useState(false);
 
   // Form state — compliance tenant toggle. Readable by everyone, but only
@@ -90,6 +91,7 @@ export const TenantWorkflowSettings: React.FC = () => {
       setColorContrastMode(currentAiRemediationConfig.colorContrastMode);
       setLinkTextMode(currentAiRemediationConfig.linkTextMode);
       setFullAutoModeDefault(currentAiRemediationConfig.fullAutoModeDefault);
+      setAutoEscalateOnStallDefault(currentAiRemediationConfig.autoEscalateOnStallDefault);
       setComplianceConfig(currentComplianceConfig);
       setAcrRequired(currentComplianceConfig.acrRequired);
 
@@ -211,12 +213,13 @@ export const TenantWorkflowSettings: React.FC = () => {
   const handleSaveAiRemediationConfig = async () => {
     try {
       setSavingAiRemediation(true);
-      const updated = await tenantConfigService.updateAiRemediationConfig({ altTextMode, colorContrastMode, linkTextMode, fullAutoModeDefault });
+      const updated = await tenantConfigService.updateAiRemediationConfig({ altTextMode, colorContrastMode, linkTextMode, fullAutoModeDefault, autoEscalateOnStallDefault });
       setAiRemediationConfig(updated);
       setAltTextMode(updated.altTextMode);
       setColorContrastMode(updated.colorContrastMode);
       setLinkTextMode(updated.linkTextMode);
       setFullAutoModeDefault(updated.fullAutoModeDefault);
+      setAutoEscalateOnStallDefault(updated.autoEscalateOnStallDefault);
       toast.success('PDF AI remediation settings saved!', { duration: 3000, icon: '✅' });
     } catch (err: unknown) {
       const errorMessage = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
@@ -786,6 +789,32 @@ export const TenantWorkflowSettings: React.FC = () => {
           </div>
         </div>
 
+        <div className="border-t border-gray-200 pt-5">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <h4 className="text-sm font-medium text-gray-700">Auto-escalate on stall</h4>
+              <p className="mt-1 text-xs text-gray-500">
+                When an Auto Mode run would otherwise stop with no further progress,
+                automatically escalate guidance-only Color Contrast/Link Text fixes to
+                auto-apply for one more pass before stopping. A per-job override on the
+                Audit Results page's Settings menu always wins over this tenant default
+                when set. Off by default.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer ml-4">
+              <input
+                type="checkbox"
+                aria-label="Auto-escalate on stall"
+                className="sr-only peer"
+                checked={autoEscalateOnStallDefault}
+                disabled={!isAdmin || savingAiRemediation}
+                onChange={(e) => setAutoEscalateOnStallDefault(e.target.checked)}
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600 peer-disabled:opacity-50 peer-disabled:cursor-not-allowed"></div>
+            </label>
+          </div>
+        </div>
+
         {isAdmin && (
           <div className="flex justify-end pt-1">
             <Button
@@ -795,7 +824,8 @@ export const TenantWorkflowSettings: React.FC = () => {
                 (altTextMode === (aiRemediationConfig?.altTextMode ?? 'apply-to-pdf') &&
                   colorContrastMode === (aiRemediationConfig?.colorContrastMode ?? 'guidance-only') &&
                   linkTextMode === (aiRemediationConfig?.linkTextMode ?? 'guidance-only') &&
-                  fullAutoModeDefault === (aiRemediationConfig?.fullAutoModeDefault ?? false))
+                  fullAutoModeDefault === (aiRemediationConfig?.fullAutoModeDefault ?? false) &&
+                  autoEscalateOnStallDefault === (aiRemediationConfig?.autoEscalateOnStallDefault ?? false))
               }
             >
               {savingAiRemediation ? (
