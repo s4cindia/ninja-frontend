@@ -403,6 +403,61 @@ describe('DocumentUploader upload progress', () => {
     );
   });
 
+  it('threads autoEscalateOnStall into uploadService.uploadFile as a stringified extra field, for the direct-upload fallback path', async () => {
+    mockUploadService.uploadFile.mockResolvedValue({
+      uploadMethod: 'direct',
+      jobId: 'job-998',
+    } as Awaited<ReturnType<typeof uploadService.uploadFile>>);
+
+    render(
+      <DocumentUploader
+        acceptedFileTypes={['pdf']}
+        endpoints={{ pdf: { directUpload: '/pdf/audit-upload', auditFile: '/pdf/audit-file' } }}
+        autoEscalateOnStall={true}
+        onJobCreated={vi.fn()}
+      />
+    );
+
+    await selectFileAndStartUpload(pdfFile('escalate.pdf', 1024));
+
+    await waitFor(() => expect(mockUploadService.uploadFile).toHaveBeenCalled());
+    expect(mockUploadService.uploadFile).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      '/pdf/audit-upload',
+      { autoEscalateOnStall: 'true' }
+    );
+  });
+
+  it('includes a real JSON boolean autoEscalateOnStall in the auditFile body for the presigned-S3 upload path, alongside fullAutoMode', async () => {
+    mockUploadService.uploadFile.mockResolvedValue({
+      uploadMethod: 's3',
+      fileId: 'file-124',
+      fileKey: 'file-124',
+    } as Awaited<ReturnType<typeof uploadService.uploadFile>>);
+    mockApiPost.mockResolvedValue({ data: { data: { jobId: 'job-556' } } });
+
+    render(
+      <DocumentUploader
+        acceptedFileTypes={['pdf']}
+        endpoints={{ pdf: { directUpload: '/pdf/audit-upload', auditFile: '/pdf/audit-file' } }}
+        fullAutoMode={true}
+        autoEscalateOnStall={false}
+        onJobCreated={vi.fn()}
+      />
+    );
+
+    await selectFileAndStartUpload(pdfFile('escalate-s3.pdf', 1024));
+
+    await waitFor(() =>
+      expect(mockApiPost).toHaveBeenCalledWith('/pdf/audit-file', {
+        fileId: 'file-124',
+        fullAutoMode: true,
+        autoEscalateOnStall: false,
+      })
+    );
+  });
+
   it('shows the backend error message (not axios\'s generic status-code text) when the upload is rejected, e.g. NOT_TEAM_LEADER_OF_EXECUTIVE', async () => {
     mockUploadService.uploadFile.mockRejectedValue({
       isAxiosError: true,

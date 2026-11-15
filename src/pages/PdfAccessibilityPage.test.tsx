@@ -25,7 +25,7 @@ vi.mock('@/services/team.service', () => ({
 const mockListTeamExecutives = vi.mocked(teamService.listTeamExecutives);
 
 vi.mock('@/components/epub/EPUBUploader', () => ({
-  DocumentUploader: ({ onUploadComplete, onJobCreated, onError, acceptedFileTypes, endpoints, assigneeUserId, fullAutoMode }: {
+  DocumentUploader: ({ onUploadComplete, onJobCreated, onError, acceptedFileTypes, endpoints, assigneeUserId, fullAutoMode, autoEscalateOnStall }: {
     onUploadComplete: (summary: { jobId: string }) => void;
     onJobCreated?: (jobId: string) => void;
     onError: (error: string) => void;
@@ -33,12 +33,14 @@ vi.mock('@/components/epub/EPUBUploader', () => ({
     endpoints?: Record<string, unknown>;
     assigneeUserId?: string;
     fullAutoMode?: boolean;
+    autoEscalateOnStall?: boolean;
   }) => (
     <div data-testid="document-uploader">
       <div>Accepted Types: {acceptedFileTypes?.join(', ')}</div>
       <div>Endpoints: {JSON.stringify(endpoints)}</div>
       <div>Assignee: {assigneeUserId ?? '(none)'}</div>
       <div>Full Auto Mode: {fullAutoMode === undefined ? '(unset)' : String(fullAutoMode)}</div>
+      <div>Auto-escalate on stall: {autoEscalateOnStall === undefined ? '(unset)' : String(autoEscalateOnStall)}</div>
       <button onClick={() => onUploadComplete({ jobId: 'test-job-123' })}>
         Upload Success
       </button>
@@ -428,6 +430,28 @@ describe('PdfAccessibilityPage', () => {
 
       await user.click(checkbox);
       expect(screen.getByText('Full Auto Mode: (unset)')).toBeInTheDocument();
+    });
+  });
+
+  describe('Auto-escalate on stall checkbox', () => {
+    it('is unchecked by default, and omits autoEscalateOnStall entirely (not false) from the uploader', () => {
+      renderPage();
+
+      const checkbox = screen.getByRole('checkbox', { name: 'Auto-escalate on stall' });
+      expect(checkbox).toHaveAttribute('aria-checked', 'false');
+      expect(screen.getByText('Auto-escalate on stall: (unset)')).toBeInTheDocument();
+    });
+
+    it('passes autoEscalateOnStall={true} to the uploader once checked, and back to unset when unchecked again', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      const checkbox = screen.getByRole('checkbox', { name: 'Auto-escalate on stall' });
+      await user.click(checkbox);
+      expect(screen.getByText('Auto-escalate on stall: true')).toBeInTheDocument();
+
+      await user.click(checkbox);
+      expect(screen.getByText('Auto-escalate on stall: (unset)')).toBeInTheDocument();
     });
   });
 });
