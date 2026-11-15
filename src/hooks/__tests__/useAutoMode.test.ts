@@ -2,10 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement } from 'react';
-import { useAutoModeRoundHistory, useStartAutoMode, useBudgetEstimate, useRemediationHistory, useJobSettings, useUpdateJobSettings } from '../useAutoMode';
+import { useAutoModeRoundHistory, useStartAutoMode, useBudgetEstimate, useRemediationHistory, useJobSettings, useUpdateJobSettings, useAutoModeStatus } from '../useAutoMode';
 import { pdfRemediationService } from '@/services/pdf-remediation.service';
 import { pdfAutoModeService } from '@/services/pdfAutoMode.service';
 import type { RemediationHistoryRun, RemediationHistoryEvent } from '@/types/pdf-remediation.types';
+import type { AutoModeStatusResponse } from '@/types/pdfAutoMode.types';
 
 vi.mock('@/services/pdf-remediation.service', () => ({
   pdfRemediationService: { getRemediationHistory: vi.fn() },
@@ -332,6 +333,105 @@ describe('useBudgetEstimate', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockAutoModeService.getBudgetEstimate).toHaveBeenCalledWith('job-1');
+  });
+});
+
+function statusResponse(overrides: Partial<AutoModeStatusResponse> = {}): AutoModeStatusResponse {
+  return {
+    mode: 'manual' as const,
+    autoStatus: null,
+    autoStopReason: null,
+    autoRoundsCompleted: 0,
+    autoMaxRounds: 10,
+    autoCostSpentUsd: 0,
+    autoCostLimitUsd: 2,
+    autoColorContrastMode: 'guidance-only' as const,
+    autoAltTextMode: null,
+    ...overrides,
+  };
+}
+
+describe('useAutoModeStatus polling', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('does not poll while autoStatus is null and pendingFullAutoMode is unset -- the ordinary manual-flow case, unaffected by the Full Auto Mode fix', async () => {
+    vi.useFakeTimers();
+    try {
+      mockAutoModeService.getAutoModeStatus.mockResolvedValue(statusResponse());
+
+      renderHook(() => useAutoModeStatus('job-1'), { wrapper: createWrapper() });
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(mockAutoModeService.getAutoModeStatus).toHaveBeenCalledTimes(1);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+      expect(mockAutoModeService.getAutoModeStatus).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('still polls every 5s while autoStatus is \'running\' -- pre-existing behavior, unaffected by the pendingFullAutoMode addition', async () => {
+    vi.useFakeTimers();
+    try {
+      mockAutoModeService.getAutoModeStatus.mockResolvedValue(
+        statusResponse({ mode: 'auto', autoStatus: 'running', autoRoundsCompleted: 1, autoCostSpentUsd: 0.1 })
+      );
+
+      renderHook(() => useAutoModeStatus('job-1'), { wrapper: createWrapper() });
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(mockAutoModeService.getAutoModeStatus).toHaveBeenCalledTimes(1);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      expect(mockAutoModeService.getAutoModeStatus).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('regression (ninja-backend#825): keeps polling every 5s while pendingFullAutoMode is true even though autoStatus is still null -- without this, a server-side Full Auto Mode trigger that fires after this hook\'s first fetch is never observed, and the page stays frozen on an idle button', async () => {
+    vi.useFakeTimers();
+    try {
+      mockAutoModeService.getAutoModeStatus.mockResolvedValue(statusResponse({ pendingFullAutoMode: true }));
+
+      renderHook(() => useAutoModeStatus('job-1'), { wrapper: createWrapper() });
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(mockAutoModeService.getAutoModeStatus).toHaveBeenCalledTimes(1);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      expect(mockAutoModeService.getAutoModeStatus).toHaveBeenCalledTimes(2);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      expect(mockAutoModeService.getAutoModeStatus).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('regression: stops polling once a terminal state arrives with pendingFullAutoMode cleared -- a job whose trigger never fires (e.g. the tenant default flips off mid-wait) must not poll forever', async () => {
+    vi.useFakeTimers();
+    try {
+      mockAutoModeService.getAutoModeStatus
+        .mockResolvedValueOnce(statusResponse({ pendingFullAutoMode: true }))
+        .mockResolvedValue(statusResponse());
+
+      renderHook(() => useAutoModeStatus('job-1'), { wrapper: createWrapper() });
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(mockAutoModeService.getAutoModeStatus).toHaveBeenCalledTimes(1);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+      expect(mockAutoModeService.getAutoModeStatus).toHaveBeenCalledTimes(2);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+      expect(mockAutoModeService.getAutoModeStatus).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

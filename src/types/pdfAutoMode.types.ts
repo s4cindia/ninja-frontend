@@ -35,6 +35,15 @@ export interface AutoModeStatusResponse {
    * rounds' own individual timings, just "how long has this run been going".
    */
   autoStartedAt?: string | null;
+  /**
+   * True while no run has started yet (autoStatus still null) but Full Auto
+   * Mode (ninja-backend#823/#825) resolves to on for this job -- i.e. the
+   * backend's own server-side trigger is expected to start a run on its own
+   * once the initial audit + AI analysis complete, with no operator click.
+   * Omitted (not false) once a run has actually started or stopped. See
+   * useAutoModeStatus's own doc comment for why the frontend needs this.
+   */
+  pendingFullAutoMode?: boolean;
 }
 
 /**

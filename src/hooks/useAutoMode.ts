@@ -66,13 +66,25 @@ export function useRemediationHistory(jobId: string | undefined, opts?: { isRunn
  * once the run concludes (or was never started) — same "don't poll once
  * there's nothing left to observe" principle as the remediation-cycle-lock
  * polling in PdfAuditResultsPage.
+ *
+ * Also polls while pendingFullAutoMode is true (ninja-backend#825): real bug
+ * fix, confirmed live on staging — for a Full Auto Mode job, this query's
+ * very first fetch (right after upload) almost always sees autoStatus still
+ * null, since the server-side trigger hasn't fired yet. Without this,
+ * refetchInterval's false disabled polling for good -- unlike the manual
+ * "Start Auto Remediation" click (useStartAutoMode invalidates this query's
+ * key on success, forcing one fresh fetch), nothing ever re-enables it for a
+ * run that starts entirely server-side, so the page stayed frozen showing an
+ * idle button for the run's whole 16+ minute duration. pendingFullAutoMode
+ * keeps this ticking until the trigger actually fires (or never does).
  */
 export function useAutoModeStatus(jobId: string | undefined) {
   return useQuery({
     queryKey: STATUS_KEY(jobId ?? ''),
     queryFn: () => pdfAutoModeService.getAutoModeStatus(jobId!),
     enabled: !!jobId,
-    refetchInterval: (query) => (query.state.data?.autoStatus === 'running' ? 5000 : false),
+    refetchInterval: (query) =>
+      query.state.data?.autoStatus === 'running' || query.state.data?.pendingFullAutoMode ? 5000 : false,
   });
 }
 
