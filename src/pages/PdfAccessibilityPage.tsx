@@ -23,6 +23,12 @@ export const PdfAccessibilityPage: React.FC = () => {
   // would force Full Auto Mode off for this file even if the tenant
   // default is on. Checking the box only ever opts a file IN.
   const [fullAutoMode, setFullAutoMode] = useState(false);
+  // Same "checking only ever opts in" contract as fullAutoMode above. Shown
+  // alongside it (not as its own separate control) because it only matters
+  // in practice when Full Auto Mode is also on for this file -- that's the
+  // one path where nobody will be on the Audit Results page in time to set
+  // this via the per-job Settings menu before the auto-started run reads it.
+  const [autoEscalateOnStall, setAutoEscalateOnStall] = useState(false);
 
   // A Team Leader can lead more than one team, so each entry carries its
   // own teamName -- group so the dropdown can label unambiguously which
@@ -134,6 +140,20 @@ export const PdfAccessibilityPage: React.FC = () => {
               Full Auto Mode (skip the manual "Start Auto Remediation" step for this file)
             </span>
           </div>
+          <div className="flex items-center gap-1.5 text-sm text-gray-700 select-none">
+            <Checkbox
+              checked={autoEscalateOnStall}
+              onChange={setAutoEscalateOnStall}
+              aria-label="Auto-escalate on stall"
+            />
+            <span
+              className="cursor-pointer"
+              onClick={() => setAutoEscalateOnStall((v) => !v)}
+              title="If Auto Mode would otherwise stop with no further progress, automatically escalate guidance-only Color Contrast/Link Text/Bookmark fixes to auto-apply for one more pass before stopping. Matters most together with Full Auto Mode above, since nobody will be here to set it afterward before that run starts itself. Leave unchecked to use your tenant's own default instead."
+            >
+              Auto-escalate on stall (for this file)
+            </span>
+          </div>
           <DocumentUploader
             onUploadComplete={handleUploadComplete}
             onJobCreated={handleJobCreated}
@@ -147,6 +167,7 @@ export const PdfAccessibilityPage: React.FC = () => {
             }}
             assigneeUserId={assigneeUserId || undefined}
             fullAutoMode={fullAutoMode || undefined}
+            autoEscalateOnStall={autoEscalateOnStall || undefined}
           />
         </CardContent>
       </Card>

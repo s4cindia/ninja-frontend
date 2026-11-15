@@ -61,6 +61,17 @@ interface DocumentUploaderProps {
    * assigneeUserId above, just for a boolean instead of an id.
    */
   fullAutoMode?: boolean;
+  /**
+   * PDF-only: upload-time override for "Auto-escalate on stall"
+   * (ninja-backend#826/#827) -- same "absent means inherit the tenant
+   * default" contract as fullAutoMode above. Only matters in practice
+   * alongside fullAutoMode: true, since that's the one path where Auto Mode
+   * starts itself with nobody available to set this afterward via the
+   * per-job Settings menu on the Audit Results page before the run's own
+   * escalation check (resolved once, at loop start) already locked in the
+   * tenant default.
+   */
+  autoEscalateOnStall?: boolean;
 }
 
 interface EPUBUploaderProps {
@@ -95,6 +106,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   onError,
   assigneeUserId,
   fullAutoMode,
+  autoEscalateOnStall,
 }) => {
   const [state, setState] = useState<UploadState>('idle');
   const [progress, setProgress] = useState(0);
@@ -355,10 +367,11 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
           setUploadNow(Date.now());
         },
         endpoint.directUpload,
-        (assigneeUserId || fullAutoMode !== undefined)
+        (assigneeUserId || fullAutoMode !== undefined || autoEscalateOnStall !== undefined)
           ? {
               ...(assigneeUserId ? { assigneeUserId } : {}),
               ...(fullAutoMode !== undefined ? { fullAutoMode: String(fullAutoMode) } : {}),
+              ...(autoEscalateOnStall !== undefined ? { autoEscalateOnStall: String(autoEscalateOnStall) } : {}),
             }
           : undefined
       );
@@ -383,6 +396,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
           fileId: uploadResult.fileId,
           ...(assigneeUserId ? { assigneeUserId } : {}),
           ...(fullAutoMode !== undefined ? { fullAutoMode } : {}),
+          ...(autoEscalateOnStall !== undefined ? { autoEscalateOnStall } : {}),
         });
         const responseData = response.data.data || response.data;
         jobId = responseData.jobId || responseData.id;
