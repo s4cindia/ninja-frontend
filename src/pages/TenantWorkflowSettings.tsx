@@ -42,6 +42,7 @@ export const TenantWorkflowSettings: React.FC = () => {
   const [altTextMode, setAltTextMode] = useState<AiRemediationConfig['altTextMode']>('apply-to-pdf');
   const [colorContrastMode, setColorContrastMode] = useState<AiRemediationConfig['colorContrastMode']>('guidance-only');
   const [linkTextMode, setLinkTextMode] = useState<AiRemediationConfig['linkTextMode']>('guidance-only');
+  const [bookmarkMode, setBookmarkMode] = useState<AiRemediationConfig['bookmarkMode']>('guidance-only');
   const [fullAutoModeDefault, setFullAutoModeDefault] = useState(false);
   const [autoEscalateOnStallDefault, setAutoEscalateOnStallDefault] = useState(false);
   const [fullQCDefault, setFullQCDefault] = useState(false);
@@ -91,6 +92,7 @@ export const TenantWorkflowSettings: React.FC = () => {
       setAltTextMode(currentAiRemediationConfig.altTextMode);
       setColorContrastMode(currentAiRemediationConfig.colorContrastMode);
       setLinkTextMode(currentAiRemediationConfig.linkTextMode);
+      setBookmarkMode(currentAiRemediationConfig.bookmarkMode);
       setFullAutoModeDefault(currentAiRemediationConfig.fullAutoModeDefault);
       setAutoEscalateOnStallDefault(currentAiRemediationConfig.autoEscalateOnStallDefault);
       setFullQCDefault(currentAiRemediationConfig.fullQCDefault);
@@ -215,11 +217,12 @@ export const TenantWorkflowSettings: React.FC = () => {
   const handleSaveAiRemediationConfig = async () => {
     try {
       setSavingAiRemediation(true);
-      const updated = await tenantConfigService.updateAiRemediationConfig({ altTextMode, colorContrastMode, linkTextMode, fullAutoModeDefault, autoEscalateOnStallDefault, fullQCDefault });
+      const updated = await tenantConfigService.updateAiRemediationConfig({ altTextMode, colorContrastMode, linkTextMode, bookmarkMode, fullAutoModeDefault, autoEscalateOnStallDefault, fullQCDefault });
       setAiRemediationConfig(updated);
       setAltTextMode(updated.altTextMode);
       setColorContrastMode(updated.colorContrastMode);
       setLinkTextMode(updated.linkTextMode);
+      setBookmarkMode(updated.bookmarkMode);
       setFullAutoModeDefault(updated.fullAutoModeDefault);
       setAutoEscalateOnStallDefault(updated.autoEscalateOnStallDefault);
       setFullQCDefault(updated.fullQCDefault);
@@ -766,6 +769,27 @@ export const TenantWorkflowSettings: React.FC = () => {
           </select>
         </div>
 
+        <div>
+          <label htmlFor="bookmarkMode" className="block text-sm font-medium text-gray-700 mb-1">
+            Bookmarks
+          </label>
+          <p className="text-xs text-gray-500 mb-2">
+            Covers both generating missing bookmarks from headings and regenerating generic
+            bookmark titles (e.g. InDesign's own "Section — p.25") — both share this one setting.
+          </p>
+          <select
+            id="bookmarkMode"
+            value={bookmarkMode}
+            disabled={!isAdmin || savingAiRemediation}
+            onChange={(e) => setBookmarkMode(e.target.value as AiRemediationConfig['bookmarkMode'])}
+            className="w-full max-w-sm px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <option value="guidance-only">Guidance only — flag but never auto-apply</option>
+            <option value="disabled">Disabled — skip bookmarks entirely</option>
+            <option value="apply-to-pdf">Auto-apply — fix bookmarks automatically</option>
+          </select>
+        </div>
+
         <div className="border-t border-gray-200 pt-5">
           <div className="flex items-center justify-between">
             <div className="flex-1">
@@ -853,6 +877,7 @@ export const TenantWorkflowSettings: React.FC = () => {
                 (altTextMode === (aiRemediationConfig?.altTextMode ?? 'apply-to-pdf') &&
                   colorContrastMode === (aiRemediationConfig?.colorContrastMode ?? 'guidance-only') &&
                   linkTextMode === (aiRemediationConfig?.linkTextMode ?? 'guidance-only') &&
+                  bookmarkMode === (aiRemediationConfig?.bookmarkMode ?? 'guidance-only') &&
                   fullAutoModeDefault === (aiRemediationConfig?.fullAutoModeDefault ?? false) &&
                   autoEscalateOnStallDefault === (aiRemediationConfig?.autoEscalateOnStallDefault ?? false) &&
                   fullQCDefault === (aiRemediationConfig?.fullQCDefault ?? false))

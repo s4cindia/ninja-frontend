@@ -3408,6 +3408,7 @@ describe('PdfAuditResultsPage', () => {
           autoCostLimitUsd: 0.5,
           autoColorContrastMode: 'disabled',
           autoAltTextMode: 'apply-to-pdf',
+          autoBookmarkMode: 'apply-to-pdf',
         });
       });
     });

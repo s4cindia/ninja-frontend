@@ -21,6 +21,13 @@ const DEFAULT_MAX_ROUNDS = 10;
 const DEFAULT_COST_LIMIT_USD = 2;
 const DEFAULT_COLOR_CONTRAST_MODE: NonNullable<StartAutoModeOverrides['autoColorContrastMode']> = 'apply-to-pdf';
 const DEFAULT_ALT_TEXT_MODE: NonNullable<StartAutoModeOverrides['autoAltTextMode']> = 'apply-to-pdf';
+// Matches colorContrastMode/altTextMode's own posture in this popover
+// (apply-to-pdf, not the tenant's conservative guidance-only default) --
+// this popover's purpose is an aggressive one-off run, and defaulting
+// bookmarks to guidance-only here would just recreate the same silent gap
+// (bookmarkMode never resolving to apply-to-pdf for any real run) that
+// motivated adding this field at all.
+const DEFAULT_BOOKMARK_MODE: NonNullable<StartAutoModeOverrides['autoBookmarkMode']> = 'apply-to-pdf';
 
 interface AutoModeStartControlProps {
   /** Called with the chosen overrides when showConfig, or with no args otherwise. */
@@ -69,9 +76,16 @@ interface AutoModeStartControlProps {
    * sent for that call site).
    */
   showAltTextOption?: boolean;
+  /**
+   * Shows a "Bookmark handling" select alongside the others, sent as
+   * autoBookmarkMode. Same reason as showAltTextOption: only the single-job
+   * Audit Results page passes this -- PDF Batch has no matching backend
+   * column and would 400 on the unexpected field.
+   */
+  showBookmarkOption?: boolean;
 }
 
-export function AutoModeStartControl({ onStart, isPending, disabled, disabledTitle, showConfig, triggerLabel = 'Start Auto Remediation', budgetEstimate, mentionsPageCheckbox = false, showAltTextOption = false }: AutoModeStartControlProps) {
+export function AutoModeStartControl({ onStart, isPending, disabled, disabledTitle, showConfig, triggerLabel = 'Start Auto Remediation', budgetEstimate, mentionsPageCheckbox = false, showAltTextOption = false, showBookmarkOption = false }: AutoModeStartControlProps) {
   const [open, setOpen] = useState(false);
   const [maxRoundsInput, setMaxRoundsInput] = useState(String(DEFAULT_MAX_ROUNDS));
   const [costLimitInput, setCostLimitInput] = useState(String(DEFAULT_COST_LIMIT_USD));
@@ -80,6 +94,9 @@ export function AutoModeStartControl({ onStart, isPending, disabled, disabledTit
   );
   const [altTextMode, setAltTextMode] = useState<NonNullable<StartAutoModeOverrides['autoAltTextMode']>>(
     DEFAULT_ALT_TEXT_MODE
+  );
+  const [bookmarkMode, setBookmarkMode] = useState<NonNullable<StartAutoModeOverrides['autoBookmarkMode']>>(
+    DEFAULT_BOOKMARK_MODE
   );
 
   const hasConfidentEstimate = !!budgetEstimate && budgetEstimate.confidence !== 'low';
@@ -115,6 +132,7 @@ export function AutoModeStartControl({ onStart, isPending, disabled, disabledTit
       autoCostLimitUsd: Number.isFinite(costLimit) && costLimit > 0 ? costLimit : DEFAULT_COST_LIMIT_USD,
       autoColorContrastMode: colorContrastMode,
       ...(showAltTextOption && { autoAltTextMode: altTextMode }),
+      ...(showBookmarkOption && { autoBookmarkMode: bookmarkMode }),
     });
     setOpen(false);
   };
@@ -205,6 +223,26 @@ export function AutoModeStartControl({ onStart, isPending, disabled, disabledTit
                 >
                   <option value="apply-to-pdf">Generate AI alt text</option>
                   <option value="guidance-only">Guidance only — client supplies alt text</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Applies to every round of this run only — doesn’t change the tenant-wide default.
+                </p>
+              </div>
+            )}
+            {showBookmarkOption && (
+              <div>
+                <label htmlFor="auto-start-bookmark-mode" className="block text-xs font-medium text-gray-600 mb-1">
+                  Bookmark handling
+                </label>
+                <select
+                  id="auto-start-bookmark-mode"
+                  value={bookmarkMode}
+                  onChange={(e) => setBookmarkMode(e.target.value as NonNullable<StartAutoModeOverrides['autoBookmarkMode']>)}
+                  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  <option value="guidance-only">Guidance only — flag but never auto-apply</option>
+                  <option value="disabled">Disabled — skip bookmarks entirely</option>
+                  <option value="apply-to-pdf">Auto-apply — generate/fix bookmarks automatically</option>
                 </select>
                 <p className="text-xs text-gray-500 mt-1">
                   Applies to every round of this run only — doesn’t change the tenant-wide default.

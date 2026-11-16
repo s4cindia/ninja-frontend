@@ -1829,6 +1829,7 @@ export const PdfAuditResultsPage: React.FC = () => {
                   budgetEstimate={budgetEstimateQuery.data}
                   mentionsPageCheckbox
                   showAltTextOption
+                  showBookmarkOption
                 />
               </>
             )}

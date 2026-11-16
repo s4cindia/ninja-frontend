@@ -89,6 +89,7 @@ export interface AiRemediationConfig {
   altTextMode: 'apply-to-pdf' | 'guidance-only';
   colorContrastMode: 'guidance-only' | 'disabled' | 'apply-to-pdf';
   linkTextMode: 'guidance-only' | 'disabled' | 'apply-to-pdf';
+  bookmarkMode: 'guidance-only' | 'disabled' | 'apply-to-pdf';
   /**
    * Tenant-wide default for "Full Auto Mode" (ninja-backend#823) -- when
    * true, a newly uploaded PDF job with no upload-time override
@@ -263,7 +264,7 @@ class TenantConfigService {
       // Matches the backend's own DEFAULT_AI_REMEDIATION_CONFIG for these
       // five fields, so a 403 (non-admin) or network failure still renders
       // something sensible rather than leaving the section blank.
-      return { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only', fullAutoModeDefault: false, autoEscalateOnStallDefault: false, fullQCDefault: false };
+      return { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only', bookmarkMode: 'guidance-only', fullAutoModeDefault: false, autoEscalateOnStallDefault: false, fullQCDefault: false };
     }
   }
 
