@@ -120,6 +120,52 @@ describe('AutoModeStartControl', () => {
     });
   });
 
+  it('does not render or send a bookmark option when showBookmarkOption is omitted (e.g. PDF Batch, which has no matching backend column)', () => {
+    const { onStart } = renderControl({ showConfig: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Start Auto Remediation' }));
+
+    expect(screen.queryByLabelText('Bookmark handling')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+
+    expect(onStart).toHaveBeenCalledWith({
+      autoMaxRounds: 10,
+      autoCostLimitUsd: 2,
+      autoColorContrastMode: 'apply-to-pdf',
+    });
+  });
+
+  it('renders the Bookmark handling select, defaulted to apply-to-pdf, when showBookmarkOption is true', () => {
+    const { onStart } = renderControl({ showConfig: true, showBookmarkOption: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Start Auto Remediation' }));
+
+    expect(screen.getByLabelText('Bookmark handling')).toHaveValue('apply-to-pdf');
+
+    fireEvent.change(screen.getByLabelText('Bookmark handling'), { target: { value: 'guidance-only' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+
+    expect(onStart).toHaveBeenCalledWith({
+      autoMaxRounds: 10,
+      autoCostLimitUsd: 2,
+      autoColorContrastMode: 'apply-to-pdf',
+      autoBookmarkMode: 'guidance-only',
+    });
+  });
+
+  it('sends both alt-text and bookmark overrides together when both options are shown', () => {
+    const { onStart } = renderControl({ showConfig: true, showAltTextOption: true, showBookmarkOption: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Start Auto Remediation' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start' }));
+
+    expect(onStart).toHaveBeenCalledWith({
+      autoMaxRounds: 10,
+      autoCostLimitUsd: 2,
+      autoColorContrastMode: 'apply-to-pdf',
+      autoAltTextMode: 'apply-to-pdf',
+      autoBookmarkMode: 'apply-to-pdf',
+    });
+  });
+
   it('falls back to the default for an invalid (non-positive or non-numeric) max rounds / cost limit, rather than sending garbage to the backend', () => {
     const { onStart } = renderControl({ showConfig: true });
     fireEvent.click(screen.getByRole('button', { name: 'Start Auto Remediation' }));

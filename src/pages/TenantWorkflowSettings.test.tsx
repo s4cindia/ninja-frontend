@@ -64,7 +64,7 @@ function mockAxes4Config(overrides?: Partial<Axes4Config>): Axes4Config {
 }
 
 function mockAiRemediationConfig(overrides?: Partial<AiRemediationConfig>): AiRemediationConfig {
-  return { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only', fullAutoModeDefault: false, autoEscalateOnStallDefault: false, fullQCDefault: false, ...overrides };
+  return { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only', bookmarkMode: 'guidance-only', fullAutoModeDefault: false, autoEscalateOnStallDefault: false, fullQCDefault: false, ...overrides };
 }
 
 function mockComplianceConfig(overrides?: Partial<ComplianceConfig>): ComplianceConfig {
@@ -183,7 +183,7 @@ describe('TenantWorkflowSettings — PDF AI Remediation tenant defaults', () => 
   it('is visible (read-only) to a non-admin, showing the loaded values but no save control', async () => {
     setCurrentUser({ role: 'OPERATOR' });
     mockService.getAiRemediationConfig.mockResolvedValue(
-      mockAiRemediationConfig({ altTextMode: 'guidance-only', colorContrastMode: 'apply-to-pdf', linkTextMode: 'disabled' })
+      mockAiRemediationConfig({ altTextMode: 'guidance-only', colorContrastMode: 'apply-to-pdf', linkTextMode: 'disabled', bookmarkMode: 'apply-to-pdf' })
     );
 
     render(<TenantWorkflowSettings />);
@@ -191,17 +191,19 @@ describe('TenantWorkflowSettings — PDF AI Remediation tenant defaults', () => 
     expect(await screen.findByLabelText('Alt text')).toHaveValue('guidance-only');
     expect(screen.getByLabelText('Color contrast')).toHaveValue('apply-to-pdf');
     expect(screen.getByLabelText('Link text')).toHaveValue('disabled');
+    expect(screen.getByLabelText('Bookmarks')).toHaveValue('apply-to-pdf');
     expect(screen.getByLabelText('Alt text')).toBeDisabled();
     expect(screen.getByLabelText('Color contrast')).toBeDisabled();
     expect(screen.getByLabelText('Link text')).toBeDisabled();
+    expect(screen.getByLabelText('Bookmarks')).toBeDisabled();
     expect(screen.getByText('Only administrators can change these settings.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Save PDF AI Remediation Settings/ })).not.toBeInTheDocument();
   });
 
-  it('is editable for an ADMIN, and saves all three fields together', async () => {
+  it('is editable for an ADMIN, and saves all four fields together', async () => {
     setCurrentUser({ role: 'ADMIN' });
     mockService.updateAiRemediationConfig.mockResolvedValue(
-      mockAiRemediationConfig({ altTextMode: 'guidance-only', colorContrastMode: 'apply-to-pdf', linkTextMode: 'guidance-only' })
+      mockAiRemediationConfig({ altTextMode: 'guidance-only', colorContrastMode: 'apply-to-pdf', linkTextMode: 'guidance-only', bookmarkMode: 'apply-to-pdf' })
     );
 
     render(<TenantWorkflowSettings />);
@@ -211,6 +213,7 @@ describe('TenantWorkflowSettings — PDF AI Remediation tenant defaults', () => 
 
     fireEvent.change(altText, { target: { value: 'guidance-only' } });
     fireEvent.change(screen.getByLabelText('Color contrast'), { target: { value: 'apply-to-pdf' } });
+    fireEvent.change(screen.getByLabelText('Bookmarks'), { target: { value: 'apply-to-pdf' } });
     fireEvent.click(screen.getByRole('button', { name: /Save PDF AI Remediation Settings/ }));
 
     await waitFor(() => {
@@ -218,6 +221,7 @@ describe('TenantWorkflowSettings — PDF AI Remediation tenant defaults', () => 
         altTextMode: 'guidance-only',
         colorContrastMode: 'apply-to-pdf',
         linkTextMode: 'guidance-only',
+        bookmarkMode: 'apply-to-pdf',
         fullAutoModeDefault: false,
         autoEscalateOnStallDefault: false,
         fullQCDefault: false,
@@ -283,6 +287,7 @@ describe('TenantWorkflowSettings — PDF AI Remediation tenant defaults', () => 
         altTextMode: 'apply-to-pdf',
         colorContrastMode: 'guidance-only',
         linkTextMode: 'guidance-only',
+        bookmarkMode: 'guidance-only',
         fullAutoModeDefault: true,
         autoEscalateOnStallDefault: false,
         fullQCDefault: false,
@@ -330,6 +335,7 @@ describe('TenantWorkflowSettings — PDF AI Remediation tenant defaults', () => 
         altTextMode: 'apply-to-pdf',
         colorContrastMode: 'guidance-only',
         linkTextMode: 'guidance-only',
+        bookmarkMode: 'guidance-only',
         fullAutoModeDefault: false,
         autoEscalateOnStallDefault: true,
         fullQCDefault: false,
@@ -377,6 +383,7 @@ describe('TenantWorkflowSettings — PDF AI Remediation tenant defaults', () => 
         altTextMode: 'apply-to-pdf',
         colorContrastMode: 'guidance-only',
         linkTextMode: 'guidance-only',
+        bookmarkMode: 'guidance-only',
         fullAutoModeDefault: false,
         autoEscalateOnStallDefault: false,
         fullQCDefault: true,

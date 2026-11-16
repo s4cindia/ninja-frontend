@@ -433,6 +433,19 @@ describe('TenantConfigService', () => {
       expect(config.fullQCDefault).toBe(true);
     });
 
+    it('should fetch and return bookmarkMode', async () => {
+      vi.mocked(api.get).mockResolvedValue({
+        data: {
+          success: true,
+          data: { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only', bookmarkMode: 'apply-to-pdf', fullAutoModeDefault: false, autoEscalateOnStallDefault: false, fullQCDefault: false },
+        },
+      } as any);
+
+      const config = await tenantConfigService.getAiRemediationConfig();
+
+      expect(config.bookmarkMode).toBe('apply-to-pdf');
+    });
+
     it('should return fullAutoModeDefault: false, autoEscalateOnStallDefault: false, and fullQCDefault: false among the other defaults on API error', async () => {
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -444,6 +457,7 @@ describe('TenantConfigService', () => {
         altTextMode: 'apply-to-pdf',
         colorContrastMode: 'guidance-only',
         linkTextMode: 'guidance-only',
+        bookmarkMode: 'guidance-only',
         fullAutoModeDefault: false,
         autoEscalateOnStallDefault: false,
         fullQCDefault: false,
@@ -497,6 +511,21 @@ describe('TenantConfigService', () => {
 
       expect(api.patch).toHaveBeenCalledWith('/tenant/config/ai-remediation', { fullQCDefault: true });
       expect(config.fullQCDefault).toBe(true);
+    });
+
+    it('should PATCH bookmarkMode and return the updated config', async () => {
+      vi.mocked(api.patch).mockResolvedValue({
+        data: {
+          success: true,
+          data: { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only', bookmarkMode: 'apply-to-pdf', fullAutoModeDefault: false, autoEscalateOnStallDefault: false, fullQCDefault: false },
+          message: 'Updated',
+        },
+      } as any);
+
+      const config = await tenantConfigService.updateAiRemediationConfig({ bookmarkMode: 'apply-to-pdf' });
+
+      expect(api.patch).toHaveBeenCalledWith('/tenant/config/ai-remediation', { bookmarkMode: 'apply-to-pdf' });
+      expect(config.bookmarkMode).toBe('apply-to-pdf');
     });
   });
 

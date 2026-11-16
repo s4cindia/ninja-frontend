@@ -30,6 +30,13 @@ export interface StartAutoModeOverrides {
    * unexpected field.
    */
   autoAltTextMode?: 'apply-to-pdf' | 'guidance-only';
+  /**
+   * Per-job override for bookmark generation/title-regeneration -- same
+   * "only ever sent from the single-job Audit Results page" rule as
+   * autoAltTextMode above (AutoModeStartControl's showBookmarkOption),
+   * never from PDF Batch.
+   */
+  autoBookmarkMode?: 'guidance-only' | 'disabled' | 'apply-to-pdf';
 }
 
 /**
