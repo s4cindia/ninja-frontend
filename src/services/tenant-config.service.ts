@@ -107,6 +107,13 @@ export interface AiRemediationConfig {
    * guidance-only safety gate for that one pass.
    */
   autoEscalateOnStallDefault: boolean;
+  /**
+   * Tenant-wide default for "Full QC" -- when true, the page-by-page
+   * structure-tag review mode is visible on a job's Audit Results page
+   * unless that file's own upload-time fullQC override says otherwise.
+   * Off (false) by default.
+   */
+  fullQCDefault: boolean;
 }
 
 /**
@@ -256,7 +263,7 @@ class TenantConfigService {
       // Matches the backend's own DEFAULT_AI_REMEDIATION_CONFIG for these
       // five fields, so a 403 (non-admin) or network failure still renders
       // something sensible rather than leaving the section blank.
-      return { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only', fullAutoModeDefault: false, autoEscalateOnStallDefault: false };
+      return { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only', fullAutoModeDefault: false, autoEscalateOnStallDefault: false, fullQCDefault: false };
     }
   }
 

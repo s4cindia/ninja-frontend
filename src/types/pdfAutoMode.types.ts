@@ -99,6 +99,13 @@ export interface JobSettingOverride {
 export interface JobSettingsResponse {
   fullAutoMode: JobSettingOverride;
   autoEscalateOnStall: JobSettingOverride;
+  /**
+   * Full QC (page-by-page structure-tag review) -- read-only here, unlike
+   * the two above: set only at upload time, with no PATCH support (see the
+   * Full QC design decision, 2026-11-16). Gates visibility of the "Review
+   * structure tags" mode on PdfAuditResultsPage.
+   */
+  fullQC: JobSettingOverride;
 }
 
 /**

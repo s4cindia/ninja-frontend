@@ -8,6 +8,7 @@ import { api } from '@/services/api';
 import { pdfRemediationService } from '@/services/pdf-remediation.service';
 import { comparisonStudyService } from '@/services/comparisonStudy.service';
 import { pdfAutoModeService } from '@/services/pdfAutoMode.service';
+import { pdfStructureTagsService } from '@/services/pdfStructureTags.service';
 import { useApplyProgress } from '@/hooks/useApplyProgress';
 import type { ComparisonTrialWithJob } from '@/types/comparisonStudy.types';
 import type { PdfAuditResult, PdfAuditIssue, MatterhornSummary } from '@/types/pdf.types';
@@ -56,6 +57,23 @@ vi.mock('@/services/pdfAutoMode.service', () => ({
       autoCostLimitUsd: 2,
     }),
     stopAutoMode: vi.fn(),
+    // PdfAuditResultsPage now reads this eagerly (not just JobSettingsMenu's
+    // own lazy, popover-gated use of the same hook) to gate the "Review
+    // structure tags" toggle's visibility on fullQC.effective. Default: Full
+    // QC off, matching the real tenant default for every job that hasn't
+    // opted in — individual tests override this to exercise the toggle.
+    getJobSettings: vi.fn().mockResolvedValue({
+      fullAutoMode: { override: null, tenantDefault: false, effective: false },
+      autoEscalateOnStall: { override: null, tenantDefault: false, effective: false },
+      fullQC: { override: null, tenantDefault: false, effective: false },
+    }),
+    updateJobSettings: vi.fn(),
+  },
+}));
+vi.mock('@/services/pdfStructureTags.service', () => ({
+  pdfStructureTagsService: {
+    getStructureTagsForPage: vi.fn().mockResolvedValue([]),
+    retagStructureElement: vi.fn(),
   },
 }));
 // Has its own dedicated test file — stub here to keep these tests focused on
@@ -86,17 +104,33 @@ vi.mock('@/components/pdf/AutoModeStatusCard', () => ({
   ),
 }));
 vi.mock('@/components/pdf/PdfPreviewPanel', () => ({
-  PdfPreviewPanel: ({ pdfUrl, currentPage, onPageChange, onIssueSelect }: {
+  PdfPreviewPanel: ({ pdfUrl, currentPage, onPageChange, onIssueSelect, structureTagElements, onStructureTagElementSelect, onStructureTagChange }: {
     pdfUrl: string;
     currentPage: number;
     onPageChange: (page: number) => void;
     onIssueSelect: (issue: { id: string }) => void;
+    structureTagElements?: Array<{ elementId: string; tag: string }>;
+    onStructureTagElementSelect?: (element: { elementId: string; tag: string }) => void;
+    onStructureTagChange?: (element: { elementId: string; tag: string }, newTag: string) => void;
   }) => (
     <div data-testid="pdf-preview-panel">
       <div>PDF URL: {pdfUrl}</div>
       <div>Current Page: {currentPage}</div>
       <button onClick={() => onPageChange(2)}>Change Page</button>
       <button onClick={() => onIssueSelect({ id: 'issue-1' })}>Select Issue</button>
+      {structureTagElements !== undefined && (
+        <div data-testid="structure-tag-mode">
+          {structureTagElements.length} structure elements on this page
+          {structureTagElements.map((el) => (
+            <button key={el.elementId} onClick={() => onStructureTagElementSelect?.(el)}>
+              Select {el.tag}
+            </button>
+          ))}
+          <button onClick={() => onStructureTagChange?.({ elementId: '12-0', tag: 'H1' }, 'H2')}>
+            Change to H2
+          </button>
+        </div>
+      )}
     </div>
   ),
 }));
@@ -3937,6 +3971,71 @@ describe('PdfAuditResultsPage', () => {
         expect(mockApi.post).toHaveBeenCalledWith('/jobs/job-123/team-review/request-review', { notes: undefined })
       );
       await waitFor(() => expect(screen.getByRole('button', { name: /requested/i })).toBeDisabled());
+    });
+  });
+
+  describe('Structure Tag QC Review toggle', () => {
+    function mockGetsFor(auditResultOverrides: Partial<PdfAuditResult> = {}) {
+      const mockResult = createMockAuditResult(auditResultOverrides);
+      mockApi.get.mockImplementation((url: string) => {
+        if (url.includes('/audit/result')) return Promise.resolve({ data: { data: mockResult } });
+        if (url.includes('/auto-tag/status')) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url.includes('/ai-analysis')) return Promise.resolve({ data: { data: { suggestions: [], analyzed: 0, total: 0, status: 'complete' } } });
+        if (url.startsWith('/jobs/')) return Promise.resolve({ data: { data: { output: {} } } });
+        return Promise.resolve({ data: { data: {} } });
+      });
+      return mockResult;
+    }
+
+    it('does not show the toggle when Full QC does not resolve true for this job (the default mock)', async () => {
+      mockGetsFor();
+
+      renderWithRouter('job-123');
+
+      await screen.findByText('test-document.pdf');
+      expect(screen.queryByTitle(/review structure tags/i)).not.toBeInTheDocument();
+    });
+
+    it('shows the toggle, and switches the preview into structure-tag mode, when fullQC.effective is true', async () => {
+      mockGetsFor();
+      vi.mocked(pdfAutoModeService.getJobSettings).mockResolvedValue({
+        fullAutoMode: { override: null, tenantDefault: false, effective: false },
+        autoEscalateOnStall: { override: null, tenantDefault: false, effective: false },
+        fullQC: { override: true, tenantDefault: false, effective: true },
+      });
+
+      renderWithRouter('job-123');
+      await screen.findByText('test-document.pdf');
+
+      const toggle = await screen.findByTitle(/review structure tags/i);
+      expect(screen.queryByTestId('structure-tag-mode')).not.toBeInTheDocument();
+
+      fireEvent.click(toggle);
+
+      await waitFor(() => expect(screen.getByTitle(/exit structure tag review/i)).toBeInTheDocument());
+      expect(await screen.findByTestId('structure-tag-mode')).toBeInTheDocument();
+    });
+
+    it('calls the retag service when a structure element\'s tag is changed, via onStructureTagChange', async () => {
+      mockGetsFor();
+      vi.mocked(pdfAutoModeService.getJobSettings).mockResolvedValue({
+        fullAutoMode: { override: null, tenantDefault: false, effective: false },
+        autoEscalateOnStall: { override: null, tenantDefault: false, effective: false },
+        fullQC: { override: true, tenantDefault: false, effective: true },
+      });
+      vi.mocked(pdfStructureTagsService.retagStructureElement).mockResolvedValue({
+        elementId: '12-0', tag: 'H2', pageNumber: 1,
+        bbox: { x: 0, y: 0, width: 10, height: 10, pageWidth: 612, pageHeight: 792 },
+      });
+
+      renderWithRouter('job-123');
+      await screen.findByText('test-document.pdf');
+      fireEvent.click(await screen.findByTitle(/review structure tags/i));
+      await screen.findByTestId('structure-tag-mode');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Change to H2' }));
+
+      await waitFor(() => expect(pdfStructureTagsService.retagStructureElement).toHaveBeenCalledWith('job-123', '12-0', 'H2'));
     });
   });
 });

@@ -32,10 +32,12 @@ function renderMenu(props: Partial<Parameters<typeof JobSettingsMenu>[0]> = {}) 
 function settings(overrides: {
   fullAutoMode?: Partial<{ override: boolean | null; tenantDefault: boolean; effective: boolean }>;
   autoEscalateOnStall?: Partial<{ override: boolean | null; tenantDefault: boolean; effective: boolean }>;
+  fullQC?: Partial<{ override: boolean | null; tenantDefault: boolean; effective: boolean }>;
 } = {}) {
   return {
     fullAutoMode: { override: null, tenantDefault: false, effective: false, ...overrides.fullAutoMode },
     autoEscalateOnStall: { override: null, tenantDefault: false, effective: false, ...overrides.autoEscalateOnStall },
+    fullQC: { override: null, tenantDefault: false, effective: false, ...overrides.fullQC },
   };
 }
 

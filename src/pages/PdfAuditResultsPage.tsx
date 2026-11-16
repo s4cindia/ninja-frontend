@@ -23,7 +23,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { FileText, Loader2, Download, Share2, RotateCw, Filter, X, ChevronDown, ListChecks, Maximize2, Minimize2, Zap, Sparkles, FileWarning } from 'lucide-react';
+import { FileText, Loader2, Download, Share2, RotateCw, Filter, X, ChevronDown, ListChecks, Maximize2, Minimize2, Zap, Sparkles, FileWarning, Tags } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
@@ -86,7 +86,8 @@ import { cn } from '@/utils/cn';
 import { validateJobId } from '@/utils/validation';
 import { useCreateRemediationPlan } from '@/hooks/usePdfRemediation';
 import { useComparisonTrial, useInvalidateComparisonTrial } from '@/hooks/useComparisonStudy';
-import { useAutoModeStatus, useAutoModeRoundHistory, useStartAutoMode, useStopAutoMode, useRemediationHistory, useBudgetEstimate } from '@/hooks/useAutoMode';
+import { useAutoModeStatus, useAutoModeRoundHistory, useStartAutoMode, useStopAutoMode, useRemediationHistory, useBudgetEstimate, useJobSettings } from '@/hooks/useAutoMode';
+import { useStructureTags, useRetagStructureElement } from '@/hooks/useStructureTags';
 import { useApplyProgress } from '@/hooks/useApplyProgress';
 import { AutoModeStatusCard } from '@/components/pdf/AutoModeStatusCard';
 import { AutoModeStartControl } from '@/components/pdf/AutoModeStartControl';
@@ -97,6 +98,7 @@ import { derivePhases } from '@/utils/pdfPhaseStepper';
 import { deriveCurrentRoundPhase } from '@/utils/autoModeRoundPhase';
 import type { ComparisonTrialMode } from '@/types/comparisonStudy.types';
 import type { PdfAuditResult, PdfAuditIssue } from '@/types/pdf.types';
+import type { StructureTagElement } from '@/types/pdfStructureTags.types';
 import { TeamReviewPanel } from '@/components/pdf/TeamReviewPanel';
 import { OwnerReviewBlockedBanner } from '@/components/pdf/OwnerReviewBlockedBanner';
 import { isReviewBlockedError } from '@/services/team.service';
@@ -200,6 +202,10 @@ export const PdfAuditResultsPage: React.FC = () => {
   // 404ing for a job with no run yet, so this is always safe to fire.
   const autoModeStatusQuery = useAutoModeStatus(jobId);
   const stopAutoMode = useStopAutoMode(jobId);
+  // Eager (no `enabled` gate), unlike JobSettingsMenu's own lazy use of this
+  // same hook -- the Full QC toggle's visibility (below) needs to be known
+  // as soon as the page loads, not only once an unrelated popover opens.
+  const jobSettingsQuery = useJobSettings(jobId);
   // Real bug, confirmed live (2026-10-19): useMutation's error/success state
   // is tied to this component's own mount lifecycle, not to jobId -- React
   // Router re-renders this page with a new jobId on normal in-app navigation
@@ -286,6 +292,15 @@ export const PdfAuditResultsPage: React.FC = () => {
   const [justCheckedStatus, setJustCheckedStatus] = useState(false);
   const [currentScanLevel, setCurrentScanLevel] = useState<ScanLevel>('basic');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // Structure Tag QC Review (gated by the Full QC toggle, see
+  // jobSettingsQuery below) -- switches the center PdfPreviewPanel from its
+  // normal issue-overlay view into a page-by-page structure-tag review
+  // mode. Reuses this page's existing full-screen mode for the sustained
+  // review session rather than a separate one.
+  const [structureTagsMode, setStructureTagsMode] = useState(false);
+  const [selectedStructureTagElementId, setSelectedStructureTagElementId] = useState<string | null>(null);
+  const structureTagsQuery = useStructureTags(jobId, currentPage, { enabled: structureTagsMode });
+  const retagStructureElement = useRetagStructureElement(jobId, currentPage);
 
   // AI analysis state
   const [aiSuggestions, setAiSuggestions] = useState<Map<string, AiAnalysis>>(new Map());
@@ -914,7 +929,15 @@ export const PdfAuditResultsPage: React.FC = () => {
   // Handlers
   const handlePageChange = useCallback((page: number) => {
     setCurrentPage(page);
+    setSelectedStructureTagElementId(null);
   }, []);
+
+  const handleStructureTagChange = useCallback((element: StructureTagElement, newTag: string) => {
+    retagStructureElement.mutate(
+      { elementId: element.elementId, newTag },
+      { onError: (err) => toast.error(getErrorMessage(err) || 'Failed to change structure tag') }
+    );
+  }, [retagStructureElement]);
 
   const scrollToIssueCard = useCallback((issueId: string) => {
     document.getElementById(`issue-card-${issueId}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -2001,6 +2024,11 @@ export const PdfAuditResultsPage: React.FC = () => {
             onPageChange={handlePageChange}
             onIssueSelect={handleIssueSelect}
             issueNumberMap={issueNumberMap}
+            structureTagElements={structureTagsMode ? (structureTagsQuery.data ?? []) : undefined}
+            selectedStructureTagElementId={selectedStructureTagElementId}
+            onStructureTagElementSelect={(element) => setSelectedStructureTagElementId(element.elementId)}
+            onStructureTagChange={handleStructureTagChange}
+            structureTagSaving={retagStructureElement.isPending}
           />
         </div>
 
@@ -2021,6 +2049,24 @@ export const PdfAuditResultsPage: React.FC = () => {
                 >
                   {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                 </button>
+                {jobSettingsQuery.data?.fullQC.effective && (
+                  <button
+                    type="button"
+                    title={structureTagsMode ? 'Exit structure tag review' : 'Review structure tags — inspect and correct every structure tag on this page'}
+                    onClick={() => {
+                      setStructureTagsMode((v) => !v);
+                      setSelectedStructureTagElementId(null);
+                    }}
+                    className={cn(
+                      'p-1.5 rounded transition-colors',
+                      structureTagsMode
+                        ? 'text-blue-700 bg-blue-100 hover:bg-blue-200'
+                        : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'
+                    )}
+                  >
+                    <Tags className="h-4 w-4" />
+                  </button>
+                )}
               {!disableManualActions && (eligibleForApplyAll + pendingEligible) > 0 && (
                 <Button
                   variant="primary"
