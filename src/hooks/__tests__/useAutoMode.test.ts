@@ -92,8 +92,30 @@ describe('useAutoModeRoundHistory', () => {
         completedAt: '2026-09-01T10:05:00.000Z',
         startedAt: '2026-09-01T10:00:00.000Z',
         durationMs: 5 * 60 * 1000,
+        resolvedByCode: null,
+        regressionsByCode: null,
       },
     ]);
+  });
+
+  it('passes resolvedByCode/regressionsByCode through from the reaudit event when present', async () => {
+    mockService.getRemediationHistory.mockResolvedValue([
+      run(1, [
+        event({ action: 'apply_fixes', source: 'auto_loop', appliedCount: 5, failedCount: 0 }),
+        event({
+          action: 'reaudit', source: 'auto_loop', resolvedCount: 3, remainingCount: 0, regressionCount: 4, resolutionRate: 100,
+          resolvedByCode: { 'MATTERHORN-13-001': 2, 'COLOR-CONTRAST': 1 },
+          regressionsByCode: { 'SPAN-ILLEGAL-NESTING': 4 },
+        }),
+      ]),
+    ]);
+
+    const { result } = renderRoundHistory({ enabled: true, isRunning: false, completedRounds: 1 }, 'job-1');
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(result.current.data?.[0].resolvedByCode).toEqual({ 'MATTERHORN-13-001': 2, 'COLOR-CONTRAST': 1 });
+    expect(result.current.data?.[0].regressionsByCode).toEqual({ 'SPAN-ILLEGAL-NESTING': 4 });
   });
 
   it('falls back to the reaudit\'s own startedAt for round duration when no apply_fixes event was logged', async () => {

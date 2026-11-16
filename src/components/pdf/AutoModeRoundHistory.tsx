@@ -52,6 +52,30 @@ function TrendArrow({ current, previous }: { current: number | null; previous: n
 
 const ROUND_TABLE_COLUMN_COUNT = 6;
 
+/** Sorted, most-frequent-first -- "CODE ×N" entries, for the expanded
+ * round's resolved/regressions breakdown. Returns null when there's
+ * nothing to show (absent, or an empty map). */
+function formatCodeBreakdown(byCode: Record<string, number> | null | undefined): Array<{ code: string; count: number }> | null {
+  if (!byCode) return null;
+  const entries = Object.entries(byCode).map(([code, count]) => ({ code, count }));
+  if (entries.length === 0) return null;
+  return entries.sort((a, b) => b.count - a.count);
+}
+
+function CodeBreakdownList({ label, byCode, badgeVariant }: { label: string; byCode: Record<string, number> | null | undefined; badgeVariant: 'default' | 'warning' }) {
+  const entries = formatCodeBreakdown(byCode);
+  if (!entries) return null;
+
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+      <span className="text-gray-500">{label}:</span>
+      {entries.map(({ code, count }) => (
+        <Badge key={code} variant={badgeVariant} size="sm">{code} ×{count}</Badge>
+      ))}
+    </div>
+  );
+}
+
 function RoundTable({ rounds }: { rounds: AutoModeRound[] }) {
   // Collapsed by default -- an expanded round only adds a row when toggled,
   // so existing row-count assertions elsewhere stay valid without this ever
@@ -126,7 +150,9 @@ function RoundTable({ rounds }: { rounds: AutoModeRound[] }) {
               {isExpanded && (
                 <tr className="border-t border-gray-50 bg-gray-50">
                   <td id={detailId} colSpan={ROUND_TABLE_COLUMN_COUNT} className="py-2 px-2 font-sans text-gray-600">
-                    {summarizeRound(r, rounds[idx - 1] ?? null)}
+                    <p>{summarizeRound(r, rounds[idx - 1] ?? null)}</p>
+                    <CodeBreakdownList label="Resolved" byCode={r.resolvedByCode} badgeVariant="default" />
+                    <CodeBreakdownList label="Regressions" byCode={r.regressionsByCode} badgeVariant="warning" />
                   </td>
                 </tr>
               )}

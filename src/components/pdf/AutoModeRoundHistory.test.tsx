@@ -203,6 +203,57 @@ describe('AutoModeRoundHistory', () => {
     expect(screen.queryByText(/384 fixes applied this round/)).not.toBeInTheDocument();
   });
 
+  it('shows a per-code breakdown of resolved/regressions when a round is expanded', () => {
+    render(
+      <AutoModeRoundHistory
+        rounds={[
+          round({
+            round: 1,
+            applied: 304,
+            resolved: 303,
+            regressions: 253,
+            remaining: 50,
+            resolvedByCode: { 'MATTERHORN-13-001': 280, 'COLOR-CONTRAST': 23 },
+            regressionsByCode: { 'SPAN-ILLEGAL-NESTING': 200, 'STRUCTURE-ELEMENT-WRONG-PARENT': 53 },
+          }),
+        ]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /1/ }));
+
+    expect(screen.getByText('Resolved:')).toBeInTheDocument();
+    expect(screen.getByText('MATTERHORN-13-001 ×280')).toBeInTheDocument();
+    expect(screen.getByText('COLOR-CONTRAST ×23')).toBeInTheDocument();
+    expect(screen.getByText('Regressions:')).toBeInTheDocument();
+    expect(screen.getByText('SPAN-ILLEGAL-NESTING ×200')).toBeInTheDocument();
+    expect(screen.getByText('STRUCTURE-ELEMENT-WRONG-PARENT ×53')).toBeInTheDocument();
+  });
+
+  it('sorts the code breakdown most-frequent-first', () => {
+    render(
+      <AutoModeRoundHistory
+        rounds={[
+          round({ round: 1, regressionsByCode: { 'RARE-CODE': 1, 'COMMON-CODE': 50, 'MID-CODE': 10 } }),
+        ]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /1/ }));
+
+    const badges = screen.getAllByText(/×\d+$/);
+    expect(badges.map(b => b.textContent)).toEqual(['COMMON-CODE ×50', 'MID-CODE ×10', 'RARE-CODE ×1']);
+  });
+
+  it('renders no breakdown section at all when resolvedByCode/regressionsByCode are absent', () => {
+    render(<AutoModeRoundHistory rounds={[round({ round: 1, resolved: 5, regressions: 2 })]} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /1/ }));
+
+    expect(screen.queryByText('Resolved:')).not.toBeInTheDocument();
+    expect(screen.queryByText('Regressions:')).not.toBeInTheDocument();
+  });
+
   it('regression: an invalid/corrupted stored value falls back to table view instead of crashing', () => {
     localStorage.setItem(STORAGE_KEY, 'not-a-real-view');
 

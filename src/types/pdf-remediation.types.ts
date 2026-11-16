@@ -314,6 +314,11 @@ export interface RemediationHistoryEvent {
   triggeredBy?: string | null;
   startedAt: string;
   completedAt?: string | null;
+  /** Per-issue-code counts behind resolvedCount/regressionCount -- only
+   * ever populated on a 'reaudit' event. See the backend Prisma field's
+   * own doc comment (RemediationCycleEvent.resolvedByCode/regressionsByCode). */
+  resolvedByCode?: Record<string, number> | null;
+  regressionsByCode?: Record<string, number> | null;
 }
 
 /**
