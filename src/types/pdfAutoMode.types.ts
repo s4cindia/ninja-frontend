@@ -18,6 +18,12 @@ import type { AutoColorContrastMode, AutoModeStatus, AutoModeStopReason } from '
  */
 export type AutoAltTextMode = 'apply-to-pdf' | 'guidance-only' | null;
 
+/** Same shape as AutoColorContrastMode -- link text and bookmark modes are
+ * resolved the same "null means inherit" way (see resolveLinkTextMode/
+ * resolveBookmarkMode on the backend). */
+export type AutoLinkTextMode = AutoColorContrastMode;
+export type AutoBookmarkMode = AutoColorContrastMode;
+
 export interface AutoModeStatusResponse {
   mode: 'manual' | 'auto';
   autoStatus: AutoModeStatus;
@@ -28,6 +34,26 @@ export interface AutoModeStatusResponse {
   autoCostLimitUsd: number;
   autoColorContrastMode: AutoColorContrastMode;
   autoAltTextMode: AutoAltTextMode;
+  autoLinkTextMode: AutoLinkTextMode;
+  autoBookmarkMode: AutoBookmarkMode;
+  /** One-time escalation (ninja-backend#827/#829) already fired for this
+   * run -- color contrast/link text/bookmarks got forced to apply-to-pdf
+   * after a stall, so the modes above no longer reflect what was configured
+   * going in. */
+  autoStallEscalated: boolean;
+  /**
+   * The resolved (job-override ?? tenant-default) value actually governing
+   * this job right now, independent of whether a run exists yet -- lets the
+   * UI show "Full Auto Mode: On" / "Auto-escalate on stall: On" for the
+   * whole lifetime of the job (pending, running, and stopped), not just the
+   * brief pre-start window pendingFullAutoMode covers. Real incident
+   * (2026-11-16): with neither visible anywhere, a stale page view of an
+   * old job's results looked identical to a fresh run, and a real stall
+   * with no escalation looked like a bug because there was no way to
+   * confirm escalation was even turned on for that run.
+   */
+  fullAutoModeEffective: boolean;
+  autoEscalateOnStallEffective: boolean;
   /**
    * When the CURRENT run started (ninja-backend#671) — null if no run has
    * ever started, or once a run has stopped. Anchors a live elapsed-time
