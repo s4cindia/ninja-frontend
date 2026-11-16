@@ -420,7 +420,20 @@ describe('TenantConfigService', () => {
       expect(config.autoEscalateOnStallDefault).toBe(true);
     });
 
-    it('should return fullAutoModeDefault: false and autoEscalateOnStallDefault: false among the other defaults on API error', async () => {
+    it('should fetch and return fullQCDefault', async () => {
+      vi.mocked(api.get).mockResolvedValue({
+        data: {
+          success: true,
+          data: { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only', fullAutoModeDefault: false, autoEscalateOnStallDefault: false, fullQCDefault: true },
+        },
+      } as any);
+
+      const config = await tenantConfigService.getAiRemediationConfig();
+
+      expect(config.fullQCDefault).toBe(true);
+    });
+
+    it('should return fullAutoModeDefault: false, autoEscalateOnStallDefault: false, and fullQCDefault: false among the other defaults on API error', async () => {
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       vi.mocked(api.get).mockRejectedValue(new Error('Network error'));
@@ -433,6 +446,7 @@ describe('TenantConfigService', () => {
         linkTextMode: 'guidance-only',
         fullAutoModeDefault: false,
         autoEscalateOnStallDefault: false,
+        fullQCDefault: false,
       });
 
       consoleErrorSpy.mockRestore();
@@ -468,6 +482,21 @@ describe('TenantConfigService', () => {
 
       expect(api.patch).toHaveBeenCalledWith('/tenant/config/ai-remediation', { autoEscalateOnStallDefault: true });
       expect(config.autoEscalateOnStallDefault).toBe(true);
+    });
+
+    it('should PATCH fullQCDefault and return the updated config', async () => {
+      vi.mocked(api.patch).mockResolvedValue({
+        data: {
+          success: true,
+          data: { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only', fullAutoModeDefault: false, autoEscalateOnStallDefault: false, fullQCDefault: true },
+          message: 'Updated',
+        },
+      } as any);
+
+      const config = await tenantConfigService.updateAiRemediationConfig({ fullQCDefault: true });
+
+      expect(api.patch).toHaveBeenCalledWith('/tenant/config/ai-remediation', { fullQCDefault: true });
+      expect(config.fullQCDefault).toBe(true);
     });
   });
 

@@ -35,6 +35,8 @@ import {
 import { cn } from '@/utils/cn';
 import { Button } from '../ui/Button';
 import type { PdfAuditIssue } from '@/types/pdf.types';
+import type { StructureTagElement } from '@/types/pdfStructureTags.types';
+import { StructureTagBox, StructureTagDetailStrip } from './StructureTagPanel';
 
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
@@ -52,6 +54,22 @@ export interface PdfPreviewPanelProps {
   onIssueSelect: (issue: PdfAuditIssue) => void;
   issueNumberMap?: Map<string, number>;
   className?: string;
+  /**
+   * Structure Tag QC Review (gated by the Full QC toggle) -- when present
+   * (even an empty array), switches this panel from its normal
+   * issue-overlay view into structure-tag review mode: the issue overlay,
+   * highlight toggle, and issue breakdown bar are hidden, and every
+   * structure element on the current page is rendered instead, color-coded
+   * by tag family and click-to-select. Reuses this component's existing
+   * zoom/page-nav/Document rendering and overlay-positioning math rather
+   * than a separate sibling viewer -- the two modes are mutually
+   * exclusive, never shown together.
+   */
+  structureTagElements?: StructureTagElement[];
+  selectedStructureTagElementId?: string | null;
+  onStructureTagElementSelect?: (element: StructureTagElement) => void;
+  onStructureTagChange?: (element: StructureTagElement, newTag: string) => void;
+  structureTagSaving?: boolean;
 }
 
 type ZoomLevel = 'fit-width' | 'fit-page' | 50 | 75 | 100 | 125 | 150 | 200;
@@ -189,7 +207,13 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
   onIssueSelect,
   issueNumberMap,
   className,
+  structureTagElements,
+  selectedStructureTagElementId,
+  onStructureTagElementSelect,
+  onStructureTagChange,
+  structureTagSaving,
 }) => {
+  const structureTagMode = structureTagElements !== undefined;
   const [numPages, setNumPages] = useState<number | null>(null);
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>(100);
   const [showHighlights, setShowHighlights] = useState(true);
@@ -245,6 +269,30 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
       ?? issues.find(i => i.id === selectedIssueId)
       ?? null;
   }, [selectedIssueId, currentPageIssues, issues]);
+
+  // Structure Tag QC Review -- same page-filter + scale/padding math as
+  // currentPageIssues/highlights above, just keyed by elementId instead of
+  // issue id and driven by bbox (already top-left-origin, like
+  // AuditIssue.boundingBox) instead of issue.boundingBox.
+  const currentPageStructureTags = useMemo(() => {
+    return structureTagElements?.filter((el) => el.pageNumber === currentPage) ?? [];
+  }, [structureTagElements, currentPage]);
+
+  const structureTagBoxes = useMemo(() => {
+    const scale = typeof zoomLevel === 'number' ? zoomLevel / 100 : 1;
+    return currentPageStructureTags.map((element) => ({
+      element,
+      x: element.bbox.x * scale + OVERLAY_PADDING_PX,
+      y: element.bbox.y * scale + OVERLAY_PADDING_PX,
+      width: Math.max(element.bbox.width * scale, 4),
+      height: Math.max(element.bbox.height * scale, 4),
+    }));
+  }, [currentPageStructureTags, zoomLevel]);
+
+  const selectedStructureTagElement = useMemo(() => {
+    if (!selectedStructureTagElementId) return null;
+    return currentPageStructureTags.find((el) => el.elementId === selectedStructureTagElementId) ?? null;
+  }, [selectedStructureTagElementId, currentPageStructureTags]);
 
   const handleDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
@@ -397,28 +445,36 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
           </Button>
         </div>
 
-        {/* Highlight toggle */}
-        <div className="flex items-center gap-2">
-          <Button
-            variant={showHighlights ? 'secondary' : 'outline'}
-            size="sm"
-            onClick={() => setShowHighlights(!showHighlights)}
-            aria-label={showHighlights ? 'Hide issue highlights' : 'Show issue highlights'}
-            title="Highlights mark only issues that include location data from the audit."
-          >
-            {showHighlights ? (
-              <>
-                <Eye className="h-4 w-4 mr-1" />
-                <span className="text-sm">Issues ({currentPageIssues.length})</span>
-              </>
-            ) : (
-              <>
-                <EyeOff className="h-4 w-4 mr-1" />
-                <span className="text-sm">Show Issues</span>
-              </>
-            )}
-          </Button>
-        </div>
+        {/* Highlight toggle -- not shown in structure-tag review mode, which
+            has no "hide" concept of its own (every element is always
+            visible so the operator can click any of them). */}
+        {structureTagMode ? (
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            {currentPageStructureTags.length} structure element{currentPageStructureTags.length === 1 ? '' : 's'} on this page
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Button
+              variant={showHighlights ? 'secondary' : 'outline'}
+              size="sm"
+              onClick={() => setShowHighlights(!showHighlights)}
+              aria-label={showHighlights ? 'Hide issue highlights' : 'Show issue highlights'}
+              title="Highlights mark only issues that include location data from the audit."
+            >
+              {showHighlights ? (
+                <>
+                  <Eye className="h-4 w-4 mr-1" />
+                  <span className="text-sm">Issues ({currentPageIssues.length})</span>
+                </>
+              ) : (
+                <>
+                  <EyeOff className="h-4 w-4 mr-1" />
+                  <span className="text-sm">Show Issues</span>
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* PDF viewer */}
@@ -452,7 +508,7 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
               </Document>
 
               {/* Issue highlights overlay */}
-              {showHighlights && highlights.length > 0 && (
+              {!structureTagMode && showHighlights && highlights.length > 0 && (
                 <div className="absolute inset-0 pointer-events-none">
                   <div className="relative w-full h-full pointer-events-auto">
                     {highlights.map((highlight, index) => (
@@ -468,12 +524,41 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* Structure tag review overlay */}
+              {structureTagMode && structureTagBoxes.length > 0 && (
+                <div className="absolute inset-0 pointer-events-none">
+                  <div className="relative w-full h-full pointer-events-auto">
+                    {structureTagBoxes.map(({ element, x, y, width, height }) => (
+                      <StructureTagBox
+                        key={element.elementId}
+                        element={element}
+                        x={x}
+                        y={y}
+                        width={width}
+                        height={height}
+                        isSelected={element.elementId === selectedStructureTagElementId}
+                        onClick={() => onStructureTagElementSelect?.(element)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
 
+        {/* Selected structure element context strip — below the PDF page, inside the scrollable area */}
+        {!error && structureTagMode && selectedStructureTagElement && (
+          <StructureTagDetailStrip
+            element={selectedStructureTagElement}
+            onChange={(newTag) => onStructureTagChange?.(selectedStructureTagElement, newTag)}
+            saving={structureTagSaving}
+          />
+        )}
+
         {/* Selected issue context strip — below the PDF page, inside the scrollable area */}
-        {!error && selectedIssue && (
+        {!error && !structureTagMode && selectedIssue && (
           <div className="mt-3 mx-auto max-w-3xl px-4 py-2.5 bg-purple-50 border border-purple-200 rounded-lg text-xs">
             <div className="flex items-center gap-2 flex-wrap">
               <span className={cn(
@@ -498,7 +583,7 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
       </div>
 
       {/* Issue type breakdown bar */}
-      {currentPageIssues.length > 0 && (
+      {!structureTagMode && currentPageIssues.length > 0 && (
         <div className="px-4 py-2 bg-white border-t border-gray-200">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-xs text-gray-500 shrink-0">

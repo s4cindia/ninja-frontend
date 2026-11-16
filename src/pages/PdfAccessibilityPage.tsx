@@ -29,6 +29,10 @@ export const PdfAccessibilityPage: React.FC = () => {
   // one path where nobody will be on the Audit Results page in time to set
   // this via the per-job Settings menu before the auto-started run reads it.
   const [autoEscalateOnStall, setAutoEscalateOnStall] = useState(false);
+  // Same "checking only ever opts in" contract as fullAutoMode above --
+  // gates visibility of the page-by-page "Review structure tags" mode on
+  // this file's Audit Results page.
+  const [fullQC, setFullQC] = useState(false);
 
   // A Team Leader can lead more than one team, so each entry carries its
   // own teamName -- group so the dropdown can label unambiguously which
@@ -154,6 +158,20 @@ export const PdfAccessibilityPage: React.FC = () => {
               Auto-escalate on stall (for this file)
             </span>
           </div>
+          <div className="flex items-center gap-1.5 text-sm text-gray-700 select-none">
+            <Checkbox
+              checked={fullQC}
+              onChange={setFullQC}
+              aria-label="Full QC"
+            />
+            <span
+              className="cursor-pointer"
+              onClick={() => setFullQC((v) => !v)}
+              title="Makes the page-by-page &quot;Review structure tags&quot; mode available on this file's Audit Results page, so an operator can inspect and correct every structure tag before the file goes out. Leave unchecked to use your tenant's own default instead."
+            >
+              Full QC (page-by-page structure-tag review, for this file)
+            </span>
+          </div>
           <DocumentUploader
             onUploadComplete={handleUploadComplete}
             onJobCreated={handleJobCreated}
@@ -168,6 +186,7 @@ export const PdfAccessibilityPage: React.FC = () => {
             assigneeUserId={assigneeUserId || undefined}
             fullAutoMode={fullAutoMode || undefined}
             autoEscalateOnStall={autoEscalateOnStall || undefined}
+            fullQC={fullQC || undefined}
           />
         </CardContent>
       </Card>

@@ -64,7 +64,7 @@ function mockAxes4Config(overrides?: Partial<Axes4Config>): Axes4Config {
 }
 
 function mockAiRemediationConfig(overrides?: Partial<AiRemediationConfig>): AiRemediationConfig {
-  return { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only', fullAutoModeDefault: false, autoEscalateOnStallDefault: false, ...overrides };
+  return { altTextMode: 'apply-to-pdf', colorContrastMode: 'guidance-only', linkTextMode: 'guidance-only', fullAutoModeDefault: false, autoEscalateOnStallDefault: false, fullQCDefault: false, ...overrides };
 }
 
 function mockComplianceConfig(overrides?: Partial<ComplianceConfig>): ComplianceConfig {
@@ -220,6 +220,7 @@ describe('TenantWorkflowSettings — PDF AI Remediation tenant defaults', () => 
         linkTextMode: 'guidance-only',
         fullAutoModeDefault: false,
         autoEscalateOnStallDefault: false,
+        fullQCDefault: false,
       });
     });
   });
@@ -284,6 +285,7 @@ describe('TenantWorkflowSettings — PDF AI Remediation tenant defaults', () => 
         linkTextMode: 'guidance-only',
         fullAutoModeDefault: true,
         autoEscalateOnStallDefault: false,
+        fullQCDefault: false,
       });
     });
   });
@@ -330,6 +332,7 @@ describe('TenantWorkflowSettings — PDF AI Remediation tenant defaults', () => 
         linkTextMode: 'guidance-only',
         fullAutoModeDefault: false,
         autoEscalateOnStallDefault: true,
+        fullQCDefault: false,
       });
     });
   });
@@ -343,6 +346,53 @@ describe('TenantWorkflowSettings — PDF AI Remediation tenant defaults', () => 
     expect(saveButton).toBeDisabled();
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'Auto-escalate on stall' }));
+    expect(saveButton).not.toBeDisabled();
+  });
+
+  it('is read-only (disabled) for a non-admin, reflecting the loaded Full QC default', async () => {
+    setCurrentUser({ role: 'OPERATOR' });
+    mockService.getAiRemediationConfig.mockResolvedValue(mockAiRemediationConfig({ fullQCDefault: true }));
+
+    render(<TenantWorkflowSettings />);
+
+    const checkbox = await screen.findByRole('checkbox', { name: 'Full QC' }) as HTMLInputElement;
+    expect(checkbox.checked).toBe(true);
+    expect(checkbox).toBeDisabled();
+  });
+
+  it('is editable for an ADMIN, and saves Full QC together with the other AI remediation fields', async () => {
+    setCurrentUser({ role: 'ADMIN' });
+    mockService.updateAiRemediationConfig.mockResolvedValue(mockAiRemediationConfig({ fullQCDefault: true }));
+
+    render(<TenantWorkflowSettings />);
+
+    const checkbox = await screen.findByRole('checkbox', { name: 'Full QC' }) as HTMLInputElement;
+    expect(checkbox).not.toBeDisabled();
+
+    fireEvent.click(checkbox);
+    fireEvent.click(screen.getByRole('button', { name: /Save PDF AI Remediation Settings/ }));
+
+    await waitFor(() => {
+      expect(mockService.updateAiRemediationConfig).toHaveBeenCalledWith({
+        altTextMode: 'apply-to-pdf',
+        colorContrastMode: 'guidance-only',
+        linkTextMode: 'guidance-only',
+        fullAutoModeDefault: false,
+        autoEscalateOnStallDefault: false,
+        fullQCDefault: true,
+      });
+    });
+  });
+
+  it('enables the Save button when only the Full QC toggle differs from the saved value', async () => {
+    setCurrentUser({ role: 'ADMIN' });
+
+    render(<TenantWorkflowSettings />);
+
+    const saveButton = await screen.findByRole('button', { name: /Save PDF AI Remediation Settings/ });
+    expect(saveButton).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Full QC' }));
     expect(saveButton).not.toBeDisabled();
   });
 });

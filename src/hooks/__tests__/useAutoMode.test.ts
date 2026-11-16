@@ -445,10 +445,11 @@ describe('useJobSettings', () => {
     vi.clearAllMocks();
   });
 
-  function settings(overrides: { fullAutoMode?: Partial<{ override: boolean | null; tenantDefault: boolean; effective: boolean }>; autoEscalateOnStall?: Partial<{ override: boolean | null; tenantDefault: boolean; effective: boolean }> } = {}) {
+  function settings(overrides: { fullAutoMode?: Partial<{ override: boolean | null; tenantDefault: boolean; effective: boolean }>; autoEscalateOnStall?: Partial<{ override: boolean | null; tenantDefault: boolean; effective: boolean }>; fullQC?: Partial<{ override: boolean | null; tenantDefault: boolean; effective: boolean }> } = {}) {
     return {
       fullAutoMode: { override: null, tenantDefault: false, effective: false, ...overrides.fullAutoMode },
       autoEscalateOnStall: { override: null, tenantDefault: false, effective: false, ...overrides.autoEscalateOnStall },
+      fullQC: { override: null, tenantDefault: false, effective: false, ...overrides.fullQC },
     };
   }
 
@@ -497,6 +498,7 @@ describe('useUpdateJobSettings', () => {
     const updated = {
       fullAutoMode: { override: true, tenantDefault: false, effective: true },
       autoEscalateOnStall: { override: null, tenantDefault: false, effective: false },
+      fullQC: { override: null, tenantDefault: false, effective: false },
     };
     mockAutoModeService.updateJobSettings.mockResolvedValue(updated);
     const { result } = renderHook(() => useUpdateJobSettings('job-1'), { wrapper: createWrapper() });
@@ -511,10 +513,12 @@ describe('useUpdateJobSettings', () => {
     const initial = {
       fullAutoMode: { override: null, tenantDefault: false, effective: false },
       autoEscalateOnStall: { override: null, tenantDefault: false, effective: false },
+      fullQC: { override: null, tenantDefault: false, effective: false },
     };
     const updated = {
       fullAutoMode: { override: null, tenantDefault: false, effective: false },
       autoEscalateOnStall: { override: true, tenantDefault: false, effective: true },
+      fullQC: { override: null, tenantDefault: false, effective: false },
     };
     mockAutoModeService.getJobSettings.mockResolvedValue(initial);
     mockAutoModeService.updateJobSettings.mockResolvedValue(updated);

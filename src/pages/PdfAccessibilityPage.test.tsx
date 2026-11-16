@@ -25,7 +25,7 @@ vi.mock('@/services/team.service', () => ({
 const mockListTeamExecutives = vi.mocked(teamService.listTeamExecutives);
 
 vi.mock('@/components/epub/EPUBUploader', () => ({
-  DocumentUploader: ({ onUploadComplete, onJobCreated, onError, acceptedFileTypes, endpoints, assigneeUserId, fullAutoMode, autoEscalateOnStall }: {
+  DocumentUploader: ({ onUploadComplete, onJobCreated, onError, acceptedFileTypes, endpoints, assigneeUserId, fullAutoMode, autoEscalateOnStall, fullQC }: {
     onUploadComplete: (summary: { jobId: string }) => void;
     onJobCreated?: (jobId: string) => void;
     onError: (error: string) => void;
@@ -34,6 +34,7 @@ vi.mock('@/components/epub/EPUBUploader', () => ({
     assigneeUserId?: string;
     fullAutoMode?: boolean;
     autoEscalateOnStall?: boolean;
+    fullQC?: boolean;
   }) => (
     <div data-testid="document-uploader">
       <div>Accepted Types: {acceptedFileTypes?.join(', ')}</div>
@@ -41,6 +42,7 @@ vi.mock('@/components/epub/EPUBUploader', () => ({
       <div>Assignee: {assigneeUserId ?? '(none)'}</div>
       <div>Full Auto Mode: {fullAutoMode === undefined ? '(unset)' : String(fullAutoMode)}</div>
       <div>Auto-escalate on stall: {autoEscalateOnStall === undefined ? '(unset)' : String(autoEscalateOnStall)}</div>
+      <div>Full QC: {fullQC === undefined ? '(unset)' : String(fullQC)}</div>
       <button onClick={() => onUploadComplete({ jobId: 'test-job-123' })}>
         Upload Success
       </button>
@@ -452,6 +454,28 @@ describe('PdfAccessibilityPage', () => {
 
       await user.click(checkbox);
       expect(screen.getByText('Auto-escalate on stall: (unset)')).toBeInTheDocument();
+    });
+  });
+
+  describe('Full QC checkbox', () => {
+    it('is unchecked by default, and omits fullQC entirely (not false) from the uploader', () => {
+      renderPage();
+
+      const checkbox = screen.getByRole('checkbox', { name: 'Full QC' });
+      expect(checkbox).toHaveAttribute('aria-checked', 'false');
+      expect(screen.getByText('Full QC: (unset)')).toBeInTheDocument();
+    });
+
+    it('passes fullQC={true} to the uploader once checked, and back to unset when unchecked again', async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      const checkbox = screen.getByRole('checkbox', { name: 'Full QC' });
+      await user.click(checkbox);
+      expect(screen.getByText('Full QC: true')).toBeInTheDocument();
+
+      await user.click(checkbox);
+      expect(screen.getByText('Full QC: (unset)')).toBeInTheDocument();
     });
   });
 });

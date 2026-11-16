@@ -361,4 +361,83 @@ describe('PdfPreviewPanel', () => {
       // This is tested implicitly by the component logic
     });
   });
+
+  describe('Structure Tag Review mode', () => {
+    const structureTagElement = {
+      elementId: '12-0',
+      tag: 'H1',
+      pageNumber: 1,
+      bbox: { x: 100, y: 292, width: 70, height: 20, pageWidth: 612, pageHeight: 792 },
+    };
+
+    it('switches into structure-tag mode whenever structureTagElements is provided (even empty), hiding the issue-highlight toggle', () => {
+      render(<PdfPreviewPanel {...defaultProps} structureTagElements={[]} />);
+
+      expect(screen.queryByLabelText(/issue highlights/i)).not.toBeInTheDocument();
+      expect(screen.getByText('0 structure elements on this page')).toBeInTheDocument();
+    });
+
+    it('stays in normal issue mode when structureTagElements is omitted entirely', () => {
+      render(<PdfPreviewPanel {...defaultProps} />);
+
+      expect(screen.getByLabelText(/issue highlights/i)).toBeInTheDocument();
+    });
+
+    it('renders one labeled box per structure element on the current page, filtered by page', () => {
+      const otherPage = { ...structureTagElement, elementId: '13-0', tag: 'P', pageNumber: 2 };
+      render(
+        <PdfPreviewPanel
+          {...defaultProps}
+          currentPage={1}
+          structureTagElements={[structureTagElement, otherPage]}
+        />
+      );
+
+      expect(screen.getByRole('button', { name: 'H1 element' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'P element' })).not.toBeInTheDocument();
+      expect(screen.getByText('1 structure element on this page')).toBeInTheDocument();
+    });
+
+    it('calls onStructureTagElementSelect when a box is clicked', () => {
+      const onSelect = vi.fn();
+      render(
+        <PdfPreviewPanel
+          {...defaultProps}
+          currentPage={1}
+          structureTagElements={[structureTagElement]}
+          onStructureTagElementSelect={onSelect}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'H1 element' }));
+
+      expect(onSelect).toHaveBeenCalledWith(structureTagElement);
+    });
+
+    it('shows the detail strip for the selected element and calls onStructureTagChange on a dropdown change', () => {
+      const onChange = vi.fn();
+      render(
+        <PdfPreviewPanel
+          {...defaultProps}
+          currentPage={1}
+          structureTagElements={[structureTagElement]}
+          selectedStructureTagElementId={structureTagElement.elementId}
+          onStructureTagChange={onChange}
+        />
+      );
+
+      expect(screen.getByText('Selected: H1')).toBeInTheDocument();
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'Change structure tag' }), { target: { value: 'H2' } });
+
+      expect(onChange).toHaveBeenCalledWith(structureTagElement, 'H2');
+    });
+
+    it('does not show the issue breakdown bar in structure-tag mode, even with issues passed', () => {
+      const issues = [createMockIssue('1', 1, 'critical')];
+      render(<PdfPreviewPanel {...defaultProps} issues={issues} structureTagElements={[]} />);
+
+      expect(screen.queryByText(/issue(s)? on this page/)).not.toBeInTheDocument();
+    });
+  });
 });

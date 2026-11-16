@@ -72,6 +72,14 @@ interface DocumentUploaderProps {
    * tenant default.
    */
   autoEscalateOnStall?: boolean;
+  /**
+   * PDF-only: upload-time override for "Full QC" -- same "absent means
+   * inherit the tenant's own aiRemediation.fullQCDefault setting" contract
+   * as fullAutoMode/autoEscalateOnStall above. Gates visibility of the
+   * page-by-page "Review structure tags" mode on the Audit Results page
+   * for this file; set only here (no PATCH support after upload).
+   */
+  fullQC?: boolean;
 }
 
 interface EPUBUploaderProps {
@@ -107,6 +115,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
   assigneeUserId,
   fullAutoMode,
   autoEscalateOnStall,
+  fullQC,
 }) => {
   const [state, setState] = useState<UploadState>('idle');
   const [progress, setProgress] = useState(0);
@@ -367,11 +376,12 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
           setUploadNow(Date.now());
         },
         endpoint.directUpload,
-        (assigneeUserId || fullAutoMode !== undefined || autoEscalateOnStall !== undefined)
+        (assigneeUserId || fullAutoMode !== undefined || autoEscalateOnStall !== undefined || fullQC !== undefined)
           ? {
               ...(assigneeUserId ? { assigneeUserId } : {}),
               ...(fullAutoMode !== undefined ? { fullAutoMode: String(fullAutoMode) } : {}),
               ...(autoEscalateOnStall !== undefined ? { autoEscalateOnStall: String(autoEscalateOnStall) } : {}),
+              ...(fullQC !== undefined ? { fullQC: String(fullQC) } : {}),
             }
           : undefined
       );
@@ -397,6 +407,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
           ...(assigneeUserId ? { assigneeUserId } : {}),
           ...(fullAutoMode !== undefined ? { fullAutoMode } : {}),
           ...(autoEscalateOnStall !== undefined ? { autoEscalateOnStall } : {}),
+          ...(fullQC !== undefined ? { fullQC } : {}),
         });
         const responseData = response.data.data || response.data;
         jobId = responseData.jobId || responseData.id;
