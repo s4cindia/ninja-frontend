@@ -109,6 +109,13 @@ export interface AutoModeRound {
   startedAt?: string | null;
   /** msBetween(startedAt, completedAt) — undefined when either timestamp is missing. */
   durationMs?: number;
+  /** Per-issue-code counts behind resolved/regressions -- see
+   * RemediationHistoryEvent's own doc comment. Optional/nullable so
+   * existing fixtures/callers that don't care about the breakdown don't
+   * need to supply it, same convention as durationMs above; absent when
+   * the reaudit event predates this field. */
+  resolvedByCode?: Record<string, number> | null;
+  regressionsByCode?: Record<string, number> | null;
 }
 
 /**
@@ -168,6 +175,8 @@ export function useAutoModeRoundHistory(
             completedAt: event.completedAt ?? null,
             startedAt: startedAt ?? null,
             durationMs: msBetween(startedAt, event.completedAt),
+            resolvedByCode: event.resolvedByCode ?? null,
+            regressionsByCode: event.regressionsByCode ?? null,
           });
           pendingApply = undefined;
         }
