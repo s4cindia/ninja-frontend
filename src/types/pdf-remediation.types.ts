@@ -356,3 +356,42 @@ export interface ApplyFailureReport {
   totalFailed: number;
   groups: ApplyFailureGroup[];
 }
+
+export interface HandoffNoteRemainingIssue {
+  code: string;
+  disposition: string;
+  count: number;
+}
+
+export interface HandoffNoteAutoRemediation {
+  roundsCompleted: number;
+  maxRounds: number;
+  stopReason: string | null;
+  costSpentUsd: number;
+  stoppedAt: string | null;
+}
+
+export interface HandoffNoteTeamReview {
+  outcome: string;
+  reviewedAt: string;
+  reviewedBy: string;
+  notes: string | null;
+}
+
+/**
+ * A factual cover note for handing a remediated file to an external QC
+ * partner — every field read from the job's own real records on the
+ * backend (pdf-remediation.controller.ts's getHandoffNote), nothing
+ * templated. Does NOT carry a "manual Full QC pass completed" field: the
+ * backend has no system-of-record for that, so HandoffNoteModal gates
+ * generation on an explicit confirmation checkbox instead.
+ */
+export interface HandoffNote {
+  fileName: string;
+  generatedAt: string;
+  score: number | null;
+  totalRemaining: number;
+  remainingIssues: HandoffNoteRemainingIssue[];
+  autoRemediation: HandoffNoteAutoRemediation | null;
+  teamReview: HandoffNoteTeamReview | null;
+}
