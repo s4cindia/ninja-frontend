@@ -69,6 +69,7 @@ export interface PdfPreviewPanelProps {
   selectedStructureTagElementId?: string | null;
   onStructureTagElementSelect?: (element: StructureTagElement) => void;
   onStructureTagChange?: (element: StructureTagElement, newTag: string) => void;
+  onFlagStructureTagElement?: (element: StructureTagElement) => void;
   structureTagSaving?: boolean;
 }
 
@@ -211,6 +212,7 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
   selectedStructureTagElementId,
   onStructureTagElementSelect,
   onStructureTagChange,
+  onFlagStructureTagElement,
   structureTagSaving,
 }) => {
   const structureTagMode = structureTagElements !== undefined;
@@ -553,6 +555,7 @@ export const PdfPreviewPanel: React.FC<PdfPreviewPanelProps> = ({
           <StructureTagDetailStrip
             element={selectedStructureTagElement}
             onChange={(newTag) => onStructureTagChange?.(selectedStructureTagElement, newTag)}
+            onFlag={onFlagStructureTagElement ? () => onFlagStructureTagElement(selectedStructureTagElement) : undefined}
             saving={structureTagSaving}
           />
         )}

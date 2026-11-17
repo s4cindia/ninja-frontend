@@ -141,4 +141,37 @@ describe('FeedbackForm', () => {
     expect(await screen.findByText('Thank you!')).toBeInTheDocument();
     expect(mockUpload).not.toHaveBeenCalled();
   });
+
+  it('merges structuredContext (pageNumber/elementPath) into context without touching the free-text Context field', async () => {
+    render(
+      <FeedbackForm
+        prefillType="FULL_QC_REVIEW"
+        prefillMessage="Flagging H2 element on page 4 for review."
+        structuredContext={{ pageNumber: 4, elementPath: '12-0' }}
+      />
+    );
+
+    expect(screen.getByLabelText(/Message/)).toHaveValue('Flagging H2 element on page 4 for review.');
+    fireEvent.click(screen.getByRole('button', { name: /submit feedback/i }));
+
+    await waitFor(() => expect(mockPost).toHaveBeenCalled());
+    const [, payload] = mockPost.mock.calls[0];
+    expect((payload as Record<string, unknown>).type).toBe('FULL_QC_REVIEW');
+    const context = (payload as Record<string, unknown>).context as Record<string, unknown>;
+    expect(context.pageNumber).toBe(4);
+    expect(context.elementPath).toBe('12-0');
+  });
+
+  it('omits pageNumber/elementPath entirely when no structuredContext is given', async () => {
+    render(<FeedbackForm />);
+
+    fireEvent.change(screen.getByLabelText(/Message/), { target: { value: 'General note' } });
+    fireEvent.click(screen.getByRole('button', { name: /submit feedback/i }));
+
+    await waitFor(() => expect(mockPost).toHaveBeenCalled());
+    const [, payload] = mockPost.mock.calls[0];
+    const context = (payload as Record<string, unknown>).context as Record<string, unknown>;
+    expect(context.pageNumber).toBeUndefined();
+    expect(context.elementPath).toBeUndefined();
+  });
 });

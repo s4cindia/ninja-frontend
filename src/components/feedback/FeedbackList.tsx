@@ -39,6 +39,7 @@ const TYPE_OPTIONS: { value: FeedbackType | 'ALL'; label: string }[] = [
   { value: 'GENERAL', label: 'General' },
   { value: 'BUG_REPORT', label: 'Bug Report' },
   { value: 'FEATURE_REQUEST', label: 'Feature Request' },
+  { value: 'FULL_QC_REVIEW', label: 'Full QC Review Note' },
 ];
 
 const STATUS_OPTIONS: { value: FeedbackStatus | 'ALL'; label: string }[] = [

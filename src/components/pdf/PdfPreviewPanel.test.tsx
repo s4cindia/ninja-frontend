@@ -433,6 +433,36 @@ describe('PdfPreviewPanel', () => {
       expect(onChange).toHaveBeenCalledWith(structureTagElement, 'H2');
     });
 
+    it('calls onFlagStructureTagElement with the selected element when the Flag button is clicked', () => {
+      const onFlag = vi.fn();
+      render(
+        <PdfPreviewPanel
+          {...defaultProps}
+          currentPage={1}
+          structureTagElements={[structureTagElement]}
+          selectedStructureTagElementId={structureTagElement.elementId}
+          onFlagStructureTagElement={onFlag}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /flag/i }));
+
+      expect(onFlag).toHaveBeenCalledWith(structureTagElement);
+    });
+
+    it('omits the Flag button when onFlagStructureTagElement is not given', () => {
+      render(
+        <PdfPreviewPanel
+          {...defaultProps}
+          currentPage={1}
+          structureTagElements={[structureTagElement]}
+          selectedStructureTagElementId={structureTagElement.elementId}
+        />
+      );
+
+      expect(screen.queryByRole('button', { name: /flag/i })).not.toBeInTheDocument();
+    });
+
     it('does not show the issue breakdown bar in structure-tag mode, even with issues passed', () => {
       const issues = [createMockIssue('1', 1, 'critical')];
       render(<PdfPreviewPanel {...defaultProps} issues={issues} structureTagElements={[]} />);

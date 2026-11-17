@@ -23,7 +23,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { FileText, Loader2, Download, Share2, RotateCw, Filter, X, ChevronDown, ListChecks, Maximize2, Minimize2, Zap, Sparkles, FileWarning, Tags } from 'lucide-react';
+import { FileText, Loader2, Download, Share2, RotateCw, Filter, X, ChevronDown, ListChecks, Maximize2, Minimize2, Zap, Sparkles, FileWarning, Tags, ClipboardList } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Alert } from '@/components/ui/Alert';
@@ -47,6 +47,8 @@ import { IssueCard, AiAnalysis } from '@/components/remediation/IssueCard';
 import { ApplyAllSuggestionsPanel } from '@/components/remediation/ApplyAllSuggestionsPanel';
 import { ApplyFailureReportModal } from '@/components/remediation/ApplyFailureReportModal';
 import { HandoffNoteModal } from '@/components/remediation/HandoffNoteModal';
+import { QcNotesModal } from '@/components/pdf/QcNotesModal';
+import { FeedbackModal } from '@/components/feedback';
 import { useRemediationTimer } from '@/hooks/useRemediationTimer';
 import { triggerAiAnalysis, type AiRemediationOverrides } from '@/services/api/pdfAiAnalysis.service';
 import type { ApplyAllAiSuggestionsResult } from '@/services/api/pdfAiAnalysis.service';
@@ -565,6 +567,8 @@ export const PdfAuditResultsPage: React.FC = () => {
   const [showApplyAllPanel, setShowApplyAllPanel] = useState(false);
   const [showApplyFailureReport, setShowApplyFailureReport] = useState(false);
   const [showHandoffNoteModal, setShowHandoffNoteModal] = useState(false);
+  const [showQcNotes, setShowQcNotes] = useState(false);
+  const [flaggedStructureTagElement, setFlaggedStructureTagElement] = useState<StructureTagElement | null>(null);
   // Lifted from ApplyAllSuggestionsPanel's own mutation (via onPendingChange)
   // — the panel owns the mutation, but the live-progress SSE connection
   // below needs to span both that step and Auto Mode's own apply step, so
@@ -2050,6 +2054,7 @@ export const PdfAuditResultsPage: React.FC = () => {
             selectedStructureTagElementId={selectedStructureTagElementId}
             onStructureTagElementSelect={(element) => setSelectedStructureTagElementId(element.elementId)}
             onStructureTagChange={handleStructureTagChange}
+            onFlagStructureTagElement={setFlaggedStructureTagElement}
             structureTagSaving={retagStructureElement.isPending}
           />
         </div>
@@ -2087,6 +2092,16 @@ export const PdfAuditResultsPage: React.FC = () => {
                     )}
                   >
                     <Tags className="h-4 w-4" />
+                  </button>
+                )}
+                {jobSettingsQuery.data?.fullQC.effective && (
+                  <button
+                    type="button"
+                    title="QC Notes — notes flagged during the structure tag review"
+                    onClick={() => setShowQcNotes(true)}
+                    className="p-1.5 rounded transition-colors text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                  >
+                    <ClipboardList className="h-4 w-4" />
                   </button>
                 )}
               {!disableManualActions && (eligibleForApplyAll + pendingEligible) > 0 && (
@@ -2418,6 +2433,23 @@ export const PdfAuditResultsPage: React.FC = () => {
         isOpen={showHandoffNoteModal}
         onClose={() => setShowHandoffNoteModal(false)}
         jobId={jobId!}
+      />
+
+      <QcNotesModal
+        isOpen={showQcNotes}
+        onClose={() => setShowQcNotes(false)}
+        jobId={jobId!}
+      />
+
+      <FeedbackModal
+        isOpen={!!flaggedStructureTagElement}
+        onClose={() => setFlaggedStructureTagElement(null)}
+        prefillType="FULL_QC_REVIEW"
+        prefillMessage={flaggedStructureTagElement ? `Flagging ${flaggedStructureTagElement.tag} element on page ${flaggedStructureTagElement.pageNumber} for review.` : undefined}
+        structuredContext={flaggedStructureTagElement ? {
+          pageNumber: flaggedStructureTagElement.pageNumber,
+          elementPath: flaggedStructureTagElement.elementId,
+        } : undefined}
       />
     </div>
   );

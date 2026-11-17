@@ -12,7 +12,7 @@
  */
 
 import React from 'react';
-import { Loader2 } from 'lucide-react';
+import { Flag, Loader2 } from 'lucide-react';
 import { PDF_UA_STRUCTURE_TAGS } from '@/types/pdfStructureTags.types';
 import type { StructureTagElement } from '@/types/pdfStructureTags.types';
 
@@ -80,8 +80,9 @@ export const StructureTagBox: React.FC<{
 export const StructureTagDetailStrip: React.FC<{
   element: StructureTagElement;
   onChange: (newTag: string) => void;
+  onFlag?: () => void;
   saving?: boolean;
-}> = ({ element, onChange, saving }) => (
+}> = ({ element, onChange, onFlag, saving }) => (
   <div className="mt-3 mx-auto max-w-3xl px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-lg text-xs">
     <div className="flex items-center gap-2 flex-wrap">
       <span className="font-semibold text-blue-900">Selected: {element.tag}</span>
@@ -100,6 +101,17 @@ export const StructureTagDetailStrip: React.FC<{
         </select>
       </label>
       {saving && <Loader2 className="h-3 w-3 animate-spin text-blue-600" aria-label="Saving" />}
+      {onFlag && (
+        <button
+          type="button"
+          onClick={onFlag}
+          className="flex items-center gap-1 px-2 py-1 text-xs border border-amber-300 text-amber-800 bg-amber-50 rounded hover:bg-amber-100 transition-colors"
+          title="Flag this element for a QC note — ambiguous call, pattern worth revisiting, etc."
+        >
+          <Flag className="h-3 w-3" />
+          Flag
+        </button>
+      )}
     </div>
     {element.textSnippet && <p className="text-blue-800 mt-1 leading-relaxed">{element.textSnippet}</p>}
   </div>

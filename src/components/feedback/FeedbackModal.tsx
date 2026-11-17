@@ -2,20 +2,23 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import { X, MessageSquare } from 'lucide-react';
 import { FeedbackForm } from './FeedbackForm';
 
-type FeedbackType = 
+type FeedbackType =
   | 'ACCESSIBILITY_ISSUE'
   | 'ALT_TEXT_QUALITY'
   | 'AUDIT_ACCURACY'
   | 'REMEDIATION_SUGGESTION'
   | 'GENERAL'
   | 'BUG_REPORT'
-  | 'FEATURE_REQUEST';
+  | 'FEATURE_REQUEST'
+  | 'FULL_QC_REVIEW';
 
 interface FeedbackModalProps {
   isOpen: boolean;
   onClose: () => void;
   prefillType?: FeedbackType;
   prefillContext?: string;
+  prefillMessage?: string;
+  structuredContext?: { pageNumber?: number; elementPath?: string };
   entityType?: string;
   entityId?: string;
 }
@@ -25,6 +28,8 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
   onClose,
   prefillType,
   prefillContext,
+  prefillMessage,
+  structuredContext,
   entityType,
   entityId,
 }) => {
@@ -110,6 +115,8 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
           <FeedbackForm
             prefillType={prefillType}
             prefillContext={prefillContext}
+            prefillMessage={prefillMessage}
+            structuredContext={structuredContext}
             entityType={entityType}
             entityId={entityId}
             onSuccess={onClose}
