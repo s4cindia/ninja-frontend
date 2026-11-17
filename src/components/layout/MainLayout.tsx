@@ -131,6 +131,7 @@ export function MainLayout() {
         { to: '/admin/reports', icon: BarChart3, label: 'Operational Reports', activePrefix: '/admin/reports' },
         { to: '/bootstrap', icon: Shield, label: 'Bootstrap Console', activePrefix: '/bootstrap' },
         { to: '/comparison-study', icon: GitCompare, label: 'Comparison Study', activePrefix: '/comparison-study' },
+        { to: '/help/administrator-guide', icon: HelpCircle, label: 'Administrator Guide' },
       ],
     },
     {
@@ -139,6 +140,7 @@ export function MainLayout() {
         { to: '/help/annotator-guide', icon: HelpCircle, label: "Annotator's Guide" },
         { to: '/help/operator-guide', icon: HelpCircle, label: 'Operator Guide' },
         { to: '/help/team-leader-guide', icon: HelpCircle, label: 'Team Leader Guide', teamLeaderOnly: true },
+        { to: '/help/full-qc-guide', icon: HelpCircle, label: 'Full QC Guide' },
       ],
     },
   ];

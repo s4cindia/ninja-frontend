@@ -1,6 +1,8 @@
 # PDF AI Remediation — Operator Guide
 
-**Version 2 — this is the operator's complete reference for auditing and remediating a PDF document on the Ninja platform, from upload through final compliance sign-off.** It assumes no prior familiarity with the platform. If you're new, read Part 1 and Part 4 first — those two sections are the ones you'll actually follow on your first job. Everything else is reference material to come back to as you need it.
+**Version 3 — this is the operator's complete reference for auditing and remediating a PDF document on the Ninja platform, from upload through final compliance sign-off.** It assumes no prior familiarity with the platform. If you're new, read Part 1 and Part 4 first — those two sections are the ones you'll actually follow on your first job. Everything else is reference material to come back to as you need it.
+
+Two companion guides cover things this guide only touches briefly: the **Full QC Guide** (the page-by-page structure-tag review feature, Part 4 Step 3 and Part 5.2 below) and the **Administrator Guide** (tenant-wide settings behind every toggle this guide mentions, Part 10 below).
 
 ---
 
@@ -69,6 +71,12 @@ Read this once before your first job — these terms appear everywhere in the re
 **Confidence tiers** — every AI-drafted suggestion carries a confidence percentage: **High (≥90%)**, **Medium (70–89%)**, **Low (&lt;70%)**. A low-confidence suggestion still shows up (visibly badged) rather than disappearing — you get to judge it yourself rather than the system silently hiding its own uncertainty.
 
 **Auto Mode vs. manual** — "Auto Mode" (Start Auto Remediation) runs its own internal loop — analyze → auto-approve → apply → re-audit — repeatedly, with no operator click in between rounds. Everything else in this guide (Re-run AI Analysis, Apply Fixes, Re-run Audit) is a **manual**, single-shot action you trigger yourself.
+
+**Full Auto Mode** — a tenant-wide (or per-job) setting that starts the Auto Mode loop above automatically, right after the initial audit, with no click and no popover configuration at all. With it off (the default), you start Auto Mode yourself per Step 3 below. Not to be confused with "Auto Mode" itself — Full Auto Mode only controls whether it starts on its own. See the **Administrator Guide** for where this is configured.
+
+**Auto-escalate on stall** — a tenant-wide (or per-job) setting that, when an Auto Mode run would otherwise stop "Stalled," automatically escalates its guidance-only Color contrast/Link text/Bookmarks settings to Auto-apply for one more pass before giving up for real (Step 4 below). See the **Administrator Guide** for where this is configured.
+
+**Full QC** — a tenant-wide (or per-file) setting that makes the page-by-page "Review structure tags" mode available on a job's Audit Results page — a tool for inspecting and correcting every structure tag directly, for the category of finding automated remediation can't safely close on its own. Off by default. See the dedicated **Full QC Guide** for the complete reference, and the **Administrator Guide** for where it's configured.
 
 **The 5-phase stepper** — a horizontal progress indicator near the top of the Audit Results page: **Audit → AI Analysis → Remediation → Verification → Compliance**. It's a coarse, at-a-glance summary; the Guided Remediation Checklist (Part 6) is the detailed, authoritative version of the same journey.
 
@@ -142,6 +150,8 @@ From the sidebar, go to **PDF Accessibility** and upload the document. This kick
 
 If the document arrives with no real structure tags at all, you'll see the **"Auto-tagged: Seam-C (YOLO)"** badge next to the file name — Ninja built the structure tree from scratch. If it already had real tags (e.g. a clean InDesign export), you'll see **"Already tagged"** instead.
 
+> **Full Auto Mode on for this job?** Auto Remediation (Step 3 below) already started on its own the moment the initial audit finished — there's nothing to click. Check the **Settings** button on the toolbar (Part 5.2) to see whether it's on for this job, and to change it.
+
 ### Step 2 — Decide: does the client supply their own alt text for this job?
 
 This is a per-job decision that shapes every alt-text setting for the rest of the workflow. There are two paths:
@@ -153,7 +163,7 @@ Keep this decision in mind for Steps 3 and 6 below — alt-text mode is set inde
 
 ### Step 3 — Start Auto Remediation
 
-On the Audit Results page toolbar, click **Start Auto Remediation**. This opens a popover with its own settings, completely independent of anything on the toolbar's checkboxes (those only matter for Step 6):
+**Skip this step if Full Auto Mode is on for this job** — the loop already started itself right after the initial audit, using the tenant's own defaults with no popover. Otherwise, on the Audit Results page toolbar, click **Start Auto Remediation**. This opens a popover with its own settings, completely independent of anything on the toolbar's checkboxes (those only matter for Step 6):
 
 | Setting | Recommended value | Notes |
 |---|---|---|
@@ -181,6 +191,8 @@ Same shape as round limit, but it ran out of money instead of rounds. If real pr
 
 **🟡 Stalled — "Stopped: no further progress was being made."**
 The last couple of rounds made no measurable progress at all — Ninja stopped itself rather than keep burning rounds/budget for nothing. This is your clearest, most direct signal that remaining items need a human, not another automated round. Proceed to **Step 6**, then expect to end up at **Step 9 (Acrobat Pro)** sooner rather than later for whatever's left.
+
+If **Auto-escalate on stall** is on for this job, the first stall doesn't stop the run outright — it automatically raises Color contrast/Link text/Bookmarks to Auto-apply for one more pass first, and only stops "Stalled" for real if that escalated pass *also* makes no progress. The banner's message tells you which happened ("already auto-escalated guidance-only fixes for one more pass, but still made no further progress" vs. the plain message above) — either way, by the time you see this banner, there's nothing more the loop can do on its own.
 
 **🔴 Error — "Auto Mode stopped on error."**
 A real, unexpected failure (shown with its own error message). This is not a normal stop reason — note the exact error text and escalate to engineering/support if retrying doesn't resolve it. Don't treat this as "mostly done, move on." One safety net worth knowing about: if the error happened after some fixes were applied but before they could be verified by the follow-up re-audit, those suggestions are automatically reverted back to "approved" rather than left incorrectly marked as done — so retrying this same job won't silently skip re-trying them.
@@ -220,9 +232,11 @@ In short: **Auto Remediation → Re-run AI Analysis → Apply Fixes → check wh
 
 ### Step 10 — Download the AI-Fixed PDF
 
-Click **Download AI-Fixed PDF** on the toolbar (only appears once at least one fix has been applied or a remediated file exists). This downloads the document exactly as Ninja has remediated it so far.
+Click **Download AI-Fixed PDF** on the toolbar (only appears once at least one fix has been applied or a remediated file exists). This downloads the document exactly as Ninja has remediated it so far. The downloaded filename now carries a version date (e.g. `mydoc_v2026-11-17.pdf`) so a document handed off more than once is never ambiguous about which pass it reflects.
 
 > **Blocked by a QC review?** If the job's most recent Team Review verdict is **Needs Correction** (Part 2's QC Shipment Gate), this button is disabled and a direct download attempt is rejected with a clear "blocked" message instead of the file. Address the reviewer's note, then either wait for a follow-up **OK** review or use **Request re-review** (shown on the Audit Results page) to notify the reviewer yourself.
+
+**Handing this file to an external QC partner?** Click **Generate Handoff Note** right next to the download button. It builds a short, factual cover note from the job's own real records — accessibility score, remaining-issue breakdown by code, the Auto Remediation round history, and the most recent Team Review (if any) — with one field you confirm yourself: a checkbox for "I completed the manual Full QC structure-tag review pass," since that's the one fact the system genuinely can't verify on its own. Leave it unchecked and the note says so honestly rather than claiming a pass that didn't happen. Copy the note or download it as a `.txt` file to send alongside the PDF.
 
 ### Step 11 — Fix the remainder in Acrobat Pro
 
@@ -270,13 +284,16 @@ File name, page count, file size, and the **Auto-tagged** or **Already tagged** 
 |---|---|
 | **Create Remediation Plan** | Navigates away to a separate page (Part 7) that groups every issue into Auto-fixable / Quick Fix / Manual sections. Disabled if there are zero issues. |
 | **Download Report** | Downloads the full audit result as a JSON file — the raw data, not a formatted document. |
-| **Download AI-Fixed PDF** | Downloads the document as currently remediated. Only appears once at least one fix has been applied or a remediated file exists. Disabled if the job's most recent Team Review verdict is Needs Correction (Part 2's QC Shipment Gate). |
+| **Download AI-Fixed PDF** | Downloads the document as currently remediated, with a dated filename (Part 4, Step 10). Only appears once at least one fix has been applied or a remediated file exists. Disabled if the job's most recent Team Review verdict is Needs Correction (Part 2's QC Shipment Gate). |
+| **Generate Handoff Note** | Builds a factual cover note for an external QC handoff from the job's own real records — see Part 4, Step 10. Same visibility condition as Download AI-Fixed PDF. |
 | **Share** | Copies the current results page URL to your clipboard. |
 | **Re-run Audit** | A full, from-scratch structural re-validation of the current document state. Use this after a manual, outside-the-normal-flow change you want freshly validated — Auto Remediation already re-audits itself every round, so you don't need this during/right after an Auto Mode run. |
 | **Re-run AI Analysis** + 3 checkboxes | One single analysis pass with per-run overrides (color-contrast, link-text, client-supplied-alt-text) — see Part 4, Step 6 for the recommended settings. Each checkbox affects only that one click, nothing else. |
-| **Start Auto Remediation** | Opens the multi-round automated loop's own settings popover — see Part 4, Step 3. |
-| **Settings** | A small menu, currently containing **Generate ACR** (Part 8). |
+| **Start Auto Remediation** | Opens the multi-round automated loop's own settings popover — see Part 4, Step 3. Not needed at all if Full Auto Mode is on for this job (Part 2 glossary). |
+| **Settings** | A menu containing **Generate ACR** (Part 8) plus, below a divider, three-state (On/Off/"Use tenant default") overrides for **Full Auto Mode** and **Auto-escalate on stall** for this one job — editable any time, not just at upload. (Full QC's per-job override lives only at upload time, not here — see the Full QC Guide.) |
 | **PAC Report** | Opens the 3-tab compliance report modal — see 5.9 below. |
+| 🏷️ **Review structure tags** *(only when Full QC is effective for this job)* | Switches the preview into page-by-page structure-tag review mode. Full reference: the **Full QC Guide**. |
+| 📋 **QC Notes** *(same condition as above)* | Lists the notes flagged during a structure-tag review pass (via the Flag button, Full QC Guide Part 6), with an Excel export. |
 
 ### 5.3 — The 5-phase stepper
 
@@ -378,7 +395,7 @@ Each step shows one of: **Not started** (hollow gray circle), **In progress** (s
 Two companion cards sit directly below:
 
 - **Manual remediation time log** — a self-reported timer ("Log time" opens a form for minutes spent + an optional note), with a running total shown alongside (e.g. "1h 20m logged"). This exists because Ninja's own automatic activity tracking only sees time spent *inside* Ninja — time in Acrobat Pro or any other outside tool is invisible unless you log it here yourself.
-- **Remediation History** — a read-only, collapsible "Run 1 / Run 2 / ..." log of every apply/re-audit/AI-analysis cycle, each with its own applied/failed/resolved/remaining/regression counts and timestamps. Only appears once the job has at least one logged cycle; the most recent run is expanded by default. This is where you check whether the remaining-issue count is still trending down (Part 4, Step 4's round-limit/budget-limit guidance) — see also the "Reading the round-by-round Regressions column" note in Part 11.
+- **Remediation History** — a read-only, collapsible "Run 1 / Run 2 / ..." log of every apply/re-audit/AI-analysis cycle, each with its own applied/failed/resolved/remaining/regression counts and timestamps. Only appears once the job has at least one logged cycle; the most recent run is expanded by default. A re-audit entry also breaks its resolved/regression counts down by issue code, not just the totals — useful for spotting exactly which code is behind a confusing regression number. This is where you check whether the remaining-issue count is still trending down (Part 4, Step 4's round-limit/budget-limit guidance) — see also the "Reading the round-by-round Regressions column" note in Part 11.
 
 ---
 
@@ -449,9 +466,11 @@ Opened from a Cost-tab row or a Quality-tab Sample Job link: **"Job History — 
 
 ## Part 10 — Settings &amp; Tenant Configuration
 
-Most tenant-wide settings are admin-controlled, but every operator should know they exist, since they're the fallback behind every per-run checkbox/popover described in this guide.
+Most tenant-wide settings are admin-controlled, but every operator should know they exist, since they're the fallback behind every per-run checkbox/popover described in this guide. The **Administrator Guide** has the complete reference for configuring every setting below — this section is just what you, as an operator, need to recognize.
 
-**PDF AI Remediation defaults** (Alt text / Color contrast / Link text, each `apply-to-pdf` / `guidance-only` / `disabled`, alt-text has no `disabled`): this is the fallback used whenever a request doesn't send its own override — the initial automatic pass on upload (Part 4, Step 1) always uses these, and so does **every** Auto Remediation run's link-text category (Part 4, Step 3 — the only category with no per-run popover control). Changing this doesn't affect a run already in progress.
+**PDF AI Remediation defaults** (Alt text / Color contrast / Link text / Bookmarks, each `apply-to-pdf` / `guidance-only` / `disabled`, alt-text has no `disabled`): this is the fallback used whenever a request doesn't send its own override — the initial automatic pass on upload (Part 4, Step 1) always uses these, and so does **every** Auto Remediation run's link-text and bookmarks categories (Part 4, Step 3 — the only two categories with no per-run popover control). Changing this doesn't affect a run already in progress.
+
+**Full Auto Mode** / **Auto-escalate on stall** / **Full QC** *(admin-controlled tenant defaults)*: see the glossary entries in Part 2 for what each does, and this page's own **Settings** menu (Part 5.2) for the per-job override on the first two. Full QC's complete reference is the dedicated **Full QC Guide**.
 
 **Require ACR for Compliance** *(admin-only toggle)*: controls whether the Compliance phase (Part 2, Part 4 Step 16) needs both the PAC report *and* a generated ACR to show Done, or just the PAC report alone. Defaults to **on** (ACR required). If your tenant has turned this off, the Compliance phase may show Done without you ever generating an ACR — know which setting your tenant uses so you're not confused by the stepper.
 
