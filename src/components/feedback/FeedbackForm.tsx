@@ -11,13 +11,25 @@ type FeedbackType =
   | 'REMEDIATION_SUGGESTION'
   | 'GENERAL'
   | 'BUG_REPORT'
-  | 'FEATURE_REQUEST';
+  | 'FEATURE_REQUEST'
+  | 'FULL_QC_REVIEW';
 
 type FeedbackSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+
+/** Structured fields merged into the submitted context alongside the
+ * auto-detected jobId/page -- unlike the free-text "Context" field below,
+ * these aren't user-editable; they identify exactly what was flagged (e.g.
+ * from the Structure Tag Review screen's "Flag" action). */
+interface FeedbackStructuredContext {
+  pageNumber?: number;
+  elementPath?: string;
+}
 
 interface FeedbackFormProps {
   prefillType?: FeedbackType;
   prefillContext?: string;
+  prefillMessage?: string;
+  structuredContext?: FeedbackStructuredContext;
   entityType?: string;
   entityId?: string;
   onSuccess?: () => void;
@@ -33,6 +45,7 @@ const FEEDBACK_TYPE_OPTIONS: { value: FeedbackType; label: string }[] = [
   { value: 'REMEDIATION_SUGGESTION', label: 'Remediation Suggestion' },
   { value: 'BUG_REPORT', label: 'Bug Report' },
   { value: 'FEATURE_REQUEST', label: 'Feature Request' },
+  { value: 'FULL_QC_REVIEW', label: 'Full QC Review Note' },
 ];
 
 const SEVERITY_OPTIONS: { value: FeedbackSeverity | ''; label: string }[] = [
@@ -59,6 +72,8 @@ function extractJobIdFromPath(pathname: string): string | undefined {
 export const FeedbackForm: React.FC<FeedbackFormProps> = ({
   prefillType = 'GENERAL',
   prefillContext = '',
+  prefillMessage = '',
+  structuredContext,
   entityType,
   entityId,
   onSuccess,
@@ -68,7 +83,7 @@ export const FeedbackForm: React.FC<FeedbackFormProps> = ({
   const attachmentInputId = useId();
   const [type, setType] = useState<FeedbackType>(prefillType);
   const [severity, setSeverity] = useState<FeedbackSeverity | ''>('');
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState(prefillMessage);
   const [context, setContext] = useState(prefillContext || `Page: ${window.location.pathname}`);
   const [files, setFiles] = useState<File[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
@@ -115,6 +130,8 @@ export const FeedbackForm: React.FC<FeedbackFormProps> = ({
       const jobId = extractJobIdFromPath(window.location.pathname);
       const contextPayload: Record<string, unknown> = { page: window.location.pathname };
       if (jobId) contextPayload.jobId = jobId;
+      if (structuredContext?.pageNumber !== undefined) contextPayload.pageNumber = structuredContext.pageNumber;
+      if (structuredContext?.elementPath) contextPayload.elementPath = structuredContext.elementPath;
 
       const payload: Record<string, unknown> = {
         type,
@@ -157,9 +174,9 @@ export const FeedbackForm: React.FC<FeedbackFormProps> = ({
       }
 
       setSubmitStatus('success');
-      setMessage('');
+      setMessage(prefillMessage);
       setContext(`Page: ${window.location.pathname}`);
-      setType('GENERAL');
+      setType(prefillType);
       setSeverity('');
       setFiles([]);
 
@@ -187,7 +204,7 @@ export const FeedbackForm: React.FC<FeedbackFormProps> = ({
     } finally {
       setIsSubmitting(false);
     }
-  }, [type, severity, message, context, entityType, entityId, files, onSuccess]);
+  }, [type, severity, message, context, structuredContext, entityType, entityId, files, onSuccess, prefillType, prefillMessage]);
 
   if (submitStatus === 'success') {
     return (

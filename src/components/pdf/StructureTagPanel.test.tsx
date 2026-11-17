@@ -80,4 +80,19 @@ describe('StructureTagDetailStrip', () => {
 
     expect(screen.queryByText('Chapter One')).not.toBeInTheDocument();
   });
+
+  it('omits the Flag button entirely when onFlag is not given', () => {
+    render(<StructureTagDetailStrip element={ELEMENT} onChange={vi.fn()} />);
+
+    expect(screen.queryByRole('button', { name: /flag/i })).not.toBeInTheDocument();
+  });
+
+  it('calls onFlag when the Flag button is clicked', () => {
+    const onFlag = vi.fn();
+    render(<StructureTagDetailStrip element={ELEMENT} onChange={vi.fn()} onFlag={onFlag} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /flag/i }));
+
+    expect(onFlag).toHaveBeenCalledTimes(1);
+  });
 });
