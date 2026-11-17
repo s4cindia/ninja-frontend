@@ -96,6 +96,8 @@ import CorpusSummaryPage from '@/pages/calibration/CorpusSummaryPage';
 import AnnotatorGuideHelpPage from '@/pages/help/AnnotatorGuidePage';
 import OperatorGuideHelpPage from '@/pages/help/OperatorGuidePage';
 import TeamLeaderGuideHelpPage from '@/pages/help/TeamLeaderGuidePage';
+import FullQcGuideHelpPage from '@/pages/help/FullQcGuidePage';
+import AdministratorGuideHelpPage from '@/pages/help/AdministratorGuidePage';
 import AdminCorpusPage from '@/pages/admin/AdminCorpusPage';
 import AdminUsersPage from '@/pages/admin/AdminUsersPage';
 import AdminTeamsPage from '@/pages/admin/AdminTeamsPage';
@@ -305,6 +307,8 @@ function AppRoutes() {
           <Route path="/help/annotator-guide" element={<AnnotatorGuideHelpPage />} />
           <Route path="/help/operator-guide" element={<OperatorGuideHelpPage />} />
           <Route path="/help/team-leader-guide" element={<TeamLeaderGuideHelpPage />} />
+          <Route path="/help/full-qc-guide" element={<FullQcGuideHelpPage />} />
+          <Route path="/help/administrator-guide" element={<AdministratorGuideHelpPage />} />
 
           {/* Admin Console Routes */}
           <Route path="/admin/corpus" element={<AdminCorpusPage />} />
