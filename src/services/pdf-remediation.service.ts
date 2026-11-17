@@ -15,6 +15,7 @@ import type {
   ReauditComparisonResult,
   RemediationHistoryRun,
   ApplyFailureReport,
+  HandoffNote,
 } from '@/types/pdf-remediation.types';
 
 /**
@@ -162,6 +163,17 @@ export async function getApplyFailureReport(jobId: string): Promise<ApplyFailure
   return { totalFailed: data?.totalFailed ?? 0, groups: data?.groups ?? [] };
 }
 
+/**
+ * A factual cover note for handing a remediated file to an external QC
+ * partner (score, remaining-issue breakdown, auto-remediation round
+ * history, most recent team review) — every field read from the job's own
+ * real records on the backend, nothing templated.
+ */
+export async function getHandoffNote(jobId: string): Promise<HandoffNote> {
+  const response = await api.get(`/pdf/${jobId}/remediation/handoff-note`);
+  return response.data.data ?? response.data;
+}
+
 export const pdfRemediationService = {
   createRemediationPlan,
   getRemediationPlan,
@@ -173,4 +185,5 @@ export const pdfRemediationService = {
   reauditPdf,
   getRemediationHistory,
   getApplyFailureReport,
+  getHandoffNote,
 };

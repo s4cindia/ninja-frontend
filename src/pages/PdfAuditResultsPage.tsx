@@ -46,6 +46,7 @@ import type { GuidanceAcknowledgment } from '@/components/pdf/RemediationCheckli
 import { IssueCard, AiAnalysis } from '@/components/remediation/IssueCard';
 import { ApplyAllSuggestionsPanel } from '@/components/remediation/ApplyAllSuggestionsPanel';
 import { ApplyFailureReportModal } from '@/components/remediation/ApplyFailureReportModal';
+import { HandoffNoteModal } from '@/components/remediation/HandoffNoteModal';
 import { useRemediationTimer } from '@/hooks/useRemediationTimer';
 import { triggerAiAnalysis, type AiRemediationOverrides } from '@/services/api/pdfAiAnalysis.service';
 import type { ApplyAllAiSuggestionsResult } from '@/services/api/pdfAiAnalysis.service';
@@ -563,6 +564,7 @@ export const PdfAuditResultsPage: React.FC = () => {
   const [showPacReport, setShowPacReport] = useState(false);
   const [showApplyAllPanel, setShowApplyAllPanel] = useState(false);
   const [showApplyFailureReport, setShowApplyFailureReport] = useState(false);
+  const [showHandoffNoteModal, setShowHandoffNoteModal] = useState(false);
   // Lifted from ApplyAllSuggestionsPanel's own mutation (via onPendingChange)
   // — the panel owns the mutation, but the live-progress SSE connection
   // below needs to span both that step and Auto Mode's own apply step, so
@@ -1452,7 +1454,15 @@ export const PdfAuditResultsPage: React.FC = () => {
       const url = window.URL.createObjectURL(response.data);
       const a = document.createElement('a');
       a.href = url;
-      a.download = auditResult.fileName.replace(/\.pdf$/i, '_remediated.pdf');
+      // Dated at download time (matches the server's own Content-Disposition
+      // convention, pdf-remediation.controller.ts's downloadRemediatedPdf) --
+      // this `a.download` value is what the browser actually uses for a
+      // blob response, overriding the server's filename header entirely, so
+      // it has to carry the version stamp itself rather than relying on the
+      // header. Built for the one-clean-final-handoff process agreed with
+      // S4 Carlisle: no ambiguity about which run a downloaded file reflects.
+      const versionStamp = new Date().toISOString().slice(0, 10);
+      a.download = auditResult.fileName.replace(/\.pdf$/i, `_v${versionStamp}.pdf`);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -1692,6 +1702,17 @@ export const PdfAuditResultsPage: React.FC = () => {
                   ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Downloading…</>
                   : <><Download className="h-4 w-4 mr-1" />Download AI-Fixed PDF</>
                 }
+              </Button>
+            )}
+            {(hasRemediatedFile || Array.from(aiSuggestions.values()).some(s => s.status === 'applied')) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowHandoffNoteModal(true)}
+                title="Generate a factual cover note for an external QC partner"
+              >
+                <FileText className="h-4 w-4 mr-1" />
+                Generate Handoff Note
               </Button>
             )}
             <Button variant="outline" size="sm" onClick={handleShareResults}>
@@ -2390,6 +2411,12 @@ export const PdfAuditResultsPage: React.FC = () => {
       <ApplyFailureReportModal
         isOpen={showApplyFailureReport}
         onClose={() => setShowApplyFailureReport(false)}
+        jobId={jobId!}
+      />
+
+      <HandoffNoteModal
+        isOpen={showHandoffNoteModal}
+        onClose={() => setShowHandoffNoteModal(false)}
         jobId={jobId!}
       />
     </div>
