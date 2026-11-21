@@ -137,6 +137,7 @@ export function MainLayout() {
     {
       title: 'Help',
       items: [
+        { to: '/help/platform-guide', icon: HelpCircle, label: 'Platform Guide (Admin, Operator & QC)' },
         { to: '/help/annotator-guide', icon: HelpCircle, label: "Annotator's Guide" },
         { to: '/help/operator-guide', icon: HelpCircle, label: 'Operator Guide' },
         { to: '/help/team-leader-guide', icon: HelpCircle, label: 'Team Leader Guide', teamLeaderOnly: true },
