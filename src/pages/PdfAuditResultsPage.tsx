@@ -367,6 +367,10 @@ export const PdfAuditResultsPage: React.FC = () => {
   const activeJobIdRef = useRef<string | undefined>(undefined);
   const autoTagPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoTagFetchedJobRef = useRef<string | null>(null);
+  // Separate from autoTagPollRef (auto-tag retry / post-remediation-status
+  // polling) so a re-audit recovery poll never clobbers or gets clobbered by
+  // those -- see handleReRunAuditForCurrentJob below.
+  const reauditRecoveryPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Same monotonic-id guard as aiFetchRequestIdRef/aiFetchAppliedIdRef below —
   // fetchAutoTagStatus is now called both by the one-shot mount effect and by
   // Auto Mode's per-round progress effect, so two requests can be in flight
@@ -1358,6 +1362,50 @@ export const PdfAuditResultsPage: React.FC = () => {
     }
   }, [jobId, fetchAuditResult, applyAutoTagStatus, applyRemediationCycleLock, bumpHistoryRefreshTrigger]);
 
+  // On a non-2xx/network failure (real incident: a CloudFront gateway
+  // timeout on this job's 190-page comprehensive re-audit), the backend
+  // keeps running and eventually persists the real result -- the client
+  // just gave up waiting on that one HTTP response. refreshRemediationCycleLock
+  // only retries for ~7s, so without this the lock (and hence the stale
+  // audit report already on screen) could sit unrefreshed indefinitely,
+  // even though the toasts below promise the page "will update
+  // automatically". Poll /auto-tag/status every 5s -- same cadence as
+  // pollPostRemediationStatus/handleRetryAutoTag -- until the lock this
+  // request held actually clears, then refetch.
+  const pollUntilReauditCycleClears = useCallback((requestJobId: string) => {
+    if (reauditRecoveryPollRef.current) clearInterval(reauditRecoveryPollRef.current);
+    reauditRecoveryPollRef.current = setInterval(async () => {
+      if (!isMountedRef.current || requestJobId !== activeJobIdRef.current) {
+        if (reauditRecoveryPollRef.current) {
+          clearInterval(reauditRecoveryPollRef.current);
+          reauditRecoveryPollRef.current = null;
+        }
+        return;
+      }
+      const lockSeq = ++lockRequestSeqRef.current;
+      try {
+        const res = await api.get(`/pdf/${encodeURIComponent(requestJobId)}/auto-tag/status`);
+        if (!isMountedRef.current) return;
+        const info = res.data.data;
+        applyRemediationCycleLock(requestJobId, info, lockSeq);
+        if (!info?.remediationCycleInProgress) {
+          if (reauditRecoveryPollRef.current) {
+            clearInterval(reauditRecoveryPollRef.current);
+            reauditRecoveryPollRef.current = null;
+          }
+          await fetchAuditResult();
+          await fetchJobFlags();
+          bumpHistoryRefreshTrigger();
+        }
+      } catch {
+        if (reauditRecoveryPollRef.current) {
+          clearInterval(reauditRecoveryPollRef.current);
+          reauditRecoveryPollRef.current = null;
+        }
+      }
+    }, 5000);
+  }, [applyRemediationCycleLock, fetchAuditResult, fetchJobFlags, bumpHistoryRefreshTrigger]);
+
   const handleReRunAuditForCurrentJob = async () => {
     if (!jobId || isReRunningAudit || remediationCycleActive) return;
     setIsReRunningAudit(true);
@@ -1371,13 +1419,13 @@ export const PdfAuditResultsPage: React.FC = () => {
       const lockDetails = getRemediationCycleLockDetails(err);
       if (lockDetails) {
         // Not fatal — a genuine click/poll race (should be rare, the button
-        // is pre-disabled once the lock is known). The status poll below
-        // updates remediationCycleLock so the button re-disables itself.
+        // is pre-disabled once the lock is known).
         toast('A remediation cycle is already in progress. This page will update automatically.');
       } else {
-        toast.error(getErrorMessage(err));
+        toast.error(`${getErrorMessage(err)} — it may still be finishing in the background. This page will update automatically.`);
       }
       await refreshRemediationCycleLock();
+      pollUntilReauditCycleClears(jobId);
     } finally {
       setIsReRunningAudit(false);
     }

@@ -2682,6 +2682,58 @@ describe('PdfAuditResultsPage', () => {
         vi.useRealTimers();
       }
     });
+
+    it('regression: refetches the audit result once the lock clears even after a CloudFront-timeout-style failure outlasts refreshRemediationCycleLock\'s ~7s retry budget (real incident: the backend kept running and eventually persisted the correct report, but the page never looked again, leaving a stale issue list on screen indefinitely)', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        let auditCallCount = 0;
+        let clicked = false;
+        let statusCallsSinceClick = 0;
+        mockApi.get.mockImplementation((url: string) => {
+          if (url === auditUrl) {
+            auditCallCount += 1;
+            const score = auditCallCount === 1 ? 75 : 90;
+            return Promise.resolve({ data: { data: createMockAuditResult({ score }) } });
+          }
+          if (url === statusUrl) {
+            if (!clicked) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+            statusCallsSinceClick += 1;
+            // Still genuinely running server-side through refreshRemediationCycleLock's
+            // entire 3-attempt/~7s budget AND the new recovery poll's first tick --
+            // only clears on a LATER tick, well past what the old bounded retry covered.
+            const inProgress = statusCallsSinceClick < 5;
+            return Promise.resolve({
+              data: { data: { status: 'complete', taggerSource: 'adobe', remediationCycleInProgress: inProgress, remediationCycleSource: 'reaudit_current_file' } },
+            });
+          }
+          if (url === aiUrl) return Promise.resolve(emptyAiResponse);
+          return Promise.resolve({ data: { data: {} } });
+        });
+        // A raw network-style failure (no `response`), same shape a CloudFront
+        // gateway timeout produces -- getRemediationCycleLockDetails returns
+        // null for it, so the generic (non-409) error path runs.
+        mockApi.post.mockRejectedValue(new Error('Gateway Timeout'));
+
+        renderWithRouter(jobId);
+
+        await screen.findByText('75');
+        const reRunButton = await screen.findByRole('button', { name: 'Re-run Audit' });
+
+        clicked = true;
+        fireEvent.click(reRunButton);
+
+        await waitFor(() => expect(reRunButton).toBeDisabled());
+
+        // Outlast refreshRemediationCycleLock's own 0/2000/5000ms retries
+        // (~7s) plus several 5s recovery-poll ticks.
+        await act(async () => { await vi.advanceTimersByTimeAsync(30000); });
+
+        await waitFor(() => expect(screen.getByText('90')).toBeInTheDocument());
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Re-run Audit' })).not.toBeDisabled());
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe('Manual remediation time log', () => {
