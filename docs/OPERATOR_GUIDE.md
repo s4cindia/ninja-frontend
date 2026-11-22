@@ -144,6 +144,89 @@ There is **no bulk select/delete/audit on the Jobs page** — every action here 
 
 This is the spine of the guide. Follow it top to bottom on a normal job; the branch points are called out explicitly.
 
+### At a Glance — The Full Sequence
+
+Two inversions trip up new operators more than anything else in this guide:
+
+- **"Re-run Audit" is not a required step in the middle of the normal loop.** Both Auto Remediation and Apply Fixes already trigger their own automatic post-action re-audit internally. The manual **Re-run Audit** button is only for when you've made a change *outside* this normal flow and want a fresh, from-scratch structural re-validation on demand.
+- **Bulk "Apply Fixes" and clicking an individual suggestion's card are alternatives, not a two-step sequence.** Pick one mechanism per suggestion — applying a suggestion both ways is redundant, not an extra safety step.
+
+The diagram below maps every numbered step (1–17) to where it sits in the full sequence, including the two Version 3 refinements covered above (Full Auto Mode, Auto-escalate on stall):
+
+```text
+Step 1. Upload PDF via PDF Accessibility
+          │
+          ▼
+    Automatic: Initial Audit + first AI Analysis pass
+          │
+          ▼
+    Full Auto Mode on for this job?
+      ├─ Yes → the loop already started on its own, skip to Step 4
+      └─ No  → Step 2: does the client supply their own alt text?
+                 ├─ No  → Step 3: Start Auto Remediation (Generate AI alt text)
+                 └─ Yes → Step 3: Start Auto Remediation (Guidance only)
+          │
+          ▼
+    Auto Mode loop (runs itself): Analyze → Auto-approve → Apply →
+    Re-audit -- repeats every round, no clicks needed
+          │
+          ▼
+Step 4. Auto Mode stops -- which of 5 reasons?
+      ├─ Converged              → go to Step 6
+      ├─ Round/Budget limit     → still trending down? Yes: raise the
+      │                           limit and repeat Step 3. No: go to Step 6
+      ├─ Stalled                → Auto-escalate on stall ON? Yes: one more
+      │                           escalated pass, then re-check this step.
+      │                           No (or already escalated): go to Step 6
+      └─ Error                  → note the exact error text, escalate to
+                                   engineering/support
+          │
+          ▼
+Step 6. Re-run AI Analysis (one pass; set checkboxes: color-contrast /
+        link-text / client-alt-text)
+          │
+          ▼
+Step 7. Apply Fixes: bulk "Apply Fixes (N)" OR an individual card's
+        Apply -- pick ONE per item, not both
+          │
+          ▼
+        Automatic post-fix re-audit (no manual Re-run Audit needed here)
+          │
+          ▼
+Step 8. Check Apply Failure Report ("Failed (N)" chip)
+          │
+          ▼
+Step 9. Fixable now = 0, remaining residue small, and "Needs
+        investigation" bucket stopped shrinking?
+      ├─ No  → back to Step 6
+      └─ Yes → continue below
+          │
+          ▼
+Step 10. Download AI-Fixed PDF (+ Generate Handoff Note if needed)
+          │
+          ▼
+Step 11. Fix remaining residue by hand in Acrobat Pro
+          │
+          ▼
+Step 12. Upload Acrobat-Pro-fixed PDF back into Ninja (automatic full
+         re-audit)
+          │
+          ▼
+Step 13. Re-run AI Analysis once more (refreshes guidance-only counts)
+          │
+          ▼
+Step 14. Run real PAC Desktop on your own machine
+          │
+          ▼
+Step 15. Upload External PAC Report into Ninja (PAC Report modal)
+          │
+          ▼
+Step 16. Settings → Generate ACR
+          │
+          ▼
+Step 17. Sign-off: confirm via Guided Remediation Checklist
+```
+
 ### Step 1 — Upload
 
 From the sidebar, go to **PDF Accessibility** and upload the document. This kicks off the **initial audit** automatically — Ninja's own structure/content/contrast/table/link/bookmark validators run against the document, followed immediately by the first **AI Analysis** pass (using your tenant's current default settings for alt-text/color-contrast/link-text — see Part 10). You land on the **Audit Results page** (Part 5) once this completes.
