@@ -812,6 +812,25 @@ export const PdfAuditResultsPage: React.FC = () => {
     return map;
   }, [auditResult]);
 
+  // QC brief Theme A (docs/qc/2026-11-23-ninja-qc-karsaklian-brief.md): issue.id
+  // is a per-run sequential counter that can be reused by a different finding
+  // on the next audit, so a suggestion keyed by the old id can be stale.
+  // Defense-in-depth on top of the backend's own stale-row clearing
+  // (clearStaleRowForReusedId): only trust the id-based lookup when both
+  // sides' fingerprints are present and actually agree; a missing fingerprint
+  // on either side (pre-migration data) falls back to trusting the id match.
+  const getSuggestionForIssue = useCallback(
+    (issue: PdfAuditIssue): AiAnalysis | undefined => {
+      const suggestion = aiSuggestions.get(issue.id);
+      if (!suggestion) return undefined;
+      if (suggestion.issueFingerprint != null && issue.fingerprint != null && suggestion.issueFingerprint !== issue.fingerprint) {
+        return undefined;
+      }
+      return suggestion;
+    },
+    [aiSuggestions]
+  );
+
   // Filter issues
   const filteredIssues = useMemo(() => {
     if (!auditResult || !auditResult.issues) return [];
@@ -849,7 +868,7 @@ export const PdfAuditResultsPage: React.FC = () => {
     // Filter by AI action
     if (filters.aiAction !== 'all') {
       issues = issues.filter((issue) => {
-        const suggestion = aiSuggestions.get(issue.id);
+        const suggestion = getSuggestionForIssue(issue);
         switch (filters.aiAction) {
           case 'fixable':
             return suggestion?.applyMode === 'apply-to-pdf' &&
@@ -890,7 +909,7 @@ export const PdfAuditResultsPage: React.FC = () => {
     }
 
     return issues;
-  }, [auditResult, filters, aiSuggestions]);
+  }, [auditResult, filters, getSuggestionForIssue]);
 
   // Count Matterhorn-related issues (shared classifier — keeps this count in
   // sync with PdfStatsCards, which consumes the same function)
@@ -2415,7 +2434,7 @@ export const PdfAuditResultsPage: React.FC = () => {
                     onPageClick={handlePageClick}
                     showMatterhorn={true}
                     pageLabels={auditResult.metadata?.pageLabels}
-                    aiSuggestion={aiSuggestions.get(issue.id)}
+                    aiSuggestion={getSuggestionForIssue(issue)}
                     issueNumber={issueNumberMap.get(issue.id)}
                     onClick={() => handleIssueSelect(issue)}
                     recordApplied={recordApplied}

@@ -12,6 +12,8 @@ export interface AiAnalysis {
   id: string;
   jobId: string;
   issueId: string;
+  /** Stable identity of the finding this row was generated for (buildIssueFingerprint, backend). issue.id churns across re-audits; only shown when it matches the current issue's own fingerprint -- see QC brief Theme A (docs/qc/2026-11-23-ninja-qc-karsaklian-brief.md). Null on rows created before this column existed. */
+  issueFingerprint?: string | null;
   suggestionType: string;
   value: string | null;
   /** Long-form alt text, only ever set on a requiresManualReview alt-text suggestion the fallback Alt-Text Generator drafted -- a copy-into-Acrobat-Pro aid, never auto-applied. */
@@ -27,6 +29,16 @@ export interface AiAnalysis {
   requiresManualReview?: boolean;
   /** Who approved this suggestion — 'auto-mode' for Comparison Study auto-mode's own auto-approval, null/undefined for anything not yet approved or approved before this field existed. */
   approvedBy?: 'operator' | 'auto-mode' | null;
+  /**
+   * True when this fix was applied but a later audit re-detected the
+   * identical finding anyway -- the change may not have taken effect or
+   * may not have been saved. `status` is reset to its default (not
+   * 'applied') whenever this is true. See QC brief Theme B
+   * (docs/qc/2026-11-23-ninja-qc-karsaklian-brief.md).
+   */
+  appliedButUnresolved?: boolean;
+  /** Set the moment `status` transitions to 'applied'; null/undefined otherwise. */
+  appliedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -475,6 +487,18 @@ export function IssueCard({
           ) : (
             /* apply-to-pdf mode */
             <div className="p-2 bg-purple-50 rounded border border-purple-200 text-xs">
+              {aiSuggestion.appliedButUnresolved && (
+                <div className="flex items-start gap-2 p-2 mb-1.5 bg-amber-50 rounded border border-amber-200">
+                  <ShieldAlert size={13} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium text-amber-800">Applied – still detected</span>
+                    <p className="text-amber-700 mt-0.5 leading-relaxed">
+                      This fix was applied, but the issue was still found when the file was re-audited afterwards. The
+                      change may not have taken effect or may not have been saved. Review before reapplying.
+                    </p>
+                  </div>
+                </div>
+              )}
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center gap-2">
                   <Sparkles size={13} className="text-purple-600" />

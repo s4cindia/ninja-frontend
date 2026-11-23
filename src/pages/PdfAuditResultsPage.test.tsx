@@ -162,12 +162,17 @@ vi.mock('@/components/pdf/MatterhornSummary', () => ({
 }));
 
 vi.mock('@/components/remediation/IssueCard', () => ({
-  IssueCard: ({ issue, onPageClick, remediationCycleInProgress }: {
+  IssueCard: ({ issue, onPageClick, remediationCycleInProgress, aiSuggestion }: {
     issue: { id: string; message: string; pageNumber?: number };
     onPageClick?: (page: number) => void;
     remediationCycleInProgress?: boolean;
+    aiSuggestion?: { id: string };
   }) => (
-    <div data-testid={`issue-card-${issue.id}`} data-remediation-cycle-in-progress={String(!!remediationCycleInProgress)}>
+    <div
+      data-testid={`issue-card-${issue.id}`}
+      data-remediation-cycle-in-progress={String(!!remediationCycleInProgress)}
+      data-ai-suggestion-id={aiSuggestion?.id ?? ''}
+    >
       <div>{issue.message}</div>
       <button onClick={() => onPageClick && onPageClick(issue.pageNumber!)}>
         Go to Page {issue.pageNumber}
@@ -4089,6 +4094,105 @@ describe('PdfAuditResultsPage', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Change to H2' }));
 
       await waitFor(() => expect(pdfStructureTagsService.retagStructureElement).toHaveBeenCalledWith('job-123', '12-0', 'H2'));
+    });
+  });
+
+  // QC brief Theme A (docs/qc/2026-11-23-ninja-qc-karsaklian-brief.md):
+  // issue.id is a per-run sequential counter reused by a different finding
+  // on the next audit. getSuggestionForIssue only trusts the issueId-based
+  // lookup when both sides' fingerprints agree, as a defense-in-depth layer
+  // on top of the backend's own stale-row clearing.
+  describe('Suggestion-to-issue pairing by fingerprint (defense-in-depth against a reused issue id)', () => {
+    const jobId = 'job-123';
+    const auditUrl = `/pdf/job/${jobId}/audit/result`;
+    const statusUrl = `/pdf/${jobId}/auto-tag/status`;
+    const aiUrl = `/pdf/${jobId}/ai-analysis`;
+
+    it('does not pair a suggestion onto an issue whose own fingerprint does not match the suggestion\'s issueFingerprint (stale row at a reused id)', async () => {
+      const mockResult = createMockAuditResult({
+        issues: [{ ...createMockIssue('1', 1, 'critical'), fingerprint: 'READING-ORDER-FLOAT:element-9' }],
+      });
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve({
+          data: {
+            data: {
+              suggestions: [{
+                id: 'sugg-stale', jobId, issueId: '1', issueFingerprint: 'OLD-CODE:element-3',
+                suggestionType: 'alt-text', value: 'x', guidance: null, confidence: 0.9, rationale: 'r',
+                model: 'gemini', applyMode: 'apply-to-pdf', status: 'applied',
+                createdAt: '2024-01-15T10:00:00Z', updatedAt: '2024-01-15T10:00:00Z',
+              }],
+              analyzed: 1, total: 1, status: 'complete',
+            },
+          },
+        });
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      const issueCard = await screen.findByTestId('issue-card-1');
+      expect(issueCard).toHaveAttribute('data-ai-suggestion-id', '');
+    });
+
+    it('does pair a suggestion when the fingerprint matches', async () => {
+      const mockResult = createMockAuditResult({
+        issues: [{ ...createMockIssue('1', 1, 'critical'), fingerprint: 'READING-ORDER-FLOAT:element-9' }],
+      });
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve({
+          data: {
+            data: {
+              suggestions: [{
+                id: 'sugg-fresh', jobId, issueId: '1', issueFingerprint: 'READING-ORDER-FLOAT:element-9',
+                suggestionType: 'alt-text', value: 'x', guidance: null, confidence: 0.9, rationale: 'r',
+                model: 'gemini', applyMode: 'apply-to-pdf', status: 'pending',
+                createdAt: '2024-01-15T10:00:00Z', updatedAt: '2024-01-15T10:00:00Z',
+              }],
+              analyzed: 1, total: 1, status: 'complete',
+            },
+          },
+        });
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      const issueCard = await screen.findByTestId('issue-card-1');
+      expect(issueCard).toHaveAttribute('data-ai-suggestion-id', 'sugg-fresh');
+    });
+
+    it('still pairs by id when either side has no fingerprint (pre-migration data) -- does not hide every suggestion', async () => {
+      const mockResult = createMockAuditResult({
+        issues: [createMockIssue('1', 1, 'critical')], // no fingerprint field at all
+      });
+      mockApi.get.mockImplementation((url: string) => {
+        if (url === auditUrl) return Promise.resolve({ data: { data: mockResult } });
+        if (url === statusUrl) return Promise.resolve({ data: { data: { status: 'complete', taggerSource: 'adobe' } } });
+        if (url === aiUrl) return Promise.resolve({
+          data: {
+            data: {
+              suggestions: [{
+                id: 'sugg-pre-migration', jobId, issueId: '1', // no issueFingerprint field
+                suggestionType: 'alt-text', value: 'x', guidance: null, confidence: 0.9, rationale: 'r',
+                model: 'gemini', applyMode: 'apply-to-pdf', status: 'pending',
+                createdAt: '2024-01-15T10:00:00Z', updatedAt: '2024-01-15T10:00:00Z',
+              }],
+              analyzed: 1, total: 1, status: 'complete',
+            },
+          },
+        });
+        return Promise.resolve({ data: { data: {} } });
+      });
+
+      renderWithRouter(jobId);
+
+      const issueCard = await screen.findByTestId('issue-card-1');
+      expect(issueCard).toHaveAttribute('data-ai-suggestion-id', 'sugg-pre-migration');
     });
   });
 });
