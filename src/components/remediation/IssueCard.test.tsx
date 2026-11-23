@@ -628,6 +628,66 @@ describe('IssueCard', () => {
     });
   });
 
+  // QC brief Theme B (docs/qc/2026-11-23-ninja-qc-karsaklian-brief.md): a fix
+  // was applied but a later audit re-detected the identical finding --
+  // resolveSuggestionStatus resets status away from 'applied' and sets this
+  // flag instead, so the card must surface it as its own warning, distinct
+  // from the normal pending state, while still offering the normal
+  // Approve/Apply/Dismiss actions (a human must still be able to act on it).
+  describe('appliedButUnresolved ("Applied – still detected")', () => {
+    const mockAiSuggestion: AiAnalysis = {
+      id: 'ai-1',
+      jobId: 'job-1',
+      issueId: 'pdf-issue-1',
+      suggestionType: 'bookmark-generate',
+      value: 'Front Matter',
+      guidance: null,
+      confidence: 0.85,
+      rationale: 'because',
+      model: 'rule-based',
+      applyMode: 'apply-to-pdf',
+      status: 'pending',
+      createdAt: '2024-01-15T10:00:00Z',
+      updatedAt: '2024-01-15T10:00:00Z',
+    };
+
+    it('shows the "Applied – still detected" badge and explanatory copy when the flag is set', () => {
+      renderWithQuery(
+        <IssueCard
+          issue={mockPdfIssue}
+          jobId="job-1"
+          aiSuggestion={{ ...mockAiSuggestion, appliedButUnresolved: true }}
+        />
+      );
+
+      expect(screen.getByText('Applied – still detected')).toBeInTheDocument();
+      expect(
+        screen.getByText(/This fix was applied, but the issue was still found when the file was re-audited afterwards\./)
+      ).toBeInTheDocument();
+    });
+
+    it('still offers Approve/Apply/Dismiss actions alongside the warning (a human must still be able to act on it)', () => {
+      renderWithQuery(
+        <IssueCard
+          issue={mockPdfIssue}
+          jobId="job-1"
+          aiSuggestion={{ ...mockAiSuggestion, appliedButUnresolved: true }}
+        />
+      );
+
+      expect(screen.getByText('Applied – still detected')).toBeInTheDocument();
+      expect(screen.getByText('Approve')).toBeInTheDocument();
+      expect(screen.getByText('Apply')).toBeInTheDocument();
+      expect(screen.getByText('Dismiss')).toBeInTheDocument();
+    });
+
+    it('does not show the warning when appliedButUnresolved is false/absent', () => {
+      renderWithQuery(<IssueCard issue={mockPdfIssue} jobId="job-1" aiSuggestion={mockAiSuggestion} />);
+
+      expect(screen.queryByText('Applied – still detected')).not.toBeInTheDocument();
+    });
+  });
+
   describe('Permanently-failed AI suggestion (Apply Failure Report, status: "failed")', () => {
     const mockAiSuggestion: AiAnalysis = {
       id: 'ai-1',

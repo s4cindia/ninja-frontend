@@ -114,6 +114,15 @@ export interface PdfAuditIssue {
   matterhornCheckpoint?: string;
   /** Which check engine found this issue, e.g. 'pdf-structure' (Ninja's own checks), 'verapdf', or 'pdfa11y'. Not set on issues audited before the external validators shipped. */
   source?: string;
+  /**
+   * Stable identity for this finding across re-audits (unlike `id`, a
+   * per-run sequential counter that can be reused by a different finding
+   * on the next audit). Computed server-side by buildIssueFingerprint and
+   * matched against AiAnalysis.issueFingerprint so a suggestion is only
+   * shown for the issue it actually belongs to -- see QC brief Theme A
+   * (docs/qc/2026-11-23-ninja-qc-karsaklian-brief.md).
+   */
+  fingerprint?: string;
   /** Recommended remediation action */
   suggestedFix?: string;
   /**
