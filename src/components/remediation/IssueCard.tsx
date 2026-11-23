@@ -39,6 +39,15 @@ export interface AiAnalysis {
   appliedButUnresolved?: boolean;
   /** Set the moment `status` transitions to 'applied'; null/undefined otherwise. */
   appliedAt?: string | null;
+  /**
+   * Set the moment a human completes review of a `requiresManualReview`
+   * row -- rejecting it, "Approve & apply long description", or
+   * "Keep short alt". NOT `status`: once the short-alt baseline
+   * auto-applies, `status` is already 'applied', long before any human
+   * has reviewed the long description. See QC brief Theme B3
+   * (docs/qc/2026-11-23-ninja-qc-karsaklian-brief.md).
+   */
+  manualReviewCompletedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -169,6 +178,11 @@ export function IssueCard({
   const [explanationOpen, setExplanationOpen] = useState(false);
   const [failureExplanationOpen, setFailureExplanationOpen] = useState(false);
   const [editedValue, setEditedValue] = useState<string | null>(null);
+  // QC brief Theme B3 (docs/qc/2026-11-23-ninja-qc-karsaklian-brief.md):
+  // defaults to the AI-drafted extendedAlt so "accept the draft as-is" is
+  // a single click; null once the operator starts editing (render prefers
+  // this over aiSuggestion.extendedAlt, same convention as editedValue).
+  const [editedLongDescription, setEditedLongDescription] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const updateStatusMutation = useMutation({
@@ -230,6 +244,49 @@ export function IssueCard({
       if (jobId) queryClient.invalidateQueries({ queryKey: ['ai-analysis', jobId] });
       onApplyError?.();
     },
+  });
+
+  // QC brief Theme B3: "Approve & apply long description" -- reuses the
+  // SAME /apply endpoint applyMutation above calls (it already supports an
+  // operator-edited value override), with manualReviewCompleted: true so
+  // the backend also marks the row's review complete in the same write.
+  const applyLongDescriptionMutation = useMutation({
+    mutationFn: async () => {
+      if (!jobId || !aiSuggestion) throw new Error('Missing jobId or suggestion');
+      const longDescription = editedLongDescription ?? aiSuggestion.extendedAlt ?? '';
+      const res = await api.post<{ data: AiAnalysis }>(
+        `/pdf/${jobId}/ai-analysis/${aiSuggestion.issueId}/apply`,
+        { value: longDescription, manualReviewCompleted: true }
+      );
+      return res.data.data;
+    },
+    onSuccess: (updated) => {
+      onAiSuggestionChange?.(updated);
+      setEditedLongDescription(null);
+      queryClient.invalidateQueries({ queryKey: ['ai-analysis', jobId] });
+      toast.success('Long description applied');
+    },
+    onError: (err: unknown) => toast.error(getErrorMessage(err)),
+  });
+
+  // QC brief Theme B3: "Keep short alt" -- a deliberate "the auto-applied
+  // baseline is good enough" decision, distinct from Dismiss/Reject
+  // (which means "accept the gap"). DB-only on the backend; nothing to
+  // re-apply here.
+  const keepShortAltMutation = useMutation({
+    mutationFn: async () => {
+      if (!jobId || !aiSuggestion) throw new Error('Missing jobId or suggestion');
+      const res = await api.post<{ data: AiAnalysis }>(
+        `/pdf/${jobId}/ai-analysis/${aiSuggestion.issueId}/keep-short-alt`
+      );
+      return res.data.data;
+    },
+    onSuccess: (updated) => {
+      onAiSuggestionChange?.(updated);
+      queryClient.invalidateQueries({ queryKey: ['ai-analysis', jobId] });
+      toast.success('Kept the short alt text');
+    },
+    onError: (err: unknown) => toast.error(getErrorMessage(err)),
   });
   // PDF issues may arrive with `code` (backend) or `ruleId` (type definition) — handle both
   const issueCode = isPdf
@@ -447,7 +504,16 @@ export function IssueCard({
           className="mt-3 border-t border-current/10 pt-3"
           onClick={(e) => e.stopPropagation()}
         >
-          {aiSuggestion.requiresManualReview ? (
+          {/* QC brief Theme B3 (docs/qc/2026-11-23-ninja-qc-karsaklian-
+              brief.md): requiresManualReview alone used to always mean
+              "fully guidance-only, nothing auto-applied" -- now a row can
+              ALSO have requiresManualReview: true with applyMode:
+              'apply-to-pdf' and status: 'applied' (a short-alt baseline
+              already auto-applied; only the long description still needs
+              review). That combination must fall through to the
+              apply-to-pdf branch below (which renders its own, distinct
+              completion UI), not this generic guidance-only box. */}
+          {aiSuggestion.requiresManualReview && aiSuggestion.applyMode !== 'apply-to-pdf' ? (
             <div className="flex items-start gap-2 p-2 bg-amber-50 rounded border border-amber-200 text-xs">
               <ShieldAlert size={13} className="text-amber-600 flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
@@ -604,6 +670,53 @@ export function IssueCard({
               )}
               {aiSuggestion.rationale && (
                 <p className="text-purple-500 mt-1 italic">{aiSuggestion.rationale}</p>
+              )}
+              {/* QC brief Theme B3 (docs/qc/2026-11-23-ninja-qc-karsaklian-
+                  brief.md): status is already 'applied' the instant the
+                  short-alt baseline auto-applies -- this is a DIFFERENT,
+                  still-open state (the long description has not been
+                  reviewed yet), distinct from a plain "Applied" row. */}
+              {aiSuggestion.status === 'applied' && aiSuggestion.requiresManualReview && !aiSuggestion.manualReviewCompletedAt && (
+                <div className="mt-1.5 pt-1.5 border-t border-purple-200/60" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-start gap-2 p-2 mb-1.5 bg-amber-50 rounded border border-amber-200">
+                    <ShieldAlert size={13} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-amber-700 leading-relaxed">
+                      The short alt text above is already applied as a baseline. Review the fuller draft description
+                      below and either approve it (replacing the short baseline) or keep the short alt as-is.
+                    </p>
+                  </div>
+                  <label className="block text-purple-800 font-medium mb-1">Long description (draft)</label>
+                  <textarea
+                    className="w-full text-purple-700 font-mono text-xs leading-relaxed bg-purple-50 border border-purple-200 rounded p-1.5 resize-y focus:outline-none focus:ring-1 focus:ring-purple-400"
+                    rows={4}
+                    value={editedLongDescription ?? aiSuggestion.extendedAlt ?? ''}
+                    onChange={(e) => setEditedLongDescription(e.target.value)}
+                  />
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    <button
+                      type="button"
+                      className="px-2 py-0.5 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors disabled:opacity-50"
+                      disabled={!jobId || applyLongDescriptionMutation.isPending || keepShortAltMutation.isPending || remediationCycleInProgress || disableManualActions}
+                      title={
+                        disableManualActions ? 'Auto Remediation is running — manual actions are disabled.'
+                          : remediationCycleInProgress ? remediationCycleSourceMessage(remediationCycleSource)
+                          : undefined
+                      }
+                      onClick={() => applyLongDescriptionMutation.mutate()}
+                    >
+                      {applyLongDescriptionMutation.isPending ? <><Loader2 size={11} className="animate-spin" /> Applying…</> : 'Approve & apply long description'}
+                    </button>
+                    <button
+                      type="button"
+                      className="px-2 py-0.5 bg-white text-gray-600 border border-gray-300 rounded hover:bg-gray-50 transition-colors disabled:opacity-50"
+                      disabled={!jobId || applyLongDescriptionMutation.isPending || keepShortAltMutation.isPending || disableManualActions}
+                      title={disableManualActions ? 'Auto Remediation is running — manual actions are disabled.' : undefined}
+                      onClick={() => keepShortAltMutation.mutate()}
+                    >
+                      {keepShortAltMutation.isPending ? <><Loader2 size={11} className="animate-spin" /> Saving…</> : 'Keep short alt'}
+                    </button>
+                  </div>
+                </div>
               )}
               {aiSuggestion.status === 'failed' && aiSuggestion.lastErrorReason && (
                 <div className="mt-1.5 pt-1.5 border-t border-purple-200/60">
