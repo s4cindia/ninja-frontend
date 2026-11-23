@@ -688,6 +688,121 @@ describe('IssueCard', () => {
     });
   });
 
+  // QC brief Theme B3 (docs/qc/2026-11-23-ninja-qc-karsaklian-brief.md): a
+  // requiresManualReview row whose short-alt baseline already auto-applied
+  // (status 'applied') but whose long description no human has reviewed
+  // yet (manualReviewCompletedAt is null) -- a distinct, still-open state
+  // from a plain "Applied" row.
+  describe('requiresManualReview + applied, manualReviewCompletedAt not yet set (Theme B3)', () => {
+    const mockApi = api as Mocked<typeof api>;
+    const mockAiSuggestion: AiAnalysis = {
+      id: 'ai-1',
+      jobId: 'job-1',
+      issueId: 'pdf-issue-1',
+      suggestionType: 'alt-text',
+      value: 'Quadrant diagram comparing cost and value',
+      extendedAlt: 'X axis: cost (low to high). Y axis: value (low to high)...',
+      guidance: null,
+      confidence: 0.82,
+      rationale: 'because',
+      model: 'gemini-flash',
+      applyMode: 'apply-to-pdf',
+      status: 'applied',
+      requiresManualReview: true,
+      createdAt: '2024-01-15T10:00:00Z',
+      updatedAt: '2024-01-15T10:00:00Z',
+    };
+
+    beforeEach(() => {
+      mockApi.post.mockReset();
+    });
+
+    it('shows the editable long-description draft and both completion actions', () => {
+      renderWithQuery(
+        <IssueCard issue={mockPdfIssue} jobId="job-1" aiSuggestion={mockAiSuggestion} />
+      );
+
+      expect(screen.getByText('Long description (draft)')).toBeInTheDocument();
+      expect(screen.getByDisplayValue(mockAiSuggestion.extendedAlt!)).toBeInTheDocument();
+      expect(screen.getByText('Approve & apply long description')).toBeInTheDocument();
+      expect(screen.getByText('Keep short alt')).toBeInTheDocument();
+    });
+
+    it('does not show the completion UI once manualReviewCompletedAt is set', () => {
+      renderWithQuery(
+        <IssueCard
+          issue={mockPdfIssue}
+          jobId="job-1"
+          aiSuggestion={{ ...mockAiSuggestion, manualReviewCompletedAt: '2024-01-16T00:00:00Z' }}
+        />
+      );
+
+      expect(screen.queryByText('Long description (draft)')).not.toBeInTheDocument();
+    });
+
+    it('does not show the completion UI for an applied row that never required manual review', () => {
+      renderWithQuery(
+        <IssueCard issue={mockPdfIssue} jobId="job-1" aiSuggestion={{ ...mockAiSuggestion, requiresManualReview: false }} />
+      );
+
+      expect(screen.queryByText('Long description (draft)')).not.toBeInTheDocument();
+    });
+
+    it('"Approve & apply long description" posts the (possibly edited) long description with manualReviewCompleted: true', async () => {
+      mockApi.post.mockResolvedValue({
+        data: { data: { ...mockAiSuggestion, manualReviewCompletedAt: '2024-01-16T00:00:00Z' } },
+      });
+      renderWithQuery(
+        <IssueCard issue={mockPdfIssue} jobId="job-1" aiSuggestion={mockAiSuggestion} />
+      );
+
+      fireEvent.click(screen.getByText('Approve & apply long description'));
+
+      await waitFor(() =>
+        expect(mockApi.post).toHaveBeenCalledWith(
+          `/pdf/job-1/ai-analysis/${mockAiSuggestion.issueId}/apply`,
+          { value: mockAiSuggestion.extendedAlt, manualReviewCompleted: true }
+        )
+      );
+    });
+
+    it('posts the operator-edited long description, not the original draft, once edited', async () => {
+      mockApi.post.mockResolvedValue({
+        data: { data: { ...mockAiSuggestion, manualReviewCompletedAt: '2024-01-16T00:00:00Z' } },
+      });
+      renderWithQuery(
+        <IssueCard issue={mockPdfIssue} jobId="job-1" aiSuggestion={mockAiSuggestion} />
+      );
+
+      fireEvent.change(screen.getByDisplayValue(mockAiSuggestion.extendedAlt!), {
+        target: { value: 'A fuller, operator-rewritten description.' },
+      });
+      fireEvent.click(screen.getByText('Approve & apply long description'));
+
+      await waitFor(() =>
+        expect(mockApi.post).toHaveBeenCalledWith(
+          `/pdf/job-1/ai-analysis/${mockAiSuggestion.issueId}/apply`,
+          { value: 'A fuller, operator-rewritten description.', manualReviewCompleted: true }
+        )
+      );
+    });
+
+    it('"Keep short alt" posts to the keep-short-alt endpoint with no body', async () => {
+      mockApi.post.mockResolvedValue({
+        data: { data: { ...mockAiSuggestion, manualReviewCompletedAt: '2024-01-16T00:00:00Z' } },
+      });
+      renderWithQuery(
+        <IssueCard issue={mockPdfIssue} jobId="job-1" aiSuggestion={mockAiSuggestion} />
+      );
+
+      fireEvent.click(screen.getByText('Keep short alt'));
+
+      await waitFor(() =>
+        expect(mockApi.post).toHaveBeenCalledWith(`/pdf/job-1/ai-analysis/${mockAiSuggestion.issueId}/keep-short-alt`)
+      );
+    });
+  });
+
   describe('Permanently-failed AI suggestion (Apply Failure Report, status: "failed")', () => {
     const mockAiSuggestion: AiAnalysis = {
       id: 'ai-1',
