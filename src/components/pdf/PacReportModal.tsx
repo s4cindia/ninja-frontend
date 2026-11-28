@@ -580,8 +580,9 @@ export function PacReportModal({ isOpen, onClose, jobId, onGenerated, isOwner = 
     setIsUploadingExternal(true);
     setExternalUploadError(null);
     try {
-      await uploadJobExternalPacReportFile(jobId, file);
+      const { uploadId } = await uploadJobExternalPacReportFile(jobId, file);
       const report = await confirmJobExternalPacReportUpload(jobId, {
+        ...(uploadId ? { uploadId } : {}),
         originalFileName: file.name,
         mimeType: file.type || 'application/pdf',
         summary,

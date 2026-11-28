@@ -416,9 +416,9 @@ describe('PacReportModal', () => {
       expect(screen.queryByLabelText('PAC Report File')).not.toBeInTheDocument();
     });
 
-    it('uploads the file then confirms it, and renders the resulting report', async () => {
+    it('uploads the file then confirms that exact upload (uploadId), and renders the resulting report', async () => {
       mockGetJobExternalPacReport.mockResolvedValue(null);
-      mockUploadJobExternalPacReportFile.mockResolvedValue(undefined);
+      mockUploadJobExternalPacReportFile.mockResolvedValue({ uploadId: '6f1c2b0e-3d4a-4b5c-8d9e-0f1a2b3c4d5e' });
       mockConfirmJobExternalPacReportUpload.mockResolvedValue(buildExternalReport());
 
       render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} isOwner />);
@@ -432,12 +432,30 @@ describe('PacReportModal', () => {
 
       await waitFor(() => expect(mockUploadJobExternalPacReportFile).toHaveBeenCalledWith('job-1', file));
       expect(mockConfirmJobExternalPacReportUpload).toHaveBeenCalledWith('job-1', {
+        uploadId: '6f1c2b0e-3d4a-4b5c-8d9e-0f1a2b3c4d5e',
         originalFileName: 'report.pdf',
         mimeType: 'application/pdf',
         summary: { pass: 40 },
       });
       expect(await screen.findByText('report.pdf')).toBeInTheDocument();
       expect(screen.getByText('Download')).toBeInTheDocument();
+    });
+
+    it('against a backend that issues no uploadId, confirms without one (no undefined key sent)', async () => {
+      mockGetJobExternalPacReport.mockResolvedValue(null);
+      mockUploadJobExternalPacReportFile.mockResolvedValue({});
+      mockConfirmJobExternalPacReportUpload.mockResolvedValue(buildExternalReport());
+
+      render(<PacReportModal isOpen jobId="job-1" onClose={() => {}} isOwner />);
+      fireEvent.click(await screen.findByRole('tab', { name: 'External PAC Report' }));
+      await screen.findByLabelText('PAC Report File');
+
+      const file = new File(['pac-bytes'], 'report.pdf', { type: 'application/pdf' });
+      fireEvent.change(screen.getByLabelText('PAC Report File'), { target: { files: [file] } });
+      fireEvent.click(screen.getByRole('button', { name: 'Upload PAC Report' }));
+
+      await waitFor(() => expect(mockConfirmJobExternalPacReportUpload).toHaveBeenCalled());
+      expect(mockConfirmJobExternalPacReportUpload.mock.calls[0][1]).not.toHaveProperty('uploadId');
     });
 
     it('rejects a negative summary count client-side without ever calling the upload service', async () => {
