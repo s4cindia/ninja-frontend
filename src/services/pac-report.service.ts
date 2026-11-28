@@ -128,14 +128,24 @@ export async function getJobExternalPacReportUploadUrl(
   jobId: string,
   filename: string,
   contentType: string,
-): Promise<{ uploadUrl: string; expiresIn: number }> {
+): Promise<{ uploadUrl: string; expiresIn: number; uploadId?: string }> {
   const response = await api.post(`/pdf/${encodeURIComponent(jobId)}/pac-report/external/upload-url`, { filename, contentType });
   return response.data.data;
 }
 
 export async function confirmJobExternalPacReportUpload(
   jobId: string,
-  data: { originalFileName: string; mimeType: string; summary: JobExternalPacReportSummary },
+  data: {
+    /**
+     * From the upload-url response: tells the backend which staged upload to
+     * confirm (it copies that exact upload to an immutable key). Optional only
+     * so this client keeps working against a backend that doesn't issue one yet.
+     */
+    uploadId?: string;
+    originalFileName: string;
+    mimeType: string;
+    summary: JobExternalPacReportSummary;
+  },
 ): Promise<JobExternalPacReport> {
   const response = await api.post(`/pdf/${encodeURIComponent(jobId)}/pac-report/external/confirm`, data);
   return response.data.data;
@@ -159,8 +169,9 @@ export async function deleteJobExternalPacReport(jobId: string): Promise<void> {
  * uploadExternalPacReportFile). Caller still has to call
  * confirmJobExternalPacReportUpload afterward with the summary counts.
  */
-export async function uploadJobExternalPacReportFile(jobId: string, file: File): Promise<void> {
-  const { uploadUrl } = await getJobExternalPacReportUploadUrl(jobId, file.name, file.type || 'application/pdf');
+/** PUTs the file to its presigned staging URL; returns the uploadId to pass to confirm. */
+export async function uploadJobExternalPacReportFile(jobId: string, file: File): Promise<{ uploadId?: string }> {
+  const { uploadUrl, uploadId } = await getJobExternalPacReportUploadUrl(jobId, file.name, file.type || 'application/pdf');
   const s3Res = await fetch(uploadUrl, {
     method: 'PUT',
     headers: { 'Content-Type': file.type || 'application/pdf' },
@@ -169,6 +180,7 @@ export async function uploadJobExternalPacReportFile(jobId: string, file: File):
   if (!s3Res.ok) {
     throw new Error(`S3 upload failed: ${s3Res.status}`);
   }
+  return { uploadId };
 }
 
 // ─── API calls ────────────────────────────────────────────────────────────────
